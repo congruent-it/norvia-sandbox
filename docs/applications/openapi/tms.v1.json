@@ -2940,6 +2940,130 @@
         }
       }
     },
+    "/v1/agent/customer-service/transport-orders/{transportOrderNumber}": {
+      "get": {
+        "tags": [
+          "CustomerServiceAgent"
+        ],
+        "summary": "Read a Transport Order as the Customer service agent: status, rating result, Shipment status and billing state with its blocking reasons.",
+        "operationId": "AgentGetTransportOrder",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTransportOrderView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/customer-service/shipments/{shipmentNumber}/tracking-events": {
+      "get": {
+        "tags": [
+          "CustomerServiceAgent"
+        ],
+        "summary": "Read a Shipment's Tracking events as the Customer service agent, with their sources and without the remarks reporters typed.",
+        "operationId": "AgentGetShipmentTimeline",
+        "parameters": [
+          {
+            "name": "shipmentNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentShipmentTimelineView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/customer-service/shipments/{shipmentNumber}/exceptions": {
+      "get": {
+        "tags": [
+          "CustomerServiceAgent"
+        ],
+        "summary": "Read a Shipment's Exceptions as the Customer service agent: type, causes, status, the Planner's notes and whether the Shipper was notified.",
+        "operationId": "AgentGetExceptions",
+        "parameters": [
+          {
+            "name": "shipmentNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentExceptionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/customer-service/shipments/{shipmentNumber}/proof-of-delivery-status": {
+      "get": {
+        "tags": [
+          "CustomerServiceAgent"
+        ],
+        "summary": "Read where a Shipment stands for its Proof of delivery: current, superseded, missing, reservations. Never who signed and never a file.",
+        "operationId": "AgentGetProofOfDeliveryStatus",
+        "parameters": [
+          {
+            "name": "shipmentNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProofOfDeliveryStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -3183,6 +3307,37 @@
         },
         "additionalProperties": false
       },
+      "AgentBillingView": {
+        "required": [
+          "state",
+          "becameBillableAt",
+          "releasedWithoutProofOfDelivery",
+          "blockingReasons"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "becameBillableAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "releasedWithoutProofOfDelivery": {
+            "type": "boolean"
+          },
+          "blockingReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "AgentCollectionView": {
         "required": [
           "postcode",
@@ -3290,6 +3445,112 @@
         },
         "additionalProperties": false
       },
+      "AgentExceptionNoteView": {
+        "required": [
+          "text",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentExceptionsView": {
+        "required": [
+          "shipmentNumber",
+          "exceptions"
+        ],
+        "type": "object",
+        "properties": {
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentExceptionView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentExceptionView": {
+        "required": [
+          "exceptionNumber",
+          "type",
+          "status",
+          "openedAt",
+          "afterDelivered",
+          "causes",
+          "notes",
+          "shipperNotified",
+          "shipperNotifiedAt",
+          "outcome",
+          "resolvedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "exceptionNumber": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "afterDelivered": {
+            "type": "boolean"
+          },
+          "causes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentExceptionNoteView"
+            }
+          },
+          "shipperNotified": {
+            "type": "boolean"
+          },
+          "shipperNotifiedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "AgentGoodsLineView": {
         "required": [
           "packageType",
@@ -3331,6 +3592,101 @@
               {
                 "$ref": "#/components/schemas/AgentDimensionsView"
               }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentProofOfDeliveryStatusView": {
+        "required": [
+          "shipmentNumber",
+          "status",
+          "withReservations",
+          "proofsOfDelivery"
+        ],
+        "type": "object",
+        "properties": {
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "withReservations": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "proofsOfDelivery": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentProofOfDeliveryView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentProofOfDeliveryView": {
+        "required": [
+          "source",
+          "deliveryTime",
+          "condition",
+          "isCurrent",
+          "receivedAt",
+          "fileCount"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "deliveryTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "condition": {
+            "type": "string"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fileCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRatingView": {
+        "required": [
+          "result",
+          "failureCode",
+          "failureMessage"
+        ],
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string"
+          },
+          "failureCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "failureMessage": {
+            "type": [
+              "null",
+              "string"
             ]
           }
         },
@@ -3401,6 +3757,25 @@
         },
         "additionalProperties": false
       },
+      "AgentShipmentTimelineView": {
+        "required": [
+          "shipmentNumber",
+          "trackingEvents"
+        ],
+        "type": "object",
+        "properties": {
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "trackingEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentTrackingEventView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "AgentShipperView": {
         "required": [
           "id",
@@ -3460,6 +3835,131 @@
             "items": {
               "$ref": "#/components/schemas/AgentGoodsLineView"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentTrackingEventView": {
+        "required": [
+          "type",
+          "eventTime",
+          "place",
+          "countryCode",
+          "eta",
+          "receivedAt",
+          "movedShipment",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "eventTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "place": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "eta": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "movedShipment": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentTransportOrderView": {
+        "required": [
+          "transportOrderNumber",
+          "status",
+          "receivedAt",
+          "correlationId",
+          "channel",
+          "shipper",
+          "shipperReference",
+          "shipmentNumber",
+          "shipmentStatus",
+          "rating",
+          "billing"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "shipper": {
+            "$ref": "#/components/schemas/AgentShipperView"
+          },
+          "shipperReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shipmentNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "shipmentStatus": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rating": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentRatingView"
+              }
+            ]
+          },
+          "billing": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentBillingView"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -7698,6 +8198,12 @@
           },
           "movedShipment": {
             "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false

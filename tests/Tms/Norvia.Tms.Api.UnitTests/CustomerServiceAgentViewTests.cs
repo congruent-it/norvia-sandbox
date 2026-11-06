@@ -95,10 +95,22 @@ public sealed class CustomerServiceAgentViewTests
                 "Earliest", "Latest",
                 "PackageType", "Quantity", "WeightKg", "DimensionsCm",
                 "Length", "Width", "Height",
+                "TransportOrderNumber", "Status", "ReceivedAt", "CorrelationId", "Channel", "Shipper", "ShipperReference", "ShipmentNumber", "ShipmentStatus", "Rating", "Billing",
+                "Result", "FailureCode", "FailureMessage",
+                "State", "BecameBillableAt", "ReleasedWithoutProofOfDelivery", "BlockingReasons",
+                "ShipmentNumber", "TrackingEvents",
+                "Type", "EventTime", "Place", "CountryCode", "Eta", "ReceivedAt", "MovedShipment", "Source",
+                "ShipmentNumber", "Exceptions",
+                "ExceptionNumber", "Type", "Status", "OpenedAt", "AfterDelivered", "Causes", "Notes", "ShipperNotified", "ShipperNotifiedAt", "Outcome", "ResolvedAt",
+                "Text", "AddedAt",
+                "ShipmentNumber", "Status", "WithReservations", "ProofsOfDelivery",
+                "Source", "DeliveryTime", "Condition", "IsCurrent", "ReceivedAt", "FileCount",
             ]);
         names.Should().NotContain(name => name.Contains("Consignee", StringComparison.Ordinal) || name.Contains("Street", StringComparison.Ordinal)
             || name.Contains("Phone", StringComparison.Ordinal) || name.Contains("Email", StringComparison.Ordinal) || name.Contains("Contact", StringComparison.Ordinal)
-            || name.Contains("Instructions", StringComparison.Ordinal) || name.Contains("Content", StringComparison.Ordinal) || name.Contains("File", StringComparison.Ordinal));
+            || name.Contains("Instructions", StringComparison.Ordinal) || name.Contains("Content", StringComparison.Ordinal) || name.Contains("Remark", StringComparison.Ordinal)
+            || name.Contains("ReceivedBy", StringComparison.Ordinal) || name.Contains("Signed", StringComparison.Ordinal) || name.Contains("Message", StringComparison.Ordinal) && name != "FailureMessage" && name != "Message"
+            || name.Contains("File", StringComparison.Ordinal) && name != "FileCount");
     }
 
     [Fact]

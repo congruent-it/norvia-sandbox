@@ -45,7 +45,7 @@ public sealed class CustomerServiceAgentAzureTests
             .Should().OnlyContain(method => method == "GET");
         Of(resources, "Microsoft.ApiManagement/service/apis/operations").Select(operation => operation["properties"]!["urlTemplate"]!.GetValue<string>())
             .Should().Equal(ContractFile["tools"]!.AsArray().Select(tool => tool!["path"]!.GetValue<string>()));
-        tools.Should().ContainSingle("the tracer has get_rejected_booking only");
+        tools.Should().HaveCount(5, "get_rejected_booking, then the four tools that summarise a Transport Order");
     }
 
     [Fact]

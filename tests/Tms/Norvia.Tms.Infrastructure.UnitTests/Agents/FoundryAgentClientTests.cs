@@ -86,7 +86,7 @@ public sealed class FoundryAgentClientTests : IDisposable
         body["agent_reference"]!["type"]!.GetValue<string>().Should().Be("agent_reference");
         body["structured_inputs"]!["correlationId"]!.GetValue<string>().Should().Be(CorrelationId);
         body["store"]!.GetValue<bool>().Should().BeFalse();
-        body["max_tool_calls"]!.GetValue<int>().Should().Be(3, because: "the definition's cap");
+        body["max_tool_calls"]!.GetValue<int>().Should().Be(4, because: "the definition's cap");
         body["max_output_tokens"]!.GetValue<int>().Should().Be(1200);
         body["conversation"].Should().BeNull("no conversation is made (docs/operations/foundry.md, spike 3)");
         body["input"]!.ToJsonString().Should().Contain("Explain why the Rejected booking 3f2b8c9e-6d5a-4c1e-9a77-0e1f2a3b4c5d was rejected, and what the Shipper should change.");
@@ -231,7 +231,7 @@ public sealed class FoundryAgentClientTests : IDisposable
     [Fact]
     public async Task AskAsync_WhenTheAgentMadeMoreCallsThanTheDefinitionAllows_IsAgentToolRefused()
     {
-        var calls = Enumerable.Repeat(McpCall("get_rejected_booking"), 4).Append(Message(Answer)).ToArray();
+        var calls = Enumerable.Repeat(McpCall("get_rejected_booking"), 5).Append(Message(Answer)).ToArray();
         _foundry.Answer(Response(calls));
 
         var result = await Client().AskAsync(Request, TestContext.Current.CancellationToken);
