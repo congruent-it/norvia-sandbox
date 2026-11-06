@@ -133,7 +133,7 @@ public sealed class IntegrationOperationsAgentAzureTests
 
         Regex.Match(foundry, @"(?ms)^resource applicationsUseTheProject .*?^\}\]").Value.Should().Contain("scope: project").And.NotContain("intakeProject");
         foundry.Should().NotContain("for principalId in applicationPrincipalIds: {\n  name: guid(intakeProject.id");
-        estate.Should().Contain("applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, identities.outputs.simulatorPrincipalId]");
+        estate.Should().Contain("applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, tmsUiIdentity.properties.principalId, identities.outputs.simulatorPrincipalId]");
     }
 
     [Fact]

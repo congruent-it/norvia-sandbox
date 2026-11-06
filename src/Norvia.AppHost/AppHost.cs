@@ -231,7 +231,12 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Authentication__Schemes__Bearer__Authority", estate.EntraIssuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", estate.EntraIssuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.TmsApiClientId)
-        .WithEnvironment("IntakeCallers__ClientIdsByChannel__ShipperApi__0", estate.IntakeClientId);
+        .WithEnvironment("IntakeCallers__ClientIdsByChannel__ShipperApi__0", estate.IntakeClientId)
+        // The Customer service agent's view (ADR 0040) takes the Entra token API Management sends for the Agent, from a scheme of its own: the
+        // audience is the agent API's app registration, not the TMS API's, so no token the TMS issues to its callers opens the view.
+        .WithEnvironment("Agents__Api__Issuer", estate.EntraIssuer)
+        .WithEnvironment("Agents__Api__Audience", estate.TmsAgentApiClientId)
+        .WithEnvironment("Agents__Api__GatewayClientId", estate.ApiManagementClientId);
 
     // The as-found toggles for the business safety nets (staleThresholdsUnset, proofMissingThresholdUnset, lateDeliveryCheckOff) are
     // TMS settings. infra/as-found.ps1 also applies them to the running app, so a toggle needs no deployment of the apps.
@@ -246,7 +251,10 @@ if (builder.ExecutionContext.IsPublishMode)
         .PublishAsExisting(estate.TmsUiIdentity, null);
     tmsWeb.WithAzureUserAssignedIdentity(tmsUiIdentity)
         .WithEnvironment("TmsApi__Entra__Scope", ReferenceExpression.Create($"{estate.TmsApiClientId}/.default"))
-        .WithEnvironment("TmsApi__Entra__ManagedIdentityClientId", estate.TmsUiClientId);
+        .WithEnvironment("TmsApi__Entra__ManagedIdentityClientId", estate.TmsUiClientId)
+        // The Agents (ADR 0040) are on only where the estate says so. The TMS UI asks the Agent published in the Foundry project as its own identity.
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryProjectEndpoint);
 
     // The TMS UI and the Partner portal have no login of their own, so in Azure they open to the presenter's browser
     // behind an Entra sign-in that only the presenter passes (ADR 0024). The apps don't know it is there.
@@ -944,6 +952,10 @@ else
             .WithEnvironment("AgentMcp__CustomerService__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/customer-service"))
             .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Audience", LocalTokens.TmsAudience);
+        // The TMS API's agent view takes the stand-in's token, which is for the TMS API's audience locally, signed with the same key.
+        tmsApi
+            .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Api__Audience", LocalTokens.TmsAudience);
         tmsWeb
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/customer-service"))
@@ -990,6 +1002,7 @@ else
             (agentMcp.Resource, "AgentMcp__CustomerService__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerService__ApiTokens__SigningKey"),
             (tmsWeb.Resource, "Agents__Tokens__SigningKey"),
+            (tmsApi.Resource, "Agents__Api__SigningKey"),
             (integrationConsole.Resource, "Agents__Tokens__SigningKey"),
             (integrationConsole.Resource, "Agents__Api__SigningKey"),
             (healthCheck.Resource, "Agents__Tokens__SigningKey"),

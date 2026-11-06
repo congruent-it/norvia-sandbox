@@ -6,9 +6,10 @@
 .DESCRIPTION
     No names publishes every agents/*.agent.yaml. For each Agent it
       1. points the Agent's MCP server at the application's address in Azure (the Integration operations agent's is the
-         Integration console's, the Estate health-check agent's is the Estate health check's; the estate could not know
-         either when it was deployed): the API Management backend, and ESTATE_INTEGRATION_CONSOLE_BASE_URL or
-         ESTATE_HEALTH_CHECK_BASE_URL so deploying the estate again keeps it;
+         Integration console's, the Estate health-check agent's is the Estate health check's, the Customer service agent's is
+         the TMS API's; the estate could not know any of them when it was deployed): the API Management backend, and
+         ESTATE_INTEGRATION_CONSOLE_BASE_URL, ESTATE_HEALTH_CHECK_BASE_URL or ESTATE_TMS_BASE_URL so deploying the estate again
+         keeps it;
       2. makes the project's connection to the MCP server, with the agent-identity authentication type
          (infra/create-agent-connection.ps1);
       3. creates the Agent's next version as a prompt agent in the Foundry project, from the file: the model, the
@@ -95,17 +96,18 @@ $apim = (Invoke-Az resource list --subscription $subscription --resource-group $
 if (-not $apim) { Write-Fail "there is no API Management service in $resourceGroup" }
 
 function Set-BackendAddress {
-    param([string] $Server, [string] $App, [string] $Backend, [string] $Variable)
+    param([string] $Server, [string] $App, [string] $Backend, [string] $Variable, [string] $Route = '/agent/v1')
     $base = Get-AppUrl $App -ResourceGroup $resourceGroup
     Set-AzdEnvironmentValue $Variable $base
-    Invoke-AzRest -Method patch -Body @{ properties = @{ url = "$base/agent/v1" } } `
+    Invoke-AzRest -Method patch -Body @{ properties = @{ url = "$base$Route" } } `
         -Url "https://management.azure.com/subscriptions/$subscription/resourceGroups/$resourceGroup/providers/Microsoft.ApiManagement/service/$apim/backends/${Backend}?api-version=2024-05-01" | Out-Null
-    Write-Pass "the $Server server calls $App at $base/agent/v1"
+    Write-Pass "the $Server server calls $App at $base$Route"
 }
 foreach ($server in $servers) {
     switch ($server) {
         'integration-operations' { Set-BackendAddress $server integration-console-web integration-console-agent-api ESTATE_INTEGRATION_CONSOLE_BASE_URL }
         'health-check' { Set-BackendAddress $server health-check-web health-check-agent-api ESTATE_HEALTH_CHECK_BASE_URL }
+        'customer-service' { Set-BackendAddress $server tms-api tms-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service' }
         default { }
     }
 }

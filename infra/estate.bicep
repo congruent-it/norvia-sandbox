@@ -182,6 +182,16 @@ module healthCheck 'estate/health-check.bicep' = {
   }
 }
 
+// The TMS UI's identity (infra/estate/identities.bicep), by its name: identities.bicep and this template are both at the 64 outputs a
+// template may have, so its principal is read from the identity itself, which the foundry module waits for.
+resource tmsUiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  scope: resourceGroup
+  name: 'id-tms-ui-${uniqueString(resourceGroup.id)}'
+  dependsOn: [
+    identities
+  ]
+}
+
 module foundry 'estate/foundry.bicep' = {
   scope: resourceGroup
   params: {
@@ -194,8 +204,8 @@ module foundry 'estate/foundry.bicep' = {
     modelCapacity: foundryModelCapacity
     agentsEnabled: agentsEnabled
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
-    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check and the Simulator (its plans' pools of Carrier texts).
-    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, identities.outputs.simulatorPrincipalId]
+    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check, the TMS UI (Explain on a Rejected booking) and the Simulator (its plans' pools of Carrier texts).
+    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, tmsUiIdentity.properties.principalId, identities.outputs.simulatorPrincipalId]
   }
 }
 
@@ -677,6 +687,22 @@ module healthCheckMcp 'estate/health-check-mcp.bicep' = {
   }
   dependsOn: [
     integrationOperationsMcp
+  ]
+}
+
+// The Customer service agent's API Management front over the TMS API's agent view, with its MCP server and the two app registrations that
+// keep it narrow (infra/smoke-test-customer-service-agent.ps1). Like the others, it has no outputs.
+module customerServiceMcp 'estate/customer-service-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    tmsBaseUrl: tmsBaseUrl
+  }
+  dependsOn: [
+    healthCheckMcp
   ]
 }
 

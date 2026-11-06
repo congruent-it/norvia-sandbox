@@ -97,6 +97,7 @@ builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResul
 builder.AddTmsInfrastructure();
 // The API serves the Customer service agent's view; it never asks an Agent, so its port stays the disabled one (the TMS UI turns it on).
 builder.AddAgentClient();
+builder.AddAgentApi();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsReset();
