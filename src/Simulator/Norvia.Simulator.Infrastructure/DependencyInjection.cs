@@ -90,20 +90,42 @@ public static class DependencyInjection
     /// </summary>
     private static void AddCarrierPersonas(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.SectionName)
+            .ValidateDataAnnotations()
+            .Validate(options => !options.UsesFoundry || options.Foundry.ProjectEndpoint is { IsAbsoluteUri: true }, "Agents:Foundry:ProjectEndpoint must be the Foundry project's absolute address.")
+            .Validate(options => !options.Enabled || !options.UsesFoundry || !string.IsNullOrWhiteSpace(options.ManagedIdentityClientId), "Agents:ManagedIdentityClientId is needed to ask the Foundry project.")
+            .ValidateOnStart();
         builder.Services.AddOptions<PersonaOptions>().BindConfiguration(PersonaOptions.SectionName)
             .Validate(options => options.IsConsistent, "Personas: every Carrier needs a profile that is defined, and each profile is defined once.")
             .ValidateOnStart();
         builder.Services.AddSingleton<IPersonaProfiles, ConfiguredPersonaProfiles>();
         builder.Services.AddSingleton<IBuiltInPools, EmbeddedBuiltInPools>();
-        builder.Services.AddSingleton<IAgentClient>(services =>
-            services.GetRequiredService<IOptions<AgentsOptions>>().Value.Enabled
-                ? ActivatorUtilities.CreateInstance<LocalAgentClient>(services)
-                : new DisabledAgentClient());
+        // On, the Foundry client asks the agent published in the project the estate named (Agents:Foundry:ProjectEndpoint); without one, the
+        // in-process runner plays it (ADR 0041). A short timeout and no retry: the client has its own deadline, and the standard resilience
+        // handler would retry (ADR 0040).
+        if (!builder.Configuration.GetValue<bool>($"{AgentsOptions.SectionName}:{nameof(AgentsOptions.Enabled)}"))
+        {
+            builder.Services.AddSingleton<IAgentClient, DisabledAgentClient>();
+        }
+        else if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{AgentsOptions.SectionName}:Foundry:ProjectEndpoint"]))
+        {
+            builder.Services.AddSingleton<Azure.Core.TokenCredential>(services => new Azure.Identity.ManagedIdentityCredential(
+                Azure.Identity.ManagedIdentityId.FromUserAssignedClientId(services.GetRequiredService<IOptions<AgentsOptions>>().Value.ManagedIdentityClientId)));
+#pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is the only way to opt a client out of the defaults.
+            builder.Services.AddHttpClient<IAgentClient, FoundryAgentClient>(http => http.Timeout = Timeout.InfiniteTimeSpan).RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+        }
+        else
+        {
+            builder.Services.AddSingleton<IAgentClient>(services => ActivatorUtilities.CreateInstance<LocalAgentClient>(services));
+        }
+
         builder.Services.AddSingleton(services =>
         {
             var options = services.GetRequiredService<IOptions<AgentsOptions>>().Value;
-            return new PersonaSettings(options.Enabled, options.MaxGenerationsPerPlan, options.PoolSize);
+            // The plan's cost cap: each generation may write at most the definition's maxOutputTokens, so only so many fit in the plan's budget.
+            var affordable = options.MaxOutputTokensPerPlan / AgentDefinitions.Load("simulator-personas").Model.MaxOutputTokens;
+            return new PersonaSettings(options.Enabled, Math.Min(options.MaxGenerationsPerPlan, affordable), options.PoolSize);
         });
         builder.Services.AddSingleton<PlanPools>();
     }

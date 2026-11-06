@@ -194,8 +194,8 @@ module foundry 'estate/foundry.bicep' = {
     modelCapacity: foundryModelCapacity
     agentsEnabled: agentsEnabled
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
-    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check.
-    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId]
+    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check and the Simulator (its plans' pools of Carrier texts).
+    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, identities.outputs.simulatorPrincipalId]
   }
 }
 

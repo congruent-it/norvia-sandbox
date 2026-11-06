@@ -404,6 +404,11 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Simulator__Enabled", estate.SimulatorEnabled)
         .WithEnvironment("Simulator__MaxOrdersPerRun", estate.SimulatorMaxOrdersPerRun)
         .WithEnvironment("Simulator__MaxConcurrentRequests", estate.SimulatorMaxConcurrentRequests)
+        // The personas agent writes the plan's pools of Carrier texts only where the estate turns the Agents on (ADR 0040). The Simulator asks the
+        // agent published in the Foundry project as its own identity; the agent has no tool and its own identity holds no role.
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryProjectEndpoint)
+        .WithEnvironment("Agents__ManagedIdentityClientId", estate.SimulatorClientId)
         .WithEnvironment("PartnerApi__BaseAddress", estate.PartnerApiUrl)
         .WithEnvironment("PartnerApi__PersonaClientIds", estate.PersonaClientIds)
         .WithEnvironment("PartnerApi__Entra__TenantId", estate.EntraTenantId)
