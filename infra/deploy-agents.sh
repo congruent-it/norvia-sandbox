@@ -64,7 +64,8 @@ foundry() {
 }
 
 # 1. Point each server's backend at its application. The example server has none.
-servers=$(for file in "${files[@]}"; do yq -r '.tools.server' "$file"; done | sort -u)
+# An Agent without tools (simulator-personas) has no server.
+servers=$(for file in "${files[@]}"; do yq -r '.tools.server // ""' "$file"; done | sed '/^$/d' | sort -u)
 apim=$(az resource list --subscription "$AZURE_SUBSCRIPTION_ID" --resource-group "$resource_group" --resource-type Microsoft.ApiManagement/service \
   --query '[0].name' --output tsv)
 [ -n "$apim" ] || fail "there is no API Management service in $resource_group"
@@ -102,8 +103,8 @@ for file in "${files[@]}"; do
   definition=$(yq -o=json '.' "$file")
   name=$(jq -r .name <<<"$definition")
   [ "$(basename "$file")" = "$name.agent.yaml" ] || fail "$file names the Agent '$name'"
-  server=$(jq -r .tools.server <<<"$definition")
-  header=$(jq -r .inputs.correlationIdHeader <<<"$definition")
+  server=$(jq -r '.tools.server // ""' <<<"$definition")
+  header=$(jq -r '.inputs.correlationIdHeader // ""' <<<"$definition")
   deployment=$(jq -r .model.deployment <<<"$definition")
   if ! jq -e --arg d "$deployment" 'index($d)' <<<"$deployments" >/dev/null; then
     deployment=$(jq -r '.[0] // empty' <<<"$deployments")
@@ -111,31 +112,43 @@ for file in "${files[@]}"; do
     echo "NOTE  $name: its model deployment is not in the project; using the estate's $deployment"
   fi
 
-  body=$(jq -n --argjson d "$definition" --arg deployment "$deployment" --arg url "$gateway/agents/$server/mcp" --arg header "$header" '{
-    description: $d.description,
-    metadata: {definitionVersion: ($d.version | tostring)},
-    definition: {
-      kind: "prompt",
-      model: $deployment,
-      instructions: $d.instructions,
-      temperature: $d.model.temperature,
-      tools: [{
-        type: "mcp",
-        server_label: ($d.tools.server | gsub("-"; "_")),
-        server_url: $url,
-        require_approval: "never",
-        project_connection_id: ($d.tools.server + "-mcp"),
-        allowed_tools: $d.tools.names,
-        headers: {($header): "{{correlationId}}"}
-      }],
-      structured_inputs: {
-        correlationId: {description: "The correlation ID of the Message trail in question, sent on every tool call.", required: true, schema: {type: "string"}}
+  if [ -n "$server" ]; then
+    body=$(jq -n --argjson d "$definition" --arg deployment "$deployment" --arg url "$gateway/agents/$server/mcp" --arg header "$header" '{
+      description: $d.description,
+      metadata: {definitionVersion: ($d.version | tostring)},
+      definition: {
+        kind: "prompt",
+        model: $deployment,
+        instructions: $d.instructions,
+        temperature: $d.model.temperature,
+        tools: [{
+          type: "mcp",
+          server_label: ($d.tools.server | gsub("-"; "_")),
+          server_url: $url,
+          require_approval: "never",
+          project_connection_id: ($d.tools.server + "-mcp"),
+          allowed_tools: $d.tools.names,
+          headers: {($header): "{{correlationId}}"}
+        }],
+        structured_inputs: {
+          correlationId: {description: "The correlation ID of the Message trail in question, sent on every tool call.", required: true, schema: {type: "string"}}
+        }
       }
-    }
-  }')
+    }')
+  else
+    # Pure generation: no tool, no structured input.
+    body=$(jq -n --argjson d "$definition" --arg deployment "$deployment" '{
+      description: $d.description,
+      metadata: {definitionVersion: ($d.version | tostring)},
+      definition: {kind: "prompt", model: $deployment, instructions: $d.instructions, temperature: $d.model.temperature, tools: []}
+    }')
+  fi
   version=$(foundry POST "/agents/$name/versions?api-version=$api_version" "$body" | jq -r .version)
   [ -n "$version" ] && [ "$version" != null ] || fail "$name: Foundry made no version"
   pass "$name: version $version (definition version $(jq -r .version <<<"$definition")) is published"
+
+  # An Agent with no tool reads nothing, so its identity needs no role.
+  [ -n "$server" ] || continue
 
   # Foundry gives the Agent its own identity (the project's shared identity holds no role, so an Agent without one can call nothing).
   identity=$(foundry GET "/agents/$name?api-version=$api_version" | jq -r '.instance_identity.principal_id // .identity.principal_id // empty')

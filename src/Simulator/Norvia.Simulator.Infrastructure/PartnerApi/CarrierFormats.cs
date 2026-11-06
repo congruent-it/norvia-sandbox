@@ -28,6 +28,7 @@ internal static class CarrierFormats
         }
 
         Add(json, "declineReason", answer.DeclineReason);
+        Add(json, "declineText", answer.DeclineText);
         return json;
     }
 

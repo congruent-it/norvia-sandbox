@@ -98,7 +98,8 @@ public sealed class CarrierTests(SimulatorFixture fixture)
             });
             if (line.Outcome == LogOutcome.Declined)
             {
-                booking["reasonCode"]!.GetValue<string>().Should().Be("NoCapacity");
+                // The Carriers write in a profile, so a decline is Other with a text from the Carrier's pool (#484).
+                booking["reasonCode"]!.GetValue<string>().Should().Be("Other");
             }
         }
 
@@ -214,7 +215,11 @@ public sealed class CarrierTests(SimulatorFixture fixture)
     [Fact]
     public async Task AReleaseTheTmsCannotPrice_IsLoggedWithItsCode_AndTheShipmentStaysPlanned_AndTheRunGoesOn()
     {
-        await using var simulator = await fixture.StartSimulatorWithSeedAsync(Ct, SeedEdits.OnlyShippers(UnpricedShipper));
+        await using var simulator = await fixture.StartSimulatorWithSeedAsync(
+            Ct,
+            SeedEdits.OnlyShippers(UnpricedShipper),
+            // PakketPunt Express (CAR-0003) has a Rate Card for every Lane out of Utrecht, so it can price this Shipper; only these two cannot.
+            SeedEdits.OnlyCarriers("CAR-0001", "CAR-0002"));
         var settings = Runs.Carried(orders: 6, Runs.NextSeed(), Everything);
 
         var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);

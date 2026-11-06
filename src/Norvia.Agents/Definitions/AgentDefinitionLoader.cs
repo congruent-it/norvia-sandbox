@@ -43,12 +43,9 @@ public static partial class AgentDefinitionLoader
             throw new InvalidAgentDefinitionException("model.maxToolCalls and model.maxOutputTokens must be 1 or more.");
         }
 
-        var tools = file.Tools ?? throw new InvalidAgentDefinitionException("tools is missing.");
-        var names = tools.Names ?? [];
-        if (names.Count == 0 || names.Distinct(StringComparer.Ordinal).Count() != names.Count)
-        {
-            throw new InvalidAgentDefinitionException("tools.names must list at least one tool, each once.");
-        }
+        // An Agent that only generates text has no tools (the Simulator's personas), so the section may be left out. A section that is
+        // there still has to list at least one tool, each once.
+        var tools = ToolsOf(file.Tools);
 
         return new AgentDefinition(
             name,
@@ -56,8 +53,24 @@ public static partial class AgentDefinitionLoader
             Required(file.Description, "description"),
             Required(file.Instructions, "instructions"),
             new ModelSettings(Required(model.Deployment, "model.deployment"), model.Temperature, model.MaxOutputTokens, model.MaxToolCalls),
-            new ToolSelection(Required(tools.Server, "tools.server"), [.. names]),
-            new RunInputs(Required(file.Inputs?.CorrelationIdHeader, "inputs.correlationIdHeader")));
+            tools,
+            tools.Names.Count == 0 ? new RunInputs(string.Empty) : new RunInputs(Required(file.Inputs?.CorrelationIdHeader, "inputs.correlationIdHeader")));
+    }
+
+    private static ToolSelection ToolsOf(FileTools? tools)
+    {
+        if (tools is null)
+        {
+            return new ToolSelection(string.Empty, []);
+        }
+
+        var names = tools.Names ?? [];
+        if (names.Count == 0 || names.Distinct(StringComparer.Ordinal).Count() != names.Count)
+        {
+            throw new InvalidAgentDefinitionException("tools.names must list at least one tool, each once.");
+        }
+
+        return new ToolSelection(Required(tools.Server, "tools.server"), [.. names]);
     }
 
     private static string Required(string? value, string field) =>

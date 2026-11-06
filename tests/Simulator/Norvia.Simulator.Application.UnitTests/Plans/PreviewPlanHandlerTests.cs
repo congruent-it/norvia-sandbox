@@ -1,8 +1,11 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Ardalis.Specification;
+using Microsoft.Extensions.Logging.Abstractions;
+using Norvia.Simulator.Application.Plans.Pools;
 using Norvia.Simulator.Application.Plans.Preview;
 using Norvia.Simulator.Application.Ports;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 
@@ -10,6 +13,8 @@ namespace Norvia.Simulator.Application.UnitTests.Plans;
 
 public sealed class PreviewPlanHandlerTests
 {
+    private static readonly string[] FirstThree = ["een", "twee", "drie"];
+
     private readonly IReadRepository<RunSequence> _sequences = Substitute.For<IReadRepository<RunSequence>>();
     private readonly IWorldSource _world = Substitute.For<IWorldSource>();
 
@@ -18,7 +23,7 @@ public sealed class PreviewPlanHandlerTests
         _world.Load().Returns(TestData.World);
     }
 
-    private PreviewPlanHandler Handler() => new(_sequences, _world, TestData.Limits);
+    private PreviewPlanHandler Handler() => new(_sequences, _world, TestData.Limits, TestData.NoPools);
 
     [Fact]
     public async Task Handle_Settings_GivesTheBookingsAPlanOfThoseSettingsWouldSend()
@@ -32,6 +37,23 @@ public sealed class PreviewPlanHandlerTests
         result.Value.Rows.Select(row => row.Reference).Should().Equal(expected.Bookings.Select(booking => booking.Reference));
         result.Value.Rows.Count(row => row.Bad is not null).Should().Be(2);
         result.Value.PerShipper.Sum(share => share.Bookings).Should().Be(8);
+    }
+
+    [Fact]
+    public async Task Handle_APlanWithPools_ShowsEachPoolWithItsSourceAndASampleAndTheNotes()
+    {
+        var profiles = Substitute.For<IPersonaProfiles>();
+        profiles.ProfileOf("CAR-0001").Returns(TestData.TerseDutch);
+        var builtIn = Substitute.For<IBuiltInPools>();
+        builtIn.TextsOf(Arg.Any<PersonaProfile>(), Arg.Any<TextCategory>()).Returns(["een", "twee", "drie", "vier", "vijf"]);
+        var pools = new PlanPools(profiles, builtIn, Substitute.For<IAgentClient>(), PersonaSettings.BuiltInOnly, NullLogger<PlanPools>.Instance);
+
+        var result = await new PreviewPlanHandler(_sequences, _world, TestData.Limits, pools).Handle(new PreviewPlanQuery(TestData.Settings()), CancellationToken.None);
+
+        result.Value.Pools.Select(pool => (pool.ProfileId, pool.Category, pool.Language, pool.Source, pool.Count, pool.CarrierIds.Single()))
+            .Should().Equal(("terse-dutch", "DeclineReason", "nl", "built-in", 5, "CAR-0001"), ("terse-dutch", "DeliveryFailedRemark", "nl", "built-in", 5, "CAR-0001"));
+        result.Value.Pools.Should().OnlyContain(pool => pool.Samples.SequenceEqual(FirstThree));
+        result.Value.PoolNotes.Should().BeEmpty();
     }
 
     [Fact]

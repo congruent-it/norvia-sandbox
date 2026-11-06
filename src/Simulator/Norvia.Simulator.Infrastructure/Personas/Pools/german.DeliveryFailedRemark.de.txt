@@ -1,0 +1,8 @@
+Empfänger bei Zustellung nicht angetroffen
+Anlieferung abgelehnt, Annahme geschlossen
+Entladung vor Ort nicht möglich
+Empfänger verweigert die Annahme
+Niemand zur Warenannahme anwesend
+Rampe belegt, Entladung nicht möglich
+Empfänger bittet um neuen Liefertermin
+Zustellversuch erfolglos, Benachrichtigung hinterlassen

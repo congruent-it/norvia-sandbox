@@ -1,6 +1,7 @@
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
@@ -17,6 +18,7 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvider time, CarrierPacing pacing)
 {
     private const string DeclineReason = "NO_CAPACITY";
+    private const string OtherReason = "OTHER";
     private const string CancellationReason = "The Carrier didn't make its collection";
     private const string ResolutionRemark = "Replanned: the Carrier booking was cancelled after the Carrier failed to collect";
     private const string ReservationsRemark = "Two pallets short";
@@ -91,13 +93,16 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
             return null;
         }
 
+        // A decline in the Carrier's own words when the plan has a pool for it: the reason is then OTHER, with the text drawn by the seed.
+        var declined = journey.Answer == CarrierAnswerKind.Decline ? DrawFor(run, shipment, TextCategory.DeclineReason) : null;
         var answer = await partner.AnswerBookingAsync(
             shipment.Carrier,
             journey.Answer == CarrierAnswerKind.Confirm
                 ? new CarrierAnswerRequest(carrierBookingNumber, Confirm: true, reference, PlannedCollection: null, DeclineReason: null)
-                : new CarrierAnswerRequest(carrierBookingNumber, Confirm: false, BookingReference: null, PlannedCollection: null, DeclineReason),
+                : new CarrierAnswerRequest(carrierBookingNumber, Confirm: false, BookingReference: null, PlannedCollection: null, declined is null ? DeclineReason : OtherReason, declined?.Text),
             cancellationToken);
-        await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Answer, answer, carrierBookingNumber, cancellationToken);
+        await writer.CarrierAsync(
+            time.GetUtcNow(), shipment, CarrierActions.Answer, answer, declined is null ? carrierBookingNumber : $"{carrierBookingNumber} ({OtherReason}, {declined.Reference})", cancellationToken);
         if (answer.Outcome != LogOutcome.Confirmed)
         {
             return null;
@@ -116,11 +121,13 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
         for (var position = 0; position < events.Count; position++)
         {
             var carrierEvent = events[position];
+            // The remark of a delivery that failed is in the Carrier's own words when the plan has a pool for it.
+            var drawn = carrierEvent == CarrierEvent.DeliveryFailed ? DrawFor(run, shipment, TextCategory.DeliveryFailedRemark) : null;
             var tracking = new CarrierTrackingRequest(
                 reference, carrierBookingNumber, CarrierReferences.EventId(shipment.Carrier, run.Number, shipment.Booking.Step, carrierEvent), carrierEvent,
-                now - (BetweenEvents * (events.Count - 1 - position)), carrierEvent.HappensAtPickup() ? shipment.Booking.Pickup : shipment.Booking.Delivery, carrierEvent.Remark());
+                now - (BetweenEvents * (events.Count - 1 - position)), carrierEvent.HappensAtPickup() ? shipment.Booking.Pickup : shipment.Booking.Delivery, drawn?.Text ?? carrierEvent.Remark());
             var sent = await partner.SendTrackingAsync(shipment.Carrier, tracking, cancellationToken);
-            await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Track, sent, $"{CarrierReferences.StatusCode(carrierEvent)} ({carrierEvent})", cancellationToken);
+            await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Track, sent, $"{CarrierReferences.StatusCode(carrierEvent)} ({carrierEvent}){(drawn is null ? string.Empty : $", {drawn.Reference}")}", cancellationToken);
             if (sent.Outcome != LogOutcome.TrackingSent)
             {
                 return null;
@@ -149,6 +156,10 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
 
         return journey.Exception is { } kind ? new ExpectedException(shipment, kind, journey.Cancel) : null;
     }
+
+    // The text the seed draws for this Shipment from its Carrier's pool, or none when the plan has no such pool (a plan made before the personas).
+    private static PoolDraw? DrawFor(SimulationRun run, PlannedShipment shipment, TextCategory category) =>
+        run.Plan.PoolFor(shipment.Carrier.Id, category)?.Draw(run.Settings.Seed, shipment.Booking.Step);
 
     // Norvia processes tracking after it accepts it, so the Exceptions show up a little later: the Planner asks a few times.
     private async Task<bool> HandleExceptionsAsync(

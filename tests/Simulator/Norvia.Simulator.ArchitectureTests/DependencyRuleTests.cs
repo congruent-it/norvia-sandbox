@@ -103,6 +103,44 @@ public sealed class DependencyRuleTests
             .ShouldNot().HaveDependencyOnAny("Microsoft.EntityFrameworkCore", "Microsoft.Data.SqlClient", "Azure.Messaging.ServiceBus", "Azure.Storage"));
     }
 
+    [Fact]
+    public void OnlyInfrastructure_KnowsTheAgentsLibraryOrTheModelSdk()
+    {
+        // The Simulator reaches an Agent through its IAgentClient port; the runner, the scripted fake and any Foundry SDK stay behind it (ADR 0040).
+        ShouldHold(Types.InAssemblies([Domain, Application, Web])
+            .ShouldNot().HaveDependencyOnAny("Norvia.Agents", "Microsoft.Extensions.AI", "Azure.AI", "OpenAI", "ModelContextProtocol"));
+    }
+
+    [Fact]
+    public void TheAgentPort_IsDefinedInApplication_AndTheLocalClientImplementsItInInfrastructure()
+    {
+        typeof(Norvia.Simulator.Application.Ports.IAgentClient).Assembly.Should().BeSameAs(Application);
+        ShouldHold(Types.InAssembly(Infrastructure).That().ImplementInterface(typeof(Norvia.Simulator.Application.Ports.IAgentClient)).Should().ResideInNamespace("Norvia.Simulator.Infrastructure.Personas"));
+    }
+
+    [Fact]
+    public void ThePersonasAgent_HasNoToolsAndNoMcpServer()
+    {
+        // Pure generation: the definition lists no tool, so the agent can read and write nothing in the estate (ADR 0040).
+        var definition = File.ReadAllText(Path.Combine(RepositoryRoot, "agents", "simulator-personas.agent.yaml"));
+
+        definition.Should().NotContain("\ntools:").And.NotContain("server:");
+    }
+
+    private static string RepositoryRoot
+    {
+        get
+        {
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Norvia.slnx")))
+            {
+                directory = directory.Parent;
+            }
+
+            return directory?.FullName ?? throw new InvalidOperationException("The repository root isn't above the test assembly.");
+        }
+    }
+
     private static void ShouldHold(ConditionList rule)
     {
         var result = rule.GetResult();
