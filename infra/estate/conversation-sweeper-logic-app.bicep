@@ -1,7 +1,7 @@
 // The conversation sweeper: a Logic Apps Standard app with one workflow that runs every night and deletes every Foundry conversation and
 // response older than a day (docs/operations/foundry.md, "Conversation cleanup"). The Agent Service keeps conversations until they are deleted,
 // so this is the safety net behind the delete after each run. Its workflow is deployed by azd's postdeploy hook
-// (infra/deploy-conversation-sweeper-logic-app.sh). It needs no secret: it calls Foundry as its managed identity, which holds the
+// (infra/deploy-conversation-sweeper-logic-app.ps1). It needs no secret: it calls Foundry as its managed identity, which holds the
 // Foundry User role on the project and nothing else.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.

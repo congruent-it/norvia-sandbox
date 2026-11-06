@@ -149,7 +149,7 @@ Links go to files, not lines, so they stay true as the code moves.
 | 8. Respond | Logic App: `Relay_the_TMS_outcome` and `Answer_the_Shipper`. Function: [RelayTmsOutcome.cs](../../../src/Integration/Norvia.Integration.TransportOrderIntake.Functions/RelayTmsOutcome.cs). Responses: [BookingResponses.cs](../../../src/Integration/Norvia.Integration.TransportOrderIntake/BookingResponses.cs) |
 | 8. Show in the TMS UI | [WaitingForPlanning.razor](../../../src/Tms/Norvia.Tms.Web/TransportOrders/WaitingForPlanning.razor), which re-reads every second by default ([LiveTransportOrderList.cs](../../../src/Tms/Norvia.Tms.Web/TransportOrders/LiveTransportOrderList.cs)) |
 | The applications | The TMS API, TMS UI and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). The Function host is the [Functions project](../../../src/Integration/Norvia.Integration.TransportOrderIntake.Functions/Norvia.Integration.TransportOrderIntake.Functions.csproj), deployed with the Logic App |
-| The Logic App resource | [intake-logic-app.bicep](../../../infra/estate/intake-logic-app.bicep), deployed by [deploy-intake-logic-app.sh](../../../infra/deploy-intake-logic-app.sh) and checked after a deploy by [smoke-test-intake.sh](../../../infra/smoke-test-intake.sh) |
+| The Logic App resource | [intake-logic-app.bicep](../../../infra/estate/intake-logic-app.bicep), deployed by [deploy-intake-logic-app.ps1](../../../infra/deploy-intake-logic-app.ps1) and checked after a deploy by [smoke-test-intake.sh](../../../infra/smoke-test-intake.sh) |
 
 ### Locally
 

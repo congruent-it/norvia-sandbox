@@ -906,7 +906,7 @@ resource consoleResubmitRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if 
 }
 
 // What Easy Auth signs Drivers in to in front of the Driver app (ADR 0037). The Driver ID is the user's app role: each
-// seeded Driver is one role, with their Driver ID as its value, and infra/create-driver-test-users.sh makes a test user
+// seeded Driver is one role, with their Driver ID as its value, and infra/create-driver-test-users.ps1 makes a test user
 // for each and assigns it. The Driver app takes the Driver ID from that role in the token, never from the request.
 resource driverApp 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-driver-app-${environmentName}'

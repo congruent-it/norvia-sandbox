@@ -121,7 +121,7 @@ public sealed class HealthCheckAgentAzureTests
         var assignments = Of(McpResources(), "Microsoft.Graph/appRoleAssignedTo@v1.0").ToList();
 
         assignments.Should().ContainSingle().Which["properties"]!["principalId"]!.GetValue<string>().Should().Be(ApimPrincipal);
-        Script("assign-agent-roles.sh").Should().Contain("appRoleAssignedTo");
+        Script("assign-agent-roles.ps1").Should().Contain("appRoleAssignedTo");
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class HealthCheckAgentAzureTests
     [Fact]
     public void DeployScript_PointsTheHealthCheckBackendAtTheApp_AndKeepsTheAddress()
     {
-        var script = Script("deploy-agents.sh");
+        var script = Script("deploy-agents.ps1");
 
         script.Should().Contain("health-check-web").And.Contain("health-check-agent-api").And.Contain("ESTATE_HEALTH_CHECK_BASE_URL");
         Script("provision-estate.ps1").Should().Contain("Norvia Estate health check (").And.Contain("id-health-check-").And.Contain("estate_health_check_agent_api_client_id");

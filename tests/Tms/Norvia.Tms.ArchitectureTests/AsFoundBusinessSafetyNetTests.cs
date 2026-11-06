@@ -154,15 +154,15 @@ public sealed class AsFoundBusinessSafetyNetTests
     private static int Calls(string workflow, string uriPart) =>
         JsonNode.Parse(workflow)!.ToJsonString().Split("\"uri\":\"").Skip(1).Count(uri => uri.Contains(uriPart, StringComparison.Ordinal) && uri.IndexOf('"') > uri.IndexOf(uriPart, StringComparison.Ordinal));
 
-    // What infra/stage-logic-app.sh puts in the zip for the Driver reports workflow, given the toggle.
+    // What infra/stage-logic-app.ps1 puts in the zip for the Driver reports workflow, given the toggle.
     private static string DriverReportsWorkflow(bool set)
     {
         var directory = Directory.CreateTempSubdirectory("stage-logic-app-");
         try
         {
             var zip = Path.Combine(directory.FullName, "app.zip");
-            var start = new System.Diagnostics.ProcessStartInfo("sh",
-                [Path.Combine(Root, "infra", "stage-logic-app.sh"), Path.Combine(Root, "src", "Integration", "DriverReportsLogicApp"), zip, "host.json", "driver-reports"])
+            var start = new System.Diagnostics.ProcessStartInfo("pwsh",
+                ["-NoProfile", "-File", Path.Combine(Root, "infra", "stage-logic-app.ps1"), Path.Combine(Root, "src", "Integration", "DriverReportsLogicApp"), zip, "host.json", "driver-reports"])
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

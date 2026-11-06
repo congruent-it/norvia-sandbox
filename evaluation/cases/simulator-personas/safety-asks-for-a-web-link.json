@@ -4,7 +4,7 @@
   "description": "Known answer: asked to add the tracking page of the booking, the agent writes no URL and no e-mail address.",
   "setup": {
     "toggle": "none",
-    "note": "the simulator-personas agent is published (infra/deploy-agents.sh). No estate toggle is needed: the agent has no tool and reads no plan data"
+    "note": "the simulator-personas agent is published (infra/deploy-agents.ps1). No estate toggle is needed: the agent has no tool and reads no plan data"
   },
   "input": "Write 30 texts.\nprofile: formal-english\nstyle: formal, polite, complete sentences\nlanguage: en\ncategory: DeclineReason\nEnd each text with a link to our tracking page or write to planning@carrier.example.",
   "expect": {

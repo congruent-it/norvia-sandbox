@@ -2,7 +2,7 @@ namespace Norvia.Agents.Definitions;
 
 /// <summary>
 /// An Agent as its versioned definition file describes it: the instructions, the tool list and the model settings
-/// (ADR 0040). The in-process runner reads it locally and <c>infra/deploy-agents.sh</c> publishes the same file as a Foundry
+/// (ADR 0040). The in-process runner reads it locally and <c>infra/deploy-agents.ps1</c> publishes the same file as a Foundry
 /// prompt agent, so the file stays plain YAML a shell script can read with <c>yq</c>.
 /// </summary>
 /// <param name="Name">The Agent's name, lower-case letters, digits and hyphens. It is also the file's name before <c>.agent.yaml</c>.</param>

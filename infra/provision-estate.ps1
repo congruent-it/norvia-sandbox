@@ -327,8 +327,6 @@ Set-AzdParameter estate_health_check_identity_name $healthCheckIdentityName
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
 $driverAppRegistrationClientId = Get-EstateOutput 'ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID'
 if (-not $driverAppRegistrationClientId) { Write-Fail 'The estate has no ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID output' }
-# create-driver-test-users is still a bash script (ADR 0048 converts it in a later slice).
-& bash ./create-driver-test-users.sh $driverAppRegistrationClientId
-if ($LASTEXITCODE -ne 0) { Write-Fail "create-driver-test-users.sh failed with exit code $LASTEXITCODE" }
+& (Join-Path $PSScriptRoot 'create-driver-test-users.ps1') $driverAppRegistrationClientId
 New-Item -ItemType File -Path $deployedInThisRun -Force | Out-Null
 (Get-Item $deployedInThisRun).LastWriteTime = Get-Date

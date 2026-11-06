@@ -7,7 +7,7 @@ namespace Norvia.PartnerPortal.Infrastructure.DriverSignIns;
 
 /// <summary>
 /// The active Drivers of the seed file, the one source of Drivers, with the Entra test user the estate made for each: the
-/// Driver ID lowercased, at the estate's domain (infra/create-driver-test-users.sh).
+/// Driver ID lowercased, at the estate's domain (infra/create-driver-test-users.ps1).
 /// </summary>
 internal sealed class SeedFileDriverSignInDirectory : IDriverSignInDirectory
 {

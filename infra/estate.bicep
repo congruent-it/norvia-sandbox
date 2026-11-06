@@ -55,14 +55,14 @@ param demoUiRedirectUris string = ''
 postdeploy hook stores it, so the console's app registration keeps it when the estate is deployed again.''')
 param integrationConsoleRedirectUris string = ''
 
-@description('''The Integration console's address, empty before the console is first deployed. infra/deploy-agents.sh stores it, so the
+@description('''The Integration console's address, empty before the console is first deployed. infra/deploy-agents.ps1 stores it, so the
 Integration operations agent's API Management backend keeps it when the estate is deployed again.''')
 param integrationConsoleBaseUrl string = ''
 
 @description('''Easy Auth's sign-in callback on the Estate health check, empty before the app is first deployed. infra/register-sign-in-callbacks.ps1 stores it.''')
 param healthCheckRedirectUris string = ''
 
-@description('''The Estate health check's address, empty before the app is first deployed. infra/deploy-agents.sh stores it (ESTATE_HEALTH_CHECK_BASE_URL), so
+@description('''The Estate health check's address, empty before the app is first deployed. infra/deploy-agents.ps1 stores it (ESTATE_HEALTH_CHECK_BASE_URL), so
 the Estate health-check agent's API Management backend keeps it when the estate is deployed again.''')
 param healthCheckBaseUrl string = ''
 

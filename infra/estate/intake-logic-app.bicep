@@ -1,6 +1,6 @@
 // The intake Logic App (P1.9): a Logic Apps Standard app that maps a partner booking, submits it to the TMS as the
 // intake identity and relays the outcome. The workflow and its local functions are deployed by azd's postdeploy hook
-// (infra/deploy-intake-logic-app.sh), because the app needs the TMS's address, which exists only after Aspire deploys it.
+// (infra/deploy-intake-logic-app.ps1), because the app needs the TMS's address, which exists only after Aspire deploys it.
 
 param location string
 param tags object

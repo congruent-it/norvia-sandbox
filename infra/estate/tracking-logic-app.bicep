@@ -1,6 +1,6 @@
 // The Carrier-tracking Logic App: a Logic Apps Standard app that picks up a Carrier's tracking message from the tracking
 // queue, maps it, records it with the TMS as the tracking identity and settles the message by what the TMS answered
-// (ADR 0008). Its workflow and local function are deployed by azd's postdeploy hook (infra/deploy-tracking-logic-app.sh),
+// (ADR 0008). Its workflow and local function are deployed by azd's postdeploy hook (infra/deploy-tracking-logic-app.ps1),
 // because the app needs the TMS's address, which exists only after Aspire deploys it.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.

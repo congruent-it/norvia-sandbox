@@ -1,11 +1,11 @@
-# The Integration operations agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.sh
+# The Integration operations agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.ps1
 # publishes it as a Foundry prompt agent. Plain YAML, so a script can read it with yq. Raise `version` on any change.
 name: integration-operations
 version: 4
 description: Explains why a Message trail, a failed run or a dead-lettered message failed, from what the Integration console records about it.
 model:
   # The model deployment in the Foundry project: the estate's one shared deployment, named after its model (foundryModelName in
-  # infra/estate.bicep). infra/deploy-agents.sh uses the estate's own when this one isn't there. A developer's own, locally, when
+  # infra/estate.bicep). infra/deploy-agents.ps1 uses the estate's own when this one isn't there. A developer's own, locally, when
   # Agents:Model is set.
   deployment: gpt-5.4-mini
   temperature: 0.2

@@ -5,7 +5,7 @@
 //   Agent --(token for the agent view, role IntegrationConsole.Agent.Read)--> MCP server --(API Management's token for the
 //   console's agent API, the same role)--> the console's /agent/v1
 //
-// Only two kinds of identity hold a role here: each published Agent's identity on the view (infra/assign-agent-roles.sh gives it
+// Only two kinds of identity hold a role here: each published Agent's identity on the view (infra/assign-agent-roles.ps1 gives it
 // after every publish), and API Management's identity on the console's agent API (below). No operator holds either.
 extension microsoftGraphV1
 
@@ -18,7 +18,7 @@ param apiManagementPrincipalId string
 @description('API Management\'s identity (its client ID), named in the tool calls\' authentication policy.')
 param apiManagementClientId string
 
-@description('''The Integration console\'s address, empty before the apps are first deployed. infra/deploy-agents.sh stores it (ESTATE_INTEGRATION_CONSOLE_BASE_URL)
+@description('''The Integration console\'s address, empty before the apps are first deployed. infra/deploy-agents.ps1 stores it (ESTATE_INTEGRATION_CONSOLE_BASE_URL)
 and points the backend at it; the placeholder fails every tool call with a gateway error, which the Agent sees as a refused tool.''')
 param consoleBaseUrl string = ''
 
@@ -30,7 +30,7 @@ var apiRoleId = guid('norvia-integration-console-agent-api', environmentName, ro
 // The agent view: the audience of an Agent's token. Entra issues a token for it only to an identity that holds the role.
 resource view 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-agent-${contract.server}-view-${environmentName}'
-  // infra/create-agent-connection.sh and infra/assign-agent-roles.sh look the view up by this name.
+  // infra/create-agent-connection.ps1 and infra/assign-agent-roles.ps1 look the view up by this name.
   displayName: 'Norvia ${contract.server} agent view (${environmentName})'
   signInAudience: 'AzureADMyOrg'
   identifierUris: [

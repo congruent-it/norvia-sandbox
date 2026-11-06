@@ -1,6 +1,6 @@
 # The Simulator's personas agent (ADR 0040). It has no tools: pure generation, structured output. For one profile, category and language it
 # returns a pool of short realistic texts, which the Simulation plan keeps and the run draws from by the seed. The in-process runner reads
-# this file locally; infra/deploy-agents.sh publishes it as a Foundry prompt agent without a tool. Raise `version` on any change.
+# this file locally; infra/deploy-agents.ps1 publishes it as a Foundry prompt agent without a tool. Raise `version` on any change.
 # This is the one definition that asks a model for adversarial text, and only for the opt-in `hostile` profile (see the last rule).
 name: simulator-personas
 version: 3

@@ -1,7 +1,7 @@
 // The Carrier-answer Logic App: a Logic Apps Standard app that API Management calls with a Carrier's confirmation or
 // rejection. It maps the answer to the Canonical Model, records it with the TMS as the answer identity and relays the TMS's
 // response to the Carrier. Its workflow and local functions are deployed by azd's postdeploy hook
-// (infra/deploy-answer-logic-app.sh), because the app needs the TMS's address, which exists only after Aspire deploys it.
+// (infra/deploy-answer-logic-app.ps1), because the app needs the TMS's address, which exists only after Aspire deploys it.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.
 // Its storage, host identity and run history are its own.

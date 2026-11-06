@@ -1,7 +1,7 @@
 // The E2 Carrier invoice outcome Logic App: a Logic Apps Standard app that picks up CarrierInvoiceApproved from its own subscription, maps it
 // to the Carrier invoice outcome format, sends it to the Carrier's invoice outcome endpoint in the Partner portal with a credential from Key
 // Vault, and reports the outcome to the ERP as told or not delivered as the Carrier invoice outcome identity. Its workflow and local function
-// are deployed by azd's postdeploy hook (infra/deploy-carrier-invoice-outcome-logic-app.sh), because the app needs the addresses of the ERP and
+// are deployed by azd's postdeploy hook (infra/deploy-carrier-invoice-outcome-logic-app.ps1), because the app needs the addresses of the ERP and
 // the Partner portal, which exist only after Aspire deploys them.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.

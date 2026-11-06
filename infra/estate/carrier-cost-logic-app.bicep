@@ -1,6 +1,6 @@
 // The P9 Carrier cost Logic App: a Logic Apps Standard app that picks up CarrierCostIncurred from its own subscription and records the
 // Carrier cost with the ERP billing API as the Carrier cost identity. Its workflow is deployed by azd's postdeploy hook
-// (infra/deploy-carrier-cost-logic-app.sh), because the app needs the ERP billing API's address, which exists only after Aspire deploys it. It
+// (infra/deploy-carrier-cost-logic-app.ps1), because the app needs the ERP billing API's address, which exists only after Aspire deploys it. It
 // has no local function and reads no Key Vault: the ERP accepts the Canonical Model, so the event goes to it as the message carries it, and
 // the Logic App proves who it is with its managed identity.
 //

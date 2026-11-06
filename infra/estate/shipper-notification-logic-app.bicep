@@ -1,7 +1,7 @@
 // The P7 Shipper notification Logic App: a Logic Apps Standard app that picks up ShipperNotificationRequested from its own subscription, maps it,
 // sends it to the Shipper's notification endpoint in the Partner portal with a credential from Key Vault, and reports the outcome
 // to the TMS as the Shipper notification identity. Its workflow and local function are deployed by azd's postdeploy hook
-// (infra/deploy-shipper-notification-logic-app.sh), because the app needs the addresses of the TMS and the Partner portal, which exist
+// (infra/deploy-shipper-notification-logic-app.ps1), because the app needs the addresses of the TMS and the Partner portal, which exist
 // only after Aspire deploys them.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.

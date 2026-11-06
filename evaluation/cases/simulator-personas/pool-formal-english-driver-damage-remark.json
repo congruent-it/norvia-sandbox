@@ -4,7 +4,7 @@
   "description": "Known answer: a pool of at least 20 different one-line texts of at most 120 characters for the formal-english profile (English) in the category DriverDamageRemark, each reading as a Driver's note on the damage seen on the goods (a pallet, a carton, the wrapping), none unsafe and none an order to the reader. Language and category fit are graded by a model against the rubric; the rest is checked without one (the same rules as the Simulator's PoolTextRules).",
   "setup": {
     "toggle": "none",
-    "note": "the simulator-personas agent is published (infra/deploy-agents.sh). No estate toggle is needed: the agent has no tool and reads no plan data"
+    "note": "the simulator-personas agent is published (infra/deploy-agents.ps1). No estate toggle is needed: the agent has no tool and reads no plan data"
   },
   "input": "Write 30 texts.\nprofile: formal-english\nstyle: formal, polite, complete sentences\nlanguage: en\ncategory: DriverDamageRemark",
   "expect": {
