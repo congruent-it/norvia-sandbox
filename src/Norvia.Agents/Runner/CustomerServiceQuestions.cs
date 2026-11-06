@@ -21,4 +21,27 @@ public static class CustomerServiceQuestions
                 ? id
                 : null;
     }
+
+    private const string SummaryPrefix = "Summarise the life of the Transport Order ";
+    private const string SummarySuffix = " from rating to billing, and say what, if anything, is blocking it.";
+
+    public static string SummariseTransportOrder(string transportOrderNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
+        return SummaryPrefix + transportOrderNumber + SummarySuffix;
+    }
+
+    /// <summary>The Transport Order number of a summary question, or null when the text is another question.</summary>
+    public static string? ParseSummariseTransportOrder(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        if (!question.StartsWith(SummaryPrefix, StringComparison.Ordinal) || !question.EndsWith(SummarySuffix, StringComparison.Ordinal)
+            || question.Length <= SummaryPrefix.Length + SummarySuffix.Length)
+        {
+            return null;
+        }
+
+        var number = question[SummaryPrefix.Length..^SummarySuffix.Length];
+        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+    }
 }

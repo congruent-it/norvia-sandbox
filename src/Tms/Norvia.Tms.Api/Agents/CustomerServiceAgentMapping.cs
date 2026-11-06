@@ -5,7 +5,7 @@ using Norvia.Tms.Domain.TransportOrders;
 namespace Norvia.Tms.Api.Agents;
 
 /// <summary>Maps a Rejected booking to the agent view, field by field: a field the view doesn't name never reaches an Agent.</summary>
-internal static class CustomerServiceAgentMapping
+internal static partial class CustomerServiceAgentMapping
 {
     public static AgentRejectedBookingView Of(TransportOrderView booking)
     {

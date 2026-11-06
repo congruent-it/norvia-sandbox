@@ -18,6 +18,11 @@ public static class CustomerServiceScript
 
     private static IReadOnlyList<AIContent> Next(ScriptContext context)
     {
+        if (CustomerServiceQuestions.ParseSummariseTransportOrder(context.Question) is { } number)
+        {
+            return CustomerServiceOrderScript.Next(context, number);
+        }
+
         if (CustomerServiceQuestions.ParseExplainRejectedBooking(context.Question) is not { } id)
         {
             return [new TextContent("{}")];

@@ -13,7 +13,7 @@ public interface IAgentClient
     Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken);
 }
 
-/// <summary>One question to an Agent about a Rejected booking.</summary>
+/// <summary>One question to an Agent about a Rejected booking or a Transport Order.</summary>
 /// <param name="AgentName">The Agent's definition, such as <c>customer-service</c>.</param>
-/// <param name="CorrelationId">The Rejected booking's Message trail, which the Agent's tool calls carry so they join it.</param>
+/// <param name="CorrelationId">The Rejected booking's or Transport Order's Message trail, which the Agent's tool calls carry so they join it.</param>
 public sealed record AgentRequest(string AgentName, string Question, string CorrelationId);

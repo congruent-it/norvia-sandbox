@@ -8,4 +8,10 @@ internal static partial class AgentPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Explaining Rejected booking {TransportOrderId} failed")]
     public static partial void ExplainCrashed(ILogger logger, Exception exception, Guid transportOrderId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Explaining Transport Order {TransportOrderNumber} failed with {FailureCode}")]
+    public static partial void ExplainOrderFailed(ILogger logger, string transportOrderNumber, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Explaining Transport Order {TransportOrderNumber} failed")]
+    public static partial void ExplainOrderCrashed(ILogger logger, Exception exception, string transportOrderNumber);
 }

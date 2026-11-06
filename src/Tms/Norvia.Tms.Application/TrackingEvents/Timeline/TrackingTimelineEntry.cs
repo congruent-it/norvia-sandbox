@@ -6,6 +6,7 @@ namespace Norvia.Tms.Application.TrackingEvents.Timeline;
 /// <param name="EventTime">When it happened, with the offset of where it happened.</param>
 /// <param name="ReceivedAt">When the TMS recorded it, apart from when it happened.</param>
 /// <param name="MovedShipment">Whether it moved the Shipment's status; an event that didn't is only logged.</param>
+/// <param name="Source">Who reported it: the Carrier ID, or Own fleet.</param>
 public sealed record TrackingTimelineEntry(
     TrackingEventType Type,
     DateTimeOffset EventTime,
@@ -15,7 +16,8 @@ public sealed record TrackingTimelineEntry(
     DateTimeOffset? Eta,
     string? Remark,
     DateTimeOffset ReceivedAt,
-    bool MovedShipment)
+    bool MovedShipment,
+    string? Source = null)
 {
     public static TrackingTimelineEntry Of(TrackingEvent trackingEvent)
     {
@@ -29,6 +31,7 @@ public sealed record TrackingTimelineEntry(
             trackingEvent.Eta,
             trackingEvent.Remark,
             trackingEvent.ReceivedAt,
-            trackingEvent.MovedShipment);
+            trackingEvent.MovedShipment,
+            trackingEvent.Source.ToString());
     }
 }

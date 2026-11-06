@@ -264,9 +264,9 @@ public sealed class TrackingQueriesTests
         result.IsSuccess.Should().BeTrue();
         result.Value.TrackingEvents.Should().Equal(
             new TrackingTimelineEntry(
-                TrackingEventType.Collected, Samples.Now.AddHours(1), "Rotterdam", "3011 AA", "NL", Samples.Now.AddDays(2), "Collected", Samples.Now.AddHours(2), true),
+                TrackingEventType.Collected, Samples.Now.AddHours(1), "Rotterdam", "3011 AA", "NL", Samples.Now.AddDays(2), "Collected", Samples.Now.AddHours(2), true, "CAR-0001"),
             new TrackingTimelineEntry(
-                TrackingEventType.Collected, Samples.Now.AddHours(2), "Rotterdam", "3011 AA", "NL", null, "Collected", Samples.Now.AddHours(2), false));
+                TrackingEventType.Collected, Samples.Now.AddHours(2), "Rotterdam", "3011 AA", "NL", null, "Collected", Samples.Now.AddHours(2), false, "CAR-0001"));
     }
 
     [Fact]

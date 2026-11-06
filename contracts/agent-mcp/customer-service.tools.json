@@ -7,6 +7,30 @@
       "description": "Returns a Rejected booking by its ID: when it was received, the Shipper's business name, its Shipper reference, every rejection reason with its code and message, which fields failed, and the content the Shipper submitted with the Consignee fields removed. Never a Consignee name, address or contact, and never a file's contents.",
       "method": "GET",
       "path": "/rejected-bookings/{id}"
+    },
+    {
+      "name": "get_transport_order",
+      "description": "Returns a Transport Order by its number: its status, the Shipper's business name and reference, its rating result with the failure code and message when Rating failed, its Shipment's number and status, and its billing state with the reasons that block it from being Billable. Never a Consignee name, address or contact, and never a file's contents.",
+      "method": "GET",
+      "path": "/transport-orders/{transportOrderNumber}"
+    },
+    {
+      "name": "get_shipment_timeline",
+      "description": "Returns a Shipment's Tracking events in event-time order: each one's type, when it happened, the place and country, the ETA, when the TMS received it, whether it moved the Shipment's status and its source (a Carrier ID, or Own fleet). Never a remark a Carrier or Driver typed.",
+      "method": "GET",
+      "path": "/shipments/{shipmentNumber}/tracking-events"
+    },
+    {
+      "name": "get_exceptions",
+      "description": "Returns a Shipment's Exceptions, open and resolved, in the order they opened: each one's type, causes, status, outcome, the Planner's notes, and whether the Shipper was notified and when. Never the text of a Shipper notification.",
+      "method": "GET",
+      "path": "/shipments/{shipmentNumber}/exceptions"
+    },
+    {
+      "name": "get_proof_of_delivery_status",
+      "description": "Returns where a Shipment stands for its Proof of delivery: current, missing or not due, and each Proof of delivery recorded (current or superseded) with its source, delivery time, whether it was taken clean or with reservations, and how many files it holds. Never who signed, a remark, or a file's name or contents.",
+      "method": "GET",
+      "path": "/shipments/{shipmentNumber}/proof-of-delivery-status"
     }
   ]
 }

@@ -58,8 +58,9 @@ public sealed class CustomerServiceServerTests : IAsyncLifetime
         using var response = await Post(client, Rpc("tools/list"));
 
         var tools = (await BodyAsync(response))["result"]!["tools"]!.AsArray();
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_rejected_booking");
-        tools[0]!["inputSchema"]!["required"]!.AsArray().Select(item => item!.GetValue<string>()).Should().Equal("id");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_rejected_booking", "get_transport_order", "get_shipment_timeline", "get_exceptions", "get_proof_of_delivery_status");
+        tools.Select(tool => tool!["inputSchema"]!["required"]!.AsArray().Single()!.GetValue<string>())
+            .Should().Equal("id", "transportOrderNumber", "shipmentNumber", "shipmentNumber", "shipmentNumber");
     }
 
     [Fact]
