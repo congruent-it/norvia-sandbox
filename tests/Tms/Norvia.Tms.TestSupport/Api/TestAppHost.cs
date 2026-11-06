@@ -30,6 +30,13 @@ public static class TestAppHost
     public static void RemoveWhatTheTmsUiTestsDontUse(this IDistributedApplicationTestingBuilder builder) => builder.Remove(UnneededByTheTmsUi);
 
     /// <summary>
+    /// Takes the resources the Customer service agent's UI tests don't use out of the AppHost. They keep what the TMS UI's journeys use and the MCP stand-in that plays API Management's MCP
+    /// server, with the Integration console, which the stand-in waits for.
+    /// </summary>
+    public static void RemoveWhatTheCustomerServiceAgentUiTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
+        builder.Remove([.. UnneededByTheTmsUi.Where(name => name is not "integration-console-web")]);
+
+    /// <summary>
     /// Takes the resources the fault tests don't use out of the AppHost. They keep the workers that play the Carrier-tracking and Driver reports Logic Apps (and the Trip dispatch
     /// Logic App that gives the Driver app its Trips), as each fault plays through the real path, from the Driver or the queue to the TMS.
     /// </summary>

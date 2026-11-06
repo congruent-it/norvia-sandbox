@@ -52,6 +52,23 @@ public sealed class RejectedBookingsJourneyTests(TmsUiFixture tms) : BrowserPage
         await Expect(Heading("Home")).ToBeVisibleAsync();
     }
 
+    [Fact]
+    public async Task ARejectedBooking_WhenTheAgentsAreOff_HasNoExplainButtonForCustomerService()
+    {
+        var shipperReference = $"UI-{Guid.NewGuid():N}"[..20];
+        var booking = Bookings.Valid(shipperReference);
+        booking["goodsLines"] = new JsonArray();
+        await RejectAsync(booking);
+
+        await Page.GotoAsync("/");
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Customer service" }).ClickAsync();
+        await Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference }).GetByRole(AriaRole.Link).ClickAsync();
+
+        await Expect(Heading($"Rejected booking {shipperReference}")).ToBeVisibleAsync();
+        await Expect(Region("Reasons")).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Explain this rejected booking" })).ToHaveCountAsync(0);
+    }
+
     private ILocator Heading(string name) => Page.GetByRole(AriaRole.Heading, new() { Name = name, Level = 1 });
 
     private ILocator Region(string name) => Page.GetByRole(AriaRole.Region, new() { Name = name });
