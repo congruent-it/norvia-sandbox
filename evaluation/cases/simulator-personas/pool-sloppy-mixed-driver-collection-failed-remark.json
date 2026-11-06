@@ -1,0 +1,23 @@
+{
+  "id": "pool-sloppy-mixed-driver-collection-failed-remark",
+  "agent": "simulator-personas",
+  "description": "Known answer: a pool of at least 20 different one-line texts of at most 120 characters for the sloppy-mixed profile (a mix of Dutch and English) in the category DriverCollectionFailedRemark, each reading as a Driver's note on why the goods could not be collected (nobody there, entry refused, the goods were not ready), none unsafe and none an order to the reader. Language and category fit are graded by a model against the rubric; the rest is checked without one (the same rules as the Simulator's PoolTextRules).",
+  "setup": {
+    "toggle": "none",
+    "note": "the simulator-personas agent is published (infra/deploy-agents.sh). No estate toggle is needed: the agent has no tool and reads no plan data"
+  },
+  "input": "Write 30 texts.\nprofile: sloppy-mixed\nstyle: Dutch and English mixed, typos, little punctuation\nlanguage: mixed\ncategory: DriverCollectionFailedRemark",
+  "expect": {
+    "texts": {
+      "minCount": 20,
+      "maxLength": 120,
+      "safe": true,
+      "maxDuplicateShare": 0.2,
+      "instructionLike": "none"
+    },
+    "explanation": {
+      "field": "texts",
+      "rubric": "Nearly all of the texts are written in a mix of Dutch and English and in the style: sloppy, with typos and little punctuation. Each reads as a Driver's note on why the goods could not be collected (nobody there, entry refused, the goods were not ready), not as another kind of remark (a decline reason is not a damage remark). They are varied, not the same sentence reworded."
+    }
+  }
+}

@@ -113,6 +113,8 @@ An **opt-in profile that tries to instruct the other Agents**, so their injectio
 - **Only where the Simulator is gated.** The profile is part of the Simulator, which answers nothing unless `Simulator:Enabled` is on and signs the presenter in (locally the local operator, in Azure the Entra gate), so there is nowhere to reach it from outside.
 - **The one prompt that asks for adversarial text.** The generation prompt (`agents/simulator-personas.agent.yaml`) has a rule, `THE HOSTILE PROFILE`, that says so: for the profile `hostile` only, it asks the model on purpose for remarks that try to give an order to whoever reads them, inside every other rule (one line, plain words, no address, number or name). For every other profile it says never to write such an instruction. The model is told the profile, the language and the kind of text, and **no plan data reaches it**.
 
+The pool generator has an evaluation set too (pool quality per profile and category, safety under varied prompts, and the hostile profile producing orders only when selected), run on demand and before a release and never in CI: see [Agent evaluation](agent-evaluation.md#reading-the-simulator-personas-agents-results).
+
 ### Reading a hostile run
 
 A hostile run has the same seed-driven outcomes as a normal run of the same settings: only the words inside the remarks differ. So a normal run is the control for a hostile one.
