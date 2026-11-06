@@ -14,13 +14,16 @@
 <PageTitle>Simulator · Configure</PageTitle>
 
 <h1>Configure a run</h1>
-<p class="text-muted">
-    A run books for the estate's Shippers through the Norvia Partner API, as each Shipper's Persona, plans what Norvia
-    accepted through the TMS API, as the Planner, and then has the Carriers answer, track and deliver what went to them, as their
-    Personas. What stays with the Own fleet goes on Trips the Planner dispatches, and the Drivers work the Trips of today through the Driver app,
-    as themselves. Once the deliveries are in, Finance runs Invoice now in the ERP and credits part of a line, and the invoices reach the Shippers' inboxes. Every booking, assignment, Carrier message, Driver report and invoice has a real Message trail. Choose a Preset or
-    set the numbers yourself, then preview the plan: the same seed always gives the same plan.
-</p>
+<p class="text-muted mb-2">A run plays out the estate's whole flow, each party acting as its own Persona:</p>
+<ol class="text-muted mb-4 list-decimal space-y-1 pl-6">
+    <li><strong>Shippers</strong> book through the Norvia Partner API.</li>
+    <li>The <strong>Planner</strong> plans what Norvia accepted through the TMS API.</li>
+    <li><strong>Carriers</strong> answer, track and deliver what went to them.</li>
+    <li>What stays with the <strong>Own fleet</strong> goes on Trips the Planner dispatches, and the <strong>Drivers</strong> work today's Trips through the Driver app.</li>
+    <li><strong>Finance</strong> runs Invoice now in the ERP and credits part of a line, and the invoices reach the Shippers' inboxes.</li>
+</ol>
+<p class="text-muted mb-2">Every booking, assignment, Carrier message, Driver report and invoice has a real Message trail.</p>
+<p class="text-muted">Choose a Preset or set the numbers yourself, then preview the plan. The same seed always gives the same plan.</p>
 
 @if (_failed)
 {
