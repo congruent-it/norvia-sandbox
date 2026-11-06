@@ -169,3 +169,24 @@ fluent-option {
 .col-title {
     min-width: max-content;
 }
+
+/*
+ * An accordion's header sits on the same fill as the text boxes and selects inside it, so it blends into the controls.
+ * The header is a shadow part of the item, so it is styled through ::part(): the primary blue with white text sets it
+ * apart, and the rounded corners follow the item's border until it is open and its panel continues underneath.
+ */
+fluent-accordion-item::part(heading) {
+    background-color: var(--color-primary);
+    color: #fff;
+    border-radius: calc(var(--radius-darkly) - 1px);
+    font-weight: 700;
+}
+
+fluent-accordion-item::part(heading):hover {
+    background-color: color-mix(in srgb, var(--color-primary) 85%, #fff);
+}
+
+fluent-accordion-item.expanded::part(heading) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
