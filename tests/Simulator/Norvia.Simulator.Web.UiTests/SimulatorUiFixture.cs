@@ -23,8 +23,8 @@ namespace Norvia.Simulator.Web.UiTests;
 /// its migrations, the local Partner API, the tracking and Proof of delivery workers (the Carriers' tracking only reaches the TMS through them),
 /// the Integration console (the log's Message trail links point at it), the TMS UI (the log's Transport Order, Shipment and Trip links point at it, and the Simulator waits for its address), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
 /// through the first, and the Drivers' reports only reach the TMS through the second) and the Simulator with its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
-/// Six more Simulators share its database and settings, each changed in one thing a journey needs: an operator who may only read, two whose TMS API
-/// is a <see cref="ResetStub"/> that switches its reset off or refuses it, two with the Agents on (one whose model fails for one profile), and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
+/// Seven more Simulators share its database and settings, each changed in one thing a journey needs: an operator who may only read, two whose TMS API
+/// is a <see cref="ResetStub"/> that switches its reset off or refuses it, three with the Agents on (one whose model fails for one profile, one with an Own fleet of its own for the Driver texts), and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
 /// </summary>
 public sealed class SimulatorUiFixture : IAsyncLifetime
 {
@@ -45,12 +45,17 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     private const string SignatureFleetVehicle = "VEH-0001";
     private const string SignatureFleetDriver = "DRV-0001";
 
+    // The Own fleet of the Driver texts journey, with the Agents on. DRV-0002's profile is terse Dutch.
+    private const string DriverTextsFleetVehicle = "VEH-0002";
+    private const string DriverTextsFleetDriver = "DRV-0002";
+
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
 
     private DistributedApplication? _app;
     private IPlaywright? _playwright;
     private string? _seedCopy;
     private string? _signatureSeedCopy;
+    private string? _driverTextsSeedCopy;
     private ResetStub? _stub;
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private readonly Dictionary<string, JsonObject> _originalRosters = [];
@@ -68,6 +73,9 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
 
     /// <summary>A Simulator with the Agents on, so a plan's pools of Carrier texts are written by the personas agent (the in-process runner with the scripted fake model).</summary>
     public Uri WithAgents { get; private set; } = null!;
+
+    /// <summary>A Simulator with the Agents on and an Own fleet of its own (DRV-0002, who writes terse Dutch), so a plan's pools of Driver texts are written by the fake model and a Trip of its run is its own on a day.</summary>
+    public Uri WithAgentsAndDriverFleet { get; private set; } = null!;
 
     /// <summary>A Simulator with the Agents on whose model cannot write the terse Dutch pools, so those fall back to the built-in ones.</summary>
     public Uri WithFailingAgent { get; private set; } = null!;
@@ -109,10 +117,12 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         builder.CreateResourceBuilder((ProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
 
         _signatureSeedCopy = await CopySeedOfAsync(PricedShipper, SignatureFleetVehicle, SignatureFleetDriver, startup.Token);
+        _driverTextsSeedCopy = await CopySeedOfAsync(PricedShipper, DriverTextsFleetVehicle, DriverTextsFleetDriver, startup.Token);
         _stub = ResetStub.Start();
         AddVariant(builder, simulator, "simulator-signatures", ("Seed__Path", _signatureSeedCopy));
         AddVariant(builder, simulator, "simulator-agents", ("Agents__Enabled", "true"));
         // The scripted model reads the language from the question's "language:" line, so a style that carries a line of its own with a language it doesn't know makes it answer with no texts.
+        AddVariant(builder, simulator, "simulator-agents-drivers", ("Agents__Enabled", "true"), ("Seed__Path", _driverTextsSeedCopy));
         AddVariant(builder, simulator, "simulator-agents-failing", ("Agents__Enabled", "true"), ("Personas__Profiles__1__Style", "a few blunt words\nlanguage: tlh"));
         AddVariant(builder, simulator, "simulator-viewer", ("LocalOperator__Roles__0", "Simulator.Read"), ("LocalOperator__Roles__1", ""));
         AddVariant(builder, simulator, "simulator-reset-off", ("TmsApi__BaseAddress", _stub.SwitchedOff.ToString()));
@@ -120,7 +130,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
-        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-signatures", "simulator-agents", "simulator-agents-failing", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
+        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-signatures", "simulator-agents", "simulator-agents-drivers", "simulator-agents-failing", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
         {
             await _app.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token);
         }
@@ -130,13 +140,14 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         TmsUi = _app.GetEndpoint("tms-web", "http");
         SignatureFleet = _app.GetEndpoint("simulator-signatures", "http");
         WithAgents = _app.GetEndpoint("simulator-agents", "http");
+        WithAgentsAndDriverFleet = _app.GetEndpoint("simulator-agents-drivers", "http");
         WithFailingAgent = _app.GetEndpoint("simulator-agents-failing", "http");
         Viewer = _app.GetEndpoint("simulator-viewer", "http");
         ResetSwitchedOff = _app.GetEndpoint("simulator-reset-off", "http");
         ResetRefused = _app.GetEndpoint("simulator-reset-refused", "http");
 
         // The Drivers' rosters are Monday to Friday; at the weekend they work today by a change of Roster, as a Planner would make, so the Trip journeys run on any day.
-        foreach (var driver in new[] { OwnFleetDriver, SignatureFleetDriver })
+        foreach (var driver in new[] { OwnFleetDriver, SignatureFleetDriver, DriverTextsFleetDriver })
         {
             await WorkTodayAsync(driver, startup.Token);
         }
@@ -166,7 +177,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         }
 
         _stub?.Dispose();
-        foreach (var copy in new[] { _seedCopy, _signatureSeedCopy }.OfType<string>())
+        foreach (var copy in new[] { _seedCopy, _signatureSeedCopy, _driverTextsSeedCopy }.OfType<string>())
         {
             File.Delete(copy);
         }
