@@ -17,6 +17,11 @@
     <ProjectReference Include="..\..\..\src\Norvia.Agents\Norvia.Agents.csproj" />
     <ProjectReference Include="..\Norvia.Tms.TestSupport\Norvia.Tms.TestSupport.csproj" />
     <Using Include="Norvia.Tms.TestSupport" />
+    <Using Include="Norvia.Tms.TestSupport.Billing" />
+    <Using Include="Norvia.Tms.TestSupport.Exceptions" />
+    <Using Include="Norvia.Tms.TestSupport.Planning" />
+    <Using Include="Norvia.Tms.TestSupport.ProofsOfDelivery" />
+    <Using Include="Norvia.Tms.TestSupport.TrackingEvents" />
   </ItemGroup>
   <ItemGroup>
     <!-- The Agent's definition, which the tests run the in-process runner with, as the TMS UI does. -->
