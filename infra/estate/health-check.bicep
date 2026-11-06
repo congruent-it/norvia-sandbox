@@ -5,7 +5,7 @@
 // what it may read.
 //
 // Like the other agent modules it has no outputs of the template (the estate is at the 64 a template may have), bar the identity's
-// principal for the Foundry User role; infra/provision-estate.sh finds the registration and the identity by their names.
+// principal for the Foundry User role; infra/provision-estate.ps1 finds the registration and the identity by their names.
 extension microsoftGraphV1
 
 param environmentName string
@@ -27,7 +27,7 @@ var reader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '
 
 // The app's own identity, which it reads the estate as, never with the operator's token (ADR 0017) and never the Agent's.
 resource healthCheckIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  // infra/provision-estate.sh finds it by this prefix.
+  // infra/provision-estate.ps1 finds it by this prefix.
   name: 'id-health-check-${uniqueString(resourceGroup().id)}'
   location: location
   tags: tags
@@ -48,7 +48,7 @@ resource healthCheckReadsTheEstate 'Microsoft.Authorization/roleAssignments@2022
 // decides for itself what they may do.
 resource healthCheck 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-health-check-${environmentName}'
-  // infra/provision-estate.sh finds it by this name.
+  // infra/provision-estate.ps1 finds it by this name.
   displayName: 'Norvia Estate health check (${environmentName})'
   signInAudience: 'AzureADMyOrg'
   web: {

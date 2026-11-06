@@ -2,7 +2,7 @@ namespace Norvia.AppHost;
 
 /// <summary>
 /// What the apps need from the estate in Azure (ADR 0004). The estate Bicep outputs these, and azd's preprovision
-/// hook (infra/provision-estate.sh) stores each one as <c>AZURE_ESTATE_*</c>, which is where azd looks up the value of
+/// hook (infra/provision-estate.ps1) stores each one as <c>AZURE_ESTATE_*</c>, which is where azd looks up the value of
 /// the Aspire parameter of the same name.
 /// </summary>
 public sealed class Estate(IDistributedApplicationBuilder builder)

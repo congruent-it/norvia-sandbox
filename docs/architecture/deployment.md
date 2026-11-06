@@ -41,7 +41,7 @@ Who may open what: the Demo UIs are public behind an Entra gate that admits only
 
 `azd up` deploys in this order, because each step needs an address or an identity the one before it makes ([azure.yaml](../../azure.yaml)):
 
-1. **The estate Bicep** ([infra/provision-estate.sh](../../infra/provision-estate.sh), azd's `preup` and `preprovision` hooks). It deploys with the Azure CLI, as a user who may create app registrations, and stores its outputs in the azd environment for the AppHost.
+1. **The estate Bicep** ([infra/provision-estate.ps1](../../infra/provision-estate.ps1), azd's `preup` and `preprovision` hooks). It deploys with the Azure CLI, as a user who may create app registrations, and stores its outputs in the azd environment for the AppHost.
 2. **The applications and their databases**, provisioned by Aspire into the same resource group, referencing what the estate made.
 3. **The migrations** (azd's `postdeploy` hook), one script per database.
 4. **The Logic Apps' workflows and local functions**, one `infra/deploy-*-logic-app.sh` each. The estate can't do this itself: it is deployed before the TMS, whose address a Logic App needs.

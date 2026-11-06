@@ -378,7 +378,7 @@ Links go to files, not lines, so they stay true as the code moves. The rows are 
 | End Trip, TMS: boundary tests | [TripEndTests.cs](../../../tests/Tms/Norvia.Tms.Api.IntegrationTests.Trips/Trips/TripEndTests.cs) |
 | Sign-in: both ways of signing in, the policy | [Drivers](../../../src/DriverApp/Norvia.DriverApp.Web/Drivers/DriverClaims.cs): `DriverSignIn`, `EasyAuthHandler`, `DriverClaims` |
 | Sign-in: my Trips and the refusal | [Trips.razor](../../../src/DriverApp/Norvia.DriverApp.Web/Components/Pages/Trips.razor), [Refused.razor](../../../src/DriverApp/Norvia.DriverApp.Web/Components/Pages/Refused.razor) |
-| Sign-in: the app registration and its roles | `driverApp` in [identities.bicep](../../../infra/estate/identities.bicep), [create-driver-test-users.sh](../../../infra/create-driver-test-users.sh), [register-sign-in-callbacks.sh](../../../infra/register-sign-in-callbacks.sh) |
+| Sign-in: the app registration and its roles | `driverApp` in [identities.bicep](../../../infra/estate/identities.bicep), [create-driver-test-users.sh](../../../infra/create-driver-test-users.sh), [register-sign-in-callbacks.ps1](../../../infra/register-sign-in-callbacks.ps1) |
 | Sign-in: the Easy Auth gate and the AppHost's settings | [AppHost.cs](../../../src/Norvia.AppHost/AppHost.cs), [Estate.cs](../../../src/Norvia.AppHost/Estate.cs) |
 | Sign-in: the presenter panel | [PresenterPanel.razor](../../../src/PartnerPortal/Norvia.PartnerPortal.Web/Presenter/PresenterPanel.razor), [DriverSignIns](../../../src/PartnerPortal/Norvia.PartnerPortal.Application/DriverSignIns/DriverSignInView.cs) |
 | Sign-in: boundary tests | [SignInTests.cs](../../../tests/DriverApp/Norvia.DriverApp.Web.IntegrationTests/SignInTests.cs) |

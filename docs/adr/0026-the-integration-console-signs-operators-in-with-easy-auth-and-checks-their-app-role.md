@@ -15,5 +15,5 @@ Entra signs in only users assigned one of the console's roles, so a stranger nev
 - The console trusts the header because Easy Auth is in front of it. Take Easy Auth away and anyone could send the header. The AppHost always deploys the console with it.
 - Locally there is no Easy Auth. The AppHost signs the developer in as a local operator with both roles (`LocalOperator` settings), and the console refuses to start with those settings outside Development.
 - The UI tests sign in the way Easy Auth does, by sending the header, so they exercise the console's real sign-in.
-- Entra needs the console's callback, which exists only once Aspire has deployed it. The postdeploy hook ([infra/register-sign-in-callbacks.sh](../../infra/register-sign-in-callbacks.sh)) adds it and keeps it in the azd environment as `ESTATE_INTEGRATION_CONSOLE_REDIRECT_URIS`.
+- Entra needs the console's callback, which exists only once Aspire has deployed it. The postdeploy hook ([infra/register-sign-in-callbacks.ps1](../../infra/register-sign-in-callbacks.ps1)) adds it and keeps it in the azd environment as `ESTATE_INTEGRATION_CONSOLE_REDIRECT_URIS`.
 - Someone other than the presenter who operates the console needs `IntegrationConsole.Read` on *Norvia Integration console* in Entra ID.

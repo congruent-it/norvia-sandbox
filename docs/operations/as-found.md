@@ -33,7 +33,7 @@ The toggles are one Bicep object, `asFound`, healthy by default:
 | `entitiesWithoutDeadLetterAlert` | list of queue and subscription names | A listed queue or subscription has no dead-letter alert |
 | `noAlertReceiver` | true or false | The action group is built with no receiver: the alerts exist and go nowhere |
 
-A "no alert" is an **absent** rule, never a disabled one: a health check finds nothing where a rule should be, and a disabled rule would be a different finding. Deploying never deletes, so [provision-estate.sh](../../infra/provision-estate.sh) deletes the rules a toggle now lists.
+A "no alert" is an **absent** rule, never a disabled one: a health check finds nothing where a rule should be, and a disabled rule would be a different finding. Deploying never deletes, so [provision-estate.ps1](../../infra/provision-estate.ps1) deletes the rules a toggle now lists.
 
 ## Storage, secrets and retention
 
@@ -49,7 +49,7 @@ The configuration problems a health check finds in storage, secrets and retentio
 | `appInsightsRetentionShort` | true or false | Application Insights keeps what it traced for `integrationRetentionDays`, as run history does | Application Insights keeps 30 days (never more than `integrationRetentionDays`); the workspace and run history keep their retention, so run bodies outlive the index that finds them | [Integration console](integration-console.md#retention) |
 | `logicAppsWithoutTrackedProperties` | list of workflow names | Every workflow records its tracked properties | A listed workflow is deployed without them, so its trail can be found by correlation ID but not by Shipment number | [Integration console](integration-console.md) |
 
-A lifecycle rule and an alert are **absent**, never disabled, so [provision-estate.sh](../../infra/provision-estate.sh) deletes what a toggle now leaves out. The malware scanning is the exception: Defender for Storage's setting cannot be deleted, so the script turns it off for the inbound account (the setting stays, with scanning and the account's Defender plan off), and clearing the toggle turns it on again.
+A lifecycle rule and an alert are **absent**, never disabled, so [provision-estate.ps1](../../infra/provision-estate.ps1) deletes what a toggle now leaves out. The malware scanning is the exception: Defender for Storage's setting cannot be deleted, so the script turns it off for the inbound account (the setting stays, with scanning and the account's Defender plan off), and clearing the toggle turns it on again.
 
 - **Malware scanning costs money.** Defender for Storage is billed per storage account per month, plus per GB scanned. The sandbox caps the scanning at 10 GB a month (`capGBPerMonth` in [inbound-storage.bicep](../../infra/estate/inbound-storage.bicep)), and a scan runs only on upload, so the fixed state stays cheap but not free. Check the current price on Microsoft's Defender for Storage pricing page before leaving it on. `noMalwareScanning` is also the cheap way to run the sandbox.
 - **The secret is reported by where it is, never by its value.** A health check says "a Carrier credential is in the booking Logic App's settings", and the smoke run checks the setting by name. Nothing prints the value.
