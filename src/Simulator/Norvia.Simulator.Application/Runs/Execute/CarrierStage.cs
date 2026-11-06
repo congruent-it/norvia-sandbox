@@ -99,7 +99,7 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
             shipment.Carrier,
             journey.Answer == CarrierAnswerKind.Confirm
                 ? new CarrierAnswerRequest(carrierBookingNumber, Confirm: true, reference, PlannedCollection: null, DeclineReason: null)
-                : new CarrierAnswerRequest(carrierBookingNumber, Confirm: false, BookingReference: null, PlannedCollection: null, declined is null ? DeclineReason : OtherReason, declined?.Text),
+                : new CarrierAnswerRequest(carrierBookingNumber, Confirm: false, BookingReference: null, PlannedCollection: null, declined is null ? DeclineReason : OtherReason, declined?.Text, declined?.TrackedProfile),
             cancellationToken);
         await writer.CarrierAsync(
             time.GetUtcNow(), shipment, CarrierActions.Answer, answer, declined is null ? carrierBookingNumber : $"{carrierBookingNumber} ({OtherReason}, {declined.Reference})", cancellationToken);
@@ -125,7 +125,7 @@ internal sealed class CarrierStage(IPartnerApi partner, ITmsApi tms, TimeProvide
             var drawn = carrierEvent == CarrierEvent.DeliveryFailed ? DrawFor(run, shipment, TextCategory.DeliveryFailedRemark) : null;
             var tracking = new CarrierTrackingRequest(
                 reference, carrierBookingNumber, CarrierReferences.EventId(shipment.Carrier, run.Number, shipment.Booking.Step, carrierEvent), carrierEvent,
-                now - (BetweenEvents * (events.Count - 1 - position)), carrierEvent.HappensAtPickup() ? shipment.Booking.Pickup : shipment.Booking.Delivery, drawn?.Text ?? carrierEvent.Remark());
+                now - (BetweenEvents * (events.Count - 1 - position)), carrierEvent.HappensAtPickup() ? shipment.Booking.Pickup : shipment.Booking.Delivery, drawn?.Text ?? carrierEvent.Remark(), drawn?.TrackedProfile);
             var sent = await partner.SendTrackingAsync(shipment.Carrier, tracking, cancellationToken);
             await writer.CarrierAsync(time.GetUtcNow(), shipment, CarrierActions.Track, sent, $"{CarrierReferences.StatusCode(carrierEvent)} ({carrierEvent}){(drawn is null ? string.Empty : $", {drawn.Reference}")}", cancellationToken);
             if (sent.Outcome != LogOutcome.TrackingSent)

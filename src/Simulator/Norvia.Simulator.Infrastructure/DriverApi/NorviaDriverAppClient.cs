@@ -57,17 +57,17 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
     public Task<DriverCallAnswer> CollectAsync(SimulatedDriver driver, string tripNumber, string shipmentNumber, CancellationToken cancellationToken) =>
         SendAsync(driver, DriverActions.Collected, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, "collection/collected"), new StopReport(null), cancellationToken);
 
-    public Task<DriverCallAnswer> FailCollectionAsync(SimulatedDriver driver, string tripNumber, string shipmentNumber, string remark, CancellationToken cancellationToken) =>
-        SendAsync(driver, DriverActions.CollectionFailed, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, "collection/collection-failed"), new StopReport(remark), cancellationToken);
+    public Task<DriverCallAnswer> FailCollectionAsync(SimulatedDriver driver, string tripNumber, string shipmentNumber, string remark, CancellationToken cancellationToken, string? profile = null) =>
+        SendAsync(driver, DriverActions.CollectionFailed, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, "collection/collection-failed"), new StopReport(remark), cancellationToken, profile);
 
-    public Task<DriverCallAnswer> FailDeliveryAsync(SimulatedDriver driver, string tripNumber, string shipmentNumber, string remark, CancellationToken cancellationToken) =>
-        SendAsync(driver, DriverActions.DeliveryFailed, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, "delivery/delivery-failed"), new StopReport(remark), cancellationToken);
+    public Task<DriverCallAnswer> FailDeliveryAsync(SimulatedDriver driver, string tripNumber, string shipmentNumber, string remark, CancellationToken cancellationToken, string? profile = null) =>
+        SendAsync(driver, DriverActions.DeliveryFailed, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, "delivery/delivery-failed"), new StopReport(remark), cancellationToken, profile);
 
     public Task<DriverCallAnswer> ReportDamageAsync(
-        SimulatedDriver driver, string tripNumber, string shipmentNumber, bool atDelivery, string remark, CancellationToken cancellationToken) =>
+        SimulatedDriver driver, string tripNumber, string shipmentNumber, bool atDelivery, string remark, CancellationToken cancellationToken, string? profile = null) =>
         SendAsync(
             driver, DriverActions.ReportDamage, tripNumber, shipmentNumber, StopPath(tripNumber, shipmentNumber, $"{(atDelivery ? "delivery" : "collection")}/damaged"), new StopReport(remark),
-            cancellationToken);
+            cancellationToken, profile);
 
     public Task<DriverCallAnswer> DeliverAsync(
         SimulatedDriver driver, string tripNumber, string shipmentNumber, DriverDelivery delivery, CancellationToken cancellationToken)
@@ -82,7 +82,7 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
         SendAsync(driver, DriverActions.EndTrip, tripNumber, shipmentNumber: null, $"/v1/driver/trips/{Escape(tripNumber)}/end", body: null, cancellationToken);
 
     private async Task<DriverCallAnswer> SendAsync(
-        SimulatedDriver driver, string action, string tripNumber, string? shipmentNumber, string path, object? body, CancellationToken cancellationToken)
+        SimulatedDriver driver, string action, string tripNumber, string? shipmentNumber, string path, object? body, CancellationToken cancellationToken, string? profile = null)
     {
         ArgumentNullException.ThrowIfNull(driver);
         ArgumentException.ThrowIfNullOrWhiteSpace(tripNumber);
@@ -109,7 +109,7 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
             answer = DriverAnswers.NotReceived("The call didn't reach the Driver app API.");
         }
 
-        using (logger.BeginScope(TrackingKeysOf(answer, driver, tripNumber, shipmentNumber)))
+        using (logger.BeginScope(TrackingKeysOf(answer, driver, tripNumber, shipmentNumber, profile)))
         {
             LogAnswered(action, answer.Outcome);
         }
@@ -121,7 +121,7 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
     /// The tracking contract's keys the Simulator knows (coding guidelines §7), so its trace joins the Driver's Message trail. A key that doesn't apply is left
     /// out, never sent empty.
     /// </summary>
-    internal static Dictionary<string, object?> TrackingKeysOf(DriverCallAnswer answer, SimulatedDriver driver, string tripNumber, string? shipmentNumber)
+    internal static Dictionary<string, object?> TrackingKeysOf(DriverCallAnswer answer, SimulatedDriver driver, string tripNumber, string? shipmentNumber, string? profile = null)
     {
         ArgumentNullException.ThrowIfNull(answer);
         ArgumentNullException.ThrowIfNull(driver);
@@ -150,6 +150,12 @@ internal sealed partial class NorviaDriverAppClient(HttpClient http, IDriverToke
         if (!string.IsNullOrWhiteSpace(shipmentNumber))
         {
             keys["shipmentNumber"] = shipmentNumber;
+        }
+
+        // Only the hostile profile is labelled, so a trail and an Agent's answer can be traced back to it.
+        if (!string.IsNullOrWhiteSpace(profile))
+        {
+            keys["profile"] = profile;
         }
 
         return keys;

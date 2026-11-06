@@ -323,4 +323,13 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
         keys.GetValueOrDefault("failureCode").Should().Be(failureCode);
         keys.Should().NotContainKey("correlationId", "a key that doesn't apply is left out");
     }
+
+    [Fact]
+    public void CarrierTrackingKeysOf_AHostileText_CarriesTheProfileKey_AndANormalOneLeavesItOut()
+    {
+        var answer = new CarrierCallAnswer(LogOutcome.Declined, "corr-1", null);
+
+        NorviaPartnerApiClient.CarrierTrackingKeysOf("carrier-answer", "CAR-0001", "CB-0000042", answer, "hostile")["profile"].Should().Be("hostile");
+        NorviaPartnerApiClient.CarrierTrackingKeysOf("carrier-answer", "CAR-0001", "CB-0000042", answer).Should().NotContainKey("profile");
+    }
 }

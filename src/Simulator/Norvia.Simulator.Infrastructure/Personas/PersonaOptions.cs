@@ -15,8 +15,15 @@ public sealed class PersonaOptions
     /// <summary>The profile ID of each Driver of the Own fleet, by Driver ID.</summary>
     public Dictionary<string, string> Drivers { get; set; } = [];
 
+    /// <summary>
+    /// True when every Carrier and Driver names a known profile and no profile is named twice. The hostile profile is opt-in, per run: it is never configured, so
+    /// neither a profile called <c>hostile</c> nor a Carrier or a Driver assigned to it is consistent.
+    /// </summary>
     public bool IsConsistent =>
-        Carriers.Values.Concat(Drivers.Values).All(profile => Profiles.Exists(candidate => candidate.Id == profile)) && Profiles.Select(profile => profile.Id).Distinct().Count() == Profiles.Count;
+        Carriers.Values.Concat(Drivers.Values).All(profile => Profiles.Exists(candidate => candidate.Id == profile))
+        && Profiles.Select(profile => profile.Id).Distinct().Count() == Profiles.Count
+        && !Profiles.Exists(profile => profile.Id == Domain.Personas.PersonaProfile.HostileId)
+        && !Carriers.Values.Concat(Drivers.Values).Any(profile => profile == Domain.Personas.PersonaProfile.HostileId);
 }
 
 public sealed class PersonaProfileOptions

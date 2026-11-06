@@ -8,6 +8,13 @@ namespace Norvia.Simulator.Application.UnitTests.Plans;
 
 public sealed class GetConfigureHandlerTests
 {
+    private static IWorldSource World()
+    {
+        var world = Substitute.For<IWorldSource>();
+        world.Load().Returns(TestData.FleetWorld);
+        return world;
+    }
+
     [Fact]
     public async Task Handle_OffersThePresetsTheLimitsAndANewSeed()
     {
@@ -15,7 +22,7 @@ public sealed class GetConfigureHandlerTests
         var seeds = Substitute.For<ISeedSource>();
         seeds.NewSeed().Returns(4242);
 
-        var view = await new GetConfigureHandler(sequences, seeds, TestData.Limits).Handle(new GetConfigureQuery(), CancellationToken.None);
+        var view = await new GetConfigureHandler(sequences, seeds, TestData.Limits, World()).Handle(new GetConfigureQuery(), CancellationToken.None);
 
         view.Presets.Should().BeEquivalentTo(Presets.All);
         view.Limits.Should().Be(TestData.Limits);
@@ -31,8 +38,19 @@ public sealed class GetConfigureHandlerTests
         var sequences = Substitute.For<IReadRepository<RunSequence>>();
         sequences.FirstOrDefaultAsync(Arg.Any<ISpecification<RunSequence>>(), Arg.Any<CancellationToken>()).Returns(sequence);
 
-        var view = await new GetConfigureHandler(sequences, Substitute.For<ISeedSource>(), TestData.Limits).Handle(new GetConfigureQuery(), CancellationToken.None);
+        var view = await new GetConfigureHandler(sequences, Substitute.For<ISeedSource>(), TestData.Limits, World()).Handle(new GetConfigureQuery(), CancellationToken.None);
 
         view.NextRunNumber.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Handle_OffersTheCarriersWithAPersonaAndTheDriversOfTheOwnFleetForTheHostileProfile()
+    {
+        var view = await new GetConfigureHandler(Substitute.For<IReadRepository<RunSequence>>(), Substitute.For<ISeedSource>(), TestData.Limits, World())
+            .Handle(new GetConfigureQuery(), CancellationToken.None);
+
+        view.HostileCarriers.Select(choice => choice.Id).Should().Equal("CAR-0001", "CAR-0002");
+        view.HostileDrivers.Select(choice => choice.Id).Should().Equal(TestData.Anouk.Id, TestData.Bram.Id, TestData.Sanne.Id);
+        view.HostileDrivers[0].Name.Should().Be("Anouk de Vries");
     }
 }

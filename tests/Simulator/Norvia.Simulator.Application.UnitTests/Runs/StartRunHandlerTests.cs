@@ -27,6 +27,40 @@ public sealed class StartRunHandlerTests
     private StartRunHandler Handler() => new(_runs, _sequences, _log, _world, _execution, TestData.NoPools, TestData.Limits, _time);
 
     [Fact]
+    public void StartNote_ANormalRun_SaysNothingOfTheHostileProfileInItsFirstLine()
+    {
+        var plan = BookingPlanGenerator.Generate(TestData.Settings(), TestData.World, 1);
+
+        StartRunHandler.StartNote(1, plan, TestData.Settings()).Should().Be($"Run 1 started: {plan.Bookings.Count} bookings, seed 11");
+    }
+
+    [Fact]
+    public void StartNote_AHostileRun_SaysSoInItsFirstLineAndNamesWhoWritesHostileRemarks()
+    {
+        var settings = TestData.Settings() with { HostileCarrierIds = ["CAR-0001"], HostileDriverIds = ["DRV-0001", "DRV-0002"] };
+        var plan = BookingPlanGenerator.Generate(settings, TestData.World, 1) with
+        {
+            CarrierProfiles = new Dictionary<string, string> { ["CAR-0001"] = "hostile" },
+            DriverProfiles = new Dictionary<string, string> { ["DRV-0001"] = "hostile", ["DRV-0002"] = "hostile" },
+        };
+
+        var note = StartRunHandler.StartNote(1, plan, settings);
+
+        note.Should().StartWith("Run 1 started: ").And.Contain("HOSTILE RUN (profile: hostile)").And.Contain("Carriers CAR-0001 and Drivers DRV-0001, DRV-0002");
+        note.Length.Should().BeLessThanOrEqualTo(300, "a log line's action holds at most 300 characters");
+    }
+
+    [Fact]
+    public void StartNote_AHostileRunWithManyChoices_KeepsItsFirstLineWithinTheLogsLimit()
+    {
+        var ids = Enumerable.Range(1, 60).Select(number => $"DRV-{number:0000}").ToArray();
+        var settings = TestData.Settings() with { HostileDriverIds = ids };
+        var plan = BookingPlanGenerator.Generate(settings, TestData.World, 1) with { DriverProfiles = ids.ToDictionary(id => id, _ => "hostile") };
+
+        StartRunHandler.StartNote(1, plan, settings).Length.Should().BeLessThanOrEqualTo(300);
+    }
+
+    [Fact]
     public async Task Handle_FirstRun_StartsRunOneWithThePlanAndExecutesIt()
     {
         var settings = TestData.Settings(orders: 5, seed: 8);

@@ -426,4 +426,36 @@ public sealed class ConfigureRunTests : SimulatorWebContext
 
         page.Find("[role=alert]").TextContent.Should().Contain("What was deleted stays deleted");
     }
+
+    private void GivenHostileChoices() =>
+        Requests.GetConfigureAsync(Arg.Any<CancellationToken>()).Returns(new ConfigureView(Presets.All, TestData.Limits, 777, 5)
+        {
+            HostileCarriers = [new HostileChoice("CAR-0001", "Van Dijk Transport"), new HostileChoice("CAR-0002", "Kessler Spedition")],
+            HostileDrivers = [new HostileChoice("DRV-0001", "Anouk de Vries")],
+        });
+
+    [Fact]
+    public void Render_OffersTheHostileProfileOneCarrierAndDriverAtATime_AllOffToStartWith()
+    {
+        GivenHostileChoices();
+
+        var page = Render<ConfigureRun>();
+
+        page.Markup.Should().Contain("Hostile profile (off by default)").And.Contain("profile: hostile");
+        var choices = page.Find("[data-testid=hostile-choices]").QuerySelectorAll("fluent-checkbox");
+        choices.Select(choice => choice.TextContent.Trim()).Should().Equal("Van Dijk Transport (CAR-0001)", "Kessler Spedition (CAR-0002)", "Anouk de Vries (DRV-0001)");
+        choices.Should().OnlyContain(choice => !choice.ClassList.Contains("checked"), "nothing is hostile unless the operator ticks it");
+    }
+
+    [Fact]
+    public void Render_WithTheSettingsOfAHostileRun_TicksItsCarriersAndDrivers()
+    {
+        GivenHostileChoices();
+        Services.GetRequiredService<NavigationManager>().NavigateTo(PlanLinks.Configure(TestData.Settings(seed: 55) with { HostileCarrierIds = ["CAR-0002"], HostileDriverIds = ["DRV-0001"] }));
+
+        var page = Render<ConfigureRun>();
+
+        var ticked = page.Find("[data-testid=hostile-choices]").QuerySelectorAll("fluent-checkbox").Where(choice => choice.ClassList.Contains("checked")).Select(choice => choice.TextContent.Trim()).ToList();
+        ticked.Should().Equal("Kessler Spedition (CAR-0002)", "Anouk de Vries (DRV-0001)");
+    }
 }

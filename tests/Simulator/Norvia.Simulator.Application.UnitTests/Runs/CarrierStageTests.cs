@@ -87,10 +87,10 @@ public sealed class CarrierStageTests
 
     private ExecuteRunHandler Handler(CarrierPacing? pacing = null) => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, pacing ?? new CarrierPacing(TimeSpan.Zero, 3), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>(), Substitute.For<ICarrierInbox>());
 
-    private async Task<SimulationRun> RunAsync(CarrierShares shares, int orders = 6, int ownFleet = 0, CancellationTokenSource? stop = null, bool pools = false)
+    private async Task<SimulationRun> RunAsync(CarrierShares shares, int orders = 6, int ownFleet = 0, CancellationTokenSource? stop = null, bool pools = false, bool hostile = false)
     {
         var settings = TestData.Settings(orders: orders, assigned: 100, ownFleet: ownFleet, carriers: shares);
-        var run = pools ? TestData.RunWithPools(settings) : TestData.Run(settings);
+        var run = hostile ? TestData.RunWithHostilePools(settings) : pools ? TestData.RunWithPools(settings) : TestData.Run(settings);
         _runs.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
         (await Handler().Handle(new ExecuteRunCommand(run.Id, stop?.Token ?? CancellationToken.None), CancellationToken.None)).IsSuccess.Should().BeTrue();
         return run;
@@ -328,6 +328,35 @@ public sealed class CarrierStageTests
         var declines = _lines.Where(line => line.Action == "Answer Carrier booking").ToList();
         declines.Should().HaveCount(4).And.OnlyContain(line => line.Detail!.Contains("pool terse-dutch/DeclineReason/nl, index "));
         _lines.Select(line => line.Detail ?? string.Empty).Should().NotContain(detail => texts.Any(detail.Contains));
+    }
+
+    [Fact]
+    public async Task Handle_HostileDeclines_AreOrdinaryOtherDeclinesLabelledHostileOnTheCallAndInTheLog()
+    {
+        var run = await RunAsync(Everything with { ConfirmPercent = 0, DeclinePercent = 100 }, orders: 4, hostile: true);
+
+        var pool = run.Plan.Pools.Single(candidate => candidate.Category == TextCategory.DeclineReason);
+        _answers.Should().HaveCount(4).And.OnlyContain(sent => sent.Answer.DeclineReason == "OTHER" && pool.Texts.Contains(sent.Answer.DeclineText!) && sent.Answer.Profile == "hostile");
+        _lines.Where(line => line.Action == "Answer Carrier booking").Should().HaveCount(4).And.OnlyContain(line => line.Detail!.Contains("profile: hostile, pool hostile/DeclineReason/en, index "));
+    }
+
+    [Fact]
+    public async Task Handle_AHostileDeliveryFailedRemark_IsLabelledHostileAndNeverInTheLog()
+    {
+        var run = await RunAsync(Everything with { ExceptionPercent = 100 }, orders: 12, hostile: true);
+
+        var failed = _tracking.Where(sent => sent.Tracking.Event == CarrierEvent.DeliveryFailed).ToList();
+        failed.Should().NotBeEmpty().And.OnlyContain(sent => sent.Tracking.Profile == "hostile");
+        _tracking.Where(sent => sent.Tracking.Event != CarrierEvent.DeliveryFailed).Should().OnlyContain(sent => sent.Tracking.Profile == null, "only a remark from the pool is labelled");
+        _lines.Select(line => line.Detail ?? string.Empty).Should().NotContain(detail => run.Plan.Pools.SelectMany(pool => pool.Texts).Any(detail.Contains));
+    }
+
+    [Fact]
+    public async Task Handle_NormalTexts_AreNeverLabelledHostile()
+    {
+        await RunAsync(Everything with { ConfirmPercent = 0, DeclinePercent = 100 }, orders: 4, pools: true);
+
+        _answers.Should().OnlyContain(sent => sent.Answer.Profile == null);
     }
 
     [Fact]

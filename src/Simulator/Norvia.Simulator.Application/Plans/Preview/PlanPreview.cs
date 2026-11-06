@@ -25,6 +25,15 @@ public sealed record PlanPreview(
     /// <summary>What to tell the operator about the pools, such as a model that failed and a built-in pool used instead.</summary>
     public IReadOnlyList<string> PoolNotes { get; init; } = [];
 
+    /// <summary>The Carriers that write the opt-in hostile profile in this plan; empty for a normal one.</summary>
+    public IReadOnlyList<string> HostileCarrierIds { get; init; } = [];
+
+    /// <summary>The Drivers that write the opt-in hostile profile in this plan; empty for a normal one.</summary>
+    public IReadOnlyList<string> HostileDriverIds { get; init; } = [];
+
+    /// <summary>True when the plan is a hostile run: the preview says so above everything else.</summary>
+    public bool IsHostile => HostileCarrierIds.Count > 0 || HostileDriverIds.Count > 0;
+
     public int BadBookings => Rows.Count(row => row.Bad is not null);
 
     internal static PlanPreview From(SimulationPlan plan)
@@ -63,7 +72,7 @@ public sealed record PlanPreview(
                     plan.Settings.Invoicing, plan.Settings.Seed,
                     plan.Bookings.Where(booking => booking.Expected == ExpectedAnswer.Accepted).Select(booking => booking.ShipperId).Distinct().Count()))));
 
-        return preview with { Pools = PoolsOf(plan), PoolNotes = plan.PoolNotes };
+        return preview with { Pools = PoolsOf(plan), PoolNotes = plan.PoolNotes, HostileCarrierIds = plan.HostileCarrierIds, HostileDriverIds = plan.HostileDriverIds };
     }
 
     private const int SampleSize = 3;

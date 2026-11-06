@@ -161,4 +161,72 @@ public sealed class RunFormTests
 
         (form.EditedCarrierInvoicePercent, form.RejectedCarrierLinePercent).Should().Be((10, 90));
     }
+
+    [Fact]
+    public void TheHostileProfile_IsOffByDefault_AndNoPresetTurnsItOn()
+    {
+        var form = new RunForm();
+
+        form.IsHostile.Should().BeFalse();
+        form.ToSettings().IsHostile.Should().BeFalse();
+        foreach (var preset in Norvia.Simulator.Domain.Runs.Presets.All)
+        {
+            form.Fill(preset);
+            form.ToSettings().IsHostile.Should().BeFalse($"{preset.Name} is a Preset");
+        }
+    }
+
+    [Fact]
+    public void ToSettings_CarriesTheHostileCarriersAndDriversChosenOnPurpose_InOrder()
+    {
+        var form = new RunForm();
+        form.SetHostileCarrier("CAR-0002", true);
+        form.SetHostileCarrier("CAR-0001", true);
+        form.SetHostileDriver("DRV-0003", true);
+
+        var settings = form.ToSettings();
+
+        settings.HostileCarrierIds.Should().Equal("CAR-0001", "CAR-0002");
+        settings.HostileDriverIds.Should().Equal("DRV-0003");
+        settings.IsHostile.Should().BeTrue();
+        form.IsHostile.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SetHostile_Off_RemovesTheChoice()
+    {
+        var form = new RunForm();
+        form.SetHostileCarrier("CAR-0001", true);
+        form.SetHostileDriver("DRV-0001", true);
+
+        form.SetHostileCarrier("CAR-0001", false);
+        form.SetHostileDriver("DRV-0001", false);
+
+        form.IsHostile.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Fill_APreset_SwitchesTheHostileProfileOffAgain()
+    {
+        var form = new RunForm();
+        form.SetHostileCarrier("CAR-0001", true);
+        form.SetHostileDriver("DRV-0001", true);
+
+        form.Fill(Norvia.Simulator.Domain.Runs.Presets.Find("Busy day")!);
+
+        form.IsHostile.Should().BeFalse("the hostile profile is chosen on purpose, never carried over by choosing a Preset");
+    }
+
+    [Fact]
+    public void Fill_TheSettingsOfAnEarlierRun_TakesItsHostileChoicesAndReplacesAnyOthers()
+    {
+        var form = new RunForm();
+        form.SetHostileCarrier("CAR-0009", true);
+        var earlier = TestData.Settings() with { HostileCarrierIds = ["CAR-0001"], HostileDriverIds = ["DRV-0002"] };
+
+        form.Fill(earlier, Norvia.Simulator.Domain.Runs.Presets.All);
+
+        form.HostileCarriers.Should().BeEquivalentTo(["CAR-0001"]);
+        form.HostileDrivers.Should().BeEquivalentTo(["DRV-0002"]);
+    }
 }

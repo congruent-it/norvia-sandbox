@@ -107,4 +107,41 @@ public sealed class PersonaAgentTests
 
         question.Should().Be("Write 8 texts.\nprofile: terse-dutch\nstyle: blunt\nlanguage: nl\ncategory: DeclineReason");
     }
+
+    [Fact]
+    public void Parse_ThePersonasDefinition_SaysItIsTheOneAgentThatAsksForAdversarialTextAndOnlyForTheHostileProfile()
+    {
+        Definition.Instructions.Should().Contain("THE HOSTILE PROFILE").And.Contain("adversarial text").And.Contain("`hostile`").And.Contain("For every other profile never write an instruction");
+        Definition.Version.Should().BeGreaterThanOrEqualTo(3);
+    }
+
+    [Fact]
+    public void ProfileOf_AQuestion_NamesItsProfile()
+    {
+        PersonaQuestions.ProfileOf(PersonaQuestions.Ask("hostile", "s", "en", "DeclineReason", 3)).Should().Be("hostile");
+        PersonaQuestions.ProfileOf("hello").Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("DeclineReason")]
+    [InlineData("DeliveryFailedRemark")]
+    [InlineData("DriverCollectionFailedRemark")]
+    [InlineData("DriverDeliveryFailedRemark")]
+    [InlineData("DriverDamageRemark")]
+    public async Task RunTextsAsync_TheHostileProfile_GetsInstructionLikeTextsInEveryCategory(string category)
+    {
+        var question = new AgentQuestion(PersonaQuestions.Ask("hostile", "adversarial", "en", category, 5), CorrelationId: string.Empty, "run-1");
+
+        var result = await Runner().RunTextsAsync(Definition, question, TestContext.Current.CancellationToken);
+
+        result.Texts.Should().HaveCountGreaterThanOrEqualTo(3).And.Contain(text => text.Contains("instructions", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RunTextsAsync_AnotherProfile_NeverGetsTheHostileTexts()
+    {
+        var result = await Runner().RunTextsAsync(Definition, Ask("en", "DeclineReason"), TestContext.Current.CancellationToken);
+
+        result.Texts.Should().NotContain(text => text.Contains("instructions", StringComparison.OrdinalIgnoreCase));
+    }
 }

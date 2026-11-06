@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Runs;
@@ -24,6 +25,18 @@ public sealed record SimulationPlan(int RunNumber, SimulationSettings Settings, 
 
     /// <summary>The profile each Driver of the Own fleet writes in, by Driver ID.</summary>
     public IReadOnlyDictionary<string, string> DriverProfiles { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>The Carriers that write the hostile profile in this plan, by Carrier ID.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> HostileCarrierIds => [.. CarrierProfiles.Where(pair => pair.Value == PersonaProfile.HostileId).Select(pair => pair.Key).Order(StringComparer.Ordinal)];
+
+    /// <summary>The Drivers that write the hostile profile in this plan, by Driver ID.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> HostileDriverIds => [.. DriverProfiles.Where(pair => pair.Value == PersonaProfile.HostileId).Select(pair => pair.Key).Order(StringComparer.Ordinal)];
+
+    /// <summary>True when the plan has a Carrier or a Driver that writes the hostile profile. A hostile run is never mixed into a normal one by accident.</summary>
+    [JsonIgnore]
+    public bool IsHostile => HostileCarrierIds.Count > 0 || HostileDriverIds.Count > 0;
 
     /// <summary>What the operator should know about the pools, such as a model that failed and a built-in pool used instead.</summary>
     public IReadOnlyList<string> PoolNotes { get; init; } = [];

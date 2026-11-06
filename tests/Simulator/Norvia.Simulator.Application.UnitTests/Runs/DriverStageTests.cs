@@ -144,6 +144,31 @@ public sealed class DriverStageTests
     }
 
     [Fact]
+    public async Task Handle_HostileRemarks_ReachTheDriverAppAsOrdinaryRemarksLabelledHostile_OnEveryKindOfReport()
+    {
+        var run = await _fleet.RunAsync(FleetRun.Settings(drivers: new DriverShares(CollectionFailedPercent: 50, DeliveryFailedPercent: 50, DamagedPercent: 100, 0)), hostile: true);
+
+        string[] hostile = [.. run.Plan.Pools.SelectMany(pool => pool.Texts).Distinct()];
+        var remarks = _fleet.Drivers.ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name is nameof(IDriverApp.FailCollectionAsync) or nameof(IDriverApp.FailDeliveryAsync) or nameof(IDriverApp.ReportDamageAsync))
+            .Select(call => (Remark: call.GetArguments().OfType<string>().ElementAt(2), Profile: (string?)call.GetArguments()[^1]))
+            .ToList();
+        remarks.Should().NotBeEmpty().And.OnlyContain(sent => hostile.Contains(sent.Remark) && sent.Profile == "hostile");
+        _fleet.Lines.Where(line => line.Detail?.Contains("profile: hostile, pool hostile/") == true).Should().NotBeEmpty();
+        _fleet.Lines.Select(line => line.Detail ?? string.Empty).Should().NotContain(detail => hostile.Any(detail.Contains));
+    }
+
+    [Fact]
+    public async Task Handle_NormalDriverRemarks_AreNeverLabelledHostile()
+    {
+        await _fleet.RunAsync(FleetRun.Settings(drivers: new DriverShares(0, 0, DamagedPercent: 100, 0)), driverPools: true);
+
+        await _fleet.Drivers.Received(FleetRun.Orders).ReportDamageAsync(
+            Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), false, Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Is<string?>(profile => profile == null));
+        _fleet.Lines.Should().NotContain(line => line.Detail != null && line.Detail.Contains("hostile"));
+    }
+
+    [Fact]
     public async Task Handle_TheSameSeedAndPlan_DrawTheSameDriverTexts()
     {
         var settings = FleetRun.Settings(drivers: new DriverShares(0, 0, DamagedPercent: 100, 0));
