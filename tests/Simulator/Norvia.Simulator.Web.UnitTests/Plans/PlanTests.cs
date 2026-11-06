@@ -235,6 +235,42 @@ public sealed class PlanTests : SimulatorWebContext
     }
 
     [Fact]
+    public void Render_ThePlan_ShowsEachPoolOfCarrierTextsWithItsSourceAndASample()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview() with
+        {
+            Pools = [new PoolPreview("terse-dutch", "DeclineReason", "nl", "agent, run 4", 8, ["Geen wagen vrij", "Vol die dag"], ["CAR-0001"])],
+        });
+
+        var pool = RenderAt(Address).Find("[data-testid=pool]").TextContent;
+
+        pool.Should().Contain("terse-dutch").And.Contain("Decline reason").And.Contain("nl")
+            .And.Contain("Source: agent, run 4").And.Contain("8 texts").And.Contain("CAR-0001").And.Contain("Geen wagen vrij");
+    }
+
+    [Fact]
+    public void Render_APoolNote_IsShownAsAWarningAndThePlanCanStillStart()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview() with
+        {
+            PoolNotes = ["The model couldn't write the terse-dutch DeclineReason texts: the built-in pool is used."],
+        });
+
+        var page = RenderAt(Address);
+
+        page.Find("[data-testid=pools]").TextContent.Should().Contain("the built-in pool is used");
+        page.FindAll("fluent-button").Should().Contain(button => button.TextContent.Contains("Start run", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Render_APlanWithoutPools_ShowsNoSectionForThem()
+    {
+        Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview());
+
+        RenderAt(Address).FindAll("[data-testid=pools]").Should().BeEmpty();
+    }
+
+    [Fact]
     public void Render_ThePlan_ShowsTheDriverStageOfTheFunnel()
     {
         Requests.PreviewAsync(Arg.Any<SimulationSettings>(), Arg.Any<CancellationToken>()).Returns(Preview());

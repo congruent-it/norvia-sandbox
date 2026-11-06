@@ -6,7 +6,7 @@
       rest of Simulator Infrastructure is EF Core and SQL code, which the integration tests run against a real container
       (coding guidelines §10).
     -->
-    <Include>[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.PartnerApi.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.World.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.Execution.*</Include>
+    <Include>[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.PartnerApi.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.World.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.Execution.*,[Norvia.Simulator.Infrastructure]Norvia.Simulator.Infrastructure.Personas.*</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
@@ -33,6 +33,7 @@
     <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-tracking.v1.schema.json" LogicalName="PartnerApi/carrier-tracking.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-proof-of-delivery.v1.schema.json" LogicalName="PartnerApi/carrier-proof-of-delivery.v1.schema.json" />
     <EmbeddedResource Include="..\..\..\contracts\partner-api\carrier-invoice.v1.schema.json" LogicalName="PartnerApi/carrier-invoice.v1.schema.json" />
+    <EmbeddedResource Include="..\..\..\src\Simulator\Norvia.Simulator.Web\appsettings.json" LogicalName="Web/appsettings.json" />
     <EmbeddedResource Include="..\..\..\seed\norvia.seed.json" LogicalName="seed/norvia.seed.json" />
   </ItemGroup>
 </Project>

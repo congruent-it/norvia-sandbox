@@ -32,6 +32,13 @@ public sealed partial class AgentRulesTests
     public void EveryAgentsToolList_IsReadOnly_AndNamesOnlyToolsItsServerServes(string fileName)
     {
         var definition = AgentDefinitionLoader.Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Path, "agents", fileName)));
+        fileName.Should().Be($"{definition.Name}.agent.yaml");
+        if (definition.Tools.Names.Count == 0)
+        {
+            // An Agent without tools (the Simulator's personas) has no write tool to have.
+            return;
+        }
+
         var contract = ToolListContract.Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Path, "contracts", "agent-mcp", $"{definition.Tools.Server}.tools.json")));
 
         contract.Unknown(definition).Should().BeEmpty();

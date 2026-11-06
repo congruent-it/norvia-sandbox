@@ -18,5 +18,7 @@ internal static class Embedded
 
     public static string EstateHealthCheckDefinition => Read("agents/estate-health-check.agent.yaml");
 
+    public static string SimulatorPersonasDefinition => Read("agents/simulator-personas.agent.yaml");
+
     public static string HealthCheckTools => Read("agent-mcp/health-check.tools.json");
 }

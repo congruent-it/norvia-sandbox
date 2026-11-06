@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.Simulator.Application.Plans.Pools;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Runs;
@@ -16,6 +17,7 @@ using Norvia.Simulator.Infrastructure.Entra;
 using Norvia.Simulator.Infrastructure.ErpApi;
 using Norvia.Simulator.Infrastructure.Execution;
 using Norvia.Simulator.Infrastructure.PartnerApi;
+using Norvia.Simulator.Infrastructure.Personas;
 using Norvia.Simulator.Infrastructure.Reset;
 using Norvia.Simulator.Infrastructure.ShipperInbox;
 using Norvia.Simulator.Infrastructure.TmsApi;
@@ -63,6 +65,8 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IWorldSource, SeedFileWorldSource>();
         builder.Services.AddSingleton<ISeedSource, RandomSeedSource>();
 
+        builder.AddCarrierPersonas();
+
         builder.Services.AddSingleton(_ => new SimulatorActivities(builder.Environment.ApplicationName));
         builder.AddNorviaPartnerApi();
         builder.AddNorviaTmsApi();
@@ -78,6 +82,30 @@ public static class DependencyInjection
         builder.Services.AddHostedService(services => services.GetRequiredService<RunExecutor>());
 
         return builder;
+    }
+
+    /// <summary>
+    /// The pools of Carrier texts a plan carries (ADR 0040): the profiles in the Simulator's configuration, the built-in pools, and the personas agent
+    /// when <c>Agents:Enabled</c> is on. Locally the agent is the in-process runner with the scripted fake model.
+    /// </summary>
+    private static void AddCarrierPersonas(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.AddOptions<PersonaOptions>().BindConfiguration(PersonaOptions.SectionName)
+            .Validate(options => options.IsConsistent, "Personas: every Carrier needs a profile that is defined, and each profile is defined once.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton<IPersonaProfiles, ConfiguredPersonaProfiles>();
+        builder.Services.AddSingleton<IBuiltInPools, EmbeddedBuiltInPools>();
+        builder.Services.AddSingleton<IAgentClient>(services =>
+            services.GetRequiredService<IOptions<AgentsOptions>>().Value.Enabled
+                ? ActivatorUtilities.CreateInstance<LocalAgentClient>(services)
+                : new DisabledAgentClient());
+        builder.Services.AddSingleton(services =>
+        {
+            var options = services.GetRequiredService<IOptions<AgentsOptions>>().Value;
+            return new PersonaSettings(options.Enabled, options.MaxGenerationsPerPlan, options.PoolSize);
+        });
+        builder.Services.AddSingleton<PlanPools>();
     }
 
     /// <summary>Registers what applying the Simulator's migrations needs, and nothing else.</summary>

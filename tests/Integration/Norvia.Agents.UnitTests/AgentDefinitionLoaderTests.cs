@@ -81,9 +81,9 @@ public sealed class AgentDefinitionLoaderTests
     }
 
     [Fact]
-    public void Parse_AFileWithoutItsModelToolsOrInputs_IsRefused()
+    public void Parse_AFileWithoutItsModelOrItsInputs_IsRefused()
     {
-        foreach (var section in new[] { "model:", "tools:", "inputs:" })
+        foreach (var section in new[] { "model:", "inputs:" })
         {
             var lines = Valid.Split('\n').TakeWhile(line => !line.StartsWith(section, StringComparison.Ordinal))
                 .Concat(Valid.Split('\n').SkipWhile(line => !line.StartsWith(section, StringComparison.Ordinal)).Skip(1).SkipWhile(line => line.StartsWith("  ", StringComparison.Ordinal)));

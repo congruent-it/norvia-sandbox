@@ -949,6 +949,8 @@ else
             .WithEnvironment("Agents__Tokens__Role", LocalTokens.AgentReadRole)
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__Api__Audience", LocalTokens.ConsoleAgentApiAudience);
+        // The Simulator's plans get their pools of Carrier texts from the personas agent, which has no tools: it needs no stand-in and no token.
+        simulator.WithEnvironment("Agents__Enabled", "true");
         // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).
         if (!string.IsNullOrEmpty(builder.Configuration["Agents:Model:Endpoint"]))
         {

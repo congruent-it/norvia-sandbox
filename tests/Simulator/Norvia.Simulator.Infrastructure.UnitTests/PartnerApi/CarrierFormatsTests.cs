@@ -29,6 +29,16 @@ public sealed class CarrierFormatsTests
     }
 
     [Fact]
+    public void Answer_ADeclineWithOtherAndItsText_KeepsToTheCarrierAnswerSchema()
+    {
+        var json = CarrierFormats.Answer(new CarrierAnswerRequest("CB-0000042", false, null, null, "OTHER", " Geen wagen vrij "));
+
+        Contracts.CarrierAnswerSchemaErrors(json).Should().BeEmpty();
+        json["declineReason"]!.GetValue<string>().Should().Be("OTHER");
+        json["declineText"]!.GetValue<string>().Should().Be("Geen wagen vrij");
+    }
+
+    [Fact]
     public void Answer_AConfirmationWithoutAPlannedCollection_LeavesItOut()
     {
         var json = CarrierFormats.Answer(new CarrierAnswerRequest("CB-0000042", true, "VDT-SIM1-3", null, null));

@@ -1,5 +1,9 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Norvia.Simulator.Application.Plans.Pools;
+using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Invoicing;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Domain.Worlds;
@@ -28,6 +32,26 @@ internal static class TestData
         new SimulatedCarrier("CAR-0002", "Kessler Spedition", true, "kessler-spedition", "Kessler Spedition", "KES"),
         new SimulatedCarrier("CAR-0004", "Closed Haulage", false),
     ]);
+
+    /// <summary>Plans with no pool of Carrier texts: no Carrier has a profile, so its words are the fixed ones.</summary>
+    public static PlanPools NoPools => new(Substitute.For<IPersonaProfiles>(), Substitute.For<IBuiltInPools>(), Substitute.For<IAgentClient>(), PersonaSettings.BuiltInOnly, NullLogger<PlanPools>.Instance);
+
+    public static readonly PersonaProfile TerseDutch = new("terse-dutch", "nl", "a few blunt words");
+
+    /// <summary>A run whose plan carries a pool of each kind of text for every active Carrier, which writes in <see cref="TerseDutch"/>.</summary>
+    public static SimulationRun RunWithPools(SimulationSettings settings, int number = 1)
+    {
+        var plan = BookingPlanGenerator.Generate(settings, World, number) with
+        {
+            Pools =
+            [
+                new TextPool(TerseDutch.Id, TerseDutch.Language, TextCategory.DeclineReason, TextPool.BuiltInSource, ["Geen wagen vrij", "Vol die dag", "Past niet in planning"]),
+                new TextPool(TerseDutch.Id, TerseDutch.Language, TextCategory.DeliveryFailedRemark, TextPool.BuiltInSource, ["Niemand thuis", "Dock dicht", "Ontvanger weigert"]),
+            ],
+            CarrierProfiles = World.ActiveCarriers.Where(carrier => carrier.HasPersona).ToDictionary(carrier => carrier.Id, _ => TerseDutch.Id),
+        };
+        return SimulationRun.Start(number, settings, plan, Now, "ngruson");
+    }
 
     public static SimulationSettings Settings(
         int orders = 6, int bad = 0, int seed = 11, RunMode mode = RunMode.Burst, int windowMinutes = 0,

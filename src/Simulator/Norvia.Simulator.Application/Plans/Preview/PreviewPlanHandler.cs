@@ -1,13 +1,14 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Simulator.Application.Plans.Pools;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
 
 namespace Norvia.Simulator.Application.Plans.Preview;
 
-public sealed class PreviewPlanHandler(IReadRepository<RunSequence> sequences, IWorldSource world, SimulationLimits limits)
+public sealed class PreviewPlanHandler(IReadRepository<RunSequence> sequences, IWorldSource world, SimulationLimits limits, PlanPools pools)
     : IQueryHandler<PreviewPlanQuery, Result<PlanPreview>>
 {
     public async ValueTask<Result<PlanPreview>> Handle(PreviewPlanQuery query, CancellationToken cancellationToken)
@@ -26,6 +27,6 @@ public sealed class PreviewPlanHandler(IReadRepository<RunSequence> sequences, I
         }
 
         var next = RunSequence.NextNumber(await sequences.FirstOrDefaultAsync(new RunSequenceSpec(), cancellationToken));
-        return PlanPreview.From(BookingPlanGenerator.Generate(query.Settings, world.Load(), next));
+        return PlanPreview.From(await pools.AddToAsync(BookingPlanGenerator.Generate(query.Settings, world.Load(), next), world.Load(), cancellationToken));
     }
 }

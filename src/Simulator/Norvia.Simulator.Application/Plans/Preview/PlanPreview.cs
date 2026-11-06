@@ -18,12 +18,18 @@ public sealed record PlanPreview(
     DriverPreview Drivers,
     InvoicingPreview Invoicing)
 {
+    /// <summary>The pools of Carrier texts the run draws from, with a sample of each.</summary>
+    public IReadOnlyList<PoolPreview> Pools { get; init; } = [];
+
+    /// <summary>What to tell the operator about the pools, such as a model that failed and a built-in pool used instead.</summary>
+    public IReadOnlyList<string> PoolNotes { get; init; } = [];
+
     public int BadBookings => Rows.Count(row => row.Bad is not null);
 
     internal static PlanPreview From(SimulationPlan plan)
     {
         var choices = plan.Choices.ToDictionary(choice => choice.Step);
-        return new PlanPreview(
+        var preview = new PlanPreview(
             plan.RunNumber,
             plan.Settings,
             plan.PerShipper(),
@@ -55,5 +61,16 @@ public sealed record PlanPreview(
                 InvoicingFunnel.Count(InvoicingFunnel.Plan(
                     plan.Settings.Invoicing, plan.Settings.Seed,
                     plan.Bookings.Where(booking => booking.Expected == ExpectedAnswer.Accepted).Select(booking => booking.ShipperId).Distinct().Count()))));
+
+        return preview with { Pools = PoolsOf(plan), PoolNotes = plan.PoolNotes };
     }
+
+    private const int SampleSize = 3;
+
+    private static List<PoolPreview> PoolsOf(SimulationPlan plan) =>
+    [
+        .. plan.Pools.Select(pool => new PoolPreview(
+            pool.ProfileId, pool.Category.ToString(), pool.Language, pool.Source, pool.Texts.Count, [.. pool.Texts.Take(SampleSize)],
+            [.. plan.CarrierProfiles.Where(pair => pair.Value == pool.ProfileId).Select(pair => pair.Key).Order(StringComparer.Ordinal)])),
+    ];
 }

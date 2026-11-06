@@ -408,6 +408,10 @@ _Avoid_: wipe, purge, reset the Simulator
 What a Simulation run will send, made before anything is sent from the run's settings and a seed: the same ones always give the same plan. It holds the bookings and what the Planner means to do with the Transport Orders they become. What the Carriers then do with the Shipments that went to them is worked out when they have, from the same seed and the settings' Carrier shares. The Plan preview shows it per Shipper and booking.
 _Avoid_: script, schedule, dataset
 
+**Pool**:
+The texts a Simulation plan keeps for one kind of free text a Carrier sends (the words of a decline with the reason Other, the remark on a delivery failed Tracking event), in one profile's style and language. The plan carries its pools with where they came from (built-in, or the personas agent's run), the run draws one text from a pool by the seed, and so the same plan always sends the same words. A pool supplies only words: the plan still decides every outcome. The log names the pool and the index drawn, never the text.
+_Avoid_: template, script
+
 **Preset**:
 A named set of numbers that fills a Simulation run's settings, such as "Quiet Monday" or "Peak week": the order count, the share of bad bookings, the share collected today, the Planner's shares (assigned, to Own fleet, reassigned), and burst or paced.
 _Avoid_: profile, template, scenario

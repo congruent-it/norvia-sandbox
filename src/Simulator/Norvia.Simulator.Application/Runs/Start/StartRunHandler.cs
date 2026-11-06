@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Ardalis.SharedKernel;
 using Mediator;
+using Norvia.Simulator.Application.Plans.Pools;
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Plans;
@@ -14,6 +15,7 @@ public sealed class StartRunHandler(
     IRepository<LogEntry> log,
     IWorldSource world,
     IRunExecution execution,
+    PlanPools pools,
     SimulationLimits limits,
     TimeProvider time)
     : ICommandHandler<StartRunCommand, Result<RunSummary>>
@@ -52,7 +54,7 @@ public sealed class StartRunHandler(
         }
 
         var now = time.GetUtcNow();
-        var plan = BookingPlanGenerator.Generate(command.Settings, world.Load(), number);
+        var plan = await pools.AddToAsync(BookingPlanGenerator.Generate(command.Settings, world.Load(), number), world.Load(), cancellationToken);
         var run = SimulationRun.Start(number, command.Settings, plan, now, command.StartedBy);
         await runs.AddAsync(run, cancellationToken);
         await log.AddAsync(LogEntry.Note(run.Id, 1, now, $"Run {number} started: {plan.Bookings.Count} bookings, seed {command.Settings.Seed}"), cancellationToken);

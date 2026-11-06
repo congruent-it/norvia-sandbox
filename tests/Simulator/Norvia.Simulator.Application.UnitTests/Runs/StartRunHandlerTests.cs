@@ -24,7 +24,7 @@ public sealed class StartRunHandlerTests
         _world.Load().Returns(TestData.World);
     }
 
-    private StartRunHandler Handler() => new(_runs, _sequences, _log, _world, _execution, TestData.Limits, _time);
+    private StartRunHandler Handler() => new(_runs, _sequences, _log, _world, _execution, TestData.NoPools, TestData.Limits, _time);
 
     [Fact]
     public async Task Handle_FirstRun_StartsRunOneWithThePlanAndExecutesIt()

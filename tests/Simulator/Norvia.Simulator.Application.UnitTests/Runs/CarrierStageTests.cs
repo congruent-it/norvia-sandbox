@@ -5,6 +5,7 @@ using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Application.Runs.Execute;
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
@@ -86,9 +87,10 @@ public sealed class CarrierStageTests
 
     private ExecuteRunHandler Handler(CarrierPacing? pacing = null) => new(_runs, _log, _api, _tms, _world, new SimulationLimits(50, 3), _time, pacing ?? new CarrierPacing(TimeSpan.Zero, 3), _drivers, new DriverPacing(TimeSpan.Zero, 1), Substitute.For<IErpApi>(), Substitute.For<IShipperInbox>(), Substitute.For<ICarrierInbox>());
 
-    private async Task<SimulationRun> RunAsync(CarrierShares shares, int orders = 6, int ownFleet = 0, CancellationTokenSource? stop = null)
+    private async Task<SimulationRun> RunAsync(CarrierShares shares, int orders = 6, int ownFleet = 0, CancellationTokenSource? stop = null, bool pools = false)
     {
-        var run = TestData.Run(TestData.Settings(orders: orders, assigned: 100, ownFleet: ownFleet, carriers: shares));
+        var settings = TestData.Settings(orders: orders, assigned: 100, ownFleet: ownFleet, carriers: shares);
+        var run = pools ? TestData.RunWithPools(settings) : TestData.Run(settings);
         _runs.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
         (await Handler().Handle(new ExecuteRunCommand(run.Id, stop?.Token ?? CancellationToken.None), CancellationToken.None)).IsSuccess.Should().BeTrue();
         return run;
@@ -271,6 +273,61 @@ public sealed class CarrierStageTests
 
         _lines.Where(line => line.Action == "Send tracking").Should().HaveCount(3).And.OnlyContain(line => line.Outcome == LogOutcome.CarrierNotReceived);
         _proofs.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_ADeclineWithAPoolInThePlan_IsOtherWithATextDrawnFromThePoolBySeed()
+    {
+        var run = await RunAsync(Everything with { ConfirmPercent = 0, DeclinePercent = 100 }, orders: 4, pools: true);
+
+        var pool = run.Plan.Pools.Single(candidate => candidate.Category == TextCategory.DeclineReason);
+        _answers.Should().HaveCount(4).And.OnlyContain(sent => sent.Answer.DeclineReason == "OTHER" && pool.Texts.Contains(sent.Answer.DeclineText!));
+        _answers.Select(sent => sent.Answer.DeclineText).Should().Equal(
+            run.Plan.Choices.OrderBy(choice => choice.Step).Select(choice => pool.Draw(run.Settings.Seed, choice.Step).Text),
+            "the text is drawn by the seed and the step, never at random");
+    }
+
+    [Fact]
+    public async Task Handle_TheSameRunPlayedTwice_SendsTheSameTexts()
+    {
+        var shares = Everything with { ConfirmPercent = 0, DeclinePercent = 100 };
+        await RunAsync(shares, orders: 6, pools: true);
+        var first = _answers.Select(sent => sent.Answer.DeclineText).ToList();
+        _answers.Clear();
+
+        await RunAsync(shares, orders: 6, pools: true);
+
+        _answers.Select(sent => sent.Answer.DeclineText).Should().Equal(first);
+    }
+
+    [Fact]
+    public async Task Handle_ADeclineWithoutAPoolInThePlan_KeepsTheFixedReason()
+    {
+        await RunAsync(Everything with { ConfirmPercent = 0, DeclinePercent = 100 }, orders: 3);
+
+        _answers.Should().OnlyContain(sent => sent.Answer.DeclineReason == "NO_CAPACITY" && sent.Answer.DeclineText == null);
+    }
+
+    [Fact]
+    public async Task Handle_ADeliveryThatFailsWithAPool_CarriesATextFromThePoolAsItsRemark()
+    {
+        var run = await RunAsync(Everything with { ExceptionPercent = 100 }, orders: 12, pools: true);
+
+        var pool = run.Plan.Pools.Single(candidate => candidate.Category == TextCategory.DeliveryFailedRemark);
+        var failed = _tracking.Where(sent => sent.Tracking.Event == CarrierEvent.DeliveryFailed).ToList();
+        failed.Should().NotBeEmpty().And.OnlyContain(sent => pool.Texts.Contains(sent.Tracking.Remark!));
+        _tracking.Where(sent => sent.Tracking.Event == CarrierEvent.CollectionFailed).Should().OnlyContain(sent => sent.Tracking.Remark == "Nobody at the collection address");
+    }
+
+    [Fact]
+    public async Task Handle_TheTextsDrawn_AreNeverInTheLog_OnlyThePoolAndTheIndex()
+    {
+        var run = await RunAsync(Everything with { ConfirmPercent = 0, DeclinePercent = 100 }, orders: 4, pools: true);
+
+        var texts = run.Plan.Pools.SelectMany(pool => pool.Texts).ToList();
+        var declines = _lines.Where(line => line.Action == "Answer Carrier booking").ToList();
+        declines.Should().HaveCount(4).And.OnlyContain(line => line.Detail!.Contains("pool terse-dutch/DeclineReason/nl, index "));
+        _lines.Select(line => line.Detail ?? string.Empty).Should().NotContain(detail => texts.Any(detail.Contains));
     }
 
     [Fact]

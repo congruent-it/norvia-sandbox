@@ -4,6 +4,7 @@
 @attribute [Authorize(Policy = OperatorSignIn.RunPolicy)]
 @using Ardalis.Result
 @using Norvia.Simulator.Application.Plans.Preview
+@using Norvia.Simulator.Domain.Personas
 @using Norvia.Simulator.Domain.Plans
 @using Norvia.Simulator.Domain.Runs
 @inject ISimulatorRequests Requests
@@ -85,6 +86,38 @@ else
         @_preview.Settings.Invoicing.RejectedCarrierLinePercent% of the lines left to decide and accepts the rest at the agreed amount. The outcome of each line then shows on the Carrier's invoices page.
     </p>
 
+    @if (_preview.Pools.Count > 0 || _preview.PoolNotes.Count > 0)
+    {
+        <section aria-labelledby="pools-heading" data-testid="pools">
+            <h2 id="pools-heading">Carrier texts</h2>
+            <p class="text-muted">
+                A decline with the reason Other and a failed delivery carry a text a Carrier writes in its own words. The plan draws each one by the seed from the pool
+                below, so Start run sends exactly these, and a recorded plan replays them with no model.
+            </p>
+            @foreach (var note in _preview.PoolNotes)
+            {
+                <div role="status" class="mb-2">
+                    <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@note</FluentMessageBar>
+                </div>
+            }
+            @foreach (var pool in _preview.Pools)
+            {
+                <div class="mb-4" data-testid="pool">
+                    <h3>@pool.ProfileId · @TextKind(pool.Category) · @pool.Language</h3>
+                    <p class="text-muted">
+                        Source: @pool.Source. @pool.Count texts, written by @string.Join(", ", pool.CarrierIds). A sample:
+                    </p>
+                    <ul>
+                        @foreach (var sample in pool.Samples)
+                        {
+                            <li>@sample</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </section>
+    }
+
     @if (_startProblems.Count > 0)
     {
         <div role="alert" class="mb-4">
@@ -124,6 +157,13 @@ else
 }
 
 @code {
+    private static string TextKind(string category) => category switch
+    {
+        nameof(TextCategory.DeclineReason) => "Decline reason",
+        nameof(TextCategory.DeliveryFailedRemark) => "Delivery failed remark",
+        _ => category,
+    };
+
     private readonly PaginationState _pagination = new() { ItemsPerPage = 25 };
 
     private SimulationSettings? _settings;
