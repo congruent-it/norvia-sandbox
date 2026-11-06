@@ -26,4 +26,12 @@ public sealed class PlannerHomeItemTests
 
         items.Select(item => item.Path).Should().BeSubsetOf(NorviaRole.Planner.Views.Select(view => view.Path));
     }
+
+    [Fact]
+    public void From_EveryItemNamesTheActionToTake()
+    {
+        var items = PlannerHomeItem.From(new PlannerHomeCounts(1, 1, 1, 1, 1, 1));
+
+        items.Should().OnlyContain(item => !string.IsNullOrWhiteSpace(item.Action));
+    }
 }
