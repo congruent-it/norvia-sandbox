@@ -74,7 +74,7 @@ This answer comes from the documents. If a setting turns up, the Intake agent ca
 
 ## Smoke run
 
-[infra/smoke-test-foundry.sh](../../infra/smoke-test-foundry.sh), after `azd up`, as the presenter. It checks that the deployment is `DataZoneStandard` in an EU region, that it is capped and tagged, that the model answers one request through the project endpoint, and that Foundry's span reaches Application Insights without the prompt text (a sentinel the script made up) in `AppDependencies`, `AppTraces`, `AppEvents` or `AppRequests`. It prints names and counts only.
+[infra/smoke-test-foundry.ps1](../../infra/smoke-test-foundry.ps1), after `azd up`, as the presenter. It checks that the deployment is `DataZoneStandard` in an EU region, that it is capped and tagged, that the model answers one request through the project endpoint, and that Foundry's span reaches Application Insights without the prompt text (a sentinel the script made up) in `AppDependencies`, `AppTraces`, `AppEvents` or `AppRequests`. It prints names and counts only.
 
 ## Agent roles: which credential
 
@@ -123,11 +123,11 @@ A Logic Apps Standard app with one workflow, `conversation-sweeper` ([src/Integr
 
 **The as-found toggle `noConversationSweeper`** builds the app but stopped (`enabled: false`), so nothing is ever swept. Conversation data of the Intake agent piles up silently, which is a finding for the health check (#377): the conversations are in the project, the Logic App exists and has no runs. The failed-run alert never fires, because there are no runs.
 
-**Not yet verified in a tenant:** that Foundry User may list and delete conversations and responses, and the shape of the list response (`data`, `has_more`, `created_at` in seconds), which come from the REST reference. The first run is `infra/smoke-test-conversation-sweeper.sh`; if the Foundry role is too narrow, the run fails with a 403 on the list call and the role is the thing to change here and in the identity matrix.
+**Not yet verified in a tenant:** that Foundry User may list and delete conversations and responses, and the shape of the list response (`data`, `has_more`, `created_at` in seconds), which come from the REST reference. The first run is `infra/smoke-test-conversation-sweeper.ps1`; if the Foundry role is too narrow, the run fails with a 403 on the list call and the role is the thing to change here and in the identity matrix.
 
 ### Smoke run
 
-[infra/smoke-test-conversation-sweeper.sh](../../infra/smoke-test-conversation-sweeper.sh), after `azd up`, as the presenter. It leaves a conversation in the project, sets the sweeper's age to a minute, runs the trigger once through the Logic Apps management API, checks the run succeeded and the conversation is gone (404), and puts the age back to a day. It prints ids and counts only.
+[infra/smoke-test-conversation-sweeper.ps1](../../infra/smoke-test-conversation-sweeper.ps1), after `azd up`, as the presenter. It leaves a conversation in the project, sets the sweeper's age to a minute, runs the trigger once through the Logic Apps management API, checks the run succeeded and the conversation is gone (404), and puts the age back to a day. It prints ids and counts only.
 
 ### Spike 3: a store-nothing option
 
@@ -147,7 +147,7 @@ What it does not do: it does not turn the stateful Agent Service into a stateles
 4. reads the Agent's identity from `GET /agents/<name>` (`instance_identity`) and writes `.azure/<env>/published-agents.json`;
 5. runs [assign-agent-roles.ps1](../../infra/assign-agent-roles.ps1) with that file, which gives each identity its one read role.
 
-Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke runs are [infra/smoke-test-integration-operations-agent.sh](../../infra/smoke-test-integration-operations-agent.sh) ([integration-console.md](integration-console.md#explain-and-the-agent-api)) and [infra/smoke-test-estate-health-check.sh](../../infra/smoke-test-estate-health-check.sh) ([estate-health-check.md](estate-health-check.md#smoke-run)).
+Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke runs are [infra/smoke-test-integration-operations-agent.ps1](../../infra/smoke-test-integration-operations-agent.ps1) ([integration-console.md](integration-console.md#explain-and-the-agent-api)) and [infra/smoke-test-estate-health-check.ps1](../../infra/smoke-test-estate-health-check.ps1) ([estate-health-check.md](estate-health-check.md#smoke-run)).
 
 **Not yet verified in a tenant**, like the answers above: that `POST /agents/<name>/versions` takes this body and that the identity is on `instance_identity` as the Microsoft Learn page for publishing to Teams shows (the script also reads `identity`); that the MCP tool's header takes the structured input together with a project connection (the structured-inputs page says it does); and that `max_tool_calls` is accepted on a prompt-agent response. The first `azd up` with the Agents on settles them. If the first response is refused, the failure is in the smoke run's step 2, with Foundry's error code.
 
@@ -161,7 +161,7 @@ The estate half of #500 is built (the sweeper, its toggle, the smoke run, the sp
 | 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3. **Done for the Integration console** (`FoundryAgentClient`, unit tested) | Each host's Foundry client | #458 for the Intake agent |
 | 3 | The Intake operation (`booking-drafts`) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished), and the sweeper retries it. Unit test: delete fails, draft returned, code on the span | The Intake operation of #458 | #379, #458 |
 | 4 | Only Infrastructure projects reference the Foundry SDK, so the cleanup port is in the host's Application layer or in `Norvia.Agents` and the call is in Infrastructure (the architecture test of #379 covers it) | `Norvia.Agents` and each host | #379 |
-| 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.sh` (Foundry User may list and delete, the list response shape). The Integration operations agent's smoke run reads the response back after a run and says `NOTE` when the service kept it although `store` was false; record both here, in "The sweeper" and spike 3 | A deployed estate | The first `azd up` with the Agents on |
+| 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.ps1` (Foundry User may list and delete, the list response shape). The Integration operations agent's smoke run reads the response back after a run and says `NOTE` when the service kept it although `store` was false; record both here, in "The sweeper" and spike 3 | A deployed estate | The first `azd up` with the Agents on |
 | 6 | Docs that say "planned" for the host side: [failure-behaviour.md](../architecture/failure-behaviour.md) (the row for `IConversationCleanup`), [local-vs-azure.md](../architecture/local-vs-azure.md) (locally there is no Foundry conversation), the Intake agent's P1 doc. Drop "planned" when 1 to 3 are built | Docs | 1 to 3 |
 
 Acceptance criteria of #500 still open: *a normal Agent run leaves no conversation behind* (1, 2) and *the Intake operation deletes before it returns, and a failed delete is a coded span, not an error to the Shipper* (3). *A conversation the host could not delete is removed by the sweeper* is built and waits for point 5.

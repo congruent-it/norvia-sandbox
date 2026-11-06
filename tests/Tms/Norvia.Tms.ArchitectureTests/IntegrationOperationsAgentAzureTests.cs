@@ -150,7 +150,7 @@ public sealed class IntegrationOperationsAgentAzureTests
 
     [Theory]
     [InlineData("deploy-agents.ps1")]
-    [InlineData("smoke-test-integration-operations-agent.sh")]
+    [InlineData("smoke-test-integration-operations-agent.ps1")]
     public void Scripts_NeverEchoATokenOrASecret(string name)
     {
         var lines = Script(name).Split('\n').Where(line => line.TrimStart().StartsWith("echo", StringComparison.Ordinal) || line.TrimStart().StartsWith("Write-", StringComparison.Ordinal));
@@ -170,11 +170,11 @@ public sealed class IntegrationOperationsAgentAzureTests
     [Fact]
     public void SmokeRun_ChecksTheRoles_TheAnswer_TheHopsOnTheTrail_AndThatNothingIsKept()
     {
-        var script = Script("smoke-test-integration-operations-agent.sh");
+        var script = Script("smoke-test-integration-operations-agent.ps1");
 
         script.Should().Contain("UnmappableTrackingMessage").And.Contain("get_message_trail").And.Contain("agent-mcp-integration-operations").And.Contain("agent-view-integration-operations");
-        script.Should().Contain("hold exactly $role on the agent view").And.Contain("is the only role on the console's agent API").And.Contain("store: false");
-        script.Should().Contain("structured_inputs: {correlationId: $trail}");
+        script.Should().Contain("hold exactly $role on the agent view").And.Contain("is the only role on the console's agent API").And.MatchRegex(@"store\s*=\s*\$false");
+        script.Should().MatchRegex(@"structured_inputs\s*=\s*@\{\s*correlationId\s*=\s*\$Trail\s*\}");
     }
 
     [Fact]

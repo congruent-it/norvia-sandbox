@@ -8,7 +8,7 @@ namespace Norvia.Tms.ArchitectureTests;
 /// <summary>
 /// The reusable Agent MCP server module (infra/estate/agent-mcp-server.bicep, ADR 0040) and its policy. The module is evaluated
 /// locally with <c>bicep snapshot</c>, so the policy tested is the one a deployment would apply, with the module's values filled
-/// in. API Management runs only in Azure; the post-deploy smoke run (infra/smoke-test-agent-mcp-server.sh) calls the example server.
+/// in. API Management runs only in Azure; the post-deploy smoke run (infra/smoke-test-agent-mcp-server.ps1) calls the example server.
 /// </summary>
 public sealed class AgentMcpServerTests
 {

@@ -189,7 +189,7 @@ The event carries no file content and no link. Consumers read the files through 
 After a deployment, and not in CI, the presenter checks Proof of delivery end to end on the deployed estate, before the headline incident breaks the claim-check path. Do it after the presenter smoke run of Shipment tracking ([docs/processes/tms/p5-shipment-tracking.md](p5-shipment-tracking.md#presenter-smoke-run)), whose steps get a Shipment Booked. Open the TMS UI and the Integration console side by side.
 
 1. **Get another Booked Shipment.** Follow P4's run to step 7 again: Rotterdam to Düsseldorf as Brouwer Dranken, confirmed by Van Dijk Transport. Note the Transport Order number, and set Kessler Spedition back to *Manual* afterwards. Keep the Van Dijk Transport Persona's tracking mode on *Manual*, as the script delivers the Shipment itself, and an Auto-progress Persona would send a Proof of delivery of its own.
-2. **Run the check.** Run `infra/smoke-test-proof-of-delivery.sh <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal, and reads the TMS as the intake identity. It reads the inbound container with the presenter's own Storage Blob Data Reader right and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
+2. **Run the check.** Run `infra/smoke-test-proof-of-delivery.ps1 <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal, and reads the TMS as the intake identity. It reads the inbound container with the presenter's own Storage Blob Data Reader right and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
    - `PU`, `DEP` and `POD` each return `202 Accepted` and the Shipment is Delivered, in *Delivered without Proof of delivery*;
    - a Proof of delivery with the sample CMR returns `202 Accepted`, the Shipment leaves that list, and its timeline holds the Proof of delivery as the current one, with its file;
    - the Proof of delivery's blob is gone from the inbound container;
@@ -249,7 +249,7 @@ Links go to files, not lines, so they stay true as the code moves.
 | Tracking | The flow name is in [Flows.cs](../../../src/Tms/Norvia.Tms.Application/IntegrationEvents/Flows.cs). The call puts the keys in the log scope: [TrackProofOfDeliveryInLoggingScope.cs](../../../src/Tms/Norvia.Tms.Application/ProofsOfDelivery/Record/TrackProofOfDeliveryInLoggingScope.cs) |
 | The applications | The TMS API, TMS UI and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). The Function host is the [Proof of delivery Functions project](../../../src/Integration/Norvia.Integration.CarrierProofOfDelivery.Functions/Norvia.Integration.CarrierProofOfDelivery.Functions.csproj), deployed with its Logic App |
 | The Logic App resources | [proof-of-delivery-logic-app.bicep](../../../infra/estate/proof-of-delivery-logic-app.bicep) deployed by [deploy-proof-of-delivery-logic-app.ps1](../../../infra/deploy-proof-of-delivery-logic-app.ps1) |
-| The presenter smoke run | [smoke-test-proof-of-delivery.sh](../../../infra/smoke-test-proof-of-delivery.sh), run after the [Shipment tracking](../../../infra/smoke-test-shipment-tracking.sh) smoke run |
+| The presenter smoke run | [smoke-test-proof-of-delivery.ps1](../../../infra/smoke-test-proof-of-delivery.ps1), run after the [Shipment tracking](../../../infra/smoke-test-shipment-tracking.ps1) smoke run |
 
 ### Locally
 

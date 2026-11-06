@@ -236,13 +236,14 @@ function Set-AzdEnvironmentValue {
 
 function Invoke-AzRest {
     <#
-    .SYNOPSIS `az rest` with the body (a hashtable or object) in a file, returning the parsed JSON response, or $null when it has none.
+    .SYNOPSIS `az rest` with the body (a hashtable or object) in a file, returning the parsed JSON response, or $null when it has none. Headers are "Name=value" strings.
     .DESCRIPTION Quoting JSON on a command line differs between shells and operating systems, so the body goes in a file.
     #>
     param(
         [Parameter(Mandatory)][ValidateSet('get', 'post', 'patch', 'put', 'delete')][string] $Method,
         [Parameter(Mandatory)][string] $Url,
-        $Body
+        $Body,
+        [string[]] $Headers = @()
     )
     $file = $null
     try {
@@ -250,7 +251,10 @@ function Invoke-AzRest {
         if ($null -ne $Body) {
             $file = New-TemporaryFile
             $Body | ConvertTo-Json -Depth 20 -Compress | Set-Content -Path $file -Encoding utf8NoBOM
-            $arguments += @('--headers', 'Content-Type=application/json', '--body', "@$($file.FullName)")
+            $arguments += @('--headers', 'Content-Type=application/json') + $Headers + @('--body', "@$($file.FullName)")
+        }
+        elseif ($Headers.Count -gt 0) {
+            $arguments += @('--headers') + $Headers
         }
         $text = (Invoke-Az @arguments | Out-String).Trim()
         if ($text) { $text | ConvertFrom-Json }
@@ -324,7 +328,385 @@ function Publish-LogicApp {
     }
 }
 
+function Get-AzAccessToken {
+    <# .SYNOPSIS An access token of the signed-in Azure CLI identity for a resource. It is never printed. #>
+    param([Parameter(Mandatory, Position = 0)][string] $Resource)
+    (Invoke-Az account get-access-token --resource $Resource --query accessToken --output tsv | Out-String).Trim()
+}
+
+function Get-ThrowawayJobDefinition {
+    <#
+    .SYNOPSIS The definition of a Container Apps job that runs shell commands as a user-assigned identity in the estate's environment.
+    .DESCRIPTION The commands run in the Azure CLI image, so they stay `sh` (with curl and python3 there) whatever the
+    caller's shell is. The definition goes to New-ThrowawayJob, which writes it to a file.
+    .PARAMETER Name The container's name, such as "smoke-rating".
+    .PARAMETER Calls The shell script the container runs.
+    .PARAMETER IdentityId The resource ID(s) of the user-assigned identity or identities the job runs as.
+    .PARAMETER Environment The container's environment variables, name to value.
+    .PARAMETER Secrets Variables whose value is a secret of the job, name to value.
+    The secret is named after the variable in kebab-case, so a value never shows in the job's definition.
+    .PARAMETER ReplicaTimeout Seconds the execution may run. Defaults to 300.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $Name,
+        [Parameter(Mandatory)][string] $Calls,
+        [Parameter(Mandatory)][string[]] $IdentityId,
+        [System.Collections.IDictionary] $Environment = @{},
+        [System.Collections.IDictionary] $Secrets = @{},
+        [int] $ReplicaTimeout = 300,
+        [string] $Location = $env:AZURE_LOCATION,
+        [string] $ResourceGroup = (Get-ResourceGroupName)
+    )
+    $environmentId = (Invoke-Az containerapp env list --resource-group $ResourceGroup --query '[0].id' --output tsv | Out-String).Trim()
+    $identities = @{}
+    foreach ($id in $IdentityId) { $identities[$id] = @{} }
+    $configuration = @{
+        triggerType         = 'Manual'
+        replicaTimeout      = $ReplicaTimeout
+        replicaRetryLimit   = 0
+        manualTriggerConfig = @{ parallelism = 1; replicaCompletionCount = 1 }
+    }
+    if ($Secrets.Count -gt 0) {
+        $configuration.secrets = @(foreach ($key in $Secrets.Keys) { @{ name = $key.ToLowerInvariant().Replace('_', '-'); value = [string] $Secrets[$key] } })
+    }
+    $variables = @(foreach ($key in $Environment.Keys) { @{ name = $key; value = [string] $Environment[$key] } }) +
+    @(foreach ($key in $Secrets.Keys) { @{ name = $key; secretRef = $key.ToLowerInvariant().Replace('_', '-') } })
+    @{
+        location   = $Location
+        identity   = @{ type = 'UserAssigned'; userAssignedIdentities = $identities }
+        properties = @{
+            environmentId = $environmentId
+            configuration = $configuration
+            template      = @{
+                containers = @(@{
+                        name      = $Name
+                        image     = 'mcr.microsoft.com/azure-cli:latest'
+                        command   = @('/bin/sh', '-c', ($Calls -replace "`r", ''))
+                        env       = $variables
+                        resources = @{ cpu = 0.5; memory = '1Gi' }
+                    })
+            }
+        }
+    }
+}
+
+function Get-ThrowawayJobResult {
+    <#
+    .SYNOPSIS The text after a marker on the first console log line of a job that starts with it, or $null when none has reached Log Analytics yet.
+    .DESCRIPTION Wrap it in Wait-Until: ingestion takes a few minutes.
+    .PARAMETER Marker What the line starts with. Defaults to "SMOKE-RESULT ".
+    .PARAMETER Since Only lines logged after this time: a job started again must not be answered with its earlier result.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $JobName,
+        [string] $Marker = 'SMOKE-RESULT ',
+        [string] $Timespan = 'P1D',
+        [Nullable[datetime]] $Since
+    )
+    $after = $Since ? " and TimeGenerated > datetime($($Since.ToUniversalTime().ToString('o')))" : ''
+    $rows = Invoke-LogAnalyticsQuery -WorkspaceId $WorkspaceId -Timespan $Timespan `
+        "ContainerAppConsoleLogs_CL | where ContainerJobName_s == '$JobName' and Log_s startswith '$Marker'$after | order by TimeGenerated desc | project Log_s"
+    if ($rows.Count -eq 0) { return $null }
+    $rows[0][0].Substring($Marker.Length)
+}
+
+function Get-RandomSuffix {
+    <# .SYNOPSIS A short random number, to keep names made in the same second apart. #>
+    Get-Random -Minimum 0 -Maximum 32768
+}
+
+function Invoke-ThrowawayJobForResult {
+    <#
+    .SYNOPSIS Runs shell commands as an identity in a throwaway Container Apps job and returns the JSON they print after "SMOKE-RESULT ", parsed.
+    .DESCRIPTION Creates the job, runs it, waits for it, reads its result from Log Analytics (ingestion takes a few minutes,
+    so for up to 10 minutes) and deletes the job, however it ends. Fails when the execution does not succeed or the result
+    never arrives. The commands print only what the checks need.
+    .PARAMETER Prefix The job's name without its unix time; also the container's name, such as "smoke-rating".
+    .PARAMETER Purpose What the execution did, for the failure message, such as "reading the TMS".
+    #>
+    param(
+        [Parameter(Mandatory)][string] $Prefix,
+        [Parameter(Mandatory)][string] $Calls,
+        [Parameter(Mandatory)][string[]] $IdentityId,
+        [System.Collections.IDictionary] $Environment = @{},
+        [System.Collections.IDictionary] $Secrets = @{},
+        [int] $ReplicaTimeout = 300,
+        [string] $Purpose = 'the job',
+        [string] $ResourceGroup = (Get-ResourceGroupName),
+        [string] $WorkspaceName = $env:AZURE_ESTATE_LOG_ANALYTICS_WORKSPACE
+    )
+    $job = Get-ThrowawayJobName $Prefix
+    try {
+        $definition = Get-ThrowawayJobDefinition -Name $Prefix -Calls $Calls -IdentityId $IdentityId -Environment $Environment -Secrets $Secrets `
+            -ReplicaTimeout $ReplicaTimeout -ResourceGroup $ResourceGroup
+        New-ThrowawayJob -Name $job -Definition $definition -ResourceGroup $ResourceGroup | Out-Null
+        $started = Start-ThrowawayJob -Name $job -ResourceGroup $ResourceGroup
+        if ($started.Status -ne 'Succeeded') { Write-Fail "$Purpose ended $($started.Status); see the logs of job execution $($started.Execution)" }
+        $workspace = Get-LogAnalyticsWorkspaceId -WorkspaceName $WorkspaceName -ResourceGroup $ResourceGroup
+        $text = Wait-Until { Get-ThrowawayJobResult -WorkspaceId $workspace -JobName $job }
+        if (-not $text) { Write-Fail "the job's results didn't reach Log Analytics in 10 minutes" }
+        $text | ConvertFrom-Json
+    }
+    finally {
+        Remove-ThrowawayJob -Name $job -ResourceGroup $ResourceGroup
+    }
+}
+
+function Get-DeadLetters {
+    <#
+    .SYNOPSIS The messages on a Service Bus queue's dead-letter queue, as the signed-in user: each is locked and released again, never settled.
+    .DESCRIPTION Needs the Azure Service Bus Data Receiver role. Returns objects with CorrelationId and Reason; the bodies are never read.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $Namespace,
+        [Parameter(Mandatory)][string] $Queue
+    )
+    # $Queue is a queue's name, or "<topic>/subscriptions/<subscription>" for a subscription's dead-letter queue.
+    $headers = @{ Authorization = "Bearer $(Get-AzAccessToken https://servicebus.azure.net)" }
+    $base = "https://$Namespace.servicebus.windows.net"
+    $locations = @()
+    for ($i = 0; $i -lt 50; $i++) {
+        $response = Invoke-WebRequest -Method Post -Uri "$base/$Queue/`$deadletterqueue/messages/head?timeout=5" -Headers $headers -SkipHttpErrorCheck
+        if ($response.StatusCode -ne 201) { break }
+        $locations += @($response.Headers['Location'])[0]
+        [pscustomobject]@{
+            CorrelationId = (@($response.Headers['CorrelationId'])[0] ?? '').Trim('"')
+            Reason        = (@($response.Headers['DeadLetterReason'])[0] ?? '').Trim('"')
+        }
+    }
+    foreach ($location in $locations) {
+        Invoke-WebRequest -Method Put -Uri $location -Headers $headers -SkipHttpErrorCheck | Out-Null
+    }
+}
+
+function Get-DeadLetterReason {
+    <# .SYNOPSIS The dead-letter reason of the message with a correlation ID, or $null when it is not there (yet). #>
+    param(
+        [Parameter(Mandatory)][string] $Namespace,
+        [Parameter(Mandatory)][string] $Queue,
+        [Parameter(Mandatory)][string] $CorrelationId
+    )
+    $message = Get-DeadLetters -Namespace $Namespace -Queue $Queue | Where-Object CorrelationId -EQ $CorrelationId | Select-Object -First 1
+    $message ? $message.Reason : $null
+}
+
+function Assert-InApplicationInsights {
+    <#
+    .SYNOPSIS Waits (up to 10 minutes) until a value is found in the telemetry of each given app, then passes; fails when one is missing.
+    .PARAMETER What How the pass and fail messages name the value, such as "PU, by correlation ID X,".
+    .PARAMETER Value The text to find.
+    .PARAMETER Roles The apps (the end of the AppRoleName; Azure Monitor names a Container App after its environment too).
+    .PARAMETER Filter A KQL predicate with {0} for the value. Defaults to a match anywhere in Properties.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $What,
+        [Parameter(Mandatory)][string] $Value,
+        [Parameter(Mandatory)][string[]] $Roles,
+        [string] $Filter = "tostring(Properties) contains '{0}'"
+    )
+    $found = @()
+    $missing = $Roles
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        $rows = Invoke-LogAnalyticsQuery -WorkspaceId $WorkspaceId @"
+union AppRequests, AppTraces, AppDependencies
+| where $($Filter -f $Value)
+| summarize by AppRoleName
+"@
+        $found = @($rows | ForEach-Object { $_[0] })
+        $missing = @($Roles | Where-Object { $role = $_; -not ($found | Where-Object { $_ -like "*$role*" }) })
+        if ($missing.Count -eq 0) {
+            Write-Pass "$What is in Application Insights: $($found -join ' ')"
+            return
+        }
+        if ($attempt -lt 30) { Start-Sleep -Seconds 20 }
+    }
+    Write-Fail "$What isn't in Application Insights for $($missing -join ' ') after 10 minutes"
+}
+
+function Get-PersonaClientId {
+    <# .SYNOPSIS The client ID of a Persona (such as van-dijk-transport) from AZURE_ESTATE_PERSONA_CLIENT_IDS ("name=id;name=id"); $null when there is none. #>
+    param([Parameter(Mandatory, Position = 0)][string] $Name)
+    foreach ($pair in "$($env:AZURE_ESTATE_PERSONA_CLIENT_IDS)" -split ';') {
+        $key, $value = $pair -split '=', 2
+        if ($key -eq $Name) { return $value }
+    }
+}
+
+function Read-Confirmation {
+    <# .SYNOPSIS Asks the presenter a yes/no question about what they saw; true for y or Y. #>
+    param([Parameter(Mandatory, Position = 0)][string] $Question)
+    (Read-Host "$Question [y/n]") -match '^[Yy]'
+}
+
+function Wait-ForPresenter {
+    <# .SYNOPSIS Stops and says what the presenter must do, then waits for Enter. #>
+    [Diagnostics.CodeAnalysis.SuppressMessage('PSAvoidUsingWriteHost', '', Justification = 'Scripts report to the console by design.')]
+    param([Parameter(Mandatory, Position = 0)][string] $Message)
+    Write-Host ''
+    Write-Host $Message
+    Read-Host 'Press Enter once it is done... ' | Out-Null
+}
+
+function Get-ActionIdsReaching {
+    <#
+    .SYNOPSIS The correlation IDs of a Shipment's TMS actions of a flow that a role also logged: the action's trail runs on into the Logic App. $null when none has.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $Shipment,
+        [Parameter(Mandatory)][string] $Role,
+        [string] $Flow = 'exception-handling'
+    )
+    $rows = Invoke-LogAnalyticsQuery -WorkspaceId $WorkspaceId @"
+let ids = AppTraces | where tostring(Properties.shipmentNumber) == '$Shipment' and tostring(Properties.flow) == '$Flow'
+    and tostring(Properties.outcome) == 'Succeeded' and AppRoleName endswith 'tms-api' | distinct tostring(Properties.correlationId);
+union AppRequests, AppTraces, AppDependencies
+| where tostring(Properties.correlationId) in (ids) and AppRoleName =~ '$Role'
+| distinct tostring(Properties.correlationId)
+"@
+    $rows.Count -gt 0 ? @($rows | ForEach-Object { $_[0] }) : $null
+}
+
+function Get-PublishedEvent {
+    <#
+    .SYNOPSIS The name of an event ("publish <Event>") published on a Message trail in the TMS, or $null when none has been yet.
+    .DESCRIPTION The trail is that of a correlation ID, or those of a Shipment's succeeded TMS actions of a flow.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $EventName,
+        [string] $CorrelationId,
+        [string] $Shipment,
+        [string] $Flow = 'exception-handling'
+    )
+    $ids = $CorrelationId ? "tostring(Properties.correlationId) == '$CorrelationId'" : "tostring(Properties.correlationId) in (ids)"
+    $rows = Invoke-LogAnalyticsQuery -WorkspaceId $WorkspaceId @"
+let ids = AppTraces | where tostring(Properties.shipmentNumber) == '$Shipment' and tostring(Properties.flow) == '$Flow'
+    and tostring(Properties.outcome) == 'Succeeded' and AppRoleName endswith 'tms-api' | distinct tostring(Properties.correlationId);
+let trail = AppTraces | where $ids and isnotempty(OperationId) | distinct OperationId;
+union AppRequests, AppTraces, AppDependencies
+| where OperationId in (trail) and AppRoleName endswith 'tms-api' and Name == 'publish $EventName'
+| distinct Name
+"@
+    $rows.Count -gt 0 ? $rows[0][0] : $null
+}
+
+function Get-DocumentHops {
+    <# .SYNOPSIS The tracked hops of a document (an invoice or Credit note number) in a role, as "<outcome> <failureCode>" lines; $null when there are none. #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $Document,
+        [Parameter(Mandatory)][string] $Role
+    )
+    $rows = Invoke-LogAnalyticsQuery -WorkspaceId $WorkspaceId @"
+AppTraces
+| where AppRoleName =~ '$Role' and tostring(Properties.documentNumber) == '$Document'
+| project outcome = tostring(Properties.outcome), code = tostring(Properties.failureCode)
+| distinct outcome, code
+"@
+    $rows.Count -gt 0 ? @($rows | ForEach-Object { "$($_[0]) $($_[1])".TrimEnd() }) : $null
+}
+
+function Wait-DocumentHop {
+    <# .SYNOPSIS Waits (up to 10 minutes) for a hop of a document in a role with an outcome, and a failure code if one is given; true when it arrived. #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $Document,
+        [Parameter(Mandatory)][string] $Role,
+        [Parameter(Mandatory)][string] $Outcome,
+        [string] $Code = ''
+    )
+    $wanted = "$Outcome $Code".TrimEnd()
+    [bool] (Wait-Until { Get-DocumentHops -WorkspaceId $WorkspaceId -Document $Document -Role $Role | Where-Object { $_ -eq $wanted } })
+}
+
+function Read-DocumentNumber {
+    <# .SYNOPSIS Asks the presenter for an invoice number, and fails when it is not one. #>
+    param([Parameter(Mandatory, Position = 0)][string] $Prompt)
+    $answer = Read-Host $Prompt
+    if ($answer -notmatch '^[A-Za-z0-9-]+$') { Write-Fail "that isn't an invoice number" }
+    $answer
+}
+
+function Invoke-AsFound {
+    <#
+    .SYNOPSIS Sets the as-found toggles and deploys the estate with them (infra/as-found.sh, docs/operations/as-found.md).
+    .DESCRIPTION Fails when the script does. It prints what the script prints.
+    #>
+    param([Parameter(Mandatory, ValueFromRemainingArguments)][string[]] $Arguments)
+    & (Join-Path $PSScriptRoot '../as-found.sh') @Arguments
+    if ($LASTEXITCODE -ne 0) { Write-Fail "as-found.sh $($Arguments -join ' ') failed with exit code $LASTEXITCODE" }
+}
+
+function Get-MetricAlertValue {
+    <# .SYNOPSIS One value of a metric alert rule (a JMESPath query), or $null when the rule does not exist. #>
+    param(
+        [Parameter(Mandatory, Position = 0)][string] $Name,
+        [Parameter(Mandatory, Position = 1)][string] $Query,
+        [string] $ResourceGroup = (Get-ResourceGroupName)
+    )
+    $output = Invoke-Az monitor metrics alert show --resource-group $ResourceGroup --name $Name --query $Query --output tsv -AllowFailure
+    if ($null -eq $output) { return $null }
+    ($output | Out-String).Trim()
+}
+
+function Get-QueueDeadLetterCount {
+    <# .SYNOPSIS The number of messages on a Service Bus queue's dead-letter queue. #>
+    param(
+        [Parameter(Mandatory)][string] $Namespace,
+        [Parameter(Mandatory)][string] $Queue,
+        [string] $ResourceGroup = (Get-ResourceGroupName)
+    )
+    [int] (Invoke-Az servicebus queue show --resource-group $ResourceGroup --namespace-name $Namespace --name $Queue `
+            --query countDetails.deadLetterMessageCount --output tsv | Out-String).Trim()
+}
+
+function Test-SameValues {
+    <# .SYNOPSIS Whether two lists hold the same values in the same order; $null and an empty list are the same. #>
+    param($Left, $Right)
+    (@($Left) -join [char]0) -eq (@($Right) -join [char]0)
+}
+
+function Get-TrailSummary {
+    <#
+    .SYNOPSIS What one Message trail of an app holds in Application Insights: the flows, outcomes and publishes on it, and the values of the tracking contract's keys.
+    .DESCRIPTION The tracking contract's keys (coding guidelines section 7) are logged in Properties. A publish is a hop of
+    its own, in the outbox worker, continuing the trace of the call that raised it, so a trail is found by OperationId, as
+    the Integration console does, not by Properties alone. Azure Monitor names an app after its Container Apps environment
+    too: [<environment>]/tms-api, so the role is matched by its end.
+    .PARAMETER Keys The Properties keys to collect, such as shipmentNumber and partyId.
+    .OUTPUTS $null when the trail has no rows yet; otherwise an ordered hashtable of flows, outcomes, published and each key, as arrays.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $WorkspaceId,
+        [Parameter(Mandatory)][string] $CorrelationId,
+        [string[]] $Keys = @(),
+        [string] $Role = 'tms-api'
+    )
+    $keyColumns = @(foreach ($key in $Keys) { "    $key = make_set_if(tostring(Properties.$key), isnotempty(tostring(Properties.$key)))," })
+    $rows = Invoke-LogAnalyticsQuery -WorkspaceId $WorkspaceId @"
+let trail = AppTraces | where tostring(Properties.correlationId) == '$CorrelationId' and isnotempty(OperationId) | distinct OperationId;
+union AppRequests, AppTraces, AppDependencies
+| where OperationId in (trail) and AppRoleName endswith '$Role'
+| summarize rows = count(),
+    flows = make_set_if(tostring(Properties.flow), isnotempty(tostring(Properties.flow))),
+    outcomes = make_set_if(tostring(Properties.outcome), isnotempty(tostring(Properties.outcome))),
+$($keyColumns -join [Environment]::NewLine)
+    published = make_set_if(Name, isnotempty(Name) and Name startswith 'publish ')
+"@
+    if ($rows.Count -eq 0 -or [int] $rows[0][0] -le 0) { return $null }
+    $row = $rows[0]
+    $summary = [ordered]@{ correlationId = $CorrelationId }
+    $names = @('rows', 'flows', 'outcomes') + $Keys + @('published')
+    for ($i = 1; $i -lt $names.Count; $i++) { $summary[$names[$i]] = @(@($row[$i] | ConvertFrom-Json) | Sort-Object) }
+    $summary
+}
+
 Export-ModuleMember -Function Write-Pass, Write-Fail, Invoke-Az, Import-AzdEnvironment, Get-ResourceGroupName,
 Get-AppFqdn, Get-AppUrl, Wait-Until, Get-LogAnalyticsWorkspaceId, Invoke-LogAnalyticsQuery,
 New-ThrowawayJob, Get-ThrowawayJobName, Start-ThrowawayJob, Remove-ThrowawayJob, Get-RequiredEnvironmentVariable,
-Set-AzdEnvironmentValue, Invoke-AzRest, Publish-LogicApp
+Set-AzdEnvironmentValue, Invoke-AzRest, Publish-LogicApp, Get-AzAccessToken, Get-ThrowawayJobDefinition,
+Get-ThrowawayJobResult, Get-RandomSuffix, Test-SameValues, Get-TrailSummary, Invoke-ThrowawayJobForResult, Get-DeadLetters, Get-DeadLetterReason, Assert-InApplicationInsights, Get-PersonaClientId, Wait-ForPresenter, Get-ActionIdsReaching, Get-PublishedEvent, Read-Confirmation, Get-DocumentHops, Wait-DocumentHop, Read-DocumentNumber, Invoke-AsFound,
+Get-MetricAlertValue, Get-QueueDeadLetterCount

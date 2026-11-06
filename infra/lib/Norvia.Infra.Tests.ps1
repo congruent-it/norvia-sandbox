@@ -258,3 +258,139 @@ Describe 'Publish-LogicApp' {
         Should -Invoke -ModuleName Norvia.Infra Start-Sleep -Times 2
     }
 }
+
+Describe 'Get-ThrowawayJobDefinition' {
+    BeforeEach {
+        Mock -ModuleName Norvia.Infra Invoke-Az { "/subscriptions/s/environments/env`n" }
+    }
+
+    It 'runs the calls as the identity in the estate environment, with the variables as env entries' {
+        $definition = Get-ThrowawayJobDefinition -Name smoke-x -Calls 'echo hi' -IdentityId '/id/one' `
+            -Environment ([ordered]@{ TMS = 'https://tms' }) -Location westeurope -ResourceGroup rg-test
+        $definition.properties.environmentId | Should -Be '/subscriptions/s/environments/env'
+        $definition.identity.userAssignedIdentities.Keys | Should -Contain '/id/one'
+        $container = $definition.properties.template.containers[0]
+        $container.name | Should -Be 'smoke-x'
+        $container.command | Should -Be @('/bin/sh', '-c', 'echo hi')
+        $container.env[0].name | Should -Be 'TMS'
+        $container.env[0].value | Should -Be 'https://tms'
+    }
+}
+
+Describe 'Get-ThrowawayJobResult' {
+    It 'strips the marker from the first line' {
+        Mock -ModuleName Norvia.Infra Invoke-LogAnalyticsQuery { , @(, @('SMOKE-RESULT {"a":1}')) }
+        Get-ThrowawayJobResult -WorkspaceId w -JobName j | Should -Be '{"a":1}'
+    }
+
+    It 'returns $null when no line has arrived' {
+        Mock -ModuleName Norvia.Infra Invoke-LogAnalyticsQuery { , @() }
+        Get-ThrowawayJobResult -WorkspaceId w -JobName j | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Test-SameValues' {
+    It 'is true for the same values in the same order, and for null and an empty list' {
+        Test-SameValues @('a', 'b') @('a', 'b') | Should -BeTrue
+        Test-SameValues $null @() | Should -BeTrue
+    }
+
+    It 'is false for other values or another order' {
+        Test-SameValues @('a', 'b') @('b', 'a') | Should -BeFalse
+        Test-SameValues @('a') @() | Should -BeFalse
+    }
+}
+
+Describe 'Get-TrailSummary' {
+    It 'returns $null while the trail has no rows' {
+        Mock -ModuleName Norvia.Infra Invoke-LogAnalyticsQuery { , @() }
+        Get-TrailSummary -WorkspaceId w -CorrelationId c -Keys shipmentNumber | Should -BeNullOrEmpty
+    }
+
+    It 'names each column after its key' {
+        Mock -ModuleName Norvia.Infra Invoke-LogAnalyticsQuery { , @(, @('3', '["b","a"]', '["Succeeded"]', '["SHP-1"]', '["publish X"]')) }
+        $summary = Get-TrailSummary -WorkspaceId w -CorrelationId c -Keys shipmentNumber
+        $summary.flows | Should -Be @('a', 'b')
+        $summary.shipmentNumber | Should -Be @('SHP-1')
+        $summary.published | Should -Be @('publish X')
+    }
+}
+
+Describe 'Invoke-ThrowawayJobForResult' {
+    BeforeEach {
+        Mock -ModuleName Norvia.Infra Get-ThrowawayJobDefinition { @{} }
+        Mock -ModuleName Norvia.Infra New-ThrowawayJob { }
+        Mock -ModuleName Norvia.Infra Remove-ThrowawayJob { }
+        Mock -ModuleName Norvia.Infra Get-LogAnalyticsWorkspaceId { 'w' }
+    }
+
+    It 'returns the parsed result and deletes the job' {
+        Mock -ModuleName Norvia.Infra Start-ThrowawayJob { [pscustomobject]@{ Execution = 'e'; Status = 'Succeeded' } }
+        Mock -ModuleName Norvia.Infra Get-ThrowawayJobResult { '{"a":1}' }
+        (Invoke-ThrowawayJobForResult -Prefix smoke-x -Calls 'x' -IdentityId i -ResourceGroup rg -WorkspaceName n).a | Should -Be 1
+        Should -Invoke -ModuleName Norvia.Infra Remove-ThrowawayJob -Times 1
+    }
+
+    It 'fails with the status when the execution does not succeed, and still deletes the job' {
+        Mock -ModuleName Norvia.Infra Start-ThrowawayJob { [pscustomobject]@{ Execution = 'e1'; Status = 'Failed' } }
+        { Invoke-ThrowawayJobForResult -Prefix smoke-x -Calls 'x' -IdentityId i -Purpose 'reading the TMS' -ResourceGroup rg -WorkspaceName n } |
+            Should -Throw '*reading the TMS ended Failed*e1*'
+        Should -Invoke -ModuleName Norvia.Infra Remove-ThrowawayJob -Times 1
+    }
+}
+
+Describe 'Get-ThrowawayJobDefinition secrets and identities' {
+    It 'keeps a secret out of the variables and refers to it by name' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { 'env' }
+        $definition = Get-ThrowawayJobDefinition -Name n -Calls c -IdentityId '/id/one', '/id/two' `
+            -Secrets ([ordered]@{ VAN_DIJK_KEY = 'hunter2' }) -Location westeurope -ResourceGroup rg
+        $definition.identity.userAssignedIdentities.Keys.Count | Should -Be 2
+        $definition.properties.configuration.secrets[0].name | Should -Be 'van-dijk-key'
+        $variable = $definition.properties.template.containers[0].env | Where-Object name -EQ 'VAN_DIJK_KEY'
+        $variable.secretRef | Should -Be 'van-dijk-key'
+        $variable.ContainsKey('value') | Should -BeFalse
+    }
+}
+
+Describe 'Assert-InApplicationInsights' {
+    It 'passes when every app is found' {
+        Mock -ModuleName Norvia.Infra Invoke-LogAnalyticsQuery { , @(, @('[env]/tms-api'), , @('apim-x')) }
+        Assert-InApplicationInsights -WorkspaceId w -What 'PU' -Value v -Roles tms-api, apim-x 6>&1 | Should -BeLike 'PASS  PU is in Application Insights*'
+    }
+
+    It 'fails naming the app that is missing' {
+        Mock -ModuleName Norvia.Infra Invoke-LogAnalyticsQuery { , @(, @('apim-x')) }
+        Mock -ModuleName Norvia.Infra Start-Sleep { }
+        { Assert-InApplicationInsights -WorkspaceId w -What 'PU' -Value v -Roles tms-api, apim-x } | Should -Throw '*for tms-api after 10 minutes'
+    }
+}
+
+Describe 'Get-PersonaClientId' {
+    It 'finds a Persona in the semicolon list' {
+        $env:AZURE_ESTATE_PERSONA_CLIENT_IDS = 'kessler=aaa;van-dijk-transport=bbb'
+        try {
+            Get-PersonaClientId van-dijk-transport | Should -Be 'bbb'
+            Get-PersonaClientId nobody | Should -BeNullOrEmpty
+        }
+        finally { $env:AZURE_ESTATE_PERSONA_CLIENT_IDS = $null }
+    }
+}
+
+Describe 'Get-MetricAlertValue' {
+    It 'returns $null when the rule does not exist' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { $null }
+        Get-MetricAlertValue alert-x name -ResourceGroup rg | Should -BeNullOrEmpty
+    }
+
+    It 'returns the trimmed value' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { "true`n" }
+        Get-MetricAlertValue alert-x enabled -ResourceGroup rg | Should -Be 'true'
+    }
+}
+
+Describe 'Get-QueueDeadLetterCount' {
+    It 'returns the count as a number' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { '3' }
+        Get-QueueDeadLetterCount -Namespace n -Queue q -ResourceGroup rg | Should -Be 3
+    }
+}

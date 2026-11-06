@@ -43,7 +43,7 @@ API Management MCP servers need response payload logging off at the service scop
 1. **Write the tool list.** Add `contracts/agent-mcp/<server>.tools.json` (name, description, `GET`, path for each tool, and the read role). Tools are reads only; the contract test fails on any other method. The local MCP stand-in reads the same file.
 2. **Register the agent view's identity.** In the application's Bicep, an app registration for the agent view with the role from the file, a service principal that requires assignment (see `agent-mcp-example.bicep`). Agents are given the role after each publish ([identity and access](../architecture/identity-and-access.md#agents)).
 3. **Call the module.** `tools: loadJsonContent('../../contracts/agent-mcp/<server>.tools.json').tools`, the `audience`, the `requiredRole`, and the `backendId`, `backendAudience` and identity of the application's agent view. Add the application's agent view as an API Management backend the way `tms-api` is in `partner-api.bicep`.
-4. **Add the smoke run.** Copy `infra/smoke-test-agent-mcp-server.sh` for the server's first tool, and add the server to the C4 and the identity matrix.
+4. **Add the smoke run.** Copy `infra/smoke-test-agent-mcp-server.ps1` for the server's first tool, and add the server to the C4 and the identity matrix.
 
 ## The example server
 
@@ -57,4 +57,4 @@ API Management MCP servers need response payload logging off at the service scop
 
 ## Smoke run
 
-[infra/smoke-test-agent-mcp-server.sh](../../infra/smoke-test-agent-mcp-server.sh), after `azd up`, signed in as the presenter. It calls the example server's `tools/list` and its tool with a token for the example identity, and checks that a call without a token, a token for another API, an identity without the role and an unlisted tool are refused, and that the call is in Application Insights with `agentId` and `toolName`. The example identity has no secret, so the script adds one for an hour and removes it again.
+[infra/smoke-test-agent-mcp-server.ps1](../../infra/smoke-test-agent-mcp-server.ps1), after `azd up`, signed in as the presenter. It calls the example server's `tools/list` and its tool with a token for the example identity, and checks that a call without a token, a token for another API, an identity without the role and an unlisted tool are refused, and that the call is in Application Insights with `agentId` and `toolName`. The example identity has no secret, so the script adds one for an hour and removes it again.

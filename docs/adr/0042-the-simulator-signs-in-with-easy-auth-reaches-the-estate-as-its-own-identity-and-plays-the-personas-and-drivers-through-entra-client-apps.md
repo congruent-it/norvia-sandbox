@@ -22,4 +22,4 @@ The Simulator ([ADR 0039](0039-the-simulator-books-only-through-the-estates-real
 - Entra needs the Simulator's callback, which exists only once Aspire has deployed it. The postdeploy hook ([infra/register-sign-in-callbacks.ps1](../../infra/register-sign-in-callbacks.ps1)) adds it and keeps it in the azd environment as `ESTATE_SIMULATOR_REDIRECT_URIS`.
 - The estate grows a client app, a service principal, a federated credential and a role assignment for each seeded Driver. A new Driver in the seed file gets them on the next estate deployment.
 - Its migrations are a Container Apps job like the other databases', started by the postdeploy hook.
-- The Entra token sources are not unit tested against Entra. Their wiring and the choice between Entra and local tokens are, and the post-deploy smoke run ([infra/smoke-test-simulator.sh](../../infra/smoke-test-simulator.sh)) shows that the tokens work.
+- The Entra token sources are not unit tested against Entra. Their wiring and the choice between Entra and local tokens are, and the post-deploy smoke run ([infra/smoke-test-simulator.ps1](../../infra/smoke-test-simulator.ps1)) shows that the tokens work.

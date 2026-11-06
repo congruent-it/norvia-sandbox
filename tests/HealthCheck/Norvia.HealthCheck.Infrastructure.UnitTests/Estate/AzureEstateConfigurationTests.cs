@@ -10,7 +10,7 @@ namespace Norvia.HealthCheck.Infrastructure.UnitTests.Estate;
 
 /// <summary>
 /// The Azure adapter maps what Resource Graph and Service Bus answer to the snapshots' shape. Fakes stand in for Azure; what a real
-/// estate answers is the smoke run's to show (infra/smoke-test-estate-health-check.sh).
+/// estate answers is the smoke run's to show (infra/smoke-test-estate-health-check.ps1).
 /// </summary>
 public sealed class AzureEstateConfigurationTests : IDisposable
 {

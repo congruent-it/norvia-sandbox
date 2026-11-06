@@ -28,7 +28,7 @@ param foundryProjectName string
 param foundryProjectEndpoint string
 
 @description('''How old a conversation or response must be before it is deleted, in minutes. A day is far shorter than integrationRetentionDays.
-The smoke run (infra/smoke-test-conversation-sweeper.sh) sets it shorter for a moment.''')
+The smoke run (infra/smoke-test-conversation-sweeper.ps1) sets it shorter for a moment.''')
 @minValue(1)
 param maxAgeMinutes int = 1440
 

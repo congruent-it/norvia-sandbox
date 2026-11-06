@@ -1,5 +1,5 @@
 // The example MCP server: one read-only tool over nothing (API Management answers it itself), with the identities to call it.
-// It is what the post-deploy smoke run (infra/smoke-test-agent-mcp-server.sh) calls and what shows an agent slice the shape of
+// It is what the post-deploy smoke run (infra/smoke-test-agent-mcp-server.ps1) calls and what shows an agent slice the shape of
 // an agent-mcp-server call. It holds no data, so it stays deployed.
 extension microsoftGraphV1
 
