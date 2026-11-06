@@ -18,7 +18,7 @@ The files are static web assets, so every UI serves them from `/_content/Norvia.
 ## Changing the icon
 
 1. Edit `src/Norvia.Branding/wwwroot/favicon.svg`. Check it at 16×16 px on a light and a dark tab.
-2. Run `src/Norvia.Branding/export-icons.sh` to write the ICO and the Apple touch icon from it. It needs `rsvg-convert` (librsvg) and ImageMagick (`magick`).
+2. Run `pwsh src/Norvia.Branding/export-icons.ps1` to write the ICO and the Apple touch icon from it. It needs PowerShell 7, `rsvg-convert` (librsvg) and ImageMagick (`magick`) on the PATH, on Windows too.
 3. Commit the SVG and the exported files together. The unit tests check their formats and sizes.
 
 ## Without sign-in

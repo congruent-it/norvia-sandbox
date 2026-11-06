@@ -1,6 +1,6 @@
 # Scripts are PowerShell 7, not bash
 
-The repo's scripts (54 in `infra/`, plus `src/Norvia.Branding/export-icons.sh`) are written in PowerShell 7 (`pwsh`), not bash. They are being converted one slice at a time, each `.sh` deleted as its `.ps1` lands, so there is never a second copy. `export-icons` keeps `rsvg-convert` and `magick` as prerequisites.
+The repo's scripts (54 in `infra/`, plus `src/Norvia.Branding/export-icons`) are written in PowerShell 7 (`pwsh`), not bash. They are being converted one slice at a time, each `.sh` deleted as its `.ps1` lands, so there is never a second copy. `export-icons` keeps `rsvg-convert` and `magick` as prerequisites.
 
 Bash scripts ran only where bash and its companions are: Windows needed WSL or Git Bash, and the scripts leaned on `jq`, `zip`, `python3`, `sed` and `mktemp --suffix`, whose flags differ between GNU and BSD. PowerShell 7 runs the same on Windows, Linux and macOS and brings what those tools were there for: `ConvertFrom-Json`/`ConvertTo-Json`, `Compress-Archive` and `Invoke-RestMethod`. The Azure CLI stays, as does `azd`; `azure.yaml` runs its hooks with `shell: pwsh`.
 
