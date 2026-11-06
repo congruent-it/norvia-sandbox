@@ -17,7 +17,8 @@
     <FluentDataGrid Items="bookings.OrderByDescending(booking => booking.ReceivedAt).AsQueryable()" TGridItem="TransportOrderSummary" Class="flatly-table" aria-label="Rejected bookings">
         @* A Rejected booking has no Transport Order number, and may have no Shipper reference, so it opens from when it was received. *@
         <TemplateColumn Title="Received">
-            <a href="/rejected-bookings/@context.Id">@NorviaTime.Format(context.ReceivedAt)</a>
+            @* A full page load, not a navigation inside the circuit: the detail page reads the role from the request while it prerenders, and Explain shows only for Customer service. *@
+            <a href="/rejected-bookings/@context.Id" target="_top">@NorviaTime.Format(context.ReceivedAt)</a>
         </TemplateColumn>
         <PropertyColumn Title="Shipper" Property="@(booking => booking.Shipper.Name ?? booking.Shipper.Id)" />
         <PropertyColumn Title="Shipper reference" Property="@(booking => SubmittedTransportOrder.Given(booking.ShipperReference))" />

@@ -18,7 +18,7 @@ namespace Norvia.Tms.TestSupport;
 /// headless Chromium to drive the TMS UI. It holds the key the TMS trusts locally, so <see cref="Intake"/> submits
 /// Transport Orders the way the intake Logic App does.
 /// </summary>
-public sealed class TmsUiFixture : IAsyncLifetime
+public class TmsUiFixture : IAsyncLifetime
 {
     private const string IntakeRole = "TransportOrders.Intake";
     private const string AnswerRole = "CarrierBookings.Answer";
@@ -54,7 +54,16 @@ public sealed class TmsUiFixture : IAsyncLifetime
 
     public IBrowser Browser { get; private set; } = null!;
 
-    public async ValueTask InitializeAsync()
+    /// <summary>The running AppHost, for a fixture that stops or starts one of its resources.</summary>
+    protected DistributedApplication App => _app!;
+
+    /// <summary>Arguments for the AppHost, such as <c>Agents:Enabled=true</c>. None by default.</summary>
+    protected virtual string[] AppHostArguments => [];
+
+    /// <summary>Takes the resources the tests don't use out of the AppHost. By default those the TMS UI's journeys don't use.</summary>
+    protected virtual void ConfigureAppHost(IDistributedApplicationTestingBuilder builder) => builder.RemoveWhatTheTmsUiTestsDontUse();
+
+    public virtual async ValueTask InitializeAsync()
     {
         using var startup = new CancellationTokenSource(StartupTimeout);
 
@@ -65,9 +74,9 @@ public sealed class TmsUiFixture : IAsyncLifetime
         }
 
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
-            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}", "AppHost:SeedDemoData=true"],
+            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}", "AppHost:SeedDemoData=true", .. AppHostArguments],
             startup.Token);
-        builder.RemoveWhatTheTmsUiTestsDontUse();
+        ConfigureAppHost(builder);
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
         await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", startup.Token);
@@ -186,8 +195,9 @@ public sealed class TmsUiFixture : IAsyncLifetime
                 SecurityAlgorithms.HmacSha256),
         });
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
+        GC.SuppressFinalize(this);
         if (Browser is not null)
         {
             await Browser.DisposeAsync();
