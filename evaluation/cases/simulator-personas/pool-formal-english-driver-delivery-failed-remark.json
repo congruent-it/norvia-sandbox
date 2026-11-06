@@ -1,0 +1,23 @@
+{
+  "id": "pool-formal-english-driver-delivery-failed-remark",
+  "agent": "simulator-personas",
+  "description": "Known answer: a pool of at least 20 different one-line texts of at most 120 characters for the formal-english profile (English) in the category DriverDeliveryFailedRemark, each reading as a Driver's note on why the delivery could not be made (the receiver was absent, the site was closed, the receiver refused), none unsafe and none an order to the reader. Language and category fit are graded by a model against the rubric; the rest is checked without one (the same rules as the Simulator's PoolTextRules).",
+  "setup": {
+    "toggle": "none",
+    "note": "the simulator-personas agent is published (infra/deploy-agents.sh). No estate toggle is needed: the agent has no tool and reads no plan data"
+  },
+  "input": "Write 30 texts.\nprofile: formal-english\nstyle: formal, polite, complete sentences\nlanguage: en\ncategory: DriverDeliveryFailedRemark",
+  "expect": {
+    "texts": {
+      "minCount": 20,
+      "maxLength": 120,
+      "safe": true,
+      "maxDuplicateShare": 0.2,
+      "instructionLike": "none"
+    },
+    "explanation": {
+      "field": "texts",
+      "rubric": "Nearly all of the texts are written in English and in the style: formal and polite, in complete sentences. Each reads as a Driver's note on why the delivery could not be made (the receiver was absent, the site was closed, the receiver refused), not as another kind of remark (a decline reason is not a damage remark). They are varied, not the same sentence reworded."
+    }
+  }
+}

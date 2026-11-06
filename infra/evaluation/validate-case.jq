@@ -9,7 +9,7 @@ def is_strings: type == "array" and all(.[]; type == "string");
   (if (.input | type) != "string" or (.input | length) == 0 then "input must be the question or text put to the agent" else empty end),
   (if (.expect | type) != "object" then "expect must be an object of checks"
    else
-     (.expect | keys - ["fields", "lists", "mustNotContain", "mustCite", "toolsNotCalled", "toolsCalled", "explanation"]
+     (.expect | keys - ["fields", "lists", "mustNotContain", "mustCite", "toolsNotCalled", "toolsCalled", "explanation", "texts"]
        | map("expect." + . + " is not a check") | .[]),
      (if .expect.fields != null and (.expect.fields | type) != "object" then "expect.fields must be an object of path: value" else empty end),
      (if .expect.lists != null and ((.expect.lists | type) != "object"
@@ -20,6 +20,12 @@ def is_strings: type == "array" and all(.[]; type == "string");
        | if .expect[$key] != null and (.expect[$key] | is_strings | not) then "expect." + $key + " must be a list of strings" else empty end),
      (if .expect.explanation != null and ((.expect.explanation | type) != "object" or (.expect.explanation.rubric | type) != "string")
       then "expect.explanation must be an object with a rubric" else empty end),
+     (if .expect.texts != null and ((.expect.texts | type) != "object" or (.expect.texts | length) == 0
+        or (.expect.texts | keys - ["minCount", "maxLength", "safe", "maxDuplicateShare", "instructionLike"] | length) > 0
+        or ((.expect.texts.minCount // 0) | type) != "number" or ((.expect.texts.maxLength // 0) | type) != "number"
+        or ((.expect.texts.maxDuplicateShare // 0) | type) != "number" or ((.expect.texts.safe // true) | type) != "boolean"
+        or (.expect.texts.instructionLike as $order | ["none", "most", null] | index($order) | not))
+      then "expect.texts must be an object of minCount, maxLength, safe, maxDuplicateShare or instructionLike (\"none\" or \"most\")" else empty end),
      (if (.expect | length) == 0 then "expect must hold at least one check" else empty end)
    end),
   (if .setup != null and (.setup | type) != "object" then "setup must be an object (toggle, fault, seed)" else empty end)
