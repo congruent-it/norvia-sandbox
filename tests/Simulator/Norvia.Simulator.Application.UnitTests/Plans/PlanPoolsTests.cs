@@ -173,4 +173,110 @@ public sealed class PlanPoolsTests
         back.CarrierProfiles.Should().Equal(plan.CarrierProfiles);
         back.PoolFor("CAR-0002", TextCategory.DeliveryFailedRemark)!.Draw(5, 2).Text.Should().Be(plan.PoolFor("CAR-0002", TextCategory.DeliveryFailedRemark)!.Draw(5, 2).Text);
     }
+
+    // The Drivers of the Own fleet: Anouk and Bram write in terse Dutch, Sanne in German.
+    private void DriversWriteIn()
+    {
+        _profiles.ProfileOfDriver(TestData.Anouk.Id).Returns(Dutch);
+        _profiles.ProfileOfDriver(TestData.Bram.Id).Returns(Dutch);
+        _profiles.ProfileOfDriver(TestData.Sanne.Id).Returns(German);
+    }
+
+    [Fact]
+    public async Task AddTo_DriversWithProfiles_GetAPoolForEachKindOfDriverTextAndTheirProfilesAreKept()
+    {
+        DriversWriteIn();
+
+        var plan = await Pools().AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+
+        plan.DriverProfiles.Should().Equal(new Dictionary<string, string> { [TestData.Anouk.Id] = "terse-dutch", [TestData.Bram.Id] = "terse-dutch", [TestData.Sanne.Id] = "german" });
+        plan.Pools.Where(pool => TextCategories.IsDriverText(pool.Category)).Select(pool => (pool.ProfileId, pool.Category)).Should().BeEquivalentTo(
+            TextCategories.ForDrivers.SelectMany(category => new[] { ("terse-dutch", category), ("german", category) }));
+        plan.Pools.Where(pool => !TextCategories.IsDriverText(pool.Category)).Should().HaveCount(4);
+        plan.DriverPoolFor(TestData.Sanne.Id, TextCategory.DriverDamageRemark)!.Language.Should().Be("de");
+        plan.DriverPoolFor("DRV-9999", TextCategory.DriverDamageRemark).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AddTo_AskingTheAgentForDriverTexts_TellsItOnlyTheProfileTheKindAndTheCount()
+    {
+        DriversWriteIn();
+        _agent.GeneratePoolAsync(Arg.Any<PoolRequest>(), Arg.Any<CancellationToken>()).Returns(Texts("a b", "c d", "e f"));
+
+        await Pools(enabled: true, cap: 20).AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+
+        foreach (var category in TextCategories.ForDrivers)
+        {
+            await _agent.Received(1).GeneratePoolAsync(new PoolRequest(Dutch, category, 5), Arg.Any<CancellationToken>());
+            await _agent.Received(1).GeneratePoolAsync(new PoolRequest(German, category, 5), Arg.Any<CancellationToken>());
+        }
+    }
+
+    [Fact]
+    public async Task AddTo_ADriverTextThatFailsValidationOrTooFewLeft_FallsBackToTheBuiltInPoolWithANote()
+    {
+        DriversWriteIn();
+        _agent.GeneratePoolAsync(Arg.Is<PoolRequest>(request => request.Category == TextCategory.DriverDamageRemark), Arg.Any<CancellationToken>())
+            .Returns(Texts("Vol", "Bel 0612345678", "https://x.nl"));
+        _agent.GeneratePoolAsync(Arg.Is<PoolRequest>(request => request.Category != TextCategory.DriverDamageRemark), Arg.Any<CancellationToken>())
+            .Returns(Texts("Geen plek", "Vol", "Niet mogelijk"));
+
+        var plan = await Pools(enabled: true).AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+
+        plan.Pools.Where(pool => pool.Category == TextCategory.DriverDamageRemark).Should().OnlyContain(pool => pool.Source == "built-in");
+        plan.Pools.Where(pool => pool.Category == TextCategory.DriverCollectionFailedRemark).Should().OnlyContain(pool => pool.Source == "agent, run 7");
+        plan.PoolNotes.Should().Contain(note => note.Contains("DriverDamageRemark") && note.Contains("only 1 usable"));
+    }
+
+    [Fact]
+    public async Task AddTo_TheModelFailingForDrivers_NeverBlocksThePlan()
+    {
+        DriversWriteIn();
+        _agent.GeneratePoolAsync(Arg.Any<PoolRequest>(), Arg.Any<CancellationToken>()).Returns<Result<IReadOnlyList<string>>>(_ => throw new InvalidOperationException("boom"));
+
+        var plan = await Pools(enabled: true).AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+
+        plan.Pools.Should().NotBeEmpty().And.OnlyContain(pool => pool.Source == "built-in");
+        plan.DriverProfiles.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task AddTo_DriversWithNoBuiltInPool_KeepTheirFixedWordsWithANote()
+    {
+        DriversWriteIn();
+        _builtIn.TextsOf(German, TextCategory.DriverCollectionFailedRemark).Returns([]);
+
+        var plan = await Pools().AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+
+        plan.DriverPoolFor(TestData.Sanne.Id, TextCategory.DriverCollectionFailedRemark).Should().BeNull();
+        plan.DriverPoolFor(TestData.Sanne.Id, TextCategory.DriverDamageRemark).Should().NotBeNull();
+        plan.PoolNotes.Should().ContainSingle().Which.Should().Contain("german DriverCollectionFailedRemark");
+    }
+
+    [Fact]
+    public async Task AddTo_TheDriverCapOnGenerations_IsTheSameCapAsTheCarriers()
+    {
+        DriversWriteIn();
+        _agent.GeneratePoolAsync(Arg.Any<PoolRequest>(), Arg.Any<CancellationToken>()).Returns(Texts("Geen plek", "Vol", "Niet mogelijk"));
+
+        var plan = await Pools(enabled: true, cap: 3).AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+
+        await _agent.ReceivedWithAnyArgs(3).GeneratePoolAsync(Arg.Any<PoolRequest>(), Arg.Any<CancellationToken>());
+        plan.Pools.Count(pool => pool.Source != "built-in").Should().Be(3);
+        plan.PoolNotes.Should().NotBeEmpty().And.OnlyContain(note => note.Contains("cap of 3"));
+    }
+
+    [Fact]
+    public async Task AddTo_APlanWithDriverPools_StoresAndReadsBackAsJsonAndDrawsTheSameText()
+    {
+        DriversWriteIn();
+        var plan = await Pools().AddToAsync(Plan(), TestData.FleetWorld, CancellationToken.None);
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+
+        var back = System.Text.Json.JsonSerializer.Deserialize<SimulationPlan>(System.Text.Json.JsonSerializer.Serialize(plan, options), options)!;
+
+        back.DriverProfiles.Should().Equal(plan.DriverProfiles);
+        back.DriverPoolFor(TestData.Bram.Id, TextCategory.DriverDamageRemark)!.Draw(5, 2).Text
+            .Should().Be(plan.DriverPoolFor(TestData.Bram.Id, TextCategory.DriverDamageRemark)!.Draw(5, 2).Text);
+    }
 }

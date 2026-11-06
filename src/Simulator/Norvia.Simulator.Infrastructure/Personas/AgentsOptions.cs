@@ -14,14 +14,14 @@ public sealed class AgentsOptions
 
     /// <summary>The cap on pools one plan may ask the agent for (a plan has a pool for each profile and kind of text).</summary>
     [Range(0, 100)]
-    public int MaxGenerationsPerPlan { get; set; } = 8;
+    public int MaxGenerationsPerPlan { get; set; } = 20;
 
     /// <summary>
     /// The cost cap of a plan, as the most output tokens its generations may be allowed to write together. Each generation is capped at the
     /// definition's <c>maxOutputTokens</c>, so the plan makes no more generations than fit in it, whatever <see cref="MaxGenerationsPerPlan"/> says.
     /// </summary>
     [Range(0, 200_000)]
-    public int MaxOutputTokensPerPlan { get; set; } = 8_000;
+    public int MaxOutputTokensPerPlan { get; set; } = 16_000;
 
     /// <summary>How many texts a pool is asked to hold.</summary>
     [Range(3, 50)]

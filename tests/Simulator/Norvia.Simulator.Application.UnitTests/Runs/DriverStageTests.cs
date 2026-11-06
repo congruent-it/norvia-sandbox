@@ -1,6 +1,7 @@
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Worlds;
 
 namespace Norvia.Simulator.Application.UnitTests.Runs;
@@ -124,6 +125,56 @@ public sealed class DriverStageTests
 
         await _fleet.Drivers.Received(FleetRun.Orders).ReportDamageAsync(
             Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), false, Arg.Is<string>(remark => remark.Length > 0), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_FailuresAndDamageWithAPoolInThePlan_CarryTextsFromTheDriversPoolsAsTheirRemarks()
+    {
+        var run = await _fleet.RunAsync(FleetRun.Settings(drivers: new DriverShares(CollectionFailedPercent: 50, DeliveryFailedPercent: 50, DamagedPercent: 100, 0)), driverPools: true);
+
+        string[] collectionPool = [.. run.Plan.Pools.Single(pool => pool.Category == TextCategory.DriverCollectionFailedRemark).Texts];
+        string[] deliveryPool = [.. run.Plan.Pools.Single(pool => pool.Category == TextCategory.DriverDeliveryFailedRemark).Texts];
+        string[] damagePool = [.. run.Plan.Pools.Single(pool => pool.Category == TextCategory.DriverDamageRemark).Texts];
+        var collection = _fleet.Drivers.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(IDriverApp.FailCollectionAsync)).Select(call => (string)call.GetArguments()[3]!).ToList();
+        var delivery = _fleet.Drivers.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(IDriverApp.FailDeliveryAsync)).Select(call => (string)call.GetArguments()[3]!).ToList();
+        var damage = _fleet.Drivers.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(IDriverApp.ReportDamageAsync)).Select(call => (string)call.GetArguments()[4]!).ToList();
+        collection.Should().NotBeEmpty().And.OnlyContain(remark => collectionPool.Contains(remark));
+        delivery.Should().NotBeEmpty().And.OnlyContain(remark => deliveryPool.Contains(remark));
+        damage.Should().HaveCount(FleetRun.Orders).And.OnlyContain(remark => damagePool.Contains(remark));
+    }
+
+    [Fact]
+    public async Task Handle_TheSameSeedAndPlan_DrawTheSameDriverTexts()
+    {
+        var settings = FleetRun.Settings(drivers: new DriverShares(0, 0, DamagedPercent: 100, 0));
+        var first = new FleetRun();
+        var second = new FleetRun();
+        await first.RunAsync(settings, driverPools: true);
+        await second.RunAsync(settings, driverPools: true);
+
+        string[] Remarks(FleetRun fleet) =>
+            [.. fleet.Drivers.ReceivedCalls().Where(call => call.GetMethodInfo().Name == nameof(IDriverApp.ReportDamageAsync)).Select(call => (string)call.GetArguments()[4]!)];
+        Remarks(first).Should().NotBeEmpty().And.Equal(Remarks(second));
+    }
+
+    [Fact]
+    public async Task Handle_WithoutAPoolInThePlan_TheDriversKeepTheFixedRemarks()
+    {
+        await _fleet.RunAsync(FleetRun.Settings(drivers: new DriverShares(CollectionFailedPercent: 100, 0, 0, 0)));
+
+        await _fleet.Drivers.Received(FleetRun.Orders).FailCollectionAsync(
+            Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), "Nobody at the collection address", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_TheTextsDrawn_AreNeverInTheLog_OnlyThePoolAndTheIndex()
+    {
+        var run = await _fleet.RunAsync(FleetRun.Settings(drivers: new DriverShares(0, 0, DamagedPercent: 100, 0)), driverPools: true);
+
+        var texts = run.Plan.Pools.SelectMany(pool => pool.Texts).ToList();
+        var details = _fleet.Lines.Select(line => line.Detail ?? string.Empty).ToList();
+        details.Should().NotContain(detail => texts.Any(detail.Contains));
+        details.Should().Contain(detail => detail.Contains("pool terse-dutch/DriverDamageRemark/nl, index "));
     }
 
     [Fact]

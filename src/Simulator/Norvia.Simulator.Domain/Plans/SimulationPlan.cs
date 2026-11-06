@@ -22,12 +22,21 @@ public sealed record SimulationPlan(int RunNumber, SimulationSettings Settings, 
     /// <summary>The profile each Carrier writes in, by Carrier ID.</summary>
     public IReadOnlyDictionary<string, string> CarrierProfiles { get; init; } = new Dictionary<string, string>();
 
+    /// <summary>The profile each Driver of the Own fleet writes in, by Driver ID.</summary>
+    public IReadOnlyDictionary<string, string> DriverProfiles { get; init; } = new Dictionary<string, string>();
+
     /// <summary>What the operator should know about the pools, such as a model that failed and a built-in pool used instead.</summary>
     public IReadOnlyList<string> PoolNotes { get; init; } = [];
 
     /// <summary>The pool a Carrier draws from for a kind of text, or null when the plan has none for it.</summary>
     public TextPool? PoolFor(string carrierId, TextCategory category) =>
         CarrierProfiles.TryGetValue(carrierId, out var profile)
+            ? Pools.FirstOrDefault(pool => pool.ProfileId == profile && pool.Category == category)
+            : null;
+
+    /// <summary>The pool a Driver draws from for a kind of text, or null when the plan has none for it.</summary>
+    public TextPool? DriverPoolFor(string driverId, TextCategory category) =>
+        DriverProfiles.TryGetValue(driverId, out var profile)
             ? Pools.FirstOrDefault(pool => pool.ProfileId == profile && pool.Category == category)
             : null;
 

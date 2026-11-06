@@ -7,7 +7,7 @@ using Norvia.Simulator.Domain.Worlds;
 namespace Norvia.Simulator.Application.Plans.Pools;
 
 /// <summary>
-/// Gives a Simulation plan its pools of Carrier texts: one for each profile its Carriers write in and each kind of text. A pool is the
+/// Gives a Simulation plan its pools of Carrier and Driver texts: one for each profile its Carriers and Drivers write in and each kind of text. A pool is the
 /// built-in one unless the Agents are on, the plan's cap on generations allows it and the personas agent wrote enough valid texts. Whatever
 /// goes wrong with the model is a note on the plan and the built-in pool, never a failed plan: no Agent is called while a run is sending.
 /// </summary>
@@ -24,17 +24,25 @@ public sealed partial class PlanPools(
             .Select(carrier => (carrier.Id, Profile: profiles.ProfileOf(carrier.Id)))
             .Where(pair => pair.Profile is not null)
             .ToDictionary(pair => pair.Id, pair => pair.Profile!, StringComparer.Ordinal);
-        if (carrierProfiles.Count == 0)
+        var driverProfiles = world.OwnFleetDrivers
+            .Select(driver => (driver.Id, Profile: profiles.ProfileOfDriver(driver.Id)))
+            .Where(pair => pair.Profile is not null)
+            .ToDictionary(pair => pair.Id, pair => pair.Profile!, StringComparer.Ordinal);
+        if (carrierProfiles.Count == 0 && driverProfiles.Count == 0)
         {
             return plan;
         }
 
+        // A profile gets a pool for each kind of text its Carriers send and each its Drivers send, and for no other.
+        var carrierProfileIds = carrierProfiles.Values.Select(profile => profile.Id).ToHashSet(StringComparer.Ordinal);
+        var driverProfileIds = driverProfiles.Values.Select(profile => profile.Id).ToHashSet(StringComparer.Ordinal);
+
         var pools = new List<TextPool>();
         var notes = new List<string>();
         var generations = 0;
-        foreach (var profile in carrierProfiles.Values.DistinctBy(profile => profile.Id).OrderBy(profile => profile.Id, StringComparer.Ordinal))
+        foreach (var profile in carrierProfiles.Values.Concat(driverProfiles.Values).DistinctBy(profile => profile.Id).OrderBy(profile => profile.Id, StringComparer.Ordinal))
         {
-            foreach (var category in Enum.GetValues<TextCategory>())
+            foreach (var category in Enum.GetValues<TextCategory>().Where(category => TextCategories.IsDriverText(category) ? driverProfileIds.Contains(profile.Id) : carrierProfileIds.Contains(profile.Id)))
             {
                 TextPool? generated = null;
                 if (settings.AgentsEnabled && generations < settings.MaxGenerationsPerPlan)
@@ -69,6 +77,7 @@ public sealed partial class PlanPools(
         {
             Pools = pools,
             CarrierProfiles = carrierProfiles.Where(pair => kept.Contains(pair.Value.Id)).ToDictionary(pair => pair.Key, pair => pair.Value.Id, StringComparer.Ordinal),
+            DriverProfiles = driverProfiles.Where(pair => kept.Contains(pair.Value.Id)).ToDictionary(pair => pair.Key, pair => pair.Value.Id, StringComparer.Ordinal),
             PoolNotes = notes,
         };
     }

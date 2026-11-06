@@ -53,6 +53,22 @@ internal static class TestData
         return SimulationRun.Start(number, settings, plan, Now, "ngruson");
     }
 
+    /// <summary>A run whose plan carries a pool of each kind of Driver text, which every Driver of the Own fleet writes in (<see cref="TerseDutch"/>).</summary>
+    public static SimulationRun RunWithDriverPools(SimulationSettings settings, int number = 1)
+    {
+        var plan = BookingPlanGenerator.Generate(settings, World, number) with
+        {
+            Pools =
+            [
+                new TextPool(TerseDutch.Id, TerseDutch.Language, TextCategory.DriverCollectionFailedRemark, TextPool.BuiltInSource, ["Niemand bij ophaaladres", "Dock dicht", "Niet klaar"]),
+                new TextPool(TerseDutch.Id, TerseDutch.Language, TextCategory.DriverDeliveryFailedRemark, TextPool.BuiltInSource, ["Ontvanger weg", "Adres gesloten", "Niemand wil tekenen"]),
+                new TextPool(TerseDutch.Id, TerseDutch.Language, TextCategory.DriverDamageRemark, TextPool.BuiltInSource, ["Pallet kapot", "Doos ingedrukt", "Folie los"]),
+            ],
+            DriverProfiles = FleetWorld.OwnFleetDrivers.ToDictionary(driver => driver.Id, _ => TerseDutch.Id),
+        };
+        return SimulationRun.Start(number, settings, plan, Now, "ngruson");
+    }
+
     public static SimulationSettings Settings(
         int orders = 6, int bad = 0, int seed = 11, RunMode mode = RunMode.Burst, int windowMinutes = 0,
         int assigned = 0, int ownFleet = 50, int reassign = 0, CarrierShares? carriers = null) =>

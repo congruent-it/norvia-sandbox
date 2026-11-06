@@ -31,6 +31,33 @@ public sealed class PersonasTests
     }
 
     [Fact]
+    public void TheShippedConfiguration_GivesEveryDriverOfTheOwnFleetAProfileThatIsDefined()
+    {
+        var options = Configured();
+
+        options.Drivers.Keys.Should().Contain(["DRV-0001", "DRV-0002", "DRV-0003", "DRV-0004", "DRV-0005"]);
+        options.Drivers.Values.Distinct().Should().BeEquivalentTo("formal-english", "terse-dutch", "sloppy-mixed", "german");
+    }
+
+    [Fact]
+    public void IsConsistent_ADriverWithAProfileThatIsNotDefined_IsNot()
+    {
+        var options = new PersonaOptions { Profiles = [new PersonaProfileOptions { Id = "a", Language = "en", Style = "s" }], Drivers = { ["DRV-1"] = "b" } };
+
+        options.IsConsistent.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ProfileOfDriver_AKeyedDriver_GivesTheirProfileAndAnotherDriverNone()
+    {
+        var profiles = new ConfiguredPersonaProfiles(Options.Create(Configured()));
+
+        profiles.ProfileOfDriver("DRV-0004")!.Id.Should().Be("german");
+        profiles.ProfileOfDriver("DRV-9999").Should().BeNull();
+        profiles.ProfileOf("DRV-0004").Should().BeNull();
+    }
+
+    [Fact]
     public void IsConsistent_ACarrierWithAProfileThatIsNotDefined_IsNot()
     {
         var options = new PersonaOptions { Profiles = [new PersonaProfileOptions { Id = "a", Language = "en", Style = "s" }], Carriers = { ["CAR-1"] = "b" } };

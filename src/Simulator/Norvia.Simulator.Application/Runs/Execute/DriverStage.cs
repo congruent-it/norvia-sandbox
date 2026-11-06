@@ -1,6 +1,7 @@
 using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Runs;
 using Norvia.Simulator.Domain.Worlds;
 
@@ -14,6 +15,7 @@ namespace Norvia.Simulator.Application.Runs.Execute;
 /// </summary>
 internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacing pacing)
 {
+    // The fixed words a Driver sends when the plan has no pool for them (a plan made before the personas, or a Driver with no profile).
     private const string CollectionFailedRemark = "Nobody at the collection address";
     private const string DeliveryFailedRemark = "The Consignee was closed";
     private const string DamageRemark = "A pallet was damaged";
@@ -40,7 +42,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
                 return new DriverResult(true, started, completed, failures);
             }
 
-            var outcome = await WorkAsync(trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], run.Settings.Seed, failures, writer, stopSending, cancellationToken);
+            var outcome = await WorkAsync(run, trip, [.. journeys.Skip(first).Take(trip.Shipments.Count)], failures, writer, stopSending, cancellationToken);
             first += trip.Shipments.Count;
             started += outcome.Started ? 1 : 0;
             completed += outcome.Completed ? 1 : 0;
@@ -54,7 +56,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
     }
 
     private async Task<TripOutcome> WorkAsync(
-        RunningTrip trip, IReadOnlyList<DriverJourney> journeys, int seed, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
+        SimulationRun run, RunningTrip trip, IReadOnlyList<DriverJourney> journeys, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken stopSending, CancellationToken cancellationToken)
     {
         var driver = trip.Driver;
         var reached = await WaitAsync(driver, trip.TripNumber, _ => true, stopSending, cancellationToken);
@@ -96,7 +98,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
                 return TripOutcome.Cancelled(started: true);
             }
 
-            await WorkShipmentAsync(trip, trip.Shipments[position], journeys[position], seed, failures, writer, cancellationToken);
+            await WorkShipmentAsync(run, trip, trip.Shipments[position], journeys[position], failures, writer, cancellationToken);
         }
 
         var end = await app.EndTripAsync(driver, trip.TripNumber, cancellationToken);
@@ -125,8 +127,9 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
     }
 
     private async Task WorkShipmentAsync(
-        RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, int seed, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken cancellationToken)
+        SimulationRun run, RunningTrip trip, OwnFleetShipment shipment, DriverJourney journey, List<ExpectedFailure> failures, RunLogWriter writer, CancellationToken cancellationToken)
     {
+        var seed = run.Settings.Seed;
         var driver = trip.Driver;
         var number = shipment.ShipmentNumber;
 
@@ -135,15 +138,17 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
 
         if (journey.Damaged)
         {
-            var damage = await app.ReportDamageAsync(driver, trip.TripNumber, number, atDelivery: false, DamageRemark, cancellationToken);
-            await ReportAsync(DriverActions.ReportDamage, damage, "At the collection");
+            var said = DrawFor(run, driver, shipment, TextCategory.DriverDamageRemark);
+            var damage = await app.ReportDamageAsync(driver, trip.TripNumber, number, atDelivery: false, said?.Text ?? DamageRemark, cancellationToken);
+            await ReportAsync(DriverActions.ReportDamage, damage, WithReference("At the collection", said));
             Expect(failures, shipment, damage, ExceptionKinds.Damaged);
         }
 
         if (journey.CollectionFailed)
         {
-            var failed = await app.FailCollectionAsync(driver, trip.TripNumber, number, CollectionFailedRemark, cancellationToken);
-            await ReportAsync(DriverActions.CollectionFailed, failed, null);
+            var said = DrawFor(run, driver, shipment, TextCategory.DriverCollectionFailedRemark);
+            var failed = await app.FailCollectionAsync(driver, trip.TripNumber, number, said?.Text ?? CollectionFailedRemark, cancellationToken);
+            await ReportAsync(DriverActions.CollectionFailed, failed, WithReference(null, said));
             Expect(failures, shipment, failed, ExceptionKinds.CollectionFailed);
             return;
         }
@@ -157,8 +162,9 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
 
         if (journey.DeliveryFailed)
         {
-            var failed = await app.FailDeliveryAsync(driver, trip.TripNumber, number, DeliveryFailedRemark, cancellationToken);
-            await ReportAsync(DriverActions.DeliveryFailed, failed, null);
+            var said = DrawFor(run, driver, shipment, TextCategory.DriverDeliveryFailedRemark);
+            var failed = await app.FailDeliveryAsync(driver, trip.TripNumber, number, said?.Text ?? DeliveryFailedRemark, cancellationToken);
+            await ReportAsync(DriverActions.DeliveryFailed, failed, WithReference(null, said));
             Expect(failures, shipment, failed, ExceptionKinds.DeliveryFailed);
             return;
         }
@@ -175,6 +181,14 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
             Expect(failures, shipment, delivered, ExceptionKinds.Reservations);
         }
     }
+
+    // The text the seed draws for this Shipment from its Driver's pool, or none when the plan has no such pool (a plan made before the personas).
+    private static PoolDraw? DrawFor(SimulationRun run, SimulatedDriver driver, OwnFleetShipment shipment, TextCategory category) =>
+        run.Plan.DriverPoolFor(driver.Id, category)?.Draw(run.Settings.Seed, shipment.Booking.Step);
+
+    // The log keeps the pool and the index of a drawn text, never the text (coding guidelines §7).
+    private static string? WithReference(string? detail, PoolDraw? drawn) =>
+        drawn is null ? detail : detail is null ? drawn.Reference : $"{detail}, {drawn.Reference}";
 
     // The TMS opens an Exception for a report it records; the Planner looks for it later.
     private static void Expect(List<ExpectedFailure> failures, OwnFleetShipment shipment, DriverCallAnswer answer, string kind)
