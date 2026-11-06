@@ -146,6 +146,27 @@ public sealed class SimulatorFixture : IAsyncLifetime
         return host;
     }
 
+    /// <summary>
+    /// A Simulator with the Agents on, so a plan's pools of Carrier texts are written by the personas agent (the in-process runner with the scripted fake
+    /// model), and with the port to the agent changed by <paramref name="configureServices"/> when a test needs to watch it or make it fail.
+    /// </summary>
+    public async Task<SimulatorHost> StartSimulatorWithAgentsAsync(
+        Action<IServiceCollection>? configureServices, CancellationToken cancellationToken, params Action<JsonObject>[] edits)
+    {
+        var seed = JsonNode.Parse(await File.ReadAllTextAsync(_settings["Seed:Path"], cancellationToken))!.AsObject();
+        foreach (var edit in edits)
+        {
+            edit(seed);
+        }
+
+        var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
+        _seedCopies.Add(copy);
+        await File.WriteAllTextAsync(copy, seed.ToJsonString(), cancellationToken);
+        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["Seed:Path"] = copy, ["Agents:Enabled"] = "true" }, configureServices);
+        _hosts.Add(host);
+        return host;
+    }
+
     /// <summary>A Simulator whose TMS API address leads nowhere, so none of the Planner's calls reach the TMS.</summary>
     public SimulatorHost StartSimulatorWithoutTms()
     {
