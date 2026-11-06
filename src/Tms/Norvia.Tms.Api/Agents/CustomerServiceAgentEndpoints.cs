@@ -24,7 +24,7 @@ public static class CustomerServiceAgentEndpoints
         var group = app.NewVersionedApi("CustomerServiceAgent")
             .MapGroup("/v{version:apiVersion}/agent/customer-service")
             .HasApiVersion(1)
-            .RequireAuthorization(policy => policy.RequireRole(AgentRoles.CustomerServiceRead))
+            .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AgentApiAuthentication.Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.CustomerServiceRead))
             .WithMetadata(new TrackedFlow(Flow))
             .AddEndpointFilter<AgentCallTracking>();
 

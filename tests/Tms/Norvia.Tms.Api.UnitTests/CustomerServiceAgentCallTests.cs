@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Options;
 using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Application.Agents;
 
@@ -14,9 +15,14 @@ public sealed class CustomerServiceAgentCallTests
 
     private readonly FakeLogger<AgentCallTracking> _logger = new();
 
-    private static DefaultEndpointFilterInvocationContext ContextOf(string? azp, string? tool)
+    private static DefaultEndpointFilterInvocationContext ContextOf(string? azp, string? tool, string? agentHeader = null)
     {
         var http = new DefaultHttpContext();
+        if (agentHeader is not null)
+        {
+            http.Request.Headers[AgentCallTracking.AgentHeader] = agentHeader;
+        }
+
         if (azp is not null)
         {
             http.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("azp", azp)], "test"));
@@ -38,7 +44,7 @@ public sealed class CustomerServiceAgentCallTests
     [Fact]
     public async Task Invoke_ARead_IsTaggedWithTheAgentFromTheTokenAndTheToolFromTheServer_AndSucceeded()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         var result = await filter.InvokeAsync(ContextOf("norvia-local-agent-customer-service", "get_rejected_booking"), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
 
@@ -49,9 +55,29 @@ public sealed class CustomerServiceAgentCallTests
     }
 
     [Fact]
+    public async Task Invoke_BehindApiManagement_IsTaggedWithTheAgentTheGatewayNames()
+    {
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions { GatewayClientId = "gateway-client" }), _logger);
+
+        await filter.InvokeAsync(ContextOf("gateway-client", "get_rejected_booking", "agent-identity"), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
+
+        ScopeOf("Succeeded")["agentId"].Should().Be("agent-identity");
+    }
+
+    [Fact]
+    public async Task Invoke_ACallerThatIsNotTheGateway_CannotNameTheAgentWithAHeader()
+    {
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions { GatewayClientId = "gateway-client" }), _logger);
+
+        await filter.InvokeAsync(ContextOf("someone-else", "get_rejected_booking", "agent-identity"), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
+
+        ScopeOf("Succeeded")["agentId"].Should().Be("someone-else");
+    }
+
+    [Fact]
     public async Task Invoke_ANotFound_IsRefused()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         await filter.InvokeAsync(ContextOf("agent", "get_rejected_booking"), _ => ValueTask.FromResult<object?>(TypedResults.Problem(statusCode: 404)));
 
@@ -61,7 +87,7 @@ public sealed class CustomerServiceAgentCallTests
     [Fact]
     public async Task Invoke_ACallWithNoAgentOrToolName_LeavesThoseKeysOut()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         await filter.InvokeAsync(ContextOf(null, null), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
 
@@ -71,7 +97,7 @@ public sealed class CustomerServiceAgentCallTests
     [Fact]
     public async Task Invoke_AToolNameThatIsFarTooLong_IsLeftOut()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         await filter.InvokeAsync(ContextOf("agent", new string('t', 500)), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
 
