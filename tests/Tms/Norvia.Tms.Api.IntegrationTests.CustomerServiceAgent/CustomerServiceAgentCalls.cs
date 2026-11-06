@@ -49,7 +49,12 @@ internal static class CustomerServiceAgentCalls
             cancellationToken);
 
     /// <summary>Calls <c>get_rejected_booking</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
-    public static async Task<(bool IsError, string Text)> GetRejectedBookingAsync(this HttpClient client, Guid id, string correlationId, CancellationToken cancellationToken)
+    public static Task<(bool IsError, string Text)> GetRejectedBookingAsync(this HttpClient client, Guid id, string correlationId, CancellationToken cancellationToken) =>
+        client.CallToolAsync(Tool, new JsonObject { ["id"] = id.ToString("D") }, correlationId, cancellationToken);
+
+    /// <summary>Calls a tool and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
+    public static async Task<(bool IsError, string Text)> CallToolAsync(
+        this HttpClient client, string tool, JsonObject arguments, string correlationId, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(CustomerServiceAgentFixture.McpPath, UriKind.Relative))
         {
@@ -58,7 +63,7 @@ internal static class CustomerServiceAgentCalls
                 ["jsonrpc"] = "2.0",
                 ["id"] = 1,
                 ["method"] = "tools/call",
-                ["params"] = new JsonObject { ["name"] = Tool, ["arguments"] = new JsonObject { ["id"] = id.ToString("D") } },
+                ["params"] = new JsonObject { ["name"] = tool, ["arguments"] = arguments },
             }),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
