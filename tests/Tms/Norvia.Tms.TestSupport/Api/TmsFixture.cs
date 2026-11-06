@@ -199,13 +199,16 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The running AppHost, for a fixture that does more to it than the TMS API's tests.</summary>
     protected DistributedApplication App => _app!;
 
+    /// <summary>More configuration for the AppHost, as command-line arguments (<c>Agents:Enabled=true</c>), which it reads while it builds its resources.</summary>
+    protected virtual string[] AppHostArguments => [];
+
     /// <summary>Cuts the AppHost down to what the tests use, and sets what they need on the rest. The default is the TMS API, its database and the Service Bus emulator.</summary>
     protected virtual void ConfigureAppHost(IDistributedApplicationTestingBuilder builder) => builder.RemoveWhatTheTmsApiTestsDontUse();
 
     private async Task StartAppAsync(CancellationToken cancellationToken)
     {
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
-            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
+            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}", .. AppHostArguments],
             cancellationToken);
         ConfigureAppHost(builder);
         foreach (var topicName in new[] { TransportOrderEventsTopic, ShipmentEventsTopic, TripEventsTopic })

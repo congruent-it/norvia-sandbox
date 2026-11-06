@@ -22,6 +22,7 @@
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Capacity" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Faults" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.CarrierBookings" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Planning" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Remaining" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Trips" />
