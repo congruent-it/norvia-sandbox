@@ -175,6 +175,7 @@
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Billing/Norvia.Tms.Api.IntegrationTests.Billing.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Capacity/Norvia.Tms.Api.IntegrationTests.Capacity.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.CarrierBookings/Norvia.Tms.Api.IntegrationTests.CarrierBookings.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent/Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Faults/Norvia.Tms.Api.IntegrationTests.Faults.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Planning/Norvia.Tms.Api.IntegrationTests.Planning.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Remaining/Norvia.Tms.Api.IntegrationTests.Remaining.csproj" />
