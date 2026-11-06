@@ -44,6 +44,13 @@ Describe 'Invoke-Az' {
     }
 }
 
+Describe 'Invoke-Az stderr' {
+    It 'leaves what az writes to stderr out of the output' {
+        Mock -ModuleName Norvia.Infra az { $global:LASTEXITCODE = 0; Write-Error 'WARNING: a bicep upgrade' -ErrorAction Continue; '{"a":1}' }
+        (Invoke-Az deployment sub create | Out-String | ConvertFrom-Json).a | Should -Be 1
+    }
+}
+
 Describe 'Get-AppFqdn' {
     It 'trims the line az prints' {
         Mock -ModuleName Norvia.Infra Invoke-Az { "tms-api.example.westeurope.azurecontainerapps.io`n" }

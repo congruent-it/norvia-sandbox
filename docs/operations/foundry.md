@@ -34,7 +34,7 @@ Set in the azd environment, then `azd provision`:
 
 | Setting | Default | Does |
 |---|---|---|
-| `ESTATE_AGENTS_ENABLED_SETTING` | `false` | `Agents:Enabled`: whether the Agents do anything. The estate decides, as for the Simulator. The account, project and model exist either way. The estate is at the 64 outputs a template may have, so [provision-estate.sh](../../infra/provision-estate.sh) hands it to the apps as `AZURE_ESTATE_AGENTS_ENABLED`, as it does the reset setting |
+| `ESTATE_AGENTS_ENABLED_SETTING` | `false` | `Agents:Enabled`: whether the Agents do anything. The estate decides, as for the Simulator. The account, project and model exist either way. The estate is at the 64 outputs a template may have, so [provision-estate.ps1](../../infra/provision-estate.ps1) hands it to the apps as `AZURE_ESTATE_AGENTS_ENABLED`, as it does the reset setting |
 | `ESTATE_FOUNDRY_MODEL_DEPLOYED` | `true` | `false` removes only the model deployment, so every Agent run fails. This is the switch #377's agent toggles use to break the Agents |
 | `ESTATE_FOUNDRY_MODEL_CAPACITY` | `30` | The cap, in thousands of tokens a minute |
 | `ESTATE_FOUNDRY_LOCATION` | empty | Overrides the region |

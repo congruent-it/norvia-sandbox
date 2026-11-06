@@ -1,6 +1,6 @@
 #!/bin/sh
 # Makes an Entra test user for each active Driver of the seed file, and assigns it the app role of the Driver app's
-# registration that carries the Driver ID (ADR 0037). Run by provision-estate.sh after the estate is deployed, with the
+# registration that carries the Driver ID (ADR 0037). Run by provision-estate.ps1 after the estate is deployed, with the
 # Driver app's client ID. It is safe to run again: it finds the users it made and keeps the roles it assigned.
 #
 # A user's name is the Driver ID lowercased at the tenant's default domain, such as drv-0001@norvia.onmicrosoft.com. They
@@ -54,7 +54,7 @@ jq -c '.drivers[] | select(.active)' "$seed" | while read -r driver; do
   echo "Driver $id signs in as $user_name"
 done
 
-# The Estate parameters, as provision-estate.sh sets the estate's outputs.
+# The Estate parameters, as provision-estate.ps1 sets the estate's outputs.
 set_parameter() {
   azd env set "AZURE_$1" "$2"
   azd env config set "infra.parameters.$(echo "$1" | tr '[:upper:]' '[:lower:]')" "$(printf '%s' "$2" | jq -R .)"

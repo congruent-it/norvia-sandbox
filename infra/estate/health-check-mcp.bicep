@@ -64,7 +64,7 @@ resource viewPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
 // nothing else (the operators' sign-in is another app registration), and the role is the only one on it.
 resource healthCheckAgentApi 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-health-check-agent-api-${environmentName}'
-  // infra/provision-estate.sh finds it by this name.
+  // infra/provision-estate.ps1 finds it by this name.
   displayName: 'Norvia Estate health check agent API (${environmentName})'
   signInAudience: 'AzureADMyOrg'
   identifierUris: [

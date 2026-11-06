@@ -41,7 +41,8 @@ function Invoke-Az {
         if ($AllowFailure) { return $null }
         throw "az $($Arguments -join ' ') failed with exit code ${LASTEXITCODE}: $($output -join [Environment]::NewLine)"
     }
-    $output
+    # What `az` writes to stderr (warnings, such as Bicep's) is not part of its output: `--output json` stays parseable.
+    $output | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] }
 }
 
 function Import-AzdEnvironment {

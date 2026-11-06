@@ -161,10 +161,10 @@ public sealed class IntegrationOperationsAgentAzureTests
     [Fact]
     public void DeployScript_RunsLastInAzdsPostdeployHook_AfterTheAppsAreDeployed()
     {
-        var azure = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "azure.yaml"));
+        var postdeploy = Script("postdeploy.ps1");
 
-        azure.Should().Contain("./infra/deploy-agents.sh");
-        azure.IndexOf("./infra/deploy-agents.sh", StringComparison.Ordinal).Should().BeGreaterThan(azure.IndexOf("./infra/register-sign-in-callbacks.sh", StringComparison.Ordinal));
+        postdeploy.Should().Contain("deploy-agents.sh");
+        postdeploy.IndexOf("deploy-agents.sh", StringComparison.Ordinal).Should().BeGreaterThan(postdeploy.IndexOf("register-sign-in-callbacks.ps1", StringComparison.Ordinal));
     }
 
     [Fact]

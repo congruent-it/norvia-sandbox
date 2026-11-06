@@ -15,5 +15,5 @@ The picker is a page, `/pick-driver`, that lists the seeded Drivers. Its post pu
 ## Consequences
 
 - Anyone who can pass the presenter's gate can act as any Driver, the same trust as the TMS UI, where the presenter acts as the Planner.
-- With the picker on, the Driver app signs in to the demo UIs' registration, so `register-sign-in-callbacks.sh` adds its callback there and skips the Driver app's registration. The Driver test users are not used, but nothing stops a deployment from making them.
+- With the picker on, the Driver app signs in to the demo UIs' registration, so `register-sign-in-callbacks.ps1` adds its callback there and skips the Driver app's registration. The Driver test users are not used, but nothing stops a deployment from making them.
 - The cookie is a choice, not proof of identity: it counts only for a user Easy Auth has signed in.

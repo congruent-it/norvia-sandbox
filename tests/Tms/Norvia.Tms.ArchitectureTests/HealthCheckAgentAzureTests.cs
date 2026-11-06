@@ -103,7 +103,7 @@ public sealed class HealthCheckAgentAzureTests
         }
 
         apps.Select(app => app["displayName"]!.GetValue<string>()).Should().Contain("Norvia health-check agent view (env)", "the scripts look the view up by this name");
-        apps.Select(app => app["displayName"]!.GetValue<string>()).Should().Contain("Norvia Estate health check agent API (env)", "provision-estate.sh and the smoke run look the API up by this name");
+        apps.Select(app => app["displayName"]!.GetValue<string>()).Should().Contain("Norvia Estate health check agent API (env)", "provision-estate.ps1 and the smoke run look the API up by this name");
         ContractFile["role"]!.GetValue<string>().Should().Be("HealthCheck.Agent.Read");
     }
 
@@ -157,7 +157,7 @@ public sealed class HealthCheckAgentAzureTests
         var app = Of(AppResources("param healthCheckRedirectUris = 'https://a.example/.auth/login/aad/callback'"), "Microsoft.Graph/applications@v1.0").Single()["properties"]!;
 
         app["web"]!["redirectUris"]!.AsArray().Select(uri => uri!.GetValue<string>()).Should().Equal("https://a.example/.auth/login/aad/callback");
-        Script("register-sign-in-callbacks.sh").Should().Contain("ESTATE_HEALTH_CHECK_REDIRECT_URIS");
+        Script("register-sign-in-callbacks.ps1").Should().Contain("ESTATE_HEALTH_CHECK_REDIRECT_URIS");
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public sealed class HealthCheckAgentAzureTests
         var script = Script("deploy-agents.sh");
 
         script.Should().Contain("health-check-web").And.Contain("health-check-agent-api").And.Contain("ESTATE_HEALTH_CHECK_BASE_URL");
-        Script("provision-estate.sh").Should().Contain("Norvia Estate health check (").And.Contain("id-health-check-").And.Contain("estate_health_check_agent_api_client_id");
+        Script("provision-estate.ps1").Should().Contain("Norvia Estate health check (").And.Contain("id-health-check-").And.Contain("estate_health_check_agent_api_client_id");
     }
 
     [Fact]

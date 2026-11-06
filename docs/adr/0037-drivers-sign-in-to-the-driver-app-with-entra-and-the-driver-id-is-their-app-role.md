@@ -18,5 +18,5 @@ Locally there is no Entra and no Easy Auth. The AppHost turns on a stand-in (`Lo
 
 - The Driver app trusts the header because Easy Auth is in front of it. The AppHost always deploys it with Easy Auth.
 - A Driver has exactly one role, their own. A user holding more would have more than one Driver ID, and the first would win. The test-users script assigns one.
-- Entra needs the Driver app's callback, which exists only once Aspire has deployed it. The postdeploy hook ([infra/register-sign-in-callbacks.sh](../../infra/register-sign-in-callbacks.sh)) adds it and keeps it in the azd environment as `ESTATE_DRIVER_APP_REDIRECT_URIS`.
+- Entra needs the Driver app's callback, which exists only once Aspire has deployed it. The postdeploy hook ([infra/register-sign-in-callbacks.ps1](../../infra/register-sign-in-callbacks.ps1)) adds it and keeps it in the azd environment as `ESTATE_DRIVER_APP_REDIRECT_URIS`.
 - Putting the Driver ID from the token on every event, and the TMS checking it against the Trip's Driver, come with the Driver app's actions.

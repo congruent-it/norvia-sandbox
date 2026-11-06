@@ -75,7 +75,7 @@ resource monitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-0
 
 // Every subscription's filter also routes resubmits from the Integration console, so a resubmitted message reaches only
 // the subscription it was dead-lettered from (coding guidelines §7). The rule is not named $Default, which Service Bus drops when
-// it carries a SQL filter; infra/provision-estate.sh deletes the $Default rule, which passes all, after the deployment.
+// it carries a SQL filter; infra/provision-estate.ps1 deletes the $Default rule, which passes all, after the deployment.
 resource monitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
   parent: monitoring
   name: 'resubmit-aware'

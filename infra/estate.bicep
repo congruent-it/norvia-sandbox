@@ -59,7 +59,7 @@ param integrationConsoleRedirectUris string = ''
 Integration operations agent's API Management backend keeps it when the estate is deployed again.''')
 param integrationConsoleBaseUrl string = ''
 
-@description('''Easy Auth's sign-in callback on the Estate health check, empty before the app is first deployed. infra/register-sign-in-callbacks.sh stores it.''')
+@description('''Easy Auth's sign-in callback on the Estate health check, empty before the app is first deployed. infra/register-sign-in-callbacks.ps1 stores it.''')
 param healthCheckRedirectUris string = ''
 
 @description('''The Estate health check's address, empty before the app is first deployed. infra/deploy-agents.sh stores it (ESTATE_HEALTH_CHECK_BASE_URL), so
@@ -98,7 +98,7 @@ Carrier-answer, Shipper notification, Carrier cancellation, Trip dispatch, Carri
 param tmsBaseUrl string = ''
 
 @secure()
-@description('''A random value the Carrier endpoints' credentials are derived from. The deployment hook (provision-estate.sh) makes it
+@description('''A random value the Carrier endpoints' credentials are derived from. The deployment hook (provision-estate.ps1) makes it
 once and keeps it in the azd environment.''')
 param carrierEndpointKeySeed string
 
