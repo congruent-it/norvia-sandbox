@@ -10,21 +10,26 @@
 <PageTitle>Home · Norvia TMS</PageTitle>
 
 <h1>Home</h1>
-<p>What needs you to act now. Each item opens its list.</p>
+<p>What needs you to act now. Select a card to open its list and act.</p>
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="work to act on" Empty="Nothing to show." Context="counts">
     <ul aria-label="Work to act on" class="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
         @foreach (var item in PlannerHomeItem.From(counts[0]))
         {
-            <li class="rounded-flatly border border-gray-300 p-4">
-                <a href="@item.Path" class="text-lg font-bold">@item.Title</a>
+            <li class="@CardClass(item) relative flex flex-col gap-2 rounded-flatly border p-4">
+                @* The title is the card's one link; its ::after stretches over the card, so the whole card opens the list. *@
+                <a href="@item.Path" class="text-lg font-bold after:absolute after:inset-0">@item.Title</a>
                 @if (item.Count == 0)
                 {
                     <p class="m-0 text-gray-500">@item.NothingToDo</p>
                 }
                 else
                 {
-                    <p class="m-0"><strong aria-label="@($"{item.Count} {item.Title}")">@item.Count</strong> @item.Unit</p>
+                    <p class="m-0 flex items-baseline gap-2">
+                        <strong class="text-4xl leading-none" aria-label="@($"{item.Count} {item.Title}")">@item.Count</strong>
+                        <span>@item.Unit</span>
+                    </p>
+                    <span class="mt-auto pt-2 font-bold text-primary" aria-hidden="true">@item.Action →</span>
                 }
             </li>
         }
@@ -41,6 +46,10 @@
         _list.Changed += () => InvokeAsync(StateHasChanged);
         _list.Start();
     }
+
+    // Work waiting stands out with the accent; a card with nothing to do recedes.
+    private static string CardClass(PlannerHomeItem item) =>
+        item.Count == 0 ? "border-gray-300 bg-gray-50" : "border-primary border-l-4 bg-white shadow-sm hover:shadow-md";
 
     public ValueTask DisposeAsync() => _list.DisposeAsync();
 

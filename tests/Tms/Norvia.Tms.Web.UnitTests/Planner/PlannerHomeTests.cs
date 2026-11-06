@@ -48,6 +48,27 @@ public sealed class PlannerHomeTests : TmsWebContext
         item.QuerySelector("strong").Should().BeNull();
     }
 
+    [Fact]
+    public void Render_WithWorkToDo_ShowsTheActionToTakeOnTheCard()
+    {
+        GivenLists(waiting: 3, toRelease: 2, exceptions: 0);
+
+        var page = Render<PlannerHome>();
+
+        page.WaitForElement("li:has(a[href='/shipments/to-release'])").TextContent.Should().Contain("Release them");
+        page.Find("li:has(a[href='/transport-orders'])").TextContent.Should().Contain("Plan them");
+    }
+
+    [Fact]
+    public void Render_WithNothingToDoForAnItem_ShowsNoActionOnTheCard()
+    {
+        GivenLists(waiting: 3, toRelease: 0, exceptions: 0);
+
+        var page = Render<PlannerHome>();
+
+        page.WaitForElement("li:has(a[href='/shipments/to-release'])").TextContent.Should().NotContain("Release them");
+    }
+
     private void GivenLists(int waiting, int toRelease, int exceptions)
     {
         Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns(new TransportOrderToPlanSummary[waiting]);
