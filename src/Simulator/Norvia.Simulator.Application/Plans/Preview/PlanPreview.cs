@@ -1,6 +1,7 @@
 using Norvia.Simulator.Domain.Carriers;
 using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Invoicing;
+using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
@@ -71,6 +72,7 @@ public sealed record PlanPreview(
     [
         .. plan.Pools.Select(pool => new PoolPreview(
             pool.ProfileId, pool.Category.ToString(), pool.Language, pool.Source, pool.Texts.Count, [.. pool.Texts.Take(SampleSize)],
-            [.. plan.CarrierProfiles.Where(pair => pair.Value == pool.ProfileId).Select(pair => pair.Key).Order(StringComparer.Ordinal)])),
+            TextCategories.IsDriverText(pool.Category) ? [] : [.. plan.CarrierProfiles.Where(pair => pair.Value == pool.ProfileId).Select(pair => pair.Key).Order(StringComparer.Ordinal)],
+            TextCategories.IsDriverText(pool.Category) ? [.. plan.DriverProfiles.Where(pair => pair.Value == pool.ProfileId).Select(pair => pair.Key).Order(StringComparer.Ordinal)] : null)),
     ];
 }

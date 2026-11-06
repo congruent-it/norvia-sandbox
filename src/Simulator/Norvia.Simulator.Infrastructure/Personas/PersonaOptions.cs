@@ -12,7 +12,11 @@ public sealed class PersonaOptions
     /// <summary>The profile ID of each Carrier, by Carrier ID.</summary>
     public Dictionary<string, string> Carriers { get; set; } = [];
 
-    public bool IsConsistent => Carriers.Values.All(profile => Profiles.Exists(candidate => candidate.Id == profile)) && Profiles.Select(profile => profile.Id).Distinct().Count() == Profiles.Count;
+    /// <summary>The profile ID of each Driver of the Own fleet, by Driver ID.</summary>
+    public Dictionary<string, string> Drivers { get; set; } = [];
+
+    public bool IsConsistent =>
+        Carriers.Values.Concat(Drivers.Values).All(profile => Profiles.Exists(candidate => candidate.Id == profile)) && Profiles.Select(profile => profile.Id).Distinct().Count() == Profiles.Count;
 }
 
 public sealed class PersonaProfileOptions

@@ -409,7 +409,7 @@ What a Simulation run will send, made before anything is sent from the run's set
 _Avoid_: script, schedule, dataset
 
 **Pool**:
-The texts a Simulation plan keeps for one kind of free text a Carrier sends (the words of a decline with the reason Other, the remark on a delivery failed Tracking event), in one profile's style and language. The plan carries its pools with where they came from (built-in, or the personas agent's run), the run draws one text from a pool by the seed, and so the same plan always sends the same words. A pool supplies only words: the plan still decides every outcome. The log names the pool and the index drawn, never the text.
+The texts a Simulation plan keeps for one kind of free text a Carrier or a Driver sends (the words of a decline with the reason Other, the remark on a delivery failed Tracking event, the remark on a Driver's Collection failed, Delivery failed or Report damage report), in one profile's style and language. The plan carries its pools with where they came from (built-in, or the personas agent's run), the run draws one text from a pool by the seed, and so the same plan always sends the same words. A pool supplies only words: the plan still decides every outcome. The log names the pool and the index drawn, never the text.
 _Avoid_: template, script
 
 **Preset**:

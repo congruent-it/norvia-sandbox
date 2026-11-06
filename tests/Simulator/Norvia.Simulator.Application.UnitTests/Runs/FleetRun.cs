@@ -111,9 +111,9 @@ internal sealed class FleetRun
     public ExecuteRunHandler Handler() => new(
         Runs, Log, Partner, Tms, World, new SimulationLimits(50, 3), Time, new CarrierPacing(TimeSpan.Zero, 1), Drivers, new DriverPacing(TimeSpan.Zero, 2), Erp, Inbox, Substitute.For<ICarrierInbox>());
 
-    public async Task<SimulationRun> RunAsync(SimulationSettings settings, CancellationTokenSource? stop = null)
+    public async Task<SimulationRun> RunAsync(SimulationSettings settings, CancellationTokenSource? stop = null, bool driverPools = false)
     {
-        var run = TestData.Run(settings);
+        var run = driverPools ? TestData.RunWithDriverPools(settings) : TestData.Run(settings);
         Runs.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
         (await Handler().Handle(new ExecuteRunCommand(run.Id, stop?.Token ?? CancellationToken.None), CancellationToken.None)).IsSuccess.Should().BeTrue();
         return run;

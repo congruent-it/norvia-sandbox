@@ -14,6 +14,12 @@ public static class PersonaTextScript
 
     public const string DeliveryFailedRemark = "DeliveryFailedRemark";
 
+    public const string DriverCollectionFailedRemark = "DriverCollectionFailedRemark";
+
+    public const string DriverDeliveryFailedRemark = "DriverDeliveryFailedRemark";
+
+    public const string DriverDamageRemark = "DriverDamageRemark";
+
     private static readonly Dictionary<(string Language, string Category), string[]> Texts = new()
     {
         [("en", DeclineReason)] =
@@ -79,6 +85,102 @@ public static class PersonaTextScript
             "Entladung vor Ort nicht möglich",
             "Empfänger verweigert die Annahme",
             "Niemand zur Warenannahme anwesend",
+        ],
+        [("en", DriverCollectionFailedRemark)] =
+        [
+            "Nobody was at the collection address to hand over the goods",
+            "The site refused entry and I could not load",
+            "The goods were not ready for collection at the agreed time",
+            "The shipper's dock was closed on arrival",
+            "The sender could not be reached and the goods stayed behind",
+        ],
+        [("en", DriverDeliveryFailedRemark)] =
+        [
+            "The consignee was not present to receive the goods",
+            "Delivery was refused because the site had already closed",
+            "Nobody at the address could sign for the shipment",
+            "The unloading bay was blocked and I could not deliver",
+            "The consignee declined the goods at the door",
+        ],
+        [("en", DriverDamageRemark)] =
+        [
+            "One pallet arrived damaged at the pickup",
+            "Packaging was torn open when I collected the goods",
+            "A carton was crushed before loading",
+            "Visible water damage on two pallets at collection",
+            "The shrink wrap had split and the load was loose",
+        ],
+        [("nl", DriverCollectionFailedRemark)] =
+        [
+            "Niemand aanwezig bij het ophaaladres",
+            "Terrein geweigerd, niet kunnen laden",
+            "Goederen niet klaar",
+            "Dock dicht bij aankomst",
+            "Afzender niet bereikbaar",
+        ],
+        [("nl", DriverDeliveryFailedRemark)] =
+        [
+            "Ontvanger niet aanwezig",
+            "Niemand thuis, kon niet afleveren",
+            "Dock dicht bij aankomst",
+            "Ontvanger weigert de lading",
+            "Niemand wil tekenen",
+        ],
+        [("nl", DriverDamageRemark)] =
+        [
+            "Pallet beschadigd bij ophalen",
+            "Verpakking kapot bij het laden",
+            "Doos ingedrukt",
+            "Waterschade op twee pallets",
+            "Folie los, lading loslopend",
+        ],
+        [("mixed", DriverCollectionFailedRemark)] =
+        [
+            "niemand there bij ophaaladres",
+            "kon niet laden, gate was closed",
+            "goederen nog niet klaar sorry",
+            "dock dicht bij aankomst",
+            "afzender not reachable, gebeld",
+        ],
+        [("mixed", DriverDeliveryFailedRemark)] =
+        [
+            "receiver not home, niemand open gedaan",
+            "dock was closed al, kon niet lossen",
+            "klant refused to sign",
+            "adres klopt niet?? niemand there",
+            "wachtte 30 min maar niemand kwam",
+        ],
+        [("mixed", DriverDamageRemark)] =
+        [
+            "pallet kapot bij pickup",
+            "doos crushed bij het laden",
+            "water damage op 2 pallets",
+            "folie los en lading loose",
+            "hoekje van pallet broken",
+        ],
+        [("de", DriverCollectionFailedRemark)] =
+        [
+            "Niemand an der Abholadresse angetroffen",
+            "Zutritt verweigert, Beladung nicht möglich",
+            "Ware war zum vereinbarten Zeitpunkt nicht bereit",
+            "Rampe bei Ankunft geschlossen",
+            "Absender nicht erreichbar",
+        ],
+        [("de", DriverDeliveryFailedRemark)] =
+        [
+            "Empfänger bei der Zustellung nicht angetroffen",
+            "Annahme geschlossen, Zustellung nicht möglich",
+            "Niemand konnte die Sendung quittieren",
+            "Empfänger verweigert die Annahme",
+            "Entladestelle war versperrt",
+        ],
+        [("de", DriverDamageRemark)] =
+        [
+            "Eine Palette bei der Abholung beschädigt",
+            "Verpackung beim Beladen aufgerissen",
+            "Karton eingedrückt vor der Verladung",
+            "Wasserschaden an zwei Paletten",
+            "Folie gerissen, Ladung lose",
         ],
     };
 
