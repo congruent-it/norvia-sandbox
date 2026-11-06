@@ -6,7 +6,7 @@ namespace Norvia.Tms.ArchitectureTests;
 /// The conversation sweeper (infra/estate/conversation-sweeper-logic-app.bicep, src/Integration/ConversationSweeperLogicApp): it holds only
 /// the Foundry role it needs, the as-found toggle stops it, and its workflow deletes with its own identity and fails with
 /// <c>ConversationNotDeleted</c>. The Bicep is evaluated locally with <c>bicep snapshot</c>; nothing is deployed, and the Foundry calls
-/// are made only by the post-deploy smoke run (infra/smoke-test-conversation-sweeper.sh).
+/// are made only by the post-deploy smoke run (infra/smoke-test-conversation-sweeper.ps1).
 /// </summary>
 public sealed class ConversationSweeperTests
 {

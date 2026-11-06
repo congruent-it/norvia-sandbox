@@ -5,7 +5,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.UnitTests.Trails;
 /// <summary>
 /// An Agent's call through an MCP server has a correlation ID of its own, made by API Management, and records the run it belongs to as
 /// its <c>runId</c>: the run's calls are on the run's trail. What the KQL answers is checked against the workspace by the smoke run
-/// (infra/smoke-test-estate-health-check.sh); here only that the queries still say so.
+/// (infra/smoke-test-estate-health-check.ps1); here only that the queries still say so.
 /// </summary>
 public sealed class AgentRunQueriesTests
 {

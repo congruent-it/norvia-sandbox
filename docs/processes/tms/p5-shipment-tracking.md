@@ -212,7 +212,7 @@ Delivered doesn't wait for a Proof of delivery. [P6](p6-proof-of-delivery.md) at
 After a deployment, and not in CI, the presenter checks Shipment tracking end to end on the deployed estate, before the headline incident breaks it. Do it after the presenter smoke run of Carrier booking ([docs/processes/tms/p4-carrier-booking.md](p4-carrier-booking.md#presenter-smoke-run)), whose Booked Shipment it tracks. Open the TMS UI and the Integration console side by side.
 
 1. **Get a Booked Shipment.** Follow P4's run to step 7: Rotterdam to Düsseldorf as Brouwer Dranken, confirmed by Van Dijk Transport. Note the Transport Order number. In the TMS UI, the Shipment is in *Shipments in progress*, Booked, with no Tracking event yet. Then set Kessler Spedition back to *Manual*, as P4's last step says.
-2. **Run the check.** Run `infra/smoke-test-shipment-tracking.sh <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal. It reads the TMS as the intake identity and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
+2. **Run the check.** Run `infra/smoke-test-shipment-tracking.ps1 <Transport Order number>`. It posts as Van Dijk Transport, through API Management, from a throwaway Container Apps job running as the Partner portal. It reads the TMS as the intake identity and Application Insights, which is usually 1 to 5 minutes behind. It checks that:
    - `PU`, `DEP` and `POD` each return `202 Accepted`, and the Shipment moves through Collected, In transit and Delivered, in the Planner's *Shipments in progress* until it is Delivered, with the three Tracking events on its timeline, each moving the status;
    - a Tracking event for a reference no Carrier booking has is accepted and lands on the `carrier-tracking` queue's dead-letter queue with `ShipmentNotFound`;
    - each accepted call is in Application Insights by its correlation ID, from API Management, the Carrier-tracking Logic App and the TMS.
@@ -267,7 +267,7 @@ Links go to files, not lines, so they stay true as the code moves.
 | Tracking | The flow name is in [Flows.cs](../../../src/Tms/Norvia.Tms.Application/IntegrationEvents/Flows.cs). The call puts the keys in the log scope: [TrackTrackingEventInLoggingScope.cs](../../../src/Tms/Norvia.Tms.Application/TrackingEvents/Record/TrackTrackingEventInLoggingScope.cs) |
 | The applications | The TMS API, TMS UI and Partner portal are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs). The Function host is the [tracking Functions project](../../../src/Integration/Norvia.Integration.CarrierTracking.Functions/Norvia.Integration.CarrierTracking.Functions.csproj), deployed with its Logic App |
 | The Logic App resources | [tracking-logic-app.bicep](../../../infra/estate/tracking-logic-app.bicep) deployed by [deploy-tracking-logic-app.ps1](../../../infra/deploy-tracking-logic-app.ps1) |
-| The presenter smoke run | [smoke-test-shipment-tracking.sh](../../../infra/smoke-test-shipment-tracking.sh), run after the [Carrier booking](../../../infra/smoke-test-carrier-booking.sh) smoke run |
+| The presenter smoke run | [smoke-test-shipment-tracking.ps1](../../../infra/smoke-test-shipment-tracking.ps1), run after the [Carrier booking](../../../infra/smoke-test-carrier-booking.ps1) smoke run |
 
 ### Locally
 

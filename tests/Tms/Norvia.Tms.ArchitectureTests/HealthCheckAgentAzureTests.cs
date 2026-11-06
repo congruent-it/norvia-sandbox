@@ -194,19 +194,19 @@ public sealed class HealthCheckAgentAzureTests
     [Fact]
     public void SmokeRun_ChecksTheRoles_TheFindingComingAndGoing_TheHopsOnTheTrail_AndThatNothingIsKept()
     {
-        var script = Script("smoke-test-estate-health-check.sh");
+        var script = Script("smoke-test-estate-health-check.ps1");
 
-        script.Should().Contain("./as-found.sh as-found").And.Contain("./as-found.sh fixed");
-        script.IndexOf("./as-found.sh as-found", StringComparison.Ordinal).Should().BeLessThan(script.IndexOf("./as-found.sh fixed", StringComparison.Ordinal));
-        script.Should().Contain("F-DLQ-ALERT").And.Contain("carrier-tracking").And.Contain("agent-mcp-health-check").And.Contain("agent-view-health-check").And.Contain("store: false");
+        script.Should().Contain("Invoke-AsFound as-found").And.Contain("Invoke-AsFound fixed");
+        script.IndexOf("Invoke-AsFound as-found", StringComparison.Ordinal).Should().BeLessThan(script.IndexOf("Invoke-AsFound fixed", StringComparison.Ordinal));
+        script.Should().Contain("F-DLQ-ALERT").And.Contain("carrier-tracking").And.Contain("agent-mcp-health-check").And.Contain("agent-view-health-check").And.MatchRegex(@"store\s*=\s*\$false");
         script.Should().Contain("holds no Azure role").And.Contain("holds Reader on the estate's resource group").And.Contain("is the only role on the app's agent API");
-        script.Should().Contain("structured_inputs: {correlationId: $run}");
+        script.Should().MatchRegex(@"structured_inputs\s*=\s*@\{\s*correlationId\s*=\s*\$correlation\s*\}");
     }
 
     [Fact]
     public void SmokeRun_NeverEchoesATokenOrASecret()
     {
-        var lines = Script("smoke-test-estate-health-check.sh").Split('\n').Where(line => line.TrimStart().StartsWith("echo", StringComparison.Ordinal));
+        var lines = Script("smoke-test-estate-health-check.ps1").Split('\n').Where(line => line.TrimStart().StartsWith("Write-", StringComparison.Ordinal));
 
         lines.Should().NotContain(line => line.Contains("token", StringComparison.OrdinalIgnoreCase) || line.Contains("SECRET", StringComparison.Ordinal));
     }

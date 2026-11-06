@@ -89,11 +89,11 @@ A rating that gives its answer, Rated or Rating failed, and a re-rate that does,
 
 ## Presenter smoke run
 
-After a deployment, and not in CI, the presenter checks Rating on the deployed estate with the demo seed's two bookings. Do it after the demo smoke run of the Norvia Partner API ([infra/smoke-test-partner-api.sh](../../../infra/smoke-test-partner-api.sh)), signed in as the presenter the estate was provisioned for. The postdeploy hook prints each UI's address. Open the Partner portal and the TMS UI side by side.
+After a deployment, and not in CI, the presenter checks Rating on the deployed estate with the demo seed's two bookings. Do it after the demo smoke run of the Norvia Partner API ([infra/smoke-test-partner-api.ps1](../../../infra/smoke-test-partner-api.ps1)), signed in as the presenter the estate was provisioned for. The postdeploy hook prints each UI's address. Open the Partner portal and the TMS UI side by side.
 
 1. **Book to Antwerp.** In the Partner portal, choose Brouwer Dranken in the Persona switcher. The booking form opens with Brouwer Dranken's Rotterdam warehouse as the collection and Café De Zwaan in Utrecht as the delivery, with 2 pallets of 850 kg. Change the delivery to Drankenhandel De Schelde BV (contact Pieter Janssens, +32 3 555 0117), Noorderlaan 120, 2030 Antwerpen, BE, and choose *Book transport*. Note the Transport Order number and Norvia's reference for the attempt under it, which is the booking's correlation ID.
 2. **Book to Düsseldorf.** Choose *Start a new booking*, change the delivery to Getränke Schmitz GmbH (contact Jonas Schmitz, +49 211 555 0190), Kölner Landstraße 301, 40591 Düsseldorf, DE, and book it. Note its Transport Order number and reference too.
-3. **Check the TMS.** Run `infra/smoke-test-rating.sh <Antwerp's number> <Düsseldorf's number>`. It reads the TMS as the intake identity, from a throwaway Container Apps job, and reads each order's Message trail in Application Insights, which is usually 1 to 5 minutes behind. It checks that:
+3. **Check the TMS.** Run `infra/smoke-test-rating.ps1 <Antwerp's number> <Düsseldorf's number>`. It reads the TMS as the intake identity, from a throwaway Container Apps job, and reads each order's Message trail in Application Insights, which is usually 1 to 5 minutes behind. It checks that:
    - the Antwerp order is Rated, with a Freight Charge in EUR that has a Freight line, and is waiting for planning;
    - the Düsseldorf order is Rating failed with `NoMatchingLane` and has no Freight Charge, is in the rating exceptions, and is still waiting for planning;
    - each order's intake and rating are on one Message trail under the intake's correlation ID, the rating for Brouwer Dranken (`SHP-0001`) with the outcome `Succeeded`, and with `failureCode` `NoMatchingLane` for Düsseldorf's only.
@@ -145,7 +145,7 @@ Links go to files, not lines, so they stay true as the code moves.
 | The seed Rate Cards | [norvia.seed.json](../../../seed/norvia.seed.json). The overlap rule is checked as the seed loads |
 | The applications | The TMS API, which hosts the worker, and the TMS UI are declared in the [AppHost](../../../src/Norvia.AppHost/AppHost.cs) |
 | Bicep | Rating has no Bicep resource of its own. It publishes to the topic [messaging.bicep](../../../infra/estate/messaging.bicep) declares, and the TMS API's Container App is part of the estate like any other |
-| The presenter smoke run | [smoke-test-rating.sh](../../../infra/smoke-test-rating.sh), run after the [Norvia Partner API](../../../infra/smoke-test-partner-api.sh) smoke run |
+| The presenter smoke run | [smoke-test-rating.ps1](../../../infra/smoke-test-rating.ps1), run after the [Norvia Partner API](../../../infra/smoke-test-partner-api.ps1) smoke run |
 
 ### Locally
 

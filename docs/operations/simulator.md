@@ -96,7 +96,7 @@ Locally, set `Agents:Enabled` to `true` in the AppHost's user secrets to see `ag
 
 **Tracking.** A generation is an `Agent run` span of the Simulator in Application Insights with `agent.name`, `agent.run.id` and the profile and category, and its log lines name the run ID, the profile and the category, never a text. Foundry's own traces in Application Insights keep the prompt and the answer apart in `AppGenAIContent`, outside the tables the Message trails use ([foundry.md](foundry.md#spike-2-trace-content)); the prompt is only a profile, a language and a kind of text, so the agent stays in the `norvia` project.
 
-**Post-deploy smoke run (Carrier texts).** `infra/smoke-test-simulator-personas.sh <run number>` checks the agent's identity holds no role, asks the real model, previews and runs a plan with the presenter, and checks the pools say `agent, run N`, the span is in Application Insights and no text is in the log.
+**Post-deploy smoke run (Carrier texts).** `infra/smoke-test-simulator-personas.ps1 <run number>` checks the agent's identity holds no role, asks the real model, previews and runs a plan with the presenter, and checks the pools say `agent, run N`, the span is in Application Insights and no text is in the log.
 
 ## The hostile profile
 
@@ -200,7 +200,7 @@ Run the Simulator for 20 orders and check that the whole estate took part. You n
 
 1. Open `simulator-web` (the address `azd show` prints, or `https://` and the container app's address) and sign in with Entra. A browser signed in as someone without the roles is refused by Entra.
 2. On **Configure**, read the number the next run gets. Choose *Quiet Monday*, set the **seed** to 349 and **Start run**. The log fills as it does locally; the bookings go through API Management and the intake Logic App, so a booking takes longer than locally. Wait until the run is *Completed*.
-3. Run `infra/smoke-test-simulator.sh <run number>` and press Enter when the script asks. It checks that:
+3. Run `infra/smoke-test-simulator.ps1 <run number>` and press Enter when the script asks. It checks that:
    - the Simulator answers its health check and sends a caller without a sign-in to Entra;
    - the run's Transport Orders (`SIM-<run>-<n>`) are in the TMS, most of them Planned and the bad bookings Rejected;
    - the Planner's Shipments are in the TMS, and a Trip carries a Stop for one of the run's Transport Orders;

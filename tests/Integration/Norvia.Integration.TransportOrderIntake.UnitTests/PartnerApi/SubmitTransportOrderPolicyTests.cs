@@ -5,7 +5,7 @@ namespace Norvia.Integration.TransportOrderIntake.UnitTests.PartnerApi;
 
 /// <summary>
 /// API Management checks a partner at the edge and passes the Logic App only what it derived itself (ADR 0005, P1). API
-/// Management runs only in Azure, so these tests read the policy; the smoke run (infra/smoke-test-partner-api.sh) calls it.
+/// Management runs only in Azure, so these tests read the policy; the smoke run (infra/smoke-test-partner-api.ps1) calls it.
 /// </summary>
 public sealed class SubmitTransportOrderPolicyTests
 {

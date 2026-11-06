@@ -635,7 +635,7 @@ module partnerApi 'estate/partner-api.bicep' = {
   }
 }
 
-// The example MCP server and its identities (infra/smoke-test-agent-mcp-server.sh). The estate is at the 64 outputs a template may have,
+// The example MCP server and its identities (infra/smoke-test-agent-mcp-server.ps1). The estate is at the 64 outputs a template may have,
 // so the smoke run finds the identities by their app registrations' names and the address by the API Management service.
 module agentMcpExample 'estate/agent-mcp-example.bicep' = {
   scope: resourceGroup
@@ -646,7 +646,7 @@ module agentMcpExample 'estate/agent-mcp-example.bicep' = {
 }
 
 // The Integration operations agent's MCP server over the console's agent API, with the two app registrations that keep it narrow
-// (infra/smoke-test-integration-operations-agent.sh). Like the example, it has no outputs: the estate is at the 64 a template may have,
+// (infra/smoke-test-integration-operations-agent.ps1). Like the example, it has no outputs: the estate is at the 64 a template may have,
 // so the scripts and the AppHost find its app registrations by their names.
 module integrationOperationsMcp 'estate/integration-operations-mcp.bicep' = {
   scope: resourceGroup
@@ -665,7 +665,7 @@ module integrationOperationsMcp 'estate/integration-operations-mcp.bicep' = {
 }
 
 // The Estate health-check agent's MCP server over the app's agent API, with the two app registrations that keep it narrow
-// (infra/smoke-test-estate-health-check.sh). Like the others, it has no outputs.
+// (infra/smoke-test-estate-health-check.ps1). Like the others, it has no outputs.
 module healthCheckMcp 'estate/health-check-mcp.bicep' = {
   scope: resourceGroup
   params: {
