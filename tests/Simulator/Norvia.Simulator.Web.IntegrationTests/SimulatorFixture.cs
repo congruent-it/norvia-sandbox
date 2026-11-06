@@ -150,8 +150,16 @@ public sealed class SimulatorFixture : IAsyncLifetime
     /// A Simulator with the Agents on, so a plan's pools of Carrier texts are written by the personas agent (the in-process runner with the scripted fake
     /// model), and with the port to the agent changed by <paramref name="configureServices"/> when a test needs to watch it or make it fail.
     /// </summary>
+    public Task<SimulatorHost> StartSimulatorWithAgentsAsync(
+        Action<IServiceCollection>? configureServices, CancellationToken cancellationToken, params Action<JsonObject>[] edits) =>
+        StartSimulatorWithAgentsAsync(configureServices, settings: null, cancellationToken, edits);
+
+    /// <summary>
+    /// The same, with settings of the Agents added to the AppHost's, such as the Foundry project's address and the caps, so a test can make the Simulator ask Foundry
+    /// (a faked Responses endpoint) instead of the in-process runner.
+    /// </summary>
     public async Task<SimulatorHost> StartSimulatorWithAgentsAsync(
-        Action<IServiceCollection>? configureServices, CancellationToken cancellationToken, params Action<JsonObject>[] edits)
+        Action<IServiceCollection>? configureServices, IReadOnlyDictionary<string, string>? settings, CancellationToken cancellationToken, params Action<JsonObject>[] edits)
     {
         var seed = JsonNode.Parse(await File.ReadAllTextAsync(_settings["Seed:Path"], cancellationToken))!.AsObject();
         foreach (var edit in edits)
@@ -162,7 +170,13 @@ public sealed class SimulatorFixture : IAsyncLifetime
         var copy = Path.Combine(Path.GetTempPath(), $"norvia-seed-{Guid.NewGuid():N}.json");
         _seedCopies.Add(copy);
         await File.WriteAllTextAsync(copy, seed.ToJsonString(), cancellationToken);
-        var host = new SimulatorHost(new Dictionary<string, string>(_settings) { ["Seed:Path"] = copy, ["Agents:Enabled"] = "true" }, configureServices);
+        var all = new Dictionary<string, string>(_settings) { ["Seed:Path"] = copy, ["Agents:Enabled"] = "true" };
+        foreach (var (name, value) in settings ?? new Dictionary<string, string>())
+        {
+            all[name] = value;
+        }
+
+        var host = new SimulatorHost(all, configureServices);
         _hosts.Add(host);
         return host;
     }
