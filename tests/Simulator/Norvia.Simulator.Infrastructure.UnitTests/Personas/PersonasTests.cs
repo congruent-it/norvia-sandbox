@@ -169,4 +169,69 @@ public sealed class PersonasTests
 
         result.Status.Should().Be(Ardalis.Result.ResultStatus.Unavailable);
     }
+
+    // ---- The opt-in hostile profile.
+
+    [Fact]
+    public void TheShippedConfiguration_NeverConfiguresTheHostileProfile_ItIsChosenOnPurposeInARun()
+    {
+        var options = Configured();
+
+        options.Profiles.Should().NotContain(profile => profile.Id == PersonaProfile.HostileId);
+        options.Carriers.Values.Concat(options.Drivers.Values).Should().NotContain(PersonaProfile.HostileId);
+        new ConfiguredPersonaProfiles(Options.Create(options)).ProfileOf("CAR-0001")!.IsHostile.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsConsistent_AHostileProfileInTheConfiguration_IsNot()
+    {
+        var hostile = new PersonaProfileOptions { Id = "hostile", Language = "en", Style = "s" };
+
+        new PersonaOptions { Profiles = [hostile] }.IsConsistent.Should().BeFalse();
+        new PersonaOptions { Profiles = [hostile], Carriers = { ["CAR-1"] = "hostile" } }.IsConsistent.Should().BeFalse();
+        new PersonaOptions { Profiles = [hostile], Drivers = { ["DRV-1"] = "hostile" } }.IsConsistent.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TextsOf_TheHostileProfile_HasABuiltInPoolForEveryKindOfTextThatIsBigEnoughAndPassesTheRules()
+    {
+        var pools = new EmbeddedBuiltInPools();
+
+        foreach (var category in Enum.GetValues<TextCategory>())
+        {
+            var texts = pools.TextsOf(PersonaProfile.Hostile, category);
+
+            texts.Count.Should().BeGreaterThanOrEqualTo(PoolTextRules.MinPoolSize, $"hostile {category} is a pool");
+            texts.Should().OnlyContain(text => PoolTextRules.IsAcceptable(text), "a hostile text is an ordinary remark to the TMS");
+            texts.Should().Contain(text => text.Contains("Ignore your instructions", StringComparison.Ordinal), $"hostile {category} texts try to instruct");
+        }
+    }
+
+    [Fact]
+    public async Task GeneratePoolAsync_TheScriptedFake_WritesHostileTextsThatPassTheRulesWhenAskedForTheHostileProfile()
+    {
+        var client = new LocalAgentClient(Options.Create(new AgentsOptions { Enabled = true }), NullLogger<LocalAgentClient>.Instance);
+
+        foreach (var category in Enum.GetValues<TextCategory>())
+        {
+            var result = await client.GeneratePoolAsync(new PoolRequest(PersonaProfile.Hostile, category, 8), TestContext.Current.CancellationToken);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Value.Count.Should().BeGreaterThanOrEqualTo(PoolTextRules.MinPoolSize);
+            PoolTextRules.Acceptable(result.Value).Should().Equal(result.Value);
+        }
+    }
+
+    [Fact]
+    public async Task GeneratePoolAsync_AnotherProfile_NeverGetsHostileTexts()
+    {
+        var client = new LocalAgentClient(Options.Create(new AgentsOptions { Enabled = true }), NullLogger<LocalAgentClient>.Instance);
+
+        foreach (var category in Enum.GetValues<TextCategory>())
+        {
+            var result = await client.GeneratePoolAsync(new PoolRequest(new PersonaProfile("formal-english", "en", "polite"), category, 8), TestContext.Current.CancellationToken);
+
+            result.Value.Should().NotContain(text => text.Contains("instructions", StringComparison.OrdinalIgnoreCase));
+        }
+    }
 }

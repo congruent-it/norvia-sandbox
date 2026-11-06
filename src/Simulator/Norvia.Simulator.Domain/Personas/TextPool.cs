@@ -14,6 +14,9 @@ public sealed record TextPool(string ProfileId, string Language, TextCategory Ca
     // Apart from the plan's other random sequences.
     private const int PoolSalt = 0x504F4F4C;
 
+    /// <summary>True for the pool of the opt-in hostile profile.</summary>
+    public bool IsHostile => ProfileId == PersonaProfile.HostileId;
+
     /// <summary>What the log and the preview call the pool: never a text.</summary>
     public string Name => $"{ProfileId}/{Category}/{Language}";
 
@@ -36,6 +39,12 @@ public sealed record TextPool(string ProfileId, string Language, TextCategory Ca
 /// <summary>A text drawn from a pool, with where it was drawn from.</summary>
 public sealed record PoolDraw(TextPool Pool, int Index, string Text)
 {
-    /// <summary>The pool and the index, which the log keeps instead of the text (coding guidelines §7).</summary>
-    public string Reference => $"pool {Pool.Name}, index {Index}";
+    /// <summary>True when the text is the hostile profile's.</summary>
+    public bool IsHostile => Pool.IsHostile;
+
+    /// <summary>The tracking contract's <c>profile</c> key for the call that sent the text: only the hostile profile is labelled, so a trail can be traced back to it.</summary>
+    public string? TrackedProfile => IsHostile ? PersonaProfile.HostileId : null;
+
+    /// <summary>The pool and the index, which the log keeps instead of the text (coding guidelines §7). A hostile text says so first.</summary>
+    public string Reference => IsHostile ? $"profile: hostile, pool {Pool.Name}, index {Index}" : $"pool {Pool.Name}, index {Index}";
 }

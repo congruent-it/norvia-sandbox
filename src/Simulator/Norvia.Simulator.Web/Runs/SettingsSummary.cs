@@ -55,5 +55,22 @@ public static class SettingsSummary
             ("Seed", settings.Seed.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             ("Preset", settings.PresetName ?? "Custom"),
         ]),
+        .. HostileGroup(settings),
     ];
+
+    // Only a hostile run has the group: a normal one is not cluttered with a profile it never used.
+    private static IEnumerable<SettingGroup> HostileGroup(SimulationSettings settings)
+    {
+        if (!settings.IsHostile)
+        {
+            yield break;
+        }
+
+        yield return new SettingGroup(
+            "Hostile profile (profile: hostile)",
+            [
+                ("Carriers", settings.HostileCarrierIds.Count > 0 ? string.Join(", ", settings.HostileCarrierIds) : "None"),
+                ("Drivers", settings.HostileDriverIds.Count > 0 ? string.Join(", ", settings.HostileDriverIds) : "None"),
+            ]);
+    }
 }

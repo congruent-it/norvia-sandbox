@@ -57,9 +57,34 @@ public sealed class StartRunHandler(
         var plan = await pools.AddToAsync(BookingPlanGenerator.Generate(command.Settings, world.Load(), number), world.Load(), cancellationToken);
         var run = SimulationRun.Start(number, command.Settings, plan, now, command.StartedBy);
         await runs.AddAsync(run, cancellationToken);
-        await log.AddAsync(LogEntry.Note(run.Id, 1, now, $"Run {number} started: {plan.Bookings.Count} bookings, seed {command.Settings.Seed}"), cancellationToken);
+        await log.AddAsync(LogEntry.Note(run.Id, 1, now, StartNote(number, plan, command.Settings)), cancellationToken);
 
         execution.Start(run.Id);
         return RunSummary.From(run, sent: 0);
+    }
+
+    // A hostile run says so on its first line, so it is never mistaken for a normal one (profile: hostile).
+    public static string StartNote(int number, SimulationPlan plan, SimulationSettings settings)
+    {
+        var note = $"Run {number} started: {plan.Bookings.Count} bookings, seed {settings.Seed}";
+        if (!plan.IsHostile)
+        {
+            return note;
+        }
+
+        var writers = new List<string>();
+        if (plan.HostileCarrierIds.Count > 0)
+        {
+            writers.Add($"Carriers {string.Join(", ", plan.HostileCarrierIds)}");
+        }
+
+        if (plan.HostileDriverIds.Count > 0)
+        {
+            writers.Add($"Drivers {string.Join(", ", plan.HostileDriverIds)}");
+        }
+
+        // A log line's action is at most 300 characters.
+        var hostile = $"{note}. HOSTILE RUN (profile: hostile): {string.Join(" and ", writers)} send instruction-like remarks that try to instruct the other Agents";
+        return hostile.Length <= 300 ? hostile : $"{hostile[..297]}...";
     }
 }

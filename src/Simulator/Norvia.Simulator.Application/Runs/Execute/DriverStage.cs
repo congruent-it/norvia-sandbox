@@ -139,7 +139,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         if (journey.Damaged)
         {
             var said = DrawFor(run, driver, shipment, TextCategory.DriverDamageRemark);
-            var damage = await app.ReportDamageAsync(driver, trip.TripNumber, number, atDelivery: false, said?.Text ?? DamageRemark, cancellationToken);
+            var damage = await app.ReportDamageAsync(driver, trip.TripNumber, number, atDelivery: false, said?.Text ?? DamageRemark, cancellationToken, said?.TrackedProfile);
             await ReportAsync(DriverActions.ReportDamage, damage, WithReference("At the collection", said));
             Expect(failures, shipment, damage, ExceptionKinds.Damaged);
         }
@@ -147,7 +147,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         if (journey.CollectionFailed)
         {
             var said = DrawFor(run, driver, shipment, TextCategory.DriverCollectionFailedRemark);
-            var failed = await app.FailCollectionAsync(driver, trip.TripNumber, number, said?.Text ?? CollectionFailedRemark, cancellationToken);
+            var failed = await app.FailCollectionAsync(driver, trip.TripNumber, number, said?.Text ?? CollectionFailedRemark, cancellationToken, said?.TrackedProfile);
             await ReportAsync(DriverActions.CollectionFailed, failed, WithReference(null, said));
             Expect(failures, shipment, failed, ExceptionKinds.CollectionFailed);
             return;
@@ -163,7 +163,7 @@ internal sealed class DriverStage(IDriverApp app, TimeProvider time, DriverPacin
         if (journey.DeliveryFailed)
         {
             var said = DrawFor(run, driver, shipment, TextCategory.DriverDeliveryFailedRemark);
-            var failed = await app.FailDeliveryAsync(driver, trip.TripNumber, number, said?.Text ?? DeliveryFailedRemark, cancellationToken);
+            var failed = await app.FailDeliveryAsync(driver, trip.TripNumber, number, said?.Text ?? DeliveryFailedRemark, cancellationToken, said?.TrackedProfile);
             await ReportAsync(DriverActions.DeliveryFailed, failed, WithReference(null, said));
             Expect(failures, shipment, failed, ExceptionKinds.DeliveryFailed);
             return;

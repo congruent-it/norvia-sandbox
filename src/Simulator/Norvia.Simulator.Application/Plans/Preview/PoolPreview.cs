@@ -8,4 +8,7 @@ public sealed record PoolPreview(string ProfileId, string Category, string Langu
 {
     /// <summary>True for a pool of Driver texts.</summary>
     public bool IsDriverText => DriverIds is not null;
+
+    /// <summary>True for a pool of the opt-in hostile profile.</summary>
+    public bool IsHostile => ProfileId == Domain.Personas.PersonaProfile.HostileId;
 }

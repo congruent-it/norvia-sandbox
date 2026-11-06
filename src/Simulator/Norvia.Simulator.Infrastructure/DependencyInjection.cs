@@ -96,7 +96,7 @@ public static class DependencyInjection
             .Validate(options => !options.Enabled || !options.UsesFoundry || !string.IsNullOrWhiteSpace(options.ManagedIdentityClientId), "Agents:ManagedIdentityClientId is needed to ask the Foundry project.")
             .ValidateOnStart();
         builder.Services.AddOptions<PersonaOptions>().BindConfiguration(PersonaOptions.SectionName)
-            .Validate(options => options.IsConsistent, "Personas: every Carrier and Driver needs a profile that is defined, and each profile is defined once.")
+            .Validate(options => options.IsConsistent, "Personas: every Carrier and Driver needs a profile that is defined, and each profile is defined once. The hostile profile is opt-in per run and is never configured.")
             .ValidateOnStart();
         builder.Services.AddSingleton<IPersonaProfiles, ConfiguredPersonaProfiles>();
         builder.Services.AddSingleton<IBuiltInPools, EmbeddedBuiltInPools>();

@@ -69,7 +69,7 @@ internal sealed partial class NorviaPartnerApiClient(
     {
         ArgumentNullException.ThrowIfNull(answer);
         return SendCarrierAsync(
-            carrier, CarrierActions.Answer, "carrier-answers", "carrier-answer", () => CarrierFormats.Answer(answer), answer.CarrierBookingNumber,
+            carrier, CarrierActions.Answer, "carrier-answers", "carrier-answer", () => CarrierFormats.Answer(answer), answer.CarrierBookingNumber, answer.Profile,
             (status, body, correlation) => CarrierAnswers.Answered(status, body, correlation), cancellationToken);
     }
 
@@ -77,7 +77,7 @@ internal sealed partial class NorviaPartnerApiClient(
     {
         ArgumentNullException.ThrowIfNull(tracking);
         return SendCarrierAsync(
-            carrier, CarrierActions.Track, "carrier-tracking", "carrier-tracking", () => CarrierFormats.Tracking(tracking), tracking.CarrierBookingNumber,
+            carrier, CarrierActions.Track, "carrier-tracking", "carrier-tracking", () => CarrierFormats.Tracking(tracking), tracking.CarrierBookingNumber, tracking.Profile,
             (status, body, correlation) => CarrierAnswers.Accepted(status, body, correlation, LogOutcome.TrackingSent), cancellationToken);
     }
 
@@ -85,7 +85,7 @@ internal sealed partial class NorviaPartnerApiClient(
     {
         ArgumentNullException.ThrowIfNull(proof);
         return SendCarrierAsync(
-            carrier, CarrierActions.ProveDelivery, "carrier-proofs-of-delivery", "carrier-proof-of-delivery", () => CarrierFormats.Proof(proof), proof.CarrierBookingNumber,
+            carrier, CarrierActions.ProveDelivery, "carrier-proofs-of-delivery", "carrier-proof-of-delivery", () => CarrierFormats.Proof(proof), proof.CarrierBookingNumber, profile: null,
             (status, body, correlation) => CarrierAnswers.Accepted(status, body, correlation, LogOutcome.ProofOfDeliverySent), cancellationToken);
     }
 
@@ -152,7 +152,7 @@ internal sealed partial class NorviaPartnerApiClient(
     }
 
     private async Task<CarrierCallAnswer> SendCarrierAsync(
-        SimulatedCarrier carrier, string action, string path, string flow, Func<JsonObject> format, string carrierBookingNumber,
+        SimulatedCarrier carrier, string action, string path, string flow, Func<JsonObject> format, string carrierBookingNumber, string? profile,
         Func<int, string, string?, CarrierCallAnswer> read, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(carrier);
@@ -179,7 +179,7 @@ internal sealed partial class NorviaPartnerApiClient(
             answer = CarrierAnswers.NotReceived("The call didn't reach the Norvia Partner API.");
         }
 
-        using (logger.BeginScope(CarrierTrackingKeysOf(flow, carrier.Id, carrierBookingNumber, answer)))
+        using (logger.BeginScope(CarrierTrackingKeysOf(flow, carrier.Id, carrierBookingNumber, answer, profile)))
         {
             LogCarrierAnswered(action, personaId, answer.Outcome);
         }
@@ -191,7 +191,7 @@ internal sealed partial class NorviaPartnerApiClient(
     /// The tracking contract's keys the Simulator knows of a Carrier's call (coding guidelines §7), so its trace joins Norvia's
     /// Message trail. A key that doesn't apply is left out, never sent empty.
     /// </summary>
-    internal static Dictionary<string, object?> CarrierTrackingKeysOf(string flow, string carrierId, string carrierBookingNumber, CarrierCallAnswer answer)
+    internal static Dictionary<string, object?> CarrierTrackingKeysOf(string flow, string carrierId, string carrierBookingNumber, CarrierCallAnswer answer, string? profile = null)
     {
         ArgumentNullException.ThrowIfNull(answer);
 
@@ -213,6 +213,12 @@ internal sealed partial class NorviaPartnerApiClient(
         if (answer.CorrelationId is { } correlationId)
         {
             keys["correlationId"] = correlationId;
+        }
+
+        // Only the hostile profile is labelled, so a trail and an Agent's answer can be traced back to it.
+        if (!string.IsNullOrWhiteSpace(profile))
+        {
+            keys["profile"] = profile;
         }
 
         return keys;

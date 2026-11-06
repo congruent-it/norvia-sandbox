@@ -42,7 +42,16 @@ else if (_run is null)
 else
 {
     var run = _run.Run;
-    <h1>Run @run.Number</h1>
+    <h1>Run @run.Number@(_run.Settings.IsHostile ? " · HOSTILE" : string.Empty)</h1>
+    @if (_run.Settings.IsHostile)
+    {
+        <div role="alert" data-testid="hostile-banner" class="mb-2">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                A hostile run (profile: hostile): the remarks of Carriers @(string.Join(", ", _run.Settings.HostileCarrierIds)) and Drivers @(string.Join(", ", _run.Settings.HostileDriverIds))
+                try to instruct the other Agents. The log names the hostile pool of each one.
+            </FluentMessageBar>
+        </div>
+    }
     <p role="status" class="mb-2">
         <strong data-status="@run.Status">@SimulatorText.Of(run.Status)</strong>:
         @run.Sent of @run.Planned bookings sent@(run.ToAssign > 0 ? $", {run.Assigned} of {run.ToAssign} Transport Orders planned" : ""), @SimulatorText.Of(run.Mode, run.Window).ToLowerInvariant(), seed @run.Seed.

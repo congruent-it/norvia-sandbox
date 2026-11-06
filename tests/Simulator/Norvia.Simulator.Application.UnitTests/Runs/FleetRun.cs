@@ -75,11 +75,11 @@ internal sealed class FleetRun
         Drivers.StartTripAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(call => Reported(DriverActions.StartTrip, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), null));
         Drivers.CollectAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => Reported(DriverActions.Collected, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), call.ArgAt<string>(2)));
-        Drivers.FailCollectionAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        Drivers.FailCollectionAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())
             .Returns(call => Reported(DriverActions.CollectionFailed, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), call.ArgAt<string>(2)));
-        Drivers.FailDeliveryAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        Drivers.FailDeliveryAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())
             .Returns(call => Reported(DriverActions.DeliveryFailed, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), call.ArgAt<string>(2)));
-        Drivers.ReportDamageAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        Drivers.ReportDamageAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<string?>())
             .Returns(call => Reported(DriverActions.ReportDamage, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), call.ArgAt<string>(2)));
         Drivers.DeliverAsync(Arg.Any<SimulatedDriver>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DriverDelivery>(), Arg.Any<CancellationToken>())
             .Returns(call => Reported(DriverActions.Deliver, call.Arg<SimulatedDriver>(), call.ArgAt<string>(1), call.ArgAt<string>(2)));
@@ -111,9 +111,9 @@ internal sealed class FleetRun
     public ExecuteRunHandler Handler() => new(
         Runs, Log, Partner, Tms, World, new SimulationLimits(50, 3), Time, new CarrierPacing(TimeSpan.Zero, 1), Drivers, new DriverPacing(TimeSpan.Zero, 2), Erp, Inbox, Substitute.For<ICarrierInbox>());
 
-    public async Task<SimulationRun> RunAsync(SimulationSettings settings, CancellationTokenSource? stop = null, bool driverPools = false)
+    public async Task<SimulationRun> RunAsync(SimulationSettings settings, CancellationTokenSource? stop = null, bool driverPools = false, bool hostile = false)
     {
-        var run = driverPools ? TestData.RunWithDriverPools(settings) : TestData.Run(settings);
+        var run = hostile ? TestData.RunWithHostileDriverPools(settings) : driverPools ? TestData.RunWithDriverPools(settings) : TestData.Run(settings);
         Runs.FirstOrDefaultAsync(Arg.Any<ISpecification<SimulationRun>>(), Arg.Any<CancellationToken>()).Returns(run);
         (await Handler().Handle(new ExecuteRunCommand(run.Id, stop?.Token ?? CancellationToken.None), CancellationToken.None)).IsSuccess.Should().BeTrue();
         return run;

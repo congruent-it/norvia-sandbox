@@ -35,7 +35,20 @@ public static class PlanLinks
             + $"&collfail={settings.Drivers.CollectionFailedPercent}&delfail={settings.Drivers.DeliveryFailedPercent}&damaged={settings.Drivers.DamagedPercent}&reservations={settings.Drivers.ReservationsPercent}"
             + $"&invoiced={settings.Invoicing.InvoicePercent}&credited={settings.Invoicing.CreditNotePercent}"
             + $"&editedinvoices={settings.Invoicing.EditedCarrierInvoicePercent}&rejectedlines={settings.Invoicing.RejectedCarrierLinePercent}");
-        return settings.PresetName is { } preset ? $"{query}&preset={Uri.EscapeDataString(preset)}" : query;
+        query = settings.PresetName is { } preset ? $"{query}&preset={Uri.EscapeDataString(preset)}" : query;
+
+        // The hostile profile is opt-in: an address carries it only when the settings do, so a link never turns it on by omission.
+        if (settings.HostileCarrierIds.Count > 0)
+        {
+            query += $"&hostilecarriers={Uri.EscapeDataString(string.Join(',', settings.HostileCarrierIds))}";
+        }
+
+        if (settings.HostileDriverIds.Count > 0)
+        {
+            query += $"&hostiledrivers={Uri.EscapeDataString(string.Join(',', settings.HostileDriverIds))}";
+        }
+
+        return query;
     }
 
     /// <summary>The settings in the address of the Configure screen, or null when it holds none. An address without a seed gets <paramref name="newSeed"/>.</summary>
@@ -50,7 +63,8 @@ public static class PlanLinks
             Number("orders"), Number("bad"), Number("today"), Number("seed") ?? newSeed, Text("mode"), Number("window"), Text("preset"),
             Number("assigned"), Number("ownfleet"), Number("reassign"),
             Number("release"), Number("confirm"), Number("decline"), Number("tracked"), Number("exception"), Number("delivered"), Number("pod"), Number("cancel"),
-            Number("collfail"), Number("delfail"), Number("damaged"), Number("reservations"), Number("trips"), Number("invoiced"), Number("credited"));
+            Number("collfail"), Number("delfail"), Number("damaged"), Number("reservations"), Number("trips"), Number("invoiced"), Number("credited"),
+            hostileCarriers: Text("hostilecarriers"), hostileDrivers: Text("hostiledrivers"));
     }
 
     public static string Run(Guid runId) => $"/runs/{runId}";
@@ -61,7 +75,8 @@ public static class PlanLinks
         int? assigned = null, int? ownFleet = null, int? reassign = null,
         int? release = null, int? confirm = null, int? decline = null, int? tracked = null, int? exception = null, int? delivered = null, int? pod = null, int? cancel = null,
         int? collectionFailed = null, int? deliveryFailed = null, int? damaged = null, int? reservations = null, int? trips = null,
-        int? invoiced = null, int? credited = null, int? editedInvoices = null, int? rejectedLines = null)
+        int? invoiced = null, int? credited = null, int? editedInvoices = null, int? rejectedLines = null,
+        string? hostileCarriers = null, string? hostileDrivers = null)
     {
         if (orders is null || bad is null || today is null || seed is null || !Enum.TryParse<RunMode>(mode, out var runMode))
         {
@@ -93,6 +108,11 @@ public static class PlanLinks
                 credited ?? InvoicingShares.DefaultCreditNotePercent,
                 editedInvoices ?? InvoicingShares.DefaultEditedCarrierInvoicePercent,
                 rejectedLines ?? InvoicingShares.DefaultRejectedCarrierLinePercent),
+            HostileCarrierIds = Ids(hostileCarriers),
+            HostileDriverIds = Ids(hostileDrivers),
         };
     }
+
+    private static string[] Ids(string? commaSeparated) =>
+        [.. (commaSeparated ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
 }

@@ -85,6 +85,30 @@ public sealed class RunForm : IValidatableObject
     [Range(0, 100, ErrorMessage = "The share of Carrier invoice lines Finance rejects is a percentage from 0 to 100.")]
     public int RejectedCarrierLinePercent { get; set; } = InvoicingShares.DefaultRejectedCarrierLinePercent;
 
+    /// <summary>The Carriers that write the opt-in hostile profile. Empty by default, and a Preset empties it: it is chosen on purpose, one Carrier at a time.</summary>
+    public HashSet<string> HostileCarriers { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>The Drivers that write the opt-in hostile profile. Empty by default, and a Preset empties it.</summary>
+    public HashSet<string> HostileDrivers { get; } = new(StringComparer.Ordinal);
+
+    public bool IsHostile => HostileCarriers.Count > 0 || HostileDrivers.Count > 0;
+
+    public void SetHostileCarrier(string id, bool on) => Set(HostileCarriers, id, on);
+
+    public void SetHostileDriver(string id, bool on) => Set(HostileDrivers, id, on);
+
+    private static void Set(HashSet<string> ids, string id, bool on)
+    {
+        if (on)
+        {
+            ids.Add(id);
+        }
+        else
+        {
+            ids.Remove(id);
+        }
+    }
+
     public string Mode { get; set; } = nameof(RunMode.Burst);
 
     [Range(1, SimulationSettings.MaxWindowMinutes, ErrorMessage = "A paced run is spread over 1 to 240 minutes.")]
@@ -107,12 +131,17 @@ public sealed class RunForm : IValidatableObject
             ReleasePercent, ConfirmPercent, DeclinePercent, TrackedPercent, ExceptionPercent, DeliveredPercent, ProofOfDeliveryPercent, CancelPercent),
         Drivers = new DriverShares(CollectionFailedPercent, DeliveryFailedPercent, DamagedPercent, ReservationsPercent),
         Invoicing = new InvoicingShares(InvoicePercent, CreditNotePercent, EditedCarrierInvoicePercent, RejectedCarrierLinePercent),
+        HostileCarrierIds = [.. HostileCarriers.Order(StringComparer.Ordinal)],
+        HostileDriverIds = [.. HostileDrivers.Order(StringComparer.Ordinal)],
     };
 
     public void Fill(Preset preset)
     {
         ArgumentNullException.ThrowIfNull(preset);
         Preset = preset.Name;
+        // No Preset holds the hostile profile, and choosing one never carries it over from the last: the hostile profile is switched on again on purpose.
+        HostileCarriers.Clear();
+        HostileDrivers.Clear();
         Orders = preset.OrderCount;
         BadPercent = preset.BadSharePercent;
         TodayPercent = preset.CollectedTodayPercent;
@@ -173,6 +202,10 @@ public sealed class RunForm : IValidatableObject
         CreditNotePercent = settings.Invoicing.CreditNotePercent;
         EditedCarrierInvoicePercent = settings.Invoicing.EditedCarrierInvoicePercent;
         RejectedCarrierLinePercent = settings.Invoicing.RejectedCarrierLinePercent;
+        HostileCarriers.Clear();
+        HostileCarriers.UnionWith(settings.HostileCarrierIds);
+        HostileDrivers.Clear();
+        HostileDrivers.UnionWith(settings.HostileDriverIds);
         Mode = settings.Mode.ToString();
         WindowMinutes = settings.Mode == RunMode.Paced ? (int)settings.Window.TotalMinutes : WindowMinutes;
         Seed = settings.Seed;

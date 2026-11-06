@@ -19,18 +19,32 @@ public sealed partial class PlanPools(
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(world);
 
+        // The hostile profile is opt-in, per Carrier and per Driver, and replaces the profile the Carrier or Driver would write in; nothing else ever assigns it.
+        var hostileCarriers = plan.Settings.HostileCarrierIds.ToHashSet(StringComparer.Ordinal);
+        var hostileDrivers = plan.Settings.HostileDriverIds.ToHashSet(StringComparer.Ordinal);
         var carrierProfiles = world.ActiveCarriers
             .Where(carrier => carrier.HasPersona)
-            .Select(carrier => (carrier.Id, Profile: profiles.ProfileOf(carrier.Id)))
+            .Select(carrier => (carrier.Id, Profile: hostileCarriers.Contains(carrier.Id) ? PersonaProfile.Hostile : profiles.ProfileOf(carrier.Id)))
             .Where(pair => pair.Profile is not null)
             .ToDictionary(pair => pair.Id, pair => pair.Profile!, StringComparer.Ordinal);
         var driverProfiles = world.OwnFleetDrivers
-            .Select(driver => (driver.Id, Profile: profiles.ProfileOfDriver(driver.Id)))
+            .Select(driver => (driver.Id, Profile: hostileDrivers.Contains(driver.Id) ? PersonaProfile.Hostile : profiles.ProfileOfDriver(driver.Id)))
             .Where(pair => pair.Profile is not null)
             .ToDictionary(pair => pair.Id, pair => pair.Profile!, StringComparer.Ordinal);
+        var notes = new List<string>();
+        foreach (var missing in hostileCarriers.Where(id => !carrierProfiles.ContainsKey(id)).Order(StringComparer.Ordinal))
+        {
+            notes.Add($"Carrier {missing} was chosen for the hostile profile but is not an active Carrier with a Persona: it writes nothing hostile.");
+        }
+
+        foreach (var missing in hostileDrivers.Where(id => !driverProfiles.ContainsKey(id)).Order(StringComparer.Ordinal))
+        {
+            notes.Add($"Driver {missing} was chosen for the hostile profile but is not a Driver of the Own fleet: they write nothing hostile.");
+        }
+
         if (carrierProfiles.Count == 0 && driverProfiles.Count == 0)
         {
-            return plan;
+            return notes.Count == 0 ? plan : plan with { PoolNotes = notes };
         }
 
         // A profile gets a pool for each kind of text its Carriers send and each its Drivers send, and for no other.
@@ -38,7 +52,6 @@ public sealed partial class PlanPools(
         var driverProfileIds = driverProfiles.Values.Select(profile => profile.Id).ToHashSet(StringComparer.Ordinal);
 
         var pools = new List<TextPool>();
-        var notes = new List<string>();
         var generations = 0;
         foreach (var profile in carrierProfiles.Values.Concat(driverProfiles.Values).DistinctBy(profile => profile.Id).OrderBy(profile => profile.Id, StringComparer.Ordinal))
         {

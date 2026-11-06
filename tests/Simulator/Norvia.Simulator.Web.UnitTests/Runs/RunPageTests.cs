@@ -327,4 +327,36 @@ public sealed class RunPageTests : SimulatorWebContext
 
         Requests.Received().ListLogAsync(new SimulationRunId(RunId), new LogFilter("Brouwer Dranken", LogOutcome.Rejected, ""), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public void Render_ANormalRun_IsNotLabelledHostile()
+    {
+        var page = RenderRun();
+
+        page.FindAll("[data-testid=hostile-banner]").Should().BeEmpty();
+        page.Find("h1").TextContent.Should().NotContain("HOSTILE");
+        SettingsSummary.Of(TestData.Settings()).Should().NotContain(group => group.Title.Contains("Hostile"));
+    }
+
+    [Fact]
+    public void Render_AHostileRun_SaysSoInItsTitleItsBannerAndItsSettings()
+    {
+        var settings = TestData.Settings() with { HostileCarrierIds = ["CAR-0001"], HostileDriverIds = ["DRV-0002", "DRV-0003"] };
+        GivenRun(TestData.Summary(), settings);
+
+        var page = RenderRun();
+
+        page.Find("h1").TextContent.Should().Contain("Run 4").And.Contain("HOSTILE");
+        page.Find("[data-testid=hostile-banner]").TextContent.Should().Contain("profile: hostile").And.Contain("CAR-0001").And.Contain("DRV-0002, DRV-0003");
+        var group = SettingsSummary.Of(settings).Single(candidate => candidate.Title.Contains("Hostile"));
+        group.Settings.Should().Equal(("Carriers", "CAR-0001"), ("Drivers", "DRV-0002, DRV-0003"));
+    }
+
+    [Fact]
+    public void SettingsSummary_AHostileRunWithOnlyDrivers_SaysNoneForCarriers()
+    {
+        var group = SettingsSummary.Of(TestData.Settings() with { HostileDriverIds = ["DRV-0001"] }).Single(candidate => candidate.Title.Contains("Hostile"));
+
+        group.Settings.Should().Equal(("Carriers", "None"), ("Drivers", "DRV-0001"));
+    }
 }

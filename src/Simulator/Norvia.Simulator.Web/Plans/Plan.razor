@@ -51,6 +51,17 @@ else if (_preview is null)
 }
 else
 {
+    @if (_preview.IsHostile)
+    {
+        <div role="alert" data-testid="hostile-banner" class="mb-4">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                <strong>Hostile run (profile: hostile).</strong>
+                @HostileWriters(_preview)
+                send instruction-like remarks that try to instruct the other Agents. They reach the TMS as ordinary remarks and show on their Message trails. Do not mix this run
+                into a normal one; see "Reading a hostile run" in the Simulator's operations guide.
+            </FluentMessageBar>
+        </div>
+    }
     <p class="text-muted" role="status">
         Run @_preview.RunNumber would send @_preview.Rows.Count bookings, @_preview.BadBookings of them bad, @SimulatorText.Of(_preview.Settings.Mode, _preview.Settings.Window).ToLowerInvariant(),
         from seed @_preview.Settings.Seed. This is exactly what Start run sends.
@@ -103,7 +114,7 @@ else
             @foreach (var pool in _preview.Pools.Where(pool => !pool.IsDriverText))
             {
                 <div class="mb-4" data-testid="pool">
-                    <h3>@pool.ProfileId · @TextKind(pool.Category) · @pool.Language</h3>
+                    <h3>@pool.ProfileId · @TextKind(pool.Category) · @pool.Language@(pool.IsHostile ? " · HOSTILE" : string.Empty)</h3>
                     <p class="text-muted">
                         Source: @pool.Source. @pool.Count texts, written by @string.Join(", ", pool.CarrierIds). A sample:
                     </p>
@@ -129,7 +140,7 @@ else
             @foreach (var pool in _preview.Pools.Where(pool => pool.IsDriverText))
             {
                 <div class="mb-4" data-testid="driver-pool">
-                    <h3>@pool.ProfileId · @TextKind(pool.Category) · @pool.Language</h3>
+                    <h3>@pool.ProfileId · @TextKind(pool.Category) · @pool.Language@(pool.IsHostile ? " · HOSTILE" : string.Empty)</h3>
                     <p class="text-muted">
                         Source: @pool.Source. @pool.Count texts, written by @string.Join(", ", pool.DriverIds ?? []). A sample:
                     </p>
@@ -183,6 +194,14 @@ else
 }
 
 @code {
+    private static string HostileWriters(PlanPreview preview) => string.Join(
+        " and ",
+        new[]
+        {
+            preview.HostileCarrierIds.Count > 0 ? $"Carriers {string.Join(", ", preview.HostileCarrierIds)}" : null,
+            preview.HostileDriverIds.Count > 0 ? $"Drivers {string.Join(", ", preview.HostileDriverIds)}" : null,
+        }.OfType<string>());
+
     private static string TextKind(string category) => category switch
     {
         nameof(TextCategory.DeclineReason) => "Decline reason",
@@ -284,6 +303,12 @@ else
     [SupplyParameterFromQuery(Name = "rejectedlines")]
     private int? RejectedLines { get; set; }
 
+    [SupplyParameterFromQuery(Name = "hostilecarriers")]
+    private string? HostileCarriers { get; set; }
+
+    [SupplyParameterFromQuery(Name = "hostiledrivers")]
+    private string? HostileDrivers { get; set; }
+
     private static string KindOf(PlanRow row) => row.Bad is { } bad ? SimulatorText.Of(bad) : "Good";
 
     protected override async Task OnParametersSetAsync()
@@ -291,7 +316,7 @@ else
         _settings = PlanLinks.Settings(
             Orders, Bad, Today, Seed, Mode, Window, Preset, Assigned, OwnFleet, Reassign,
             Release, Confirm, Decline, Tracked, ExceptionShare, Delivered, ProofOfDelivery, CancelShare,
-            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips, Invoiced, Credited, EditedInvoices, RejectedLines);
+            CollectionFailed, DeliveryFailed, Damaged, Reservations, Trips, Invoiced, Credited, EditedInvoices, RejectedLines, HostileCarriers, HostileDrivers);
         if (_settings is null)
         {
             return;
