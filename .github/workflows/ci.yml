@@ -21,6 +21,24 @@ env:
   CONFIGURATION: Release
 
 jobs:
+  # Scripts are PowerShell 7 (ADR 0048): every .ps1 parses, PSScriptAnalyzer reports no error and the shared module's Pester tests pass.
+  powershell:
+    name: PowerShell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install PSScriptAnalyzer and Pester
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Force
+          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Parse, analyze and test the scripts
+        shell: pwsh
+        run: ./infra/test-scripts.ps1
+
   build:
     name: Build, format, Bicep and vulnerable packages
     runs-on: ubuntu-latest

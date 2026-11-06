@@ -100,7 +100,7 @@ CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the pull request 
 
 ## Deploying to Azure
 
-Needs the [Azure Developer CLI](https://aka.ms/azd) and the Azure CLI, both signed in to the same tenant as a user who may create resources in the subscription and app registrations in Entra ID, plus `jq` and `zip`.
+Needs the [Azure Developer CLI](https://aka.ms/azd) and the Azure CLI, both signed in to the same tenant as a user who may create resources in the subscription and app registrations in Entra ID, plus [PowerShell 7.4 or later](https://aka.ms/powershell) (`pwsh`) for the scripts that have been converted ([ADR 0048](docs/adr/0048-scripts-are-powershell-7-not-bash.md)), and `jq` and `zip` for those that have not.
 
 ```bash
 azd env new <environment> --subscription <subscription-id> --location <region>

@@ -249,3 +249,12 @@ A key that doesn't apply is left out, never sent empty.
 - A PR that adds or changes an event, a subscription, a Flow, a Logic App, an app role or a local stand-in updates the matching page in [docs/architecture/](architecture/README.md) and the process's Implementation section in the same PR.
 - A PR that adds or changes an endpoint, an OpenAPI document or the database schema (an entity, its configuration or a migration) regenerates [docs/applications/](applications/README.md) in the same PR with `dotnet run --project src/Docs/Norvia.Docs.Generator`, redraws the ER diagrams with `python3 docs/architecture/diagrams/entities.py` (see [the diagram styles](architecture/diagrams/README.md#entity-relationships)), and updates the application page's hand-written parts: the endpoint's consumers, the table and column descriptions and the logical references.
 - Keep PRs small and focused on one issue.
+
+## 12. Scripts
+
+Scripts are PowerShell 7, not bash ([ADR 0048](adr/0048-scripts-are-powershell-7-not-bash.md)).
+
+- Start with `#Requires -Version 7.4` and `$ErrorActionPreference = 'Stop'`. Name the file in kebab-case with the `.ps1` extension.
+- Import the shared helpers from `infra/lib/Norvia.Infra.psm1` (`Write-Pass`, `Write-Fail`, `Get-AppFqdn`, `New-ThrowawayJob`, `Invoke-LogAnalyticsQuery`, `Wait-Until`, ...) instead of copying them. A helper two scripts need goes into the module, with a Pester test that mocks `az`. Name functions `Verb-Noun` with an approved verb (`Get-Verb`).
+- Call `az` through `Invoke-Az` so a failure stops the script. Use `ConvertFrom-Json`, `ConvertTo-Json`, `Compress-Archive` and `Invoke-RestMethod` instead of `jq`, `zip` and `python3`. Pass a JSON body to a native command as a file, not as a quoted string.
+- `pwsh infra/test-scripts.ps1` is the gate (CI runs it): every `.ps1` parses, PSScriptAnalyzer reports no error (`infra/PSScriptAnalyzerSettings.psd1`) and the Pester tests pass. Fix warnings it lists, or suppress one with a justification.
