@@ -62,5 +62,5 @@ param foundryUserPrincipalIds = filter(split(readEnvironmentVariable('ESTATE_FOU
 // Where the alerts go. Empty builds the action group with no receiver.
 param alertEmail = readEnvironmentVariable('ESTATE_ALERT_EMAIL', '')
 
-// The as-found toggles as one JSON object, set by infra/as-found.sh. Unset is the fixed state.
+// The as-found toggles as one JSON object, set by infra/as-found.ps1. Unset is the fixed state.
 param asFound = json(readEnvironmentVariable('ESTATE_ASFOUND', '{"flowsWithoutFailedRunAlert":[],"entitiesWithoutDeadLetterAlert":[],"noAlertReceiver":false,"noInboundLifecycleRule":false,"noTransitLifecycleRule":false,"proofFilesStayHot":false,"noMalwareScanning":false,"carrierSecretInlined":false,"appInsightsRetentionShort":false,"logicAppsWithoutTrackedProperties":[],"staleThresholdsUnset":false,"proofMissingThresholdUnset":false,"lateDeliveryCheckOff":false,"shipperTrackingCached":false,"noShipperRateLimit":false,"noReportBackToDriverApp":false,"noConversationSweeper":false}'))

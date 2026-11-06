@@ -6,7 +6,7 @@ namespace Norvia.Tms.ArchitectureTests;
 
 /// <summary>
 /// The shared evaluation harness (#501): each check passes and fails correctly on sample answers, a malformed case is named, the
-/// cases in the repo are well formed, and the harness never runs in CI. The runner itself runs in Azure; these run its jq.
+/// cases in the repo are well formed, and the harness never runs in CI. The runner itself runs in Azure; these run its PowerShell checks.
 /// </summary>
 public sealed class AgentEvaluationTests
 {
@@ -229,18 +229,18 @@ public sealed class AgentEvaluationTests
             .Should().NotContain("run-agent-evaluation").And.NotContain("evaluate-agent");
 
         var manual = File.ReadAllText(Path.Combine(RepositoryRoot.Path, ".github", "workflows", "evaluate-agent.yml"));
-        manual.Should().Contain("workflow_dispatch:").And.Contain("infra/run-agent-evaluation.sh");
+        manual.Should().Contain("workflow_dispatch:").And.Contain("infra/run-agent-evaluation.ps1");
         manual.Should().NotContain("push:").And.NotContain("pull_request:").And.NotContain("schedule:");
     }
 
     [Fact]
     public void TheRunner_ExitsZeroOnFindings_AndNeverEchoesATokenOrASecret()
     {
-        var script = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "infra", "run-agent-evaluation.sh"));
+        var script = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "infra", "run-agent-evaluation.ps1"));
 
-        script.Should().Contain("store: false").And.Contain("Exit code 0 even when cases fail");
-        script.Split('\n').Where(line => line.TrimStart().StartsWith("echo", StringComparison.Ordinal))
-            .Should().NotContain(line => line.Contains("$access_token", StringComparison.Ordinal));
+        script.Should().Contain("store = $false").And.Contain("Exit code 0 even when cases fail");
+        script.Split('\n').Where(line => line.TrimStart().StartsWith("Write-", StringComparison.Ordinal))
+            .Should().NotContain(line => line.Contains("$accessToken", StringComparison.Ordinal));
     }
 
     private sealed record Result(string Check, bool Pass, string Reason);
@@ -265,16 +265,16 @@ public sealed class AgentEvaluationTests
             ["grade"] = grade,
         };
 
-        var output = Jq("checks.jq", run.ToJsonString());
+        var output = Pwsh("checks.ps1", run.ToJsonString());
         return JsonSerializer.Deserialize<List<Result>>(output, JsonSerializerOptions.Web)!;
     }
 
     private static List<string> Validate(string caseFile) =>
-        JsonSerializer.Deserialize<List<string>>(Jq("validate-case.jq", caseFile))!;
+        JsonSerializer.Deserialize<List<string>>(Pwsh("validate-case.ps1", caseFile))!;
 
-    private static string Jq(string program, string input)
+    private static string Pwsh(string script, string input)
     {
-        var start = new ProcessStartInfo("jq", ["-c", "-f", Path.Combine(RepositoryRoot.Path, "infra", "evaluation", program)])
+        var start = new ProcessStartInfo("pwsh", ["-NoProfile", "-File", Path.Combine(RepositoryRoot.Path, "infra", "evaluation", script)])
         {
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -283,10 +283,10 @@ public sealed class AgentEvaluationTests
         using var process = Process.Start(start)!;
         process.StandardInput.Write(input);
         process.StandardInput.Close();
+        var error = process.StandardError.ReadToEndAsync();
         var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        process.ExitCode.Should().Be(0, error);
+        process.ExitCode.Should().Be(0, error.Result);
         return output;
     }
 }

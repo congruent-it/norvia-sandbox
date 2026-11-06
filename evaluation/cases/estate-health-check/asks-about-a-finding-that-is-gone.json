@@ -4,7 +4,7 @@
   "description": "Asking about one Finding by ID after its toggle was switched off: the result no longer holds it, so the answer has an empty findings list and says so (the agent's own rule).",
   "setup": {
     "toggle": "none",
-    "note": "infra/as-found.sh fixed; F-DLQ-ALERT was found earlier and has since been fixed"
+    "note": "infra/as-found.ps1 fixed; F-DLQ-ALERT was found earlier and has since been fixed"
   },
   "input": "Why is Finding F-DLQ-ALERT a problem, and what changes if it is fixed?",
   "expect": {

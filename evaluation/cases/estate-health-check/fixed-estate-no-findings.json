@@ -4,7 +4,7 @@
   "description": "No false positives: the fixed estate gives no Finding, and the agent says so plainly, without inventing one to be helpful.",
   "setup": {
     "toggle": "none",
-    "note": "infra/as-found.sh fixed"
+    "note": "infra/as-found.ps1 fixed"
   },
   "input": "Run an Estate health check and tell me what you found.",
   "expect": {

@@ -632,12 +632,12 @@ function Read-DocumentNumber {
 
 function Invoke-AsFound {
     <#
-    .SYNOPSIS Sets the as-found toggles and deploys the estate with them (infra/as-found.sh, docs/operations/as-found.md).
+    .SYNOPSIS Sets the as-found toggles and deploys the estate with them (infra/as-found.ps1, docs/operations/as-found.md).
     .DESCRIPTION Fails when the script does. It prints what the script prints.
     #>
     param([Parameter(Mandatory, ValueFromRemainingArguments)][string[]] $Arguments)
-    & (Join-Path $PSScriptRoot '../as-found.sh') @Arguments
-    if ($LASTEXITCODE -ne 0) { Write-Fail "as-found.sh $($Arguments -join ' ') failed with exit code $LASTEXITCODE" }
+    & (Join-Path $PSScriptRoot '../as-found.ps1') @Arguments
+    if ($LASTEXITCODE -ne 0) { Write-Fail "as-found.ps1 $($Arguments -join ' ') failed with exit code $LASTEXITCODE" }
 }
 
 function Get-MetricAlertValue {

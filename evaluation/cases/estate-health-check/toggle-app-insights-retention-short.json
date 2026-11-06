@@ -3,7 +3,7 @@
   "agent": "estate-health-check",
   "description": "One case per toggle: the estate with appInsightsRetentionShort on and nothing else. The known answer is F-APPINSIGHTS-RETENTION, the Finding of Check APPINSIGHTS-RETENTION, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
   "setup": {
-    "toggle": "appInsightsRetentionShort, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh appInsightsRetentionShort=true"
+    "toggle": "appInsightsRetentionShort, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 appInsightsRetentionShort=true"
   },
   "input": "Run an Estate health check and tell me what you found.",
   "expect": {

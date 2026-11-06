@@ -3,7 +3,7 @@
   "agent": "estate-health-check",
   "description": "One case per toggle: the estate with noTransitLifecycleRule on and nothing else. The known answer is F-LIFECYCLE-TRANSIT, the Finding of Check LIFECYCLE-TRANSIT, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
   "setup": {
-    "toggle": "noTransitLifecycleRule, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh noTransitLifecycleRule=true"
+    "toggle": "noTransitLifecycleRule, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 noTransitLifecycleRule=true"
   },
   "input": "Run an Estate health check and tell me what you found.",
   "expect": {

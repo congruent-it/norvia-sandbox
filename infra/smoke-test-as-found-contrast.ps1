@@ -72,5 +72,5 @@ try {
 }
 finally {
     try { Invoke-AsFound fixed | Out-Null }
-    catch { Write-Host 'Put the estate back with infra/as-found.sh fixed' }
+    catch { Write-Host 'Put the estate back with infra/as-found.ps1 fixed' }
 }

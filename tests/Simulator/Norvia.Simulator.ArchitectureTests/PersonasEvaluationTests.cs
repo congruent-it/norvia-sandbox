@@ -148,7 +148,7 @@ public sealed class PersonasEvaluationTests
 
     private static string Jq(string input)
     {
-        var start = new ProcessStartInfo("jq", ["-c", "-f", Path.Combine(RepositoryRoot.Path, "infra", "evaluation", "checks.jq")])
+        var start = new ProcessStartInfo("pwsh", ["-NoProfile", "-File", Path.Combine(RepositoryRoot.Path, "infra", "evaluation", "checks.ps1")])
         {
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -157,10 +157,10 @@ public sealed class PersonasEvaluationTests
         using var process = Process.Start(start)!;
         process.StandardInput.Write(input);
         process.StandardInput.Close();
+        var error = process.StandardError.ReadToEndAsync();
         var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        process.ExitCode.Should().Be(0, error);
+        process.ExitCode.Should().Be(0, error.Result);
         return output;
     }
 }

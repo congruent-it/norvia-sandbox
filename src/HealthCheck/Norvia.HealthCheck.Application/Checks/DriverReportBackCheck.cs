@@ -18,7 +18,7 @@ public sealed class DriverReportBackCheck : Check
     public override string AsFoundToggle => "noReportBackToDriverApp";
 
     public override string Fix =>
-        "Set noReportBackToDriverApp to false and deploy the Driver reports Logic App again (infra/as-found.sh does it).";
+        "Set noReportBackToDriverApp to false and deploy the Driver reports Logic App again (infra/as-found.ps1 does it).";
 
     public override IReadOnlyList<Evidence> Examine(EstateConfiguration estate)
     {

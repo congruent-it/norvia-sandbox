@@ -3,7 +3,7 @@
   "agent": "estate-health-check",
   "description": "One case per toggle: the estate with proofMissingThresholdUnset on and nothing else. The known answer is F-PROOF-MISSING-THRESHOLD, the Finding of Check PROOF-MISSING-THRESHOLD, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
   "setup": {
-    "toggle": "proofMissingThresholdUnset, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh proofMissingThresholdUnset=true"
+    "toggle": "proofMissingThresholdUnset, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 proofMissingThresholdUnset=true"
   },
   "input": "Run an Estate health check and tell me what you found.",
   "expect": {

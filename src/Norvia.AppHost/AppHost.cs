@@ -234,7 +234,7 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("IntakeCallers__ClientIdsByChannel__ShipperApi__0", estate.IntakeClientId);
 
     // The as-found toggles for the business safety nets (staleThresholdsUnset, proofMissingThresholdUnset, lateDeliveryCheckOff) are
-    // TMS settings. infra/as-found.sh also applies them to the running app, so a toggle needs no deployment of the apps.
+    // TMS settings. infra/as-found.ps1 also applies them to the running app, so a toggle needs no deployment of the apps.
     foreach (var (name, value) in AsFound.TmsSettings(builder.Configuration["ESTATE_ASFOUND"]))
     {
         tmsApi.WithEnvironment(name, value);
