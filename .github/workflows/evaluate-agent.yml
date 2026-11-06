@@ -32,7 +32,10 @@ jobs:
           FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
           EVALUATION_JUDGE_MODEL: ${{ vars.EVALUATION_JUDGE_MODEL }}
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
-        run: infra/run-agent-evaluation.sh "${{ inputs.agent }}" --runs "${{ inputs.runs }}" --out "$RUNNER_TEMP/result.json"
+          AGENT: ${{ inputs.agent }}
+          RUNS: ${{ inputs.runs }}
+        shell: pwsh
+        run: ./infra/run-agent-evaluation.ps1 -Agent $env:AGENT -Runs ([int] $env:RUNS) -Out "$env:RUNNER_TEMP/result.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

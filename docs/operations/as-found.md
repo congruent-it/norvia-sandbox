@@ -53,8 +53,8 @@ A lifecycle rule and an alert are **absent**, never disabled, so [provision-esta
 
 - **Malware scanning costs money.** Defender for Storage is billed per storage account per month, plus per GB scanned. The sandbox caps the scanning at 10 GB a month (`capGBPerMonth` in [inbound-storage.bicep](../../infra/estate/inbound-storage.bicep)), and a scan runs only on upload, so the fixed state stays cheap but not free. Check the current price on Microsoft's Defender for Storage pricing page before leaving it on. `noMalwareScanning` is also the cheap way to run the sandbox.
 - **The secret is reported by where it is, never by its value.** A health check says "a Carrier credential is in the booking Logic App's settings", and the smoke run checks the setting by name. Nothing prints the value.
-- **`proofFilesStayHot` is Aspire's.** The TMS's storage account is provisioned with the apps, so the AppHost reads the toggle from `ESTATE_ASFOUND`: `infra/as-found.sh` stores it and deletes the rule that exists, and every `azd provision` after that leaves the rule out. Going back to `fixed` needs an `azd provision` to build the rule again.
-- **`logicAppsWithoutTrackedProperties` is a deployment.** The tracked properties are in the workflow, so [stage-logic-app.ps1](../../infra/stage-logic-app.ps1) leaves them out of the listed workflows when a deploy script zips the Logic App, and `as-found.sh` deploys the workflows whose listing changed. The sources are never changed.
+- **`proofFilesStayHot` is Aspire's.** The TMS's storage account is provisioned with the apps, so the AppHost reads the toggle from `ESTATE_ASFOUND`: `infra/as-found.ps1` stores it and deletes the rule that exists, and every `azd provision` after that leaves the rule out. Going back to `fixed` needs an `azd provision` to build the rule again.
+- **`logicAppsWithoutTrackedProperties` is a deployment.** The tracked properties are in the workflow, so [stage-logic-app.ps1](../../infra/stage-logic-app.ps1) leaves them out of the listed workflows when a deploy script zips the Logic App, and `as-found.ps1` deploys the workflows whose listing changed. The sources are never changed.
 
 ## Business safety nets and API Management
 
@@ -69,9 +69,9 @@ The business-side safety nets (P5, P6, P7) already exist as TMS settings; these 
 | `noShipperRateLimit` | true or false | The four Shipper tracking operations share a rate limit of 120 calls a minute per subscription | The policies have no rate limit | P8 |
 | `noReportBackToDriverApp` | true or false | The Driver reports Logic App tells the Driver app what became of each report | The calls to the Driver app are not made, so the report stays **Sending** in the Driver app although the TMS recorded it | P12 |
 
-- **The three TMS toggles are settings of the TMS API's Container App.** The AppHost reads them from `ESTATE_ASFOUND` and sets the app's environment (`AsFound.TmsSettings` in [AsFound.cs](../../src/Norvia.AppHost/AsFound.cs)), healthy values included, so every `azd provision` or deploy keeps them. `infra/as-found.sh` also applies a changed one to the running app at once (`az containerapp update`, a new revision). Thresholds are *unset*, not zero: a zero threshold would flag everything.
+- **The three TMS toggles are settings of the TMS API's Container App.** The AppHost reads them from `ESTATE_ASFOUND` and sets the app's environment (`AsFound.TmsSettings` in [AsFound.cs](../../src/Norvia.AppHost/AsFound.cs)), healthy values included, so every `azd provision` or deploy keeps them. `infra/as-found.ps1` also applies a changed one to the running app at once (`az containerapp update`, a new revision). Thresholds are *unset*, not zero: a zero threshold would flag everything.
 - **The cache and the rate limit are fragments of the policies.** The four Shipper tracking policies in [partner-api](../../infra/estate/partner-api) hold a place for each, and [partner-api.bicep](../../infra/estate/partner-api.bicep) fills it from [shipper-rate-limit.fragment.xml](../../infra/estate/partner-api/shipper-rate-limit.fragment.xml), [shipper-cache-lookup.fragment.xml](../../infra/estate/partner-api/shipper-cache-lookup.fragment.xml) and [shipper-cache-store.fragment.xml](../../infra/estate/partner-api/shipper-cache-store.fragment.xml), or with nothing. The cache key names the Shipper, so no Shipper is given another's answer. The answer is kept after it was mapped for the Shipper, and a hit is traced `Answered the Shipper from the cache` with outcome `Succeeded`. A file is never cached. Switching the toggle off leaves entries in the cache that nothing reads; they expire after a day.
-- **`noReportBackToDriverApp` is a deployment.** [stage-logic-app.ps1](../../infra/stage-logic-app.ps1) turns each call to the Driver app's `/v1/report-outcomes` into a step that answers 200 and does nothing, so the rest of the workflow, which reads the answer, runs as it does when the Driver app is well. The hops for those steps therefore say `Succeeded`: the finding is the Driver app's list, not the trail. `as-found.sh` deploys the Driver reports Logic App again when the toggle changes. The sources are never changed.
+- **`noReportBackToDriverApp` is a deployment.** [stage-logic-app.ps1](../../infra/stage-logic-app.ps1) turns each call to the Driver app's `/v1/report-outcomes` into a step that answers 200 and does nothing, so the rest of the workflow, which reads the answer, runs as it does when the Driver app is well. The hops for those steps therefore say `Succeeded`: the finding is the Driver app's list, not the trail. `as-found.ps1` deploys the Driver reports Logic App again when the toggle changes. The sources are never changed.
 
 ## Conversation sweeper
 
@@ -81,7 +81,7 @@ The Agent Service keeps conversations until they are deleted, and the Intake age
 |---|---|---|---|---|
 | `noConversationSweeper` | true or false | The sweeper runs every night | The sweeper Logic App is built but stopped (`enabled: false`), so it never runs. A conversation the host could not delete stays in the Foundry project, and the failed-run alert never fires because there is no run. A finding for the health check (#377) | Agents |
 
-It is a deployment of the estate alone: `infra/as-found.sh noConversationSweeper=true` runs the estate's Bicep, and the workflow that was deployed stays. A disabled app cannot take a deployment, so the postdeploy hook skips the sweeper while the toggle is set; set it to false and run `azd deploy` (or `infra/deploy-conversation-sweeper-logic-app.ps1`) to deploy the workflow.
+It is a deployment of the estate alone: `infra/as-found.ps1 noConversationSweeper=true` runs the estate's Bicep, and the workflow that was deployed stays. A disabled app cannot take a deployment, so the postdeploy hook skips the sweeper while the toggle is set; set it to false and run `azd deploy` (or `infra/deploy-conversation-sweeper-logic-app.ps1`) to deploy the workflow.
 
 ## Faults
 
@@ -176,11 +176,11 @@ A **scenario** is a named re-enactment: a [preset](#presets) plus the faults to 
 
 *Story.* A Carrier posts "delivered", is told `202 Accepted`, and believes it is done. Inside the integration layer the map fails the run and the tracking queue dead-letters the message as `UnmappableTrackingMessage`, and nobody is told: no alert, and Stale, which would flag a Shipment whose next Tracking event is late, has no thresholds. The Shipper's screen stays on In transit. Only a Consignee's phone call reveals it.
 
-*What to switch on.* `infra/as-found.sh silent-carrier`, then the fault for 5 minutes, then the Carrier's Delivered event for a Shipment that is In transit.
+*What to switch on.* `infra/as-found.ps1 silent-carrier`, then the fault for 5 minutes, then the Carrier's Delivered event for a Shipment that is In transit.
 
 *What the audience sees.* The Carrier is told `202`. The Shipper's tracking screen stays on In transit. No email arrives. In the Integration console the message trail of the Transport Order shows the Carrier's send as `Succeeded` with `fault`, the Carrier-tracking run `Failed`, and the dead-lettered message with its reason, which the presenter can resubmit once the cause is fixed.
 
-*How to fix it.* `infra/as-found.sh fixed` is the fix and the **fixed run**: the failed-run and dead-letter alerts exist and go to the action group, whose email receiver is who is told, and the Stale thresholds are set. Run the fault again to show the email arrive within minutes; the dead-letter alert stays until the queue is emptied. The mapping itself is Norvia's to correct with the Carrier ([failure-behaviour.md](../architecture/failure-behaviour.md)).
+*How to fix it.* `infra/as-found.ps1 fixed` is the fix and the **fixed run**: the failed-run and dead-letter alerts exist and go to the action group, whose email receiver is who is told, and the Stale thresholds are set. Run the fault again to show the email arrive within minutes; the dead-letter alert stays until the queue is emptied. The mapping itself is Norvia's to correct with the Carrier ([failure-behaviour.md](../architecture/failure-behaviour.md)).
 
 ### The look-alike
 
@@ -192,11 +192,11 @@ A **scenario** is a named re-enactment: a [preset](#presets) plus the faults to 
 
 *Story.* The Shipper sees an old status, and it looks like incident 1. It is not: the TMS is right, and API Management answers the read from its cache.
 
-*What to switch on.* `infra/as-found.sh look-alike`. As the Shipper read a Transport Order, as the Carrier send the next Tracking event, then read it again.
+*What to switch on.* `infra/as-found.ps1 look-alike`. As the Shipper read a Transport Order, as the Carrier send the next Tracking event, then read it again.
 
 *What the audience sees.* The TMS and the Shipment's timeline show the new status, every run succeeded and the dead-letter queue is empty, but the Shipper still sees the old status for up to a day. Nothing is in the Integration console to find: the answer never reached the TMS, which API Management's own hop shows.
 
-*How to fix it.* `infra/as-found.sh fixed` removes the cache from the Shipper tracking reads.
+*How to fix it.* `infra/as-found.ps1 fixed` removes the cache from the Shipper tracking reads.
 
 ### The contrast
 
@@ -227,22 +227,22 @@ A preset is a file in [infra/presets](../../infra/presets) holding a value of `a
 ## The script
 
 ```sh
-infra/as-found.sh <preset|toggle=value>
+infra/as-found.ps1 <preset|toggle=value>
 ```
 
 ```sh
-infra/as-found.sh as-found                              # a preset
-infra/as-found.sh fixed
-infra/as-found.sh noAlertReceiver=true                  # one toggle; the others stay as they are
-infra/as-found.sh flowsWithoutFailedRunAlert=carrier-tracking,billing
-infra/as-found.sh flowsWithoutFailedRunAlert=           # a list toggle, emptied
-infra/as-found.sh noMalwareScanning=true
-infra/as-found.sh logicAppsWithoutTrackedProperties=billing,carrier-cost
-infra/as-found.sh staleThresholdsUnset=true
-infra/as-found.sh shipperTrackingCached=true
+infra/as-found.ps1 as-found                              # a preset
+infra/as-found.ps1 fixed
+infra/as-found.ps1 noAlertReceiver=true                  # one toggle; the others stay as they are
+infra/as-found.ps1 flowsWithoutFailedRunAlert=carrier-tracking,billing
+infra/as-found.ps1 flowsWithoutFailedRunAlert=           # a list toggle, emptied
+infra/as-found.ps1 noMalwareScanning=true
+infra/as-found.ps1 logicAppsWithoutTrackedProperties=billing,carrier-cost
+infra/as-found.ps1 staleThresholdsUnset=true
+infra/as-found.ps1 shipperTrackingCached=true
 ```
 
-It stores the toggles in the azd environment (`ESTATE_ASFOUND`), deploys the estate alone (`azd hooks run preprovision`, not the apps), deploys again the Logic Apps whose workflow a toggle changes (tracked properties, the report back to the Driver app), sets the TMS API's settings for the business safety nets, and prints which toggles changed and the state now. Toggles are Azure-only: locally there are no alerts, lifecycle rules or scanning. For a live demo, switch to `as-found` beforehand, and run `infra/as-found.sh fixed` live as the fix.
+It stores the toggles in the azd environment (`ESTATE_ASFOUND`), deploys the estate alone (`azd hooks run preprovision`, not the apps), deploys again the Logic Apps whose workflow a toggle changes (tracked properties, the report back to the Driver app), sets the TMS API's settings for the business safety nets, and prints which toggles changed and the state now. Toggles are Azure-only: locally there are no alerts, lifecycle rules or scanning. For a live demo, switch to `as-found` beforehand, and run `infra/as-found.ps1 fixed` live as the fix.
 
 ## Reading a result
 

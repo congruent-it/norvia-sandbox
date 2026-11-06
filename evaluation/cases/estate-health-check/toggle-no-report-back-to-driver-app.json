@@ -3,7 +3,7 @@
   "agent": "estate-health-check",
   "description": "One case per toggle: the estate with noReportBackToDriverApp on and nothing else. The known answer is F-DRIVER-REPORT-BACK, the Finding of Check DRIVER-REPORT-BACK, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
   "setup": {
-    "toggle": "noReportBackToDriverApp, switched on alone from the fixed estate: infra/as-found.sh fixed, then infra/as-found.sh noReportBackToDriverApp=true"
+    "toggle": "noReportBackToDriverApp, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 noReportBackToDriverApp=true"
   },
   "input": "Run an Estate health check and tell me what you found.",
   "expect": {

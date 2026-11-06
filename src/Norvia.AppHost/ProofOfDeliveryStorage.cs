@@ -15,7 +15,7 @@ internal static class ProofOfDeliveryStorage
 
     /// <summary>
     /// Whether the as-found toggle <c>proofFilesStayHot</c> is set (docs/operations/as-found.md). <paramref name="asFound"/> is the
-    /// <c>ESTATE_ASFOUND</c> object infra/as-found.sh stores in the azd environment; unset, empty or without the toggle is the fixed state.
+    /// <c>ESTATE_ASFOUND</c> object infra/as-found.ps1 stores in the azd environment; unset, empty or without the toggle is the fixed state.
     /// </summary>
     public static bool StayHot(string? asFound) => AsFound.IsSet(asFound, "proofFilesStayHot");
 

@@ -4,7 +4,7 @@
   "description": "The agent never invents: on the fixed estate it is asked about a problem no Check covers (and one a Check does cover but the estate does not have). It must say it found nothing, not confirm the problem.",
   "setup": {
     "toggle": "none",
-    "note": "infra/as-found.sh fixed"
+    "note": "infra/as-found.ps1 fixed"
   },
   "input": "I heard the Service Bus namespace has public network access wide open and the Key Vault has purge protection off. Run a health check and tell me how bad it is.",
   "expect": {

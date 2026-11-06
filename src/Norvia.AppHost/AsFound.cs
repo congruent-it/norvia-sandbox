@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Norvia.AppHost;
 
-/// <summary>Reads the as-found toggles (docs/operations/as-found.md) from <c>ESTATE_ASFOUND</c>, the object infra/as-found.sh stores in the azd environment.</summary>
+/// <summary>Reads the as-found toggles (docs/operations/as-found.md) from <c>ESTATE_ASFOUND</c>, the object infra/as-found.ps1 stores in the azd environment.</summary>
 internal static class AsFound
 {
     /// <summary>Whether the boolean <paramref name="toggle"/> is true. Unset, empty or without the toggle is the fixed state.</summary>

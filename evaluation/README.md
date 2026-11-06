@@ -1,6 +1,6 @@
 # Agent evaluation cases
 
-The known answers the evaluation harness ([infra/run-agent-evaluation.sh](../infra/run-agent-evaluation.sh)) checks an Agent against. One directory per agent, one file per case: `evaluation/cases/<agent>/<case>.json`. A new Agent's evaluation slice adds files here and nothing else: the checks, the runner and the result file are shared. How to run it and read the result: [docs/operations/agent-evaluation.md](../docs/operations/agent-evaluation.md).
+The known answers the evaluation harness ([infra/run-agent-evaluation.ps1](../infra/run-agent-evaluation.ps1)) checks an Agent against. One directory per agent, one file per case: `evaluation/cases/<agent>/<case>.json`. A new Agent's evaluation slice adds files here and nothing else: the checks, the runner and the result file are shared. How to run it and read the result: [docs/operations/agent-evaluation.md](../docs/operations/agent-evaluation.md).
 
 ```json
 {
@@ -27,7 +27,7 @@ The known answers the evaluation harness ([infra/run-agent-evaluation.sh](../inf
 | `input` | A string: the question, or the text for an Agent that reads text |
 | `expect` | At least one check. All must pass for the case to pass |
 
-Checks, each with a pass or fail and a reason (the logic is [infra/evaluation/checks.jq](../infra/evaluation/checks.jq)):
+Checks, each with a pass or fail and a reason (the logic is [infra/evaluation/checks.ps1](../infra/evaluation/checks.ps1)):
 
 | Check | Passes when |
 |---|---|
@@ -42,7 +42,7 @@ Checks, each with a pass or fail and a reason (the logic is [infra/evaluation/ch
 
 The structured result is read by path (`cause.code`, `action.code`, `evidence[].source`, `explanation`), so a change in the Suggestion type's shape changes the cases' paths, not the harness.
 
-An `input` may hold `${EVALUATION_CORRELATION_ID}`: the runner puts in the correlation ID of the Message trail the case's `setup` seeds, which exists only after the fault ran. It refuses to start without the variable when a case needs it; run such cases one at a time with `--case`.
+An `input` may hold `${EVALUATION_CORRELATION_ID}`: the runner puts in the correlation ID of the Message trail the case's `setup` seeds, which exists only after the fault ran. It refuses to start without the variable when a case needs it; run such cases one at a time with `-Case`.
 
 ## Integration operations agent
 
@@ -61,7 +61,7 @@ The cases of [#383](https://github.com/congruent-it/norvia-sandbox/issues/383), 
 
 ## Estate health-check agent
 
-The cases of [#396](https://github.com/congruent-it/norvia-sandbox/issues/396), in [evaluation/cases/estate-health-check/](cases/estate-health-check/). The Agent's structured answer is `summary` and `findings` (`id`, `impact`, `citation`) ([the definition](../agents/estate-health-check.agent.yaml)). A Finding's ID is `F-` and its Check's ID, and severity and fix are the Check's, so the cases check the **set of Finding IDs** exactly (`lists`) and have a model grade only the `summary` against a rubric. Each toggle's `setup` says how to switch it on alone: `infra/as-found.sh fixed`, then `infra/as-found.sh <toggle>=<value>`. All the cases ask the same question, so run those of one setup together with `--case`.
+The cases of [#396](https://github.com/congruent-it/norvia-sandbox/issues/396), in [evaluation/cases/estate-health-check/](cases/estate-health-check/). The Agent's structured answer is `summary` and `findings` (`id`, `impact`, `citation`) ([the definition](../agents/estate-health-check.agent.yaml)). A Finding's ID is `F-` and its Check's ID, and severity and fix are the Check's, so the cases check the **set of Finding IDs** exactly (`lists`) and have a model grade only the `summary` against a rubric. Each toggle's `setup` says how to switch it on alone: `infra/as-found.ps1 fixed`, then `infra/as-found.ps1 <toggle>=<value>`. All the cases ask the same question, so run those of one setup together with `-Case`.
 
 | Cases | Setup | Known answer |
 |---|---|---|

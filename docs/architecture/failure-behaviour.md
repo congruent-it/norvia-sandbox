@@ -2,7 +2,7 @@
 
 What happens when each hop of each Flow fails: how often it is retried, where a message that can't be delivered ends up and with which `failureCode`, who is told, what the Integration console can do about it, and which as-found toggle breaks it. For engineers and coding agents working on the estate and for the technical audience of a demo. Azure is the estate [c4.md](c4.md) draws; what plays each piece locally is in [local-vs-azure.md](local-vs-azure.md). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md), **Flow** included.
 
-The page is also the as-found backlog. Everything marked *planned* is designed in a process doc or an ADR and not built yet, and that includes **every alert and every toggle**: the alerts and the toggles that remove them are built ([as-found](../operations/as-found.md)): every Logic App has a failed-run alert and every queue and subscription a Logic App reads has a dead-letter alert, and `infra/as-found.sh as-found` leaves some of them out. What is still *planned* is every other toggle, and the alerts for the hops that are not a Logic App or a queue (APIM, the outboxes, the workers).
+The page is also the as-found backlog. Everything marked *planned* is designed in a process doc or an ADR and not built yet, and that includes **every alert and every toggle**: the alerts and the toggles that remove them are built ([as-found](../operations/as-found.md)): every Logic App has a failed-run alert and every queue and subscription a Logic App reads has a dead-letter alert, and `infra/as-found.ps1 as-found` leaves some of them out. What is still *planned* is every other toggle, and the alerts for the hops that are not a Logic App or a queue (APIM, the outboxes, the workers).
 
 ## Reading the tables
 
