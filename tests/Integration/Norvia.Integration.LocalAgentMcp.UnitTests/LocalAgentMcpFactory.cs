@@ -27,6 +27,11 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string HealthCheckAudience = "api://norvia-health-check-agent";
     public const string HealthCheckApiAudience = "api://norvia-health-check-agent-api";
 
+    public const string CustomerServiceAgentId = "norvia-local-agent-customer-service";
+    public const string CustomerServiceRole = "TransportOrders.CustomerServiceAgent.Read";
+    public const string CustomerServiceAudience = "api://norvia-customer-service-agent";
+    public const string TmsAudience = "api://norvia-tms";
+
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
     public StubConsole Console { get; } = new();
@@ -37,6 +42,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
 
     /// <summary>Whether the stand-in is configured to serve the Estate health check's server, as the AppHost configures it.</summary>
     public bool ServesHealthCheck { get; set; } = true;
+
+    /// <summary>Whether the stand-in is configured to serve the Customer service agent's server, as the AppHost configures it.</summary>
+    public bool ServesCustomerService { get; set; } = true;
 
     public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
 
@@ -69,6 +77,23 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
                 ["AgentMcp:HealthCheck:ApiTokens:Issuer"] = Issuer,
                 ["AgentMcp:HealthCheck:ApiTokens:Audience"] = HealthCheckApiAudience,
                 ["AgentMcp:HealthCheck:ApiTokens:SigningKey"] = signingKey,
+            })
+            {
+                builder.UseSetting(name, value);
+            }
+        }
+
+        if (ServesCustomerService)
+        {
+            foreach (var (name, value) in new Dictionary<string, string>
+            {
+                ["AgentMcp:CustomerService:Tokens:Issuer"] = Issuer,
+                ["AgentMcp:CustomerService:Tokens:Audience"] = CustomerServiceAudience,
+                ["AgentMcp:CustomerService:Tokens:SigningKey"] = signingKey,
+                ["AgentMcp:CustomerService:Api"] = "http://tms-api/v1/agent/customer-service",
+                ["AgentMcp:CustomerService:ApiTokens:Issuer"] = Issuer,
+                ["AgentMcp:CustomerService:ApiTokens:Audience"] = TmsAudience,
+                ["AgentMcp:CustomerService:ApiTokens:SigningKey"] = signingKey,
             })
             {
                 builder.UseSetting(name, value);
@@ -109,6 +134,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     /// <summary>The Estate health-check agent's token as Entra issues it to its agent identity.</summary>
     public string HealthCheckToken(string? azp = HealthCheckAgentId, string[]? roles = null) =>
         AgentToken(azp, roles ?? [HealthCheckRole], HealthCheckAudience);
+
+    /// <summary>The Customer service agent's token as Entra issues it to its agent identity.</summary>
+    public string CustomerServiceToken(string? azp = CustomerServiceAgentId, string[]? roles = null) =>
+        AgentToken(azp, roles ?? [CustomerServiceRole], CustomerServiceAudience);
 
     public HttpClient AgentClient(string? token = null)
     {

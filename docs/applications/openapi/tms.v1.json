@@ -2908,6 +2908,38 @@
         }
       }
     },
+    "/v1/agent/customer-service/rejected-bookings/{id}": {
+      "get": {
+        "tags": [
+          "CustomerServiceAgent"
+        ],
+        "summary": "Read a Rejected booking as the Customer service agent: reasons and submitted content, without the Consignee's details.",
+        "operationId": "AgentGetRejectedBooking",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRejectedBookingView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -3146,6 +3178,287 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TripWarning"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentCollectionView": {
+        "required": [
+          "postcode",
+          "city",
+          "country",
+          "earliest",
+          "latest"
+        ],
+        "type": "object",
+        "properties": {
+          "postcode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "city": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "earliest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "latest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentDeliveryView": {
+        "required": [
+          "earliest",
+          "latest"
+        ],
+        "type": "object",
+        "properties": {
+          "earliest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "latest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentDimensionsView": {
+        "required": [
+          "length",
+          "width",
+          "height"
+        ],
+        "type": "object",
+        "properties": {
+          "length": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "width": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "height": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentGoodsLineView": {
+        "required": [
+          "packageType",
+          "quantity",
+          "weightKg",
+          "dimensionsCm"
+        ],
+        "type": "object",
+        "properties": {
+          "packageType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "quantity": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "weightKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "dimensionsCm": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentDimensionsView"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRejectedBookingView": {
+        "required": [
+          "id",
+          "status",
+          "receivedAt",
+          "correlationId",
+          "channel",
+          "shipper",
+          "rejectionReasons",
+          "submitted"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "shipper": {
+            "$ref": "#/components/schemas/AgentShipperView"
+          },
+          "rejectionReasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRejectionReasonView"
+            }
+          },
+          "submitted": {
+            "$ref": "#/components/schemas/AgentSubmittedBookingView"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentRejectionReasonView": {
+        "required": [
+          "code",
+          "message",
+          "field"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentShipperView": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentSubmittedBookingView": {
+        "required": [
+          "shipperReference",
+          "collection",
+          "delivery",
+          "goodsLines"
+        ],
+        "type": "object",
+        "properties": {
+          "shipperReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "collection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentCollectionView"
+              }
+            ]
+          },
+          "delivery": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentDeliveryView"
+              }
+            ]
+          },
+          "goodsLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentGoodsLineView"
             }
           }
         },
@@ -8022,6 +8335,9 @@
     },
     {
       "name": "ShipperTracking"
+    },
+    {
+      "name": "CustomerServiceAgent"
     },
     {
       "name": "Reset"

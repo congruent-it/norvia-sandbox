@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Api.Capacity;
 using Norvia.Tms.Api.CarrierBookings;
 using Norvia.Tms.Api.Exceptions;
@@ -41,6 +42,7 @@ using Norvia.Tms.Application.Trips.Start;
 using Norvia.Tms.Domain.TransportOrders;
 using Norvia.ServiceDefaults.Faults;
 using Norvia.Tms.Infrastructure;
+using Norvia.Tms.Infrastructure.Agents;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -93,6 +95,8 @@ builder.Services
 builder.Services.AddScoped<IPipelineBehavior<StartTripCommand, Result<StartTripResult>>, TrackTripStartInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<EndTripCommand, Result<EndTripResult>>, TrackTripEndInLoggingScope>();
 builder.AddTmsInfrastructure();
+// The API serves the Customer service agent's view; it never asks an Agent, so its port stays the disabled one (the TMS UI turns it on).
+builder.AddAgentClient();
 builder.AddTmsProofOfDeliveryStorage();
 builder.AddTmsOutboxPublisher();
 builder.AddTmsReset();
@@ -196,6 +200,7 @@ app.MapCapacity();
 app.MapTrips();
 app.MapShipperNotifications();
 app.MapShipperTracking();
+app.MapCustomerServiceAgent();
 app.MapReset();
 // The presenter panel's fault switches, guarded by the Demo.Fault role: MapFaults has no unguarded way to map them.
 app.NewVersionedApi("Faults")

@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.Tms.Application.Agents;
+using Norvia.Tms.Web.Agents;
 using Norvia.Tms.Web.TransportOrders;
 
 namespace Norvia.Tms.Web.UnitTests.TransportOrders;
@@ -20,11 +22,18 @@ public abstract class TmsWebContext : BunitContext
         Services.AddFluentUIComponents();
         Services.AddSingleton(Queries);
         Services.AddSingleton(Commands);
+        Services.AddSingleton(Explain);
+        Services.AddSingleton(Options.Create(AgentSettings));
         Services.AddSingleton<TimeProvider>(Time);
         Services.AddSingleton(Options.Create(new LiveListOptions { RefreshInterval = RefreshInterval }));
     }
 
     protected ITransportOrderQueries Queries { get; } = Substitute.For<ITransportOrderQueries>();
+
+    protected IExplainRequests Explain { get; } = Substitute.For<IExplainRequests>();
+
+    /// <summary>The Agents are off unless a test turns them on, as they are off unless the AppHost or the estate does.</summary>
+    protected AgentsOptions AgentSettings { get; } = new();
 
     protected ITransportOrderCommands Commands { get; } = Substitute.For<ITransportOrderCommands>();
 

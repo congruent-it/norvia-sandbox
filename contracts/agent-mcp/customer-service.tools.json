@@ -1,0 +1,12 @@
+{
+  "server": "customer-service",
+  "role": "TransportOrders.CustomerServiceAgent.Read",
+  "tools": [
+    {
+      "name": "get_rejected_booking",
+      "description": "Returns a Rejected booking by its ID: when it was received, the Shipper's business name, its Shipper reference, every rejection reason with its code and message, which fields failed, and the content the Shipper submitted with the Consignee fields removed. Never a Consignee name, address or contact, and never a file's contents.",
+      "method": "GET",
+      "path": "/rejected-bookings/{id}"
+    }
+  ]
+}
