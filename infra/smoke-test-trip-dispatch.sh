@@ -3,7 +3,7 @@
 # presenter panel's switch are the presenter's, in the TMS UI and the Partner portal; the script stops and says what to do,
 # reads the TMS, the Driver app and Application Insights, and checks. Run it in a terminal, signed in to the Azure CLI as
 # the presenter the estate was provisioned for, once the demo's Shipments are seeded and the Trip dispatch Logic App is
-# deployed (infra/deploy-trip-dispatch-logic-app.sh), with the numbers of the two Trips the presenter builds:
+# deployed (infra/deploy-trip-dispatch-logic-app.ps1), with the numbers of the two Trips the presenter builds:
 #
 #   infra/smoke-test-trip-dispatch.sh <scenario 1 Trip number> <scenario 2 Trip number>
 #

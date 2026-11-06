@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Post-deploy smoke run of the Estate health check in Azure (not in CI). Run it in a terminal, signed in to the Azure CLI as the presenter the
 # estate was provisioned for (the presenter holds the Foundry User role on the project), once `azd up` has deployed the estate and the apps and
-# infra/deploy-agents.sh has published the Agent (it is the last postdeploy hook), with ESTATE_AGENTS_ENABLED_SETTING=true so the page narrates:
+# infra/deploy-agents.ps1 has published the Agent (it is the last postdeploy hook), with ESTATE_AGENTS_ENABLED_SETTING=true so the page narrates:
 #
 #   infra/smoke-test-estate-health-check.sh
 #
@@ -49,7 +49,7 @@ graph() { az rest --method get --url "https://graph.microsoft.com/v1.0$1" --outp
 published=$(curl -s --max-time 60 -H "Authorization: Bearer $(foundry_token)" "$endpoint/agents/$agent?api-version=v1")
 identity_principal=$(jq -r '.instance_identity.principal_id // .identity.principal_id // empty' <<<"$published")
 identity_client=$(jq -r '.instance_identity.client_id // .identity.client_id // empty' <<<"$published")
-[ -n "$identity_principal" ] && [ -n "$identity_client" ] || fail "the Agent $agent is not published, or has no identity of its own: run infra/deploy-agents.sh"
+[ -n "$identity_principal" ] && [ -n "$identity_client" ] || fail "the Agent $agent is not published, or has no identity of its own: run infra/deploy-agents.ps1"
 view=$(graph "/servicePrincipals?\$filter=displayName eq 'Norvia health-check agent view ($AZURE_ENV_NAME)'&\$select=id,appRoles")
 view_id=$(jq -r '.value[0].id // empty' <<<"$view")
 [ -n "$view_id" ] || fail "the agent view is not in Entra: has the estate been deployed?"

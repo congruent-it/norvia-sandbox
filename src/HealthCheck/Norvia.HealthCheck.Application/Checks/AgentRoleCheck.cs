@@ -18,7 +18,7 @@ public sealed class AgentRoleCheck : Check
     public override string AsFoundToggle => "agentRoleWiderThanRead";
 
     public override string Fix =>
-        "Set agentRoleWiderThanRead to false and provision the estate, then assign-agent-roles.sh gives the identity its read role alone.";
+        "Set agentRoleWiderThanRead to false and provision the estate, then assign-agent-roles.ps1 gives the identity its read role alone.";
 
     public override IReadOnlyList<Evidence> Examine(EstateConfiguration estate)
     {

@@ -3,7 +3,7 @@
 # agent as the pool source and runs it, which the script can't do for them: Entra signs them in, and the Simulator's screens are theirs.
 # The script stops and says what to do, reads Foundry and Application Insights, and checks. Run it in a terminal, signed in to the Azure
 # CLI as the presenter the estate was provisioned for (the presenter holds the Foundry User role on the project), once `azd up` has
-# deployed the estate and the apps and infra/deploy-agents.sh has published the Agent (it is the last postdeploy hook), with
+# deployed the estate and the apps and infra/deploy-agents.ps1 has published the Agent (it is the last postdeploy hook), with
 # ESTATE_AGENTS_ENABLED_SETTING=true so the Simulator asks the Agent:
 #
 #   infra/smoke-test-simulator-personas.sh <run number>
@@ -58,7 +58,7 @@ graph() { az rest --method get --url "https://graph.microsoft.com/v1.0$1" --outp
 # 1. The Agent's identity holds no role; the project's shared identity holds none either.
 published=$(curl -s --max-time 60 -H "Authorization: Bearer $(foundry_token)" "$endpoint/agents/$agent?api-version=v1")
 identity_principal=$(jq -r '.instance_identity.principal_id // .identity.principal_id // empty' <<<"$published")
-[ -n "$identity_principal" ] || fail "the Agent $agent is not published, or has no identity of its own: run infra/deploy-agents.sh"
+[ -n "$identity_principal" ] || fail "the Agent $agent is not published, or has no identity of its own: run infra/deploy-agents.ps1"
 held=$(graph "/servicePrincipals/$identity_principal/appRoleAssignments" | jq '.value | length')
 [ "$held" = 0 ] || fail "the Agent's identity $identity_principal holds $held app role(s): it must hold none"
 pass "the Agent has an identity of its own ($identity_principal) and it holds no app role"

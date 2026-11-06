@@ -3,7 +3,7 @@
 # are the presenter's, in the Driver app, and the Planner's are looked at in the TMS UI; the script stops and says what to do,
 # reads the TMS, the Driver app and Application Insights, and checks. Run it in a terminal, signed in to the Azure CLI as the
 # presenter the estate was provisioned for, once the Driver reports Logic App is deployed
-# (infra/deploy-driver-reports-logic-app.sh) and the Trip dispatch Logic App has delivered the seeded Trip to the Driver app,
+# (infra/deploy-driver-reports-logic-app.ps1) and the Trip dispatch Logic App has delivered the seeded Trip to the Driver app,
 # with the number of the Trip the TMS seeded Dispatched for today (the Trip with the seeded Driver in the TMS UI's Trips):
 #
 #   infra/smoke-test-trip-execution.sh <Trip number>

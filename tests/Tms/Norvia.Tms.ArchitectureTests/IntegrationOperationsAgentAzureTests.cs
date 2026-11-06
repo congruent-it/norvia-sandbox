@@ -113,7 +113,7 @@ public sealed class IntegrationOperationsAgentAzureTests
         var assignments = Of(Resources(), "Microsoft.Graph/appRoleAssignedTo@v1.0").ToList();
 
         assignments.Should().ContainSingle().Which["properties"]!["principalId"]!.GetValue<string>().Should().Be(ApimPrincipal);
-        Script("assign-agent-roles.sh").Should().Contain("appRoleAssignedTo");
+        Script("assign-agent-roles.ps1").Should().Contain("appRoleAssignedTo");
     }
 
     [Fact]
@@ -139,21 +139,21 @@ public sealed class IntegrationOperationsAgentAzureTests
     [Fact]
     public void DeployScript_PublishesEveryDefinitionAsAPromptAgent_WithTheReadOnlyMcpToolAndTheCorrelationHeader()
     {
-        var script = Script("deploy-agents.sh");
+        var script = Script("deploy-agents.ps1");
 
-        script.Should().Contain("kind: \"prompt\"").And.Contain("require_approval: \"never\"").And.Contain("project_connection_id").And.Contain("{{correlationId}}");
-        script.Should().Contain("allowed_tools: $d.tools.names").And.Contain("correlationIdHeader").And.Contain("agents/*.agent.yaml");
-        script.Should().Contain("create-agent-connection.sh").And.Contain("assign-agent-roles.sh");
-        script.IndexOf("create-agent-connection.sh", StringComparison.Ordinal).Should().BeLessThan(script.IndexOf("/versions?api-version", StringComparison.Ordinal));
-        script.IndexOf("/versions?api-version", StringComparison.Ordinal).Should().BeLessThan(script.IndexOf("\"$repo/infra/assign-agent-roles.sh\"", StringComparison.Ordinal));
+        script.Should().MatchRegex(@"kind\s*=\s*'prompt'").And.MatchRegex(@"require_approval\s*=\s*'never'").And.Contain("project_connection_id").And.Contain("{{correlationId}}");
+        script.Should().MatchRegex(@"allowed_tools\s*=\s*@\(\$definition\.tools\.names\)").And.Contain("correlationIdHeader").And.Contain("*.agent.yaml");
+        script.Should().Contain("create-agent-connection.ps1").And.Contain("assign-agent-roles.ps1");
+        script.LastIndexOf("create-agent-connection.ps1", StringComparison.Ordinal).Should().BeLessThan(script.IndexOf("/versions?api-version", StringComparison.Ordinal));
+        script.IndexOf("/versions?api-version", StringComparison.Ordinal).Should().BeLessThan(script.LastIndexOf("infra/assign-agent-roles.ps1", StringComparison.Ordinal));
     }
 
     [Theory]
-    [InlineData("deploy-agents.sh")]
+    [InlineData("deploy-agents.ps1")]
     [InlineData("smoke-test-integration-operations-agent.sh")]
     public void Scripts_NeverEchoATokenOrASecret(string name)
     {
-        var lines = Script(name).Split('\n').Where(line => line.TrimStart().StartsWith("echo", StringComparison.Ordinal));
+        var lines = Script(name).Split('\n').Where(line => line.TrimStart().StartsWith("echo", StringComparison.Ordinal) || line.TrimStart().StartsWith("Write-", StringComparison.Ordinal));
 
         lines.Should().NotContain(line => line.Contains("token", StringComparison.OrdinalIgnoreCase) || line.Contains("SECRET", StringComparison.Ordinal));
     }
@@ -163,8 +163,8 @@ public sealed class IntegrationOperationsAgentAzureTests
     {
         var postdeploy = Script("postdeploy.ps1");
 
-        postdeploy.Should().Contain("deploy-agents.sh");
-        postdeploy.IndexOf("deploy-agents.sh", StringComparison.Ordinal).Should().BeGreaterThan(postdeploy.IndexOf("register-sign-in-callbacks.ps1", StringComparison.Ordinal));
+        postdeploy.Should().Contain("deploy-agents.ps1");
+        postdeploy.IndexOf("deploy-agents.ps1", StringComparison.Ordinal).Should().BeGreaterThan(postdeploy.IndexOf("register-sign-in-callbacks.ps1", StringComparison.Ordinal));
     }
 
     [Fact]

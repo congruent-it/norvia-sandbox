@@ -141,15 +141,15 @@ public sealed class AsFoundStorageTests
             .ToDictionary(setting => setting!["name"]!.GetValue<string>(), setting => setting!["value"]!.GetValue<string>());
     }
 
-    // What infra/stage-logic-app.sh puts in the zip for the workflow, given the toggle.
+    // What infra/stage-logic-app.ps1 puts in the zip for the workflow, given the toggle.
     private static string Workflow(string flow, string listed)
     {
         var directory = Directory.CreateTempSubdirectory("stage-logic-app-");
         try
         {
             var zip = Path.Combine(directory.FullName, "app.zip");
-            var script = Path.Combine(Root, "infra", "stage-logic-app.sh");
-            var start = new System.Diagnostics.ProcessStartInfo("sh", [script, Path.Combine(Root, "src", "Integration", "BillingLogicApp"), zip, "host.json", flow])
+            var script = Path.Combine(Root, "infra", "stage-logic-app.ps1");
+            var start = new System.Diagnostics.ProcessStartInfo("pwsh", ["-NoProfile", "-File", script, Path.Combine(Root, "src", "Integration", "BillingLogicApp"), zip, "host.json", flow])
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

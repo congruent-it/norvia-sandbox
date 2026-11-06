@@ -1,6 +1,6 @@
 // The P11 Trip dispatch Logic App: a Logic Apps Standard app that picks up TripDispatched from its own subscription, sends the
 // Trip to the Driver app's Trip endpoint with a credential from Key Vault, and reports the version delivered or not delivered
-// to the TMS as the Trip dispatch identity. Its workflow is deployed by azd's postdeploy hook (infra/deploy-trip-dispatch-logic-app.sh),
+// to the TMS as the Trip dispatch identity. Its workflow is deployed by azd's postdeploy hook (infra/deploy-trip-dispatch-logic-app.ps1),
 // because the app needs the addresses of the TMS and the Driver app, which exist only after Aspire deploys them. It has no local
 // function: the Trip goes to the Driver app as the event carries it.
 //

@@ -207,3 +207,54 @@ Describe 'The throwaway job' {
         { Remove-ThrowawayJob -Name smoke-x-1 -ResourceGroup rg-test } | Should -Not -Throw
     }
 }
+
+Describe 'Get-RequiredEnvironmentVariable' {
+    It 'returns the value' {
+        $env:NORVIA_TEST_SET = 'x'
+        try { Get-RequiredEnvironmentVariable NORVIA_TEST_SET | Should -Be 'x' } finally { Remove-Item Env:NORVIA_TEST_SET }
+    }
+
+    It 'fails with the message when it is not set' {
+        { Get-RequiredEnvironmentVariable NORVIA_TEST_UNSET 'Deploy the estate first' } | Should -Throw 'FAIL  Deploy the estate first'
+    }
+}
+
+Describe 'Invoke-AzRest' {
+    It 'sends the body in a file and parses the response' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { '{"value":[1,2]}' }
+        (Invoke-AzRest -Method post -Url https://example/x -Body @{ a = 1 }).value | Should -Be 1, 2
+        Should -Invoke -ModuleName Norvia.Infra Invoke-Az -ParameterFilter {
+            $Arguments -contains '--method' -and $Arguments -contains 'post' -and ($Arguments | Where-Object { $_ -like '--body' }) -and ($Arguments -like '@*')
+        }
+    }
+
+    It 'returns nothing for an empty response' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { '' }
+        Invoke-AzRest -Method get -Url https://example/x | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Publish-LogicApp' {
+    BeforeEach {
+        Mock -ModuleName Norvia.Infra Write-Host { }
+        Mock -ModuleName Norvia.Infra Start-Sleep { }
+        Mock -ModuleName Norvia.Infra Invoke-Az { }
+        Mock -ModuleName Norvia.Infra dotnet { $global:LASTEXITCODE = 0 }
+    }
+
+    It 'sets the settings, builds the functions, stages the zip and deploys it' {
+        Publish-LogicApp -LogicApp logic-x -Title 'the X Logic App' -Project src/Integration/BillingLogicApp -Include host.json `
+            -Settings @{ TMS_BASE_URL = 'https://tms' } -FunctionsProject src/Integration/Norvia.Integration.CarrierBooking.Functions `
+            -ResourceGroup rg-test -Subscription sub
+        Should -Invoke -ModuleName Norvia.Infra Invoke-Az -ParameterFilter { $Arguments -contains 'appsettings' -and $Arguments -contains 'TMS_BASE_URL=https://tms' }
+        Should -Invoke -ModuleName Norvia.Infra dotnet -Times 1
+        Should -Invoke -ModuleName Norvia.Infra Invoke-Az -ParameterFilter { $Arguments -contains 'config-zip' -and ($Arguments -like '*billing*.zip') }
+    }
+
+    It 'deploys again after a failure, and gives up after the third' {
+        Mock -ModuleName Norvia.Infra Invoke-Az { throw 'restarting' } -ParameterFilter { $Arguments -contains 'config-zip' }
+        { Publish-LogicApp -LogicApp logic-x -Title 't' -Project src/Integration/BillingLogicApp -Include host.json -ResourceGroup rg-test } | Should -Throw '*restarting*'
+        Should -Invoke -ModuleName Norvia.Infra Invoke-Az -Times 3 -ParameterFilter { $Arguments -contains 'config-zip' }
+        Should -Invoke -ModuleName Norvia.Infra Start-Sleep -Times 2
+    }
+}

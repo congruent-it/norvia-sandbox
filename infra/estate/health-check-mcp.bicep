@@ -5,7 +5,7 @@
 //   Agent --(token for the agent view, role HealthCheck.Agent.Read)--> MCP server --(API Management's token for the
 //   app's agent API, the same role)--> the app's /agent/v1
 //
-// Only two kinds of identity hold a role here: each published Agent's identity on the view (infra/assign-agent-roles.sh gives it
+// Only two kinds of identity hold a role here: each published Agent's identity on the view (infra/assign-agent-roles.ps1 gives it
 // after every publish), and API Management's identity on the app's agent API (below). No operator holds either, and neither does the app's own identity, which holds Reader
 // on the estate's resource group instead (health-check.bicep): the privileged role belongs to the app, never to the Agent (#371).
 extension microsoftGraphV1
@@ -19,7 +19,7 @@ param apiManagementPrincipalId string
 @description('API Management\'s identity (its client ID), named in the tool calls\' authentication policy.')
 param apiManagementClientId string
 
-@description('''The Estate health check\'s address, empty before the apps are first deployed. infra/deploy-agents.sh stores it (ESTATE_HEALTH_CHECK_BASE_URL)
+@description('''The Estate health check\'s address, empty before the apps are first deployed. infra/deploy-agents.ps1 stores it (ESTATE_HEALTH_CHECK_BASE_URL)
 and points the backend at it; the placeholder fails every tool call with a gateway error, which the Agent sees as a refused tool.''')
 param healthCheckBaseUrl string = ''
 
@@ -31,7 +31,7 @@ var apiRoleId = guid('norvia-health-check-agent-api', environmentName, role)
 // The agent view: the audience of an Agent's token. Entra issues a token for it only to an identity that holds the role.
 resource view 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-agent-${contract.server}-view-${environmentName}'
-  // infra/create-agent-connection.sh and infra/assign-agent-roles.sh look the view up by this name.
+  // infra/create-agent-connection.ps1 and infra/assign-agent-roles.ps1 look the view up by this name.
   displayName: 'Norvia ${contract.server} agent view (${environmentName})'
   signInAudience: 'AzureADMyOrg'
   identifierUris: [

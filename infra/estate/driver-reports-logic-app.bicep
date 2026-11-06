@@ -1,6 +1,6 @@
 // The P12 Driver reports Logic App: a Logic Apps Standard app that reads the Drivers' reports from its own subscription (sessions keyed by Trip
 // number), calls the TMS for each as the Driver reports identity (for a Proof of delivery, after fetching its files from the Driver app's transit container), settles the message, and tells the Driver app what became of the report. Its
-// workflow is deployed by azd's postdeploy hook (infra/deploy-driver-reports-logic-app.sh), because the app needs the addresses of the TMS and
+// workflow is deployed by azd's postdeploy hook (infra/deploy-driver-reports-logic-app.ps1), because the app needs the addresses of the TMS and
 // the Driver app, which exist only after Aspire deploys them. It needs no secret: it calls both as its managed identity.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.

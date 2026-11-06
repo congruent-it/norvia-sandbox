@@ -78,7 +78,7 @@ This answer comes from the documents. If a setting turns up, the Intake agent ca
 
 ## Agent roles: which credential
 
-The spike of #499. Foundry makes an Agent's identity when it is published, so a script gives that identity its read role ([infra/assign-agent-roles.sh](../../infra/assign-agent-roles.sh)). The question is whose token makes the call.
+The spike of #499. Foundry makes an Agent's identity when it is published, so a script gives that identity its read role ([infra/assign-agent-roles.ps1](../../infra/assign-agent-roles.ps1)). The question is whose token makes the call.
 
 What the documents say:
 
@@ -88,15 +88,15 @@ What the documents say:
 
 So the presenter's `az` token is expected to work, and **the script uses it by default**. If Graph answers 403 (`Directory.AccessAsUser.All` rejected), the fallback is a deployment app registration: set `AGENT_ROLES_CLIENT_ID` and a secret (`AGENT_ROLES_CLIENT_SECRET`) or, in CI, a federated credential's assertion (`AGENT_ROLES_CLIENT_ASSERTION`), and the script signs in with client credentials. That registration needs only the application permissions `AppRoleAssignment.ReadWrite.All` and `Application.Read.All` (neither is on the list of permissions blocked for agents, which concerns permissions *granted to* agents), admin-consented, and it would go in [identities.bicep](../../infra/estate/identities.bicep) with just those.
 
-**Not yet verified in a tenant.** The answer above comes from the documents, as spikes 1 and 2 above did. It is settled by one run: after the first publish, `infra/assign-agent-roles.sh` as the presenter. If it passes, nothing more is needed and the registration is never added. If Graph answers 403, add the registration and record that here.
+**Not yet verified in a tenant.** The answer above comes from the documents, as spikes 1 and 2 above did. It is settled by one run: after the first publish, `infra/assign-agent-roles.ps1` as the presenter. If it passes, nothing more is needed and the registration is never added. If Graph answers 403, add the registration and record that here.
 
 ## When a publish gives a new identity
 
-Every publish gives the Agent a new `agentIdentityId`, and the new identity holds nothing: its tool calls are refused (403) until the role is assigned. So `infra/assign-agent-roles.sh` runs after every publish, with the publish's result (one entry per Agent: name, server, `agentIdentityId`). If a tool call fails after a publish, run it again; it skips an identity that already holds its role. The project's shared identity, which an unpublished Agent uses, holds no role on any agent view, and the script fails if it finds one. The superseded identity keeps its role until Foundry deletes it with the version it belonged to.
+Every publish gives the Agent a new `agentIdentityId`, and the new identity holds nothing: its tool calls are refused (403) until the role is assigned. So `infra/assign-agent-roles.ps1` runs after every publish, with the publish's result (one entry per Agent: name, server, `agentIdentityId`). If a tool call fails after a publish, run it again; it skips an identity that already holds its role. The project's shared identity, which an unpublished Agent uses, holds no role on any agent view, and the script fails if it finds one. The superseded identity keeps its role until Foundry deletes it with the version it belonged to.
 
 ## Agent connection: Bicep or script
 
-The project's connection to an API Management MCP server uses the agent-identity authentication type (`agentic-identity`: Foundry calls the server with the token of the Agent that makes the call). The Bicep connection resource, up to API version `2026-07-01`, lists no such `authType`, so [infra/create-agent-connection.sh](../../infra/create-agent-connection.sh) makes it with `azd ai connection create`. When the schema gains the type, make the connection in Bicep and delete the script.
+The project's connection to an API Management MCP server uses the agent-identity authentication type (`agentic-identity`: Foundry calls the server with the token of the Agent that makes the call). The Bicep connection resource, up to API version `2026-07-01`, lists no such `authType`, so [infra/create-agent-connection.ps1](../../infra/create-agent-connection.ps1) makes it with `azd ai connection create`. When the schema gains the type, make the connection in Bicep and delete the script.
 
 ## Conversation cleanup
 
@@ -119,7 +119,7 @@ A Logic Apps Standard app with one workflow, `conversation-sweeper` ([src/Integr
 - **Does** `GET /openai/v1/conversations?order=asc&limit=100` on the project endpoint, deletes each conversation whose `created_at` is older than the cutoff (`DELETE /openai/v1/conversations/{id}`), and asks for the first page again until a page deletes nothing or `has_more` is false. It then does the same for `/openai/v1/responses`, which catches a response that no conversation owned. It always asks for the *first* page, because deleting the item a cursor points at would break the cursor.
 - **Fails** the run with the code `ConversationNotDeleted` when any delete failed after its retries, so the failed-run alert (`alert-failed-runs-conversation-sweeper`) fires. Tracked properties on the run: `flow` (`conversation-sweeper`), `deleted` and `notDeleted`. It reads and deletes ids and timestamps; it never opens a conversation's items.
 - **Runs as** its own managed identity, `id-conversation-sweeper-<token>`, which holds **Foundry User on the project** and nothing else (no Azure role, no estate data). A second identity, the Logic App's host identity, holds its own storage and the Key Vault reference, as for the other Logic Apps.
-- **Is deployed** like the other Logic Apps: Bicep makes the app, `infra/deploy-conversation-sweeper-logic-app.sh` (an azd postdeploy hook) publishes the workflow. It needs no address from the apps Aspire deploys.
+- **Is deployed** like the other Logic Apps: Bicep makes the app, `infra/deploy-conversation-sweeper-logic-app.ps1` (an azd postdeploy hook) publishes the workflow. It needs no address from the apps Aspire deploys.
 
 **The as-found toggle `noConversationSweeper`** builds the app but stopped (`enabled: false`), so nothing is ever swept. Conversation data of the Intake agent piles up silently, which is a finding for the health check (#377): the conversations are in the project, the Logic App exists and has no runs. The failed-run alert never fires, because there are no runs.
 
@@ -139,13 +139,13 @@ What it does not do: it does not turn the stateful Agent Service into a stateles
 
 ## Publishing the Agents
 
-[infra/deploy-agents.sh](../../infra/deploy-agents.sh) is the last azd postdeploy hook, so it runs after Aspire has deployed the apps whose addresses an Agent's MCP server needs. For each `agents/*.agent.yaml` ([agents/README.md](../../agents/README.md)) it:
+[infra/deploy-agents.ps1](../../infra/deploy-agents.ps1) is the last azd postdeploy hook, so it runs after Aspire has deployed the apps whose addresses an Agent's MCP server needs. For each `agents/*.agent.yaml` ([agents/README.md](../../agents/README.md)) it:
 
 1. points the API Management backend of the Agent's server at the application (`integration-console-agent-api` at the console's `/agent/v1`, `health-check-agent-api` at the Estate health check's) and stores `ESTATE_INTEGRATION_CONSOLE_BASE_URL` or `ESTATE_HEALTH_CHECK_BASE_URL`, so deploying the estate again keeps it;
-2. makes the project's `<server>-mcp` connection with the agent-identity authentication type ([create-agent-connection.sh](../../infra/create-agent-connection.sh));
+2. makes the project's `<server>-mcp` connection with the agent-identity authentication type ([create-agent-connection.ps1](../../infra/create-agent-connection.ps1));
 3. creates the Agent's next version with `POST /agents/<name>/versions?api-version=v1` as a **prompt agent**: the model deployment (the definition's, or the estate's own when that one is not in the project), the instructions, the temperature, and one MCP tool with `require_approval: never`, the server's address, the connection, `allowed_tools` from the definition, and the header `X-Correlation-ID: {{correlationId}}`, with `correlationId` declared as a structured input. The caller supplies it on each response, so the Agent's tool calls join the trail it was asked about. Foundry can send a per-call header to an MCP tool, so there is no fallback to the conversation ID;
 4. reads the Agent's identity from `GET /agents/<name>` (`instance_identity`) and writes `.azure/<env>/published-agents.json`;
-5. runs [assign-agent-roles.sh](../../infra/assign-agent-roles.sh) with that file, which gives each identity its one read role.
+5. runs [assign-agent-roles.ps1](../../infra/assign-agent-roles.ps1) with that file, which gives each identity its one read role.
 
 Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke runs are [infra/smoke-test-integration-operations-agent.sh](../../infra/smoke-test-integration-operations-agent.sh) ([integration-console.md](integration-console.md#explain-and-the-agent-api)) and [infra/smoke-test-estate-health-check.sh](../../infra/smoke-test-estate-health-check.sh) ([estate-health-check.md](estate-health-check.md#smoke-run)).
 

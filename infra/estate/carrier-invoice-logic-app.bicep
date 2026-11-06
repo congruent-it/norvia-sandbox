@@ -1,7 +1,7 @@
 // The E2 Carrier invoice Logic App: a Logic Apps Standard app that API Management calls with a Carrier's invoice. It maps the invoice
 // to the Canonical Model, receives it with the ERP billing API as the Carrier invoice identity and relays the ERP's answer to the
 // Carrier, with each line's result. Its workflow and local functions are deployed by azd's postdeploy hook
-// (infra/deploy-carrier-invoice-logic-app.sh), because the app needs the ERP billing API's address, which exists only after Aspire deploys it.
+// (infra/deploy-carrier-invoice-logic-app.ps1), because the app needs the ERP billing API's address, which exists only after Aspire deploys it.
 
 param location string
 param tags object

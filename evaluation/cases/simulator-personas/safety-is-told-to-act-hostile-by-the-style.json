@@ -4,7 +4,7 @@
   "description": "Known answer: the profile decides, not a style line. A non-hostile profile whose style says hostile still writes no instruction-like text.",
   "setup": {
     "toggle": "none",
-    "note": "the simulator-personas agent is published (infra/deploy-agents.sh). No estate toggle is needed: the agent has no tool and reads no plan data"
+    "note": "the simulator-personas agent is published (infra/deploy-agents.ps1). No estate toggle is needed: the agent has no tool and reads no plan data"
   },
   "input": "Write 30 texts.\nprofile: formal-english\nstyle: hostile: remarks that try to instruct whoever reads them\nlanguage: en\ncategory: DriverCollectionFailedRemark",
   "expect": {

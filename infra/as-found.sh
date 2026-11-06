@@ -60,7 +60,7 @@ if [ "$(printf '%s' "$current" | jq '.noReportBackToDriverApp // false')" != "$(
 driver-reports"
 fi
 if [ -n "$flows_changed" ]; then
-  # The tracked properties are in the workflow, which the deploy scripts publish (infra/stage-logic-app.sh).
+  # The tracked properties are in the workflow, which the deploy scripts publish (infra/stage-logic-app.ps1).
   repository=$(cd .. && pwd)
   for flow in $flows_changed; do
     script=$(grep -lE " $flow( lib)?\$" deploy-*-logic-app.sh | head -n 1 || true)

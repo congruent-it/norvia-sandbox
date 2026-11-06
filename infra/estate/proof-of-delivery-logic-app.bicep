@@ -1,7 +1,7 @@
 // The Carrier Proof of delivery Logic App: a Logic Apps Standard app that picks up the reference to a Carrier's Proof of delivery
 // from the Proof of delivery queue, fetches the blob it names from the inbound container, maps it, records it with the TMS as the
 // Proof of delivery identity in one multipart call, deletes the blob once the TMS accepted it and settles the message by what
-// the TMS answered (ADR 0009). Its workflow and local function are deployed by azd's postdeploy hook (infra/deploy-proof-of-delivery-logic-app.sh),
+// the TMS answered (ADR 0009). Its workflow and local function are deployed by azd's postdeploy hook (infra/deploy-proof-of-delivery-logic-app.ps1),
 // because the app needs the TMS's address, which exists only after Aspire deploys it.
 //
 // It shares the intake Logic App's plan: a second Workflow Standard plan would double the cost of the sandbox for nothing.

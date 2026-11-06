@@ -18,7 +18,7 @@ public sealed class TrackedPropertiesCheck : Check
     public override string AsFoundToggle => "logicAppsWithoutTrackedProperties";
 
     public override string Fix =>
-        "Remove the flow from asFound.logicAppsWithoutTrackedProperties and deploy its Logic App again (infra/as-found.sh does it): stage-logic-app.sh then keeps the tracked properties.";
+        "Remove the flow from asFound.logicAppsWithoutTrackedProperties and deploy its Logic App again (infra/as-found.sh does it): stage-logic-app.ps1 then keeps the tracked properties.";
 
     public override IReadOnlyList<Evidence> Examine(EstateConfiguration estate)
     {
