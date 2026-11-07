@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalAgentMcp\Norvia.Integration.LocalAgentMcp.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The estate's Bicep is evaluated with `bicep snapshot` (nothing is deployed), as the architecture tests do; their helpers are shared, not copied. -->
+    <Compile Include="..\..\Tms\Norvia.Tms.ArchitectureTests\BicepSnapshot.cs" Link="Shared\BicepSnapshot.cs" />
+    <Compile Include="..\..\Tms\Norvia.Tms.ArchitectureTests\RepositoryRoot.cs" Link="Shared\RepositoryRoot.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- No containers and no AppHost: the stand-in runs in memory and the Bicep is read locally, so the tests may run side by side. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
