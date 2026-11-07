@@ -29,7 +29,7 @@ public static class CarrierInvoiceCalls
     }
 
     /// <summary>Records a Spot Carrier cost as the Carrier cost Logic App does, and returns its Carrier booking number. With <paramref name="rateCardId"/> the cost is priced from that Carrier Rate Card instead.</summary>
-    public static async Task<string> RecordCarrierCostAsync(HttpClient client, string reference, decimal total, CancellationToken cancellationToken, string? rateCardId = null)
+    public static async Task<string> RecordCarrierCostAsync(HttpClient client, string reference, decimal total, string? rateCardId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(client);
         var number = Random.Shared.Next(1_000_000, 10_000_000);

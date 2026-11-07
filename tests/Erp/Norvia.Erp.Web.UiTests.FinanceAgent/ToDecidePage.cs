@@ -20,14 +20,14 @@ public abstract class ToDecidePage(FinanceAgentUiFixture fixture) : TracedPage(f
     protected async Task<string> RecordCostAsync(string reference, decimal total)
     {
         using var client = Agent.LogicAppClient(CarrierInvoiceCalls.RecordCarrierCostRole);
-        return await CarrierInvoiceCalls.RecordCarrierCostAsync(client, reference, total, Ct);
+        return await CarrierInvoiceCalls.RecordCarrierCostAsync(client, reference, total, null, Ct);
     }
 
     /// <summary>Records a Carrier cost priced from a Carrier Rate Card, which the assistant treats as the agreed price.</summary>
     protected async Task<string> RecordRateCardCostAsync(string reference, decimal total)
     {
         using var client = Agent.LogicAppClient(CarrierInvoiceCalls.RecordCarrierCostRole);
-        return await CarrierInvoiceCalls.RecordCarrierCostAsync(client, reference, total, Ct, rateCardId: "CRC-0001");
+        return await CarrierInvoiceCalls.RecordCarrierCostAsync(client, reference, total, "CRC-0001", Ct);
     }
 
     /// <summary>Receives a Carrier invoice as the Carrier invoice Logic App does.</summary>

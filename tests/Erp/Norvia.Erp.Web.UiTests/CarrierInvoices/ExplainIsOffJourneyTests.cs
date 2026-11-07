@@ -18,7 +18,7 @@ public sealed class ExplainIsOffJourneyTests(ErpUiFixture erp) : BrowserPage(erp
         var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
         using (var costs = Erp.LogicAppClient(CarrierInvoiceCalls.RecordCarrierCostRole))
         {
-            await CarrierInvoiceCalls.RecordCarrierCostAsync(costs, reference, 80m, Ct);
+            await CarrierInvoiceCalls.RecordCarrierCostAsync(costs, reference, 80m, null, Ct);
         }
 
         using (var invoices = Erp.LogicAppClient(CarrierInvoiceCalls.ReceiveCarrierInvoiceRole))
