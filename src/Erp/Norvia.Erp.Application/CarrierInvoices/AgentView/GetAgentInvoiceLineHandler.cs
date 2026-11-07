@@ -61,32 +61,20 @@ public sealed class GetAgentInvoiceLineHandler(
     }
 
     // The label is all the Agent gets of a Spot price: the Planner's remark is free text and stays in the TMS and the ERP.
-    private static string SourceLabel(CarrierCostSource source) =>
-        source.IsSpot ? "Spot" : $"Rate Card version {source.RateCardVersion}";
-
     private static AgentCarrierCostView CostOf(CarrierCost cost) => new(
         cost.Id.CarrierBookingNumber,
         cost.CarrierBookingReference,
         cost.Total,
-        SourceLabel(cost.Source),
-        DateOnly.FromDateTime(cost.DeliveryTime.Date),
+        cost.Source.Label,
+        cost.DeliveredOn,
         cost.Status.ToString());
 
     private async Task<AgentEarlierLineView?> EarlierLineAsync(CarrierInvoice invoice, CarrierInvoiceLine line, CarrierCost cost, CancellationToken cancellationToken)
     {
         var all = await invoices.ListAsync(new CarrierInvoicesOfCarrierSpec(invoice.CarrierId), cancellationToken);
-        return all
-            .SelectMany(other => other.Lines.Select(earlier => (Invoice: other, Line: earlier)))
-            .Where(pair => pair.Line.CarrierBookingNumber == cost.Id.CarrierBookingNumber
-                && pair.Line.Status is CarrierInvoiceLineStatus.Matched or CarrierInvoiceLineStatus.Accepted
-                && !(pair.Invoice.InvoiceNumber == invoice.InvoiceNumber && pair.Line.CarrierBookingReference == line.CarrierBookingReference))
-            .Select(pair => new AgentEarlierLineView(
-                pair.Invoice.InvoiceNumber,
-                pair.Invoice.InvoiceDate,
-                pair.Line.CarrierBookingReference,
-                pair.Line.Status.ToString(),
-                pair.Line.AcceptedAmount ?? pair.Line.Amount))
-            .FirstOrDefault();
+        return EarlierLine.Find(all, cost.Id.CarrierBookingNumber, invoice.InvoiceNumber, line.CarrierBookingReference) is { } earlier
+            ? new AgentEarlierLineView(earlier.Invoice.InvoiceNumber, earlier.Invoice.InvoiceDate, earlier.Line.CarrierBookingReference, earlier.Line.Status.ToString(), earlier.Line.AcceptedAmount ?? earlier.Line.Amount)
+            : null;
     }
 
     private async Task<IReadOnlyList<AgentCandidateView>> CandidatesAsync(CarrierInvoice invoice, CarrierInvoiceLine line, CancellationToken cancellationToken)
@@ -101,8 +89,8 @@ public sealed class GetAgentInvoiceLineHandler(
                     candidate.Cost.CarrierBookingReference,
                     candidate.Cost.Total,
                     line.Amount - candidate.Cost.Total,
-                    SourceLabel(candidate.Cost.Source),
-                    DateOnly.FromDateTime(candidate.Cost.DeliveryTime.Date))),
+                    candidate.Cost.Source.Label,
+                    candidate.Cost.DeliveredOn)),
         ];
     }
 }

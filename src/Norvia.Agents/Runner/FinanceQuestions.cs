@@ -9,8 +9,8 @@ namespace Norvia.Agents.Runner;
 public static partial class FinanceQuestions
 {
     private const string Prefix = "Explain why the line \"";
-    private const string Middle1 = "\" of Carrier invoice \"";
-    private const string Middle2 = "\" of Carrier \"";
+    private const string InvoiceIntro = "\" of Carrier invoice \"";
+    private const string CarrierIntro = "\" of Carrier \"";
     private const string Suffix = "\" did not match, and whether it may still resolve.";
 
     public static string ExplainInvoiceLine(string carrierId, string invoiceNumber, string carrierBookingReference)
@@ -18,7 +18,7 @@ public static partial class FinanceQuestions
         ArgumentNullException.ThrowIfNull(carrierId);
         ArgumentNullException.ThrowIfNull(invoiceNumber);
         ArgumentNullException.ThrowIfNull(carrierBookingReference);
-        return Prefix + carrierBookingReference + Middle1 + invoiceNumber + Middle2 + carrierId + Suffix;
+        return Prefix + carrierBookingReference + InvoiceIntro + invoiceNumber + CarrierIntro + carrierId + Suffix;
     }
 
     /// <summary>The Carrier, invoice number and Carrier booking reference of an Explain question, or null when the text is another question.</summary>

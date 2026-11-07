@@ -78,6 +78,27 @@ public sealed class FinanceAgentViewTests
         }
     }
 
+    [Theory]
+    [InlineData("CarrierInvoices.FinanceAgent.Read", true)]
+    [InlineData("Finance", false)]
+    [InlineData("CarrierInvoices.Manage", false)]
+    [InlineData("CarrierInvoices.Receive", false)]
+    [InlineData(null, false)]
+    public async Task TheView_AdmitsOnlyACallerHoldingTheAgentReadRole(string? role, bool admitted)
+    {
+        var services = new ServiceCollection().AddLogging().AddAuthorization().BuildServiceProvider();
+        var authorization = services.GetRequiredService<IAuthorizationService>();
+        var claims = role is null ? [] : new[] { new Claim("roles", role) };
+        var caller = new ClaimsPrincipal(new ClaimsIdentity(claims, "test", "name", "roles"));
+
+        foreach (var endpoint in Endpoints())
+        {
+            var policy = endpoint.Metadata.OfType<AuthorizationPolicy>().Single();
+
+            (await authorization.AuthorizeAsync(caller, policy)).Succeeded.Should().Be(admitted);
+        }
+    }
+
     [Fact]
     public void TheRole_IsTheOneTheToolListNames_AndHeldByNoPersonOrWorker()
     {

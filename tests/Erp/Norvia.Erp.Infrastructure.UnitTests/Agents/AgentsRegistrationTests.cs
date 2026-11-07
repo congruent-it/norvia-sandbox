@@ -142,7 +142,7 @@ public sealed class AgentModelsAndDefinitionsTests
         var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(AgentToken.Create(tokens, TimeProvider.System));
 
         token.GetClaim("azp").Value.Should().Be("agent-1");
-        token.ValidTo.Should().BeAfter(DateTime.UtcNow.AddMinutes(9));
+        token.ValidTo.Should().BeAfter(TimeProvider.System.GetUtcNow().UtcDateTime.AddMinutes(9));
         tokens.IsComplete.Should().BeTrue();
     }
 }

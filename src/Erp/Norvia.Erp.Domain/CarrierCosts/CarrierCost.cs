@@ -51,6 +51,9 @@ public sealed class CarrierCost : EntityBase<CarrierCostId>, IAggregateRoot
 
     public CarrierCostStatus Status { get; private set; }
 
+    /// <summary>The day the Shipment was Delivered, where it happened.</summary>
+    public DateOnly DeliveredOn => DateOnly.FromDateTime(DeliveryTime.Date);
+
     /// <summary>The Carrier cost's total: the charge's total.</summary>
     public decimal Total => Charge.Total;
 

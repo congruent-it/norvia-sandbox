@@ -25,6 +25,9 @@ public sealed record CarrierCostSource
 
     public bool IsSpot => Kind == CarrierCostSourceKind.Spot;
 
+    /// <summary>Where the price came from, as a label: <c>Rate Card version 3</c> or <c>Spot</c>. Never the Planner's remark.</summary>
+    public string Label => IsSpot ? "Spot" : $"Rate Card version {RateCardVersion}";
+
     public static CarrierCostSource FromRateCard(string rateCardId, int version)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rateCardId);

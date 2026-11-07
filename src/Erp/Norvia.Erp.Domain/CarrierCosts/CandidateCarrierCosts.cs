@@ -61,7 +61,7 @@ public static class CandidateCarrierCosts
     // A Carrier cost delivered on or before the invoice date is the likelier one, the nearer the better; one delivered after it cannot be what the invoice is for.
     private static double DeliveryProximity(DateOnly invoiceDate, CarrierCost cost)
     {
-        var days = invoiceDate.DayNumber - DateOnly.FromDateTime(cost.DeliveryTime.Date).DayNumber;
+        var days = invoiceDate.DayNumber - cost.DeliveredOn.DayNumber;
         return days < 0 ? 0 : 1d / (1d + (days / 30d));
     }
 
