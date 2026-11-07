@@ -28,9 +28,10 @@ public sealed class GetInvoiceSummaryTests(FinanceAgentFixture fixture)
         summary["carrierName"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         summary["invoiceNumber"]!.GetValue<string>().Should().Be(invoiceNumber);
         summary["invoiceDate"]!.GetValue<string>().Should().Be("2026-10-19");
+        summary["receivedAt"]!.GetValue<DateTimeOffset>().Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(10));
         summary["status"]!.GetValue<string>().Should().Be("Received").And.Be(received["status"]!.GetValue<string>());
         summary["currency"]!.GetValue<string>().Should().Be("EUR");
-        summary["total"]!.GetValue<decimal>().Should().Be(10m + 20m + 30m + 40m + 50m + 95m + 125m + 210m + 33m + 44m + 60m + 70m);
+        summary["total"]!.GetValue<decimal>().Should().Be(received["lines"]!.AsArray().Sum(line => line!["amount"]!.GetValue<decimal>()), "the sum of what the Carrier claims on its 12 lines");
         summary["approvedAmountSoFar"]!.GetValue<decimal>().Should().Be(150m, "the five Matched lines are the only ones decided so far");
         summary["lines"]!.GetValue<int>().Should().Be(12);
         summary["toDecide"]!.GetValue<int>().Should().Be(7);
@@ -84,9 +85,10 @@ public sealed class GetInvoiceSummaryTests(FinanceAgentFixture fixture)
         var received = await FinanceAgentCalls.ReceiveAsync(fixture, invoiceNumber, _cancellationToken, lines: (reference, 80m));
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
-        var (isError, _) = await client.GetInvoiceSummaryAsync(FinanceAgentCalls.OtherCarrier, invoiceNumber, received["correlationId"]!.GetValue<string>(), _cancellationToken);
+        var (isError, text) = await client.GetInvoiceSummaryAsync(FinanceAgentCalls.OtherCarrier, invoiceNumber, received["correlationId"]!.GetValue<string>(), _cancellationToken);
 
         isError.Should().BeTrue("the other Carrier has no such invoice");
+        text.Should().NotContain(FinanceAgentCalls.SpotRemark).And.NotContainAny(FinanceAgentCalls.NeverForTheAgent);
     }
 
     // 12 lines: 5 Matched (10, 20, 30, 40, 50), 3 Price mismatch (95, 125, 210), 2 Unknown booking (33, 44) and 2 Duplicate (60, 70).

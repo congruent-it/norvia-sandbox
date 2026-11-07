@@ -128,33 +128,17 @@ internal static class FinanceAgentCalls
             cancellationToken);
 
     /// <summary>Calls <c>get_invoice_line</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
-    public static async Task<(bool IsError, string Text)> GetInvoiceLineAsync(
-        this HttpClient client, string carrierId, string invoiceNumber, string reference, string correlationId, CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(FinanceAgentFixture.McpPath, UriKind.Relative))
-        {
-            Content = JsonContent.Create(new JsonObject
-            {
-                ["jsonrpc"] = "2.0",
-                ["id"] = 1,
-                ["method"] = "tools/call",
-                ["params"] = new JsonObject
-                {
-                    ["name"] = Tool,
-                    ["arguments"] = new JsonObject { ["carrierId"] = carrierId, ["invoiceNumber"] = invoiceNumber, ["carrierBookingReference"] = reference },
-                },
-            }),
-        };
-        request.Headers.Add("X-Correlation-ID", correlationId);
-        using var response = await client.SendAsync(request, cancellationToken);
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var result = (await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["result"]!;
-        return (result["isError"]!.GetValue<bool>(), result["content"]![0]!["text"]!.GetValue<string>());
-    }
+    public static Task<(bool IsError, string Text)> GetInvoiceLineAsync(
+        this HttpClient client, string carrierId, string invoiceNumber, string reference, string correlationId, CancellationToken cancellationToken) =>
+        client.CallToolAsync(Tool, new JsonObject { ["carrierId"] = carrierId, ["invoiceNumber"] = invoiceNumber, ["carrierBookingReference"] = reference }, correlationId, cancellationToken);
 
     /// <summary>Calls <c>get_invoice_summary</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
-    public static async Task<(bool IsError, string Text)> GetInvoiceSummaryAsync(
-        this HttpClient client, string carrierId, string invoiceNumber, string correlationId, CancellationToken cancellationToken)
+    public static Task<(bool IsError, string Text)> GetInvoiceSummaryAsync(
+        this HttpClient client, string carrierId, string invoiceNumber, string correlationId, CancellationToken cancellationToken) =>
+        client.CallToolAsync(SummaryTool, new JsonObject { ["carrierId"] = carrierId, ["invoiceNumber"] = invoiceNumber }, correlationId, cancellationToken);
+
+    private static async Task<(bool IsError, string Text)> CallToolAsync(
+        this HttpClient client, string tool, JsonObject arguments, string correlationId, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(FinanceAgentFixture.McpPath, UriKind.Relative))
         {
@@ -163,11 +147,7 @@ internal static class FinanceAgentCalls
                 ["jsonrpc"] = "2.0",
                 ["id"] = 1,
                 ["method"] = "tools/call",
-                ["params"] = new JsonObject
-                {
-                    ["name"] = SummaryTool,
-                    ["arguments"] = new JsonObject { ["carrierId"] = carrierId, ["invoiceNumber"] = invoiceNumber },
-                },
+                ["params"] = new JsonObject { ["name"] = tool, ["arguments"] = arguments },
             }),
         };
         request.Headers.Add("X-Correlation-ID", correlationId);
