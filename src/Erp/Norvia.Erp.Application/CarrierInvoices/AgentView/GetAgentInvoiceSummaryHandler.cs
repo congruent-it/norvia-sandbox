@@ -29,7 +29,7 @@ public sealed class GetAgentInvoiceSummaryHandler(IReadRepository<CarrierInvoice
 
         var carrier = await carriers.FirstOrDefaultAsync(new CarrierByIdSpec(invoice.CarrierId), cancellationToken);
         var groups = ResultOrder
-            .Select(result => Group(result, invoice.Lines.Where(line => line.Result == result).ToList()))
+            .Select(result => GroupOf(result, invoice.Lines.Where(line => line.Result == result).ToList()))
             .Where(group => group.Lines > 0)
             .ToList();
 
@@ -49,10 +49,11 @@ public sealed class GetAgentInvoiceSummaryHandler(IReadRepository<CarrierInvoice
             groups);
     }
 
-    private static AgentLineGroupView Group(CarrierInvoiceLineResult result, List<CarrierInvoiceLine> lines)
-    {
-        var toDecide = lines.Count(line => line.Status == CarrierInvoiceLineStatus.ToDecide);
-        // The same rule as the line view: only an Unknown booking line that waits for Finance is matched again by itself.
-        return new AgentLineGroupView(result.ToString(), lines.Count, toDecide, lines.Sum(line => line.Amount), result == CarrierInvoiceLineResult.UnknownBooking ? toDecide : 0);
-    }
+    // The line view's own rule decides which lines resolve by themselves, so the two views cannot disagree.
+    private static AgentLineGroupView GroupOf(CarrierInvoiceLineResult result, List<CarrierInvoiceLine> lines) => new(
+        result.ToString(),
+        lines.Count,
+        lines.Count(line => line.Status == CarrierInvoiceLineStatus.ToDecide),
+        lines.Sum(line => line.Amount),
+        lines.Count(line => line.ResolvesAutomatically));
 }

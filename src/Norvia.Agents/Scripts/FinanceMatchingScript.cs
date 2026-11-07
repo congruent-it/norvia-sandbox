@@ -59,8 +59,8 @@ public static class FinanceMatchingScript
 
         if (view.ValueKind != JsonValueKind.Object
             || IntegrationOperationsScript.Text(view, "invoiceNumber") is not { } number
-            || Count(view, "lines") is not { } lines
-            || Count(view, "toDecide") is not { } toDecide
+            || WholeNumber(view, "lines") is not { } lines
+            || WholeNumber(view, "toDecide") is not { } toDecide
             || !view.TryGetProperty("byResult", out var groups) || groups.ValueKind != JsonValueKind.Array)
         {
             return Unreadable(result);
@@ -69,13 +69,13 @@ public static class FinanceMatchingScript
         var carrier = IntegrationOperationsScript.Text(view, "carrierName") ?? "the Carrier";
         var total = Amount(view, "total");
         var approved = Amount(view, "approvedAmountSoFar");
-        var resolves = Count(view, "resolveAutomatically") ?? 0;
+        var resolves = WholeNumber(view, "resolveAutomatically") ?? 0;
         var opening = $"Carrier invoice {number} of {carrier}{(total is { } claimed ? $" claims {Euro(claimed)}" : string.Empty)} on {lines} line{(lines == 1 ? string.Empty : "s")}"
-            + $"{(approved is { } sofar ? $"; {Euro(sofar)} is approved so far" : string.Empty)}.";
+            + $"{(approved is { } approvedSoFar ? $"; {Euro(approvedSoFar)} is approved so far" : string.Empty)}.";
 
         var causes = groups.EnumerateArray()
-            .Where(group => group.ValueKind == JsonValueKind.Object && Count(group, "toDecide") is > 0 && IntegrationOperationsScript.Text(group, "result") is not null)
-            .Select(group => (Result: ResultText(IntegrationOperationsScript.Text(group, "result")!), Count: Count(group, "toDecide")!.Value))
+            .Where(group => group.ValueKind == JsonValueKind.Object && WholeNumber(group, "toDecide") is > 0 && IntegrationOperationsScript.Text(group, "result") is not null)
+            .Select(group => (Result: ResultLabel(IntegrationOperationsScript.Text(group, "result")!), Count: WholeNumber(group, "toDecide")!.Value))
             .ToList();
 
         if (toDecide == 0 || causes.Count == 0)
@@ -102,14 +102,14 @@ public static class FinanceMatchingScript
             "needs-a-person");
     }
 
-    private static string ResultText(string result) => result switch
+    private static string ResultLabel(string result) => result switch
     {
         "PriceMismatch" => "Price mismatch",
         "UnknownBooking" => "Unknown booking",
         _ => result,
     };
 
-    private static int? Count(JsonElement element, string property) =>
+    private static int? WholeNumber(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var count) ? count : null;
 
     private static string Answer(ScriptedToolResult result)
