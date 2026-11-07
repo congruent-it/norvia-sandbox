@@ -126,6 +126,7 @@
   </Folder>
   <Folder Name="/tests/Erp/">
     <Project Path="tests/Erp/Norvia.Erp.Api.IntegrationTests/Norvia.Erp.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.Api.IntegrationTests.FinanceAgent/Norvia.Erp.Api.IntegrationTests.FinanceAgent.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Api.UnitTests/Norvia.Erp.Api.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Application.UnitTests/Norvia.Erp.Application.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.ArchitectureTests/Norvia.Erp.ArchitectureTests.csproj" />

@@ -179,6 +179,9 @@ jobs:
           - application: ERP
             directory: Erp
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: ERP (Carrier invoice matching agent)
+            directory: Erp
+            kinds: IntegrationTests.FinanceAgent
           - application: Driver app
             directory: DriverApp
             kinds: UnitTests ArchitectureTests IntegrationTests
