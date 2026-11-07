@@ -16,6 +16,12 @@ public static class TrackingKeys
     public const string DocumentNumber = "documentNumber";
     public const string Outcome = "outcome";
 
+    /// <summary>The identity of the Agent that made the call (the token's <c>azp</c>), on a call to an agent view.</summary>
+    public const string AgentId = "agentId";
+
+    /// <summary>The Agent tool the call was made for, on a call to an agent view.</summary>
+    public const string ToolName = "toolName";
+
     /// <summary>The sender's own ID for the message, such as a Carrier's document ID.</summary>
     public const string SourceMessageId = "sourceMessageId";
 

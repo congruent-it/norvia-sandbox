@@ -4,6 +4,7 @@
 @using Mediator
 @using Microsoft.Extensions.Options
 @using Norvia.Erp.Application.CarrierInvoices
+@using Norvia.Erp.Web.Agents
 @using Norvia.Erp.Application.CarrierInvoices.List
 @using Norvia.Erp.Web.Live
 @implements IAsyncDisposable
@@ -59,6 +60,7 @@
                         }
                         @if (line.Status == "ToDecide")
                         {
+                            <ExplainInvoiceLine CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" CarrierBookingReference="@line.CarrierBookingReference" />
                             <DecideCarrierInvoiceLineForm CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" Line="line"
                                                           CanAccept="@(CostOf(item, line) is { Status: "Open" })" />
                         }

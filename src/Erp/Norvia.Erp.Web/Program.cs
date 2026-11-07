@@ -1,6 +1,8 @@
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Erp.Application.MasterData.Shippers.List;
 using Norvia.Erp.Infrastructure;
+using Norvia.Erp.Infrastructure.Agents;
+using Norvia.Erp.Web.Agents;
 using Norvia.Erp.Web.CarrierInvoices;
 using Norvia.Erp.Web.Live;
 using Norvia.Erp.Web.Operators;
@@ -12,6 +14,7 @@ builder.AddServiceDefaults();
 
 // The ERP keeps its own database and outbox, and loads its master data from the seed file as it starts. Only Finance reaches its UI.
 builder.AddErpInfrastructure();
+builder.AddAgentClient();
 builder.AddErpResetUnavailable();
 builder.AddErpSeedLoading();
 builder.AddErpOutboxPublisher();
@@ -22,6 +25,7 @@ builder.Services.AddMediator(options =>
     options.Assemblies = [typeof(ListShippersQuery)];
 });
 
+builder.Services.AddSingleton<IExplainRequests, ExplainRequests>();
 builder.Services.AddSingleton<ErpActivities>();
 builder.Services.AddScoped<InvoiceNowAction>();
 builder.Services.AddScoped<SendAgainAction>();

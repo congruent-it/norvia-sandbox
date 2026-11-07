@@ -29,4 +29,8 @@ internal static class Embedded
     public static string CustomerServiceReplyDefinition => Read("agents/customer-service-reply.agent.yaml");
 
     public static string CustomerServiceReplyTools => Read("agent-mcp/customer-service-reply.tools.json");
+
+    public static string FinanceMatchingDefinition => Read("agents/finance-matching.agent.yaml");
+
+    public static string FinanceMatchingTools => Read("agent-mcp/finance-matching.tools.json");
 }

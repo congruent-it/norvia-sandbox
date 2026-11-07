@@ -37,6 +37,12 @@ public sealed class AgentMcpOptions
     /// </summary>
     public HealthCheckServerOptions? CustomerServiceReply { get; set; }
 
+    /// <summary>
+    /// The Carrier invoice matching agent's MCP server (<c>finance-matching</c>), served at <c>/mcp/finance-matching</c>. It calls the ERP
+    /// API's Finance agent view. Not configured, the stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? FinanceMatching { get; set; }
+
     /// <summary>Calls per Agent identity in a window, as the policy's <c>rate-limit-by-key</c> allows (60 a minute).</summary>
     [Range(1, 10_000)]
     public int RateLimitCalls { get; set; } = 60;

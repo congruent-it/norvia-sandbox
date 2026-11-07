@@ -2,10 +2,10 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <!--
-      Only the namespaces these tests unit test are gated: the seed file reader and loader. The rest of ERP Infrastructure is EF Core,
+      Only the namespaces these tests unit test are gated: the seed file reader and loader and the Agent client. The rest of ERP Infrastructure is EF Core,
       SQL and Service Bus code, which the integration tests run against real containers (coding guidelines §10).
     -->
-    <Include>[Norvia.Erp.Infrastructure]Norvia.Erp.Infrastructure.Seed.*</Include>
+    <Include>[Norvia.Erp.Infrastructure]Norvia.Erp.Infrastructure.Seed.*,[Norvia.Erp.Infrastructure]Norvia.Erp.Infrastructure.Agents.*</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
