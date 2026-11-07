@@ -101,7 +101,7 @@ public sealed class FinanceRejectionReasonAgentTests
     {
         var (result, _) = await RunAsync(Duplicate);
 
-        result.Suggestion.Cause.Should().Contain("already invoiced").And.Contain("VDT-0").And.Contain("not invoice it again");
+        result.Suggestion.Cause.Should().Contain("already invoiced").And.Contain("VDT-0").And.Contain("not invoice it again").And.Contain("those lines only");
     }
 
     [Fact]

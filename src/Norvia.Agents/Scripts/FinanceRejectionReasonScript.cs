@@ -60,7 +60,7 @@ public static class FinanceRejectionReasonScript
         return outcome switch
         {
             "UnknownBooking" => Unknown(facts, line, reference, resend, result),
-            "Duplicate" => Duplicate(facts, line, resend, result),
+            "Duplicate" => Duplicate(facts, line, result),
             "PriceMismatch" => PriceMismatch(facts, line, resend, result),
             _ => Unreadable(result),
         };
@@ -81,7 +81,7 @@ public static class FinanceRejectionReasonScript
         return Draft(text, claims, likely is null ? "medium" : "high");
     }
 
-    private static string Duplicate(JsonElement facts, string line, string resend, ScriptedToolResult result)
+    private static string Duplicate(JsonElement facts, string line, ScriptedToolResult result)
     {
         if (IntegrationOperationsScript.Text(facts, "earlierInvoiceNumber") is not { } earlier)
         {
@@ -89,7 +89,7 @@ public static class FinanceRejectionReasonScript
         }
 
         return Draft(
-            $"We have rejected {line}: it was already invoiced on your earlier invoice {earlier}. Please do not invoice it again; {resend[0].ToString().ToLowerInvariant() + resend[1..]} only for lines that have not been invoiced yet.",
+            $"We have rejected {line}: it was already invoiced on your earlier invoice {earlier}. Please do not invoice it again. If other lines have not been invoiced yet, send a new invoice, with a new invoice number, for those lines only.",
             [($"The line was already invoiced on the Carrier's earlier invoice {earlier}.", result.Id)],
             "high");
     }
