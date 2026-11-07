@@ -8,4 +8,10 @@ internal static partial class AgentPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Explaining line {CarrierBookingReference} of Carrier invoice {InvoiceNumber} failed")]
     public static partial void ExplainCrashed(ILogger logger, Exception exception, string carrierBookingReference, string invoiceNumber);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Explaining Carrier invoice {InvoiceNumber} failed with {FailureCode}")]
+    public static partial void ExplainInvoiceFailed(ILogger logger, string invoiceNumber, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Explaining Carrier invoice {InvoiceNumber} failed")]
+    public static partial void ExplainInvoiceCrashed(ILogger logger, Exception exception, string invoiceNumber);
 }

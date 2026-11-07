@@ -51,15 +51,16 @@ public sealed class FinanceMatchingServerTests : IAsyncLifetime
             .Last(keys => keys.TryGetValue("outcome", out var value) && Equals(value, outcome));
 
     [Fact]
-    public async Task ToolsList_IsExactlyTheOneReadToolOfTheContractFile()
+    public async Task ToolsList_IsExactlyTheReadToolsOfTheContractFile()
     {
         using var client = _factory.AgentClient(_factory.FinanceToken());
 
         using var response = await Post(client, Rpc("tools/list"));
 
         var tools = (await BodyAsync(response))["result"]!["tools"]!.AsArray();
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_invoice_line");
-        tools.Single()!["inputSchema"]!["required"]!.AsArray().Select(name => name!.GetValue<string>()).Should().Equal("carrierId", "invoiceNumber", "carrierBookingReference");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_invoice_line", "get_invoice_summary");
+        tools[0]!["inputSchema"]!["required"]!.AsArray().Select(name => name!.GetValue<string>()).Should().Equal("carrierId", "invoiceNumber", "carrierBookingReference");
+        tools[1]!["inputSchema"]!["required"]!.AsArray().Select(name => name!.GetValue<string>()).Should().Equal("carrierId", "invoiceNumber");
     }
 
     [Fact]

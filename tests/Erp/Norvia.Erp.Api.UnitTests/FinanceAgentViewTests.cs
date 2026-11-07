@@ -142,6 +142,33 @@ public sealed class FinanceAgentViewTests
     }
 
     [Fact]
+    public async Task GetInvoiceSummary_AnInvoiceItFinds_IsOk()
+    {
+        var view = new AgentInvoiceSummaryView("CAR-0001", "Van Dijk", "VDT-1", new DateOnly(2026, 10, 19), DateTimeOffset.UnixEpoch, "Received", 80m, "EUR", 0m, 1, 1, 0, []);
+        var mediator = Substitute.For<IMediator>();
+#pragma warning disable CA2012 // NSubstitute configures the call by reading its return value, which is never consumed.
+        mediator.Send(new GetAgentInvoiceSummaryQuery(new CarrierId("CAR-0001"), "VDT-1"), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result<AgentInvoiceSummaryView>.Success(view)));
+#pragma warning restore CA2012
+
+        var result = await FinanceAgentEndpoints.GetInvoiceSummaryAsync("CAR-0001", "VDT-1", mediator, CancellationToken.None);
+
+        result.Result.Should().BeOfType<Ok<AgentInvoiceSummaryView>>().Which.Value.Should().Be(view);
+    }
+
+    [Fact]
+    public async Task GetInvoiceSummary_AnInvoiceItDoesNotFind_IsANotFoundProblem()
+    {
+        var mediator = Substitute.For<IMediator>();
+#pragma warning disable CA2012 // NSubstitute configures the call by reading its return value, which is never consumed.
+        mediator.Send(Arg.Any<GetAgentInvoiceSummaryQuery>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result<AgentInvoiceSummaryView>.NotFound()));
+#pragma warning restore CA2012
+
+        var result = await FinanceAgentEndpoints.GetInvoiceSummaryAsync("CAR-0001", "NOPE", mediator, CancellationToken.None);
+
+        result.Result.Should().BeOfType<ProblemHttpResult>().Which.StatusCode.Should().Be(404);
+    }
+
+    [Fact]
     public async Task Invoke_ARead_IsTaggedWithTheAgentFromTheTokenAndTheToolFromTheServer_AndSucceeded()
     {
         var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);

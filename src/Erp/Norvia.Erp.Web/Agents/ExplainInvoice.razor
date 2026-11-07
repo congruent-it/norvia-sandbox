@@ -1,0 +1,105 @@
+@using Ardalis.Result
+@using Microsoft.Extensions.Options
+@using Norvia.Agents
+@using Norvia.Erp.Application.Agents
+@using Norvia.Erp.Application.Agents.Explain
+@using Norvia.Erp.Domain.Carriers
+@inject IOptions<AgentsOptions> Agents
+@inject IExplainRequests Requests
+@inject ILogger<ExplainInvoice> Logger
+@implements IDisposable
+
+@* One fixed question about one whole Carrier invoice that has lines To decide: a summary, the lines grouped by cause and which of them may
+   still resolve by themselves. Information only: no action is offered here. Off unless Agents:Enabled (ADR 0040). *@
+@if (Agents.Value.Enabled)
+{
+    <div data-explain="invoice" class="mb-4">
+        <FluentButton Appearance="Appearance.Neutral" Disabled="_asking" OnClick="ExplainAsync" aria-label="@($"Explain invoice {InvoiceNumber}")">Explain this invoice</FluentButton>
+
+        @if (_asking)
+        {
+            <div role="status" class="mt-3">
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <FluentProgressRing />
+                    <span>The assistant is reading…</span>
+                </FluentStack>
+            </div>
+        }
+        else if (_unavailable)
+        {
+            <div role="alert" class="mt-3">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+            </div>
+        }
+        else if (_suggestion is { } suggestion)
+        {
+            @* Text only: what the assistant wrote is data, so it is encoded, never rendered as markup. *@
+            <div class="mt-3" data-testid="@($"invoice-explanation-{InvoiceNumber}")">
+                <h4>Summary</h4>
+                <p>@suggestion.Cause</p>
+                <h4>Lines to decide, by cause</h4>
+                <ul>
+                    @foreach (var evidence in suggestion.Evidence)
+                    {
+                        <li>@evidence.Claim <cite class="text-muted">[@evidence.ResultId, @evidence.ToolName]</cite></li>
+                    }
+                </ul>
+                <h4>May still resolve by themselves</h4>
+                <p>@suggestion.SuggestedAction</p>
+                <p class="text-muted">Confidence: @suggestion.Confidence.ToString().ToLowerInvariant(). The assistant can be wrong; you decide.</p>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _asking;
+    private bool _unavailable;
+    private Suggestion? _suggestion;
+    private readonly CancellationTokenSource _lifetime = new();
+
+    [Parameter, EditorRequired]
+    public string CarrierId { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string InvoiceNumber { get; set; } = "";
+
+    private async Task ExplainAsync()
+    {
+        _asking = true;
+        _unavailable = false;
+        _suggestion = null;
+        try
+        {
+            var result = await Requests.ExplainAsync(new ExplainInvoiceQuery(new CarrierId(CarrierId), InvoiceNumber), _lifetime.Token);
+            if (result.IsSuccess)
+            {
+                _suggestion = result.Value;
+            }
+            else
+            {
+                _unavailable = true;
+                AgentPageLog.ExplainInvoiceFailed(Logger, InvoiceNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _unavailable = true;
+            AgentPageLog.ExplainInvoiceCrashed(Logger, exception, InvoiceNumber);
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

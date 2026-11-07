@@ -8,4 +8,6 @@ namespace Norvia.Erp.Web.Agents;
 public interface IExplainRequests
 {
     Task<Result<Suggestion>> ExplainAsync(ExplainInvoiceLineQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> ExplainAsync(ExplainInvoiceQuery query, CancellationToken cancellationToken);
 }
