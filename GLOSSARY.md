@@ -373,6 +373,10 @@ _Avoid_: reconciliation, 3-way match
 How far, in EUR, a Carrier invoice line's amount may be from its Carrier cost's total and still be Matched. An ERP setting, €0 by default: the amount must equal the Carrier cost to the cent.
 _Avoid_: margin, threshold
 
+**Likely candidate**:
+An Open Carrier cost of the same Carrier that an Unknown booking line may be about, offered by the ERP in the Carrier invoice matching agent's view. The ERP ranks the candidates (at most three) on how alike the references are, the amount and the delivery date, never the model, and the Agent describes one only as a likely candidate, never as a certainty: the Carrier may have mangled its reference, or the Carrier cost for the line may not have arrived yet.
+_Avoid_: match (that is the result of Matching), suggested match
+
 ## Systems
 
 **TMS**:
@@ -485,11 +489,11 @@ One question put to an Agent, with its tool calls and its answer, identified by 
 _Avoid_: chat, session, conversation (that is Foundry's own record of a run)
 
 **Agent view**:
-An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`), and so is the Estate health check's; the TMS API's is `/v1/agent/customer-service`, the Customer service agent's view of a Rejected booking, which leaves out the Consignee's name, address and contacts and every file's contents; an MCP server exposes each operation as a tool (ADR 0040).
+An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`), and so is the Estate health check's; the ERP API's is `/v1/agent/finance`, the Carrier invoice matching agent's view of a Carrier invoice line, which leaves out the Planner's remark of a Spot price (the cost's source is a label) and every Shipper and Consignee detail; the TMS API's is `/v1/agent/customer-service`, the Customer service agent's view of a Rejected booking, which leaves out the Consignee's name, address and contacts and every file's contents; an MCP server exposes each operation as a tool (ADR 0040).
 _Avoid_: agent endpoint, agent database
 
 **Explain**:
-The button on a Message trail that has a failure, on a failed run in the Failed runs panel, and on a dead-lettered message in the Dead-letter queues panel. It puts one fixed question about that item to the Integration operations agent and shows the Suggestion it answers with: cause, evidence, suggested action and confidence. The Dead-letter queues panel's "what needs attention" button is a fixed question too, about all the queues at once. The Integration operator decides what to do.
+The button on a Message trail that has a failure, on a failed run in the Failed runs panel, and on a dead-lettered message in the Dead-letter queues panel. It puts one fixed question about that item to the Integration operations agent and shows the Suggestion it answers with: cause, evidence, suggested action and confidence. The Dead-letter queues panel's "what needs attention" button is a fixed question too, about all the queues at once. The Integration operator decides what to do. In the ERP UI it is also the button on a Carrier invoice line that is To decide, in Finance's "Carrier invoices to decide": it puts one fixed question about the line to the Carrier invoice matching agent, and shows why the line did not match, with cited evidence and whether it may still resolve (an Unknown booking line is matched again by itself when its Carrier cost arrives). Finance decides what to do.
 
 **Estate health check**:
 A run of the checklist over the estate's configuration, by the Integration operator on the Estate health check page (the app `src/HealthCheck`). It gives the Findings of the Checks that failed, and the Estate health-check agent narrates them: it puts them in order and explains their business impact in plain language. It changes nothing and stores nothing; the result lives in the page session. Locally the configuration is a snapshot kept in the repo, so the Findings are the snapshot's and not the running estate's.

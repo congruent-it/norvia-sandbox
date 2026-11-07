@@ -18,7 +18,7 @@ internal sealed class FakeToolSource(IReadOnlyDictionary<string, Func<string>> a
 
     private static AIFunction Function(string name, Func<string> answer) =>
         AIFunctionFactory.Create(
-            (string? correlationId = null, string? logicApp = null, string? workflow = null, string? runId = null, string? entity = null, string? id = null, string? transportOrderNumber = null, string? shipmentNumber = null) => answer(),
+            (string? correlationId = null, string? logicApp = null, string? workflow = null, string? runId = null, string? entity = null, string? id = null, string? transportOrderNumber = null, string? shipmentNumber = null, string? carrierId = null, string? invoiceNumber = null, string? carrierBookingReference = null) => answer(),
             new AIFunctionFactoryOptions { Name = name, Description = name });
 
     private sealed class Session(FakeToolSource source, IReadOnlyList<AIFunction> tools) : IToolSession

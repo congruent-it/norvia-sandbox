@@ -3,13 +3,16 @@ using Bunit.TestDoubles;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Norvia.Erp.Application;
+using Norvia.Erp.Application.Agents;
 using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.CreditNotes;
 using Norvia.Erp.Application.Operators;
 using Norvia.Erp.Application.ShipperInvoices;
 using Norvia.Erp.Application.ShipperInvoices.Issue;
+using Norvia.Erp.Web.Agents;
 using Norvia.Erp.Web.CarrierInvoices;
 using Norvia.Erp.Web.ShipperInvoices;
 
@@ -24,6 +27,8 @@ public abstract class ErpWebContext : BunitContext
         Services.AddFluentUIComponents();
         Services.AddSingleton(Mediator);
         Services.AddSingleton(Retrier);
+        Services.AddSingleton(Explain);
+        Services.AddSingleton(Options.Create(AgentSettings));
         Services.AddSingleton(new ErpActivities(HostEnvironment));
         Services.AddScoped<InvoiceNowAction>();
         Services.AddScoped<SendAgainAction>();
@@ -50,6 +55,11 @@ public abstract class ErpWebContext : BunitContext
     }
 
     protected BunitAuthorizationContext User { get; }
+
+    /// <summary>What the Explain button asks of the application. The Agents are off until a test turns them on.</summary>
+    protected IExplainRequests Explain { get; } = Substitute.For<IExplainRequests>();
+
+    protected AgentsOptions AgentSettings { get; } = new();
 
     /// <summary>Runs what it is given on the substituted mediator, as the real one does once and without a conflict.</summary>
     protected IConflictRetrier Retrier { get; } = Substitute.For<IConflictRetrier>();

@@ -22,6 +22,9 @@ builder.Services.AddOptions<AgentMcpOptions>().BindConfiguration(AgentMcpOptions
     .Validate(
         options => options.CustomerServiceReply is null || (options.CustomerServiceReply.Api is { IsAbsoluteUri: true } && options.CustomerServiceReply.Tokens.IsComplete && options.CustomerServiceReply.ApiTokens.IsComplete),
         "AgentMcp:CustomerServiceReply needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
+    .Validate(
+        options => options.FinanceMatching is null || (options.FinanceMatching.Api is { IsAbsoluteUri: true } && options.FinanceMatching.Tokens.IsComplete && options.FinanceMatching.ApiTokens.IsComplete),
+        "AgentMcp:FinanceMatching needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AgentRateLimit>();
@@ -30,6 +33,7 @@ builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("integrat
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("health-check.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service-reply.tools.json")));
+builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("finance-matching.tools.json")));
 builder.Services.AddSingleton<AgentServers>();
 
 // A short wait and no retry: an Agent is never on a critical path, and the standard resilience handler would retry (ADR 0040).

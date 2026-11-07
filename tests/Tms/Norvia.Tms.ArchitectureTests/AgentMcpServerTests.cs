@@ -314,7 +314,10 @@ public sealed class AgentMcpServerTests
     }
 
     // Servers the local MCP stand-in serves before their API Management MCP server is built. Each leaves this list in the issue that adds the Bicep.
-    private static readonly Dictionary<string, string> NotYetInBicep = [];
+    private static readonly Dictionary<string, string> NotYetInBicep = new()
+    {
+        ["finance-matching.tools.json"] = "#470: the Carrier invoice matching agent in Azure",
+    };
 
     [Theory]
     [MemberData(nameof(ContractFiles))]

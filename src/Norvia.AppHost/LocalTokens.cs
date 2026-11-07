@@ -23,6 +23,7 @@ namespace Norvia.AppHost;
 /// The local Partner API trusts the same key for the Personas' tokens, which the Partner portal signs itself (ADR 0023).
 /// The Estate health check signs the Estate health-check agent's token itself, as its agent identity holding the call role, for the same stand-in, which then signs its own token for the app's agent API as that identity.
 /// The TMS UI signs the Customer service agent's token itself, as its agent identity holding the one read role of the TMS API's agent view, for the same stand-in, which then signs its own token for the TMS API as that identity.
+/// The ERP UI signs the Carrier invoice matching agent's token itself, as its agent identity holding the one read role of the ERP API's Finance agent view, for the same stand-in, which then signs its own token for the ERP API as that identity.
 /// The Integration console signs the Integration operations agent's token itself, as its agent identity holding the agent read role, for the local MCP stand-in; the stand-in then signs its own token for the console's agent API as that identity (ADR 0041).
 /// </summary>
 public static class LocalTokens
@@ -91,6 +92,15 @@ public static class LocalTokens
 
     /// <summary>The app role the Customer service reply agent holds on the TMS API's reply agent view.</summary>
     public const string CustomerServiceReplyAgentReadRole = "TransportOrders.CustomerServiceReplyAgent.Read";
+
+    /// <summary>The Carrier invoice matching agent's view audience, which its token is for (the MCP stand-in checks it, as API Management does). Its own, so no other Agent's token is for it.</summary>
+    public const string FinanceAgentAudience = "api://norvia-finance-matching-agent";
+
+    /// <summary>The Carrier invoice matching agent's local identity, which stands in for its Entra agent identity. It holds only the one read role on the ERP API.</summary>
+    public const string FinanceAgentClientId = "norvia-local-agent-finance-matching";
+
+    /// <summary>The app role the Carrier invoice matching agent holds on the ERP API's Finance agent view.</summary>
+    public const string FinanceAgentReadRole = "CarrierInvoices.FinanceAgent.Read";
 
     /// <summary>The app role the Estate health-check agent holds on the health-check API.</summary>
     public const string HealthCheckAgentReadRole = "HealthCheck.Agent.Read";

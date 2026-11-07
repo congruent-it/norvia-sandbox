@@ -5,6 +5,7 @@ using Mediator;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Norvia.Erp.Api.Agents;
 using Norvia.Erp.Api.BillableLines;
 using Norvia.Erp.Api.CarrierCosts;
 using Norvia.Erp.Api.CarrierInvoices;
@@ -21,6 +22,7 @@ using Norvia.Erp.Application.CreditNotes.ReportSent;
 using Norvia.Erp.Application.ShipperInvoices.ReportNotDelivered;
 using Norvia.Erp.Application.ShipperInvoices.ReportSent;
 using Norvia.Erp.Infrastructure;
+using Norvia.Erp.Infrastructure.Agents;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,6 +40,8 @@ builder.Services.AddScoped<IPipelineBehavior<ReportCreditNoteNotDeliveredCommand
 
 // The ERP API records and answers; a Not delivered report writes its event to the outbox, and the ERP UI's process publishes it, so the API runs no outbox publisher. The ERP UI loads the master data it checks Shippers against.
 builder.AddErpInfrastructure();
+// The API serves the Finance agent's view; it never asks an Agent, so its port stays the disabled one (the ERP UI turns it on).
+builder.AddAgentClient();
 builder.AddErpReset();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.
@@ -126,6 +130,7 @@ app.MapCarrierCosts();
 app.MapCarrierInvoices();
 app.MapShipperInvoices();
 app.MapCreditNotes();
+app.MapFinanceAgent();
 app.MapReset();
 
 await app.RunAsync();

@@ -933,6 +933,7 @@ else
             .WaitFor(integrationConsole)
             .WaitFor(healthCheck)
             .WaitFor(tmsApi)
+            .WaitFor(erpApi)
             .WithHttpHealthCheck("/health")
             .WithEnvironment("AgentMcp__Tokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__Tokens__Audience", LocalTokens.AgentAudience)
@@ -957,7 +958,22 @@ else
             .WithEnvironment("AgentMcp__CustomerServiceReply__Tokens__Audience", LocalTokens.CustomerServiceReplyAgentAudience)
             .WithEnvironment("AgentMcp__CustomerServiceReply__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/customer-service-reply"))
             .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Issuer", LocalTokens.Issuer)
-            .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Audience", LocalTokens.TmsAudience);
+            .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Audience", LocalTokens.TmsAudience)
+            // The fifth server: the Carrier invoice matching agent's, at /mcp/finance-matching. It calls the ERP API's Finance agent view as the
+            // Agent's identity, with a token for the ERP API's audience.
+            .WithEnvironment("AgentMcp__FinanceMatching__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__FinanceMatching__Tokens__Audience", LocalTokens.FinanceAgentAudience)
+            .WithEnvironment("AgentMcp__FinanceMatching__Api", ReferenceExpression.Create($"{erpApi.GetEndpoint("http")}/v1/agent/finance"))
+            .WithEnvironment("AgentMcp__FinanceMatching__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__FinanceMatching__ApiTokens__Audience", LocalTokens.ErpAudience);
+        // The ERP UI runs the Carrier invoice matching agent in process against the stand-in, signing the Agent's token itself with the local key.
+        erpWeb
+            .WithEnvironment("Agents__Enabled", "true")
+            .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/finance-matching"))
+            .WithEnvironment("Agents__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Tokens__Audience", LocalTokens.FinanceAgentAudience)
+            .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.FinanceAgentClientId)
+            .WithEnvironment("Agents__Tokens__Role", LocalTokens.FinanceAgentReadRole);
         // The TMS API's agent view takes the stand-in's token, which is for the TMS API's audience locally, signed with the same key.
         tmsApi
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
@@ -997,7 +1013,7 @@ else
         // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).
         if (!string.IsNullOrEmpty(builder.Configuration["Agents:Model:Endpoint"]))
         {
-            foreach (var host in new[] { integrationConsole, healthCheck, tmsWeb })
+            foreach (var host in new[] { integrationConsole, healthCheck, tmsWeb, erpWeb })
             {
                 host.WithEnvironment("Agents__Model__Endpoint", builder.Configuration["Agents:Model:Endpoint"]!)
                     .WithEnvironment("Agents__Model__Deployment", builder.Configuration["Agents:Model:Deployment"] ?? string.Empty);
@@ -1014,6 +1030,9 @@ else
             (agentMcp.Resource, "AgentMcp__CustomerService__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerServiceReply__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerServiceReply__ApiTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__FinanceMatching__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__FinanceMatching__ApiTokens__SigningKey"),
+            (erpWeb.Resource, "Agents__Tokens__SigningKey"),
             (tmsWeb.Resource, "Agents__ReplyTokens__SigningKey"),
             (tmsWeb.Resource, "Agents__Tokens__SigningKey"),
             (tmsApi.Resource, "Agents__Api__SigningKey"),

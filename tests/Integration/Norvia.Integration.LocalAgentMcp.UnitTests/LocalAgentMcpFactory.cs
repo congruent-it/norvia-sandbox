@@ -34,6 +34,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string CustomerServiceReplyRole = "TransportOrders.CustomerServiceReplyAgent.Read";
     public const string CustomerServiceReplyAudience = "api://norvia-customer-service-reply-agent";
     public const string TmsAudience = "api://norvia-tms";
+    public const string FinanceAgentId = "norvia-local-agent-finance-matching";
+    public const string FinanceRole = "CarrierInvoices.FinanceAgent.Read";
+    public const string FinanceAudience = "api://norvia-finance-matching-agent";
+    public const string ErpAudience = "api://norvia-erp";
 
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
@@ -48,6 +52,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
 
     /// <summary>Whether the stand-in is configured to serve the Customer service agent's server, as the AppHost configures it.</summary>
     public bool ServesCustomerService { get; set; } = true;
+
+    /// <summary>Whether the stand-in is configured to serve the Carrier invoice matching agent's server, as the AppHost configures it.</summary>
+    public bool ServesFinanceMatching { get; set; } = true;
 
     public FakeLogCollector Logs => Services.GetRequiredService<FakeLogCollector>();
 
@@ -97,6 +104,23 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
                 ["AgentMcp:CustomerService:ApiTokens:Issuer"] = Issuer,
                 ["AgentMcp:CustomerService:ApiTokens:Audience"] = TmsAudience,
                 ["AgentMcp:CustomerService:ApiTokens:SigningKey"] = signingKey,
+            })
+            {
+                builder.UseSetting(name, value);
+            }
+        }
+
+        if (ServesFinanceMatching)
+        {
+            foreach (var (name, value) in new Dictionary<string, string>
+            {
+                ["AgentMcp:FinanceMatching:Tokens:Issuer"] = Issuer,
+                ["AgentMcp:FinanceMatching:Tokens:Audience"] = FinanceAudience,
+                ["AgentMcp:FinanceMatching:Tokens:SigningKey"] = signingKey,
+                ["AgentMcp:FinanceMatching:Api"] = "http://erp-api/v1/agent/finance",
+                ["AgentMcp:FinanceMatching:ApiTokens:Issuer"] = Issuer,
+                ["AgentMcp:FinanceMatching:ApiTokens:Audience"] = ErpAudience,
+                ["AgentMcp:FinanceMatching:ApiTokens:SigningKey"] = signingKey,
             })
             {
                 builder.UseSetting(name, value);
@@ -155,6 +179,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     /// <summary>The Customer service agent's token as Entra issues it to its agent identity.</summary>
     public string CustomerServiceToken(string? azp = CustomerServiceAgentId, string[]? roles = null) =>
         AgentToken(azp, roles ?? [CustomerServiceRole], CustomerServiceAudience);
+
+    /// <summary>The Carrier invoice matching agent's token as Entra issues it to its agent identity.</summary>
+    public string FinanceToken(string? azp = FinanceAgentId, string[]? roles = null) =>
+        AgentToken(azp, roles ?? [FinanceRole], FinanceAudience);
 
     /// <summary>The Customer service reply agent's token as Entra issues it to its agent identity.</summary>
     public string CustomerServiceReplyToken(string? azp = CustomerServiceReplyAgentId, string[]? roles = null, string? audience = null) =>

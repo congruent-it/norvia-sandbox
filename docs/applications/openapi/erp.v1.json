@@ -754,6 +754,53 @@
         }
       }
     },
+    "/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}": {
+      "get": {
+        "tags": [
+          "FinanceAgent"
+        ],
+        "summary": "Read a Carrier invoice line as the Carrier invoice matching agent: its result, the amounts, the tolerance, and the candidates or the earlier line.",
+        "operationId": "AgentGetInvoiceLine",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "carrierBookingReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInvoiceLineView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -820,6 +867,232 @@
               "null",
               "string"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentCandidateView": {
+        "required": [
+          "rank",
+          "carrierBookingNumber",
+          "carrierBookingReference",
+          "total",
+          "difference",
+          "source",
+          "deliveredOn"
+        ],
+        "type": "object",
+        "properties": {
+          "rank": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "carrierBookingNumber": {
+            "type": "string"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "difference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "source": {
+            "type": "string"
+          },
+          "deliveredOn": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentCarrierCostView": {
+        "required": [
+          "carrierBookingNumber",
+          "carrierBookingReference",
+          "total",
+          "source",
+          "deliveredOn",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierBookingNumber": {
+            "type": "string"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "source": {
+            "type": "string"
+          },
+          "deliveredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentEarlierLineView": {
+        "required": [
+          "invoiceNumber",
+          "invoiceDate",
+          "carrierBookingReference",
+          "status",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentInvoiceLineView": {
+        "required": [
+          "carrierId",
+          "carrierName",
+          "invoiceNumber",
+          "invoiceDate",
+          "carrierBookingReference",
+          "result",
+          "status",
+          "invoicedAmount",
+          "currency",
+          "tolerance",
+          "difference",
+          "carrierCost",
+          "invoicedBy",
+          "candidates",
+          "resolvesAutomatically"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "carrierName": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "invoicedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "tolerance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "difference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "carrierCost": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentCarrierCostView"
+              }
+            ]
+          },
+          "invoicedBy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentEarlierLineView"
+              }
+            ]
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentCandidateView"
+            }
+          },
+          "resolvesAutomatically": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -2281,6 +2554,9 @@
     },
     {
       "name": "CreditNotes"
+    },
+    {
+      "name": "FinanceAgent"
     },
     {
       "name": "Reset"

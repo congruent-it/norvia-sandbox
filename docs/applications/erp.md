@@ -24,9 +24,9 @@ Every consumer reaches the ERP API **directly**, with a token for its own identi
 | **Carrier invoice outcome Logic App** | `carrier-invoice-outcome`, `CarrierInvoices.Report` | [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api) | No: reads the `carrier-invoice-outcome` subscription of `invoicing-events`, tells the Carrier, then reports direct |
 | **Simulator** | `simulator`, `ShipperInvoices.Manage`, `CarrierInvoices.Manage` and `Estate.Reset`. Plays Finance ([ADR 0039](../adr/0039-the-simulator-books-only-through-the-estates-real-doors.md)) | [E1](../processes/erp/e1-invoicing.md#erp-api), [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-api), Reset estate | No: direct |
 | **ERP UI** (`erp-web`) | Signs a `Finance` user in (see [identity-and-access.md](../architecture/identity-and-access.md)); holds no app role on the API | [E1](../processes/erp/e1-invoicing.md#erp-ui), [E2](../processes/erp/e2-carrier-invoice-matching.md#erp-ui) | Not a caller: it runs the same commands in process |
-| **Agents (planned)** | `CarrierInvoices.FinanceAgent.Read` for the Carrier invoice matching agent, not built | None yet | Yes, through API Management's MCP server, read-only ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) |
+| **Carrier invoice matching agent** | `CarrierInvoices.FinanceAgent.Read`, the one role of its identity (locally `norvia-local-agent-finance-matching`) | [E2](../processes/erp/e2-carrier-invoice-matching.md#explain-a-line-that-is-to-decide) | Locally through the MCP stand-in's `finance-matching` server; in Azure through API Management's MCP server, read-only (#470, [ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) |
 
-No Agent calls the ERP today, so no endpoint below lists one. [c4.md](../architecture/c4.md#l2-containers) draws the same callers.
+The Carrier invoice matching agent calls the ERP through the one read endpoint under [Agent view](#agent-view) below. [c4.md](../architecture/c4.md#l2-containers) draws the same callers.
 
 ### Billable lines
 
@@ -50,6 +50,12 @@ No Agent calls the ERP today, so no endpoint below lists one. [c4.md](../archite
 | Method and route | Purpose | App role | Request and response | Consumers |
 |---|---|---|---|---|
 | `POST /v1/carrier-costs` | Record the Carrier cost a `CarrierCostIncurred` carries, as Open. Publishes nothing. Refusals: `CarrierNotFound` (422), `CarrierCostConflict` (409), `CarrierCostWithoutChargeLines` and `CarrierCostTotalMismatch` (400). | `CarrierCosts.Record` | `CarrierCostIncurredRequest` → `RecordCarrierCostResult` (201, or 200 for a repeat) | Carrier cost Logic App (P9, E2) |
+
+### Agent view
+
+| Method and route | Purpose | App role | Request and response | Consumers |
+|---|---|---|---|---|
+| `GET /v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}` | The Carrier invoice matching agent's view of a Carrier invoice line ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)): its result, the invoiced amount, the agreed Carrier cost total and the difference, the Matching tolerance, the cost's source as a label (`Rate Card version N` or `Spot`, never the Planner's remark), for a Duplicate the earlier invoice and line that Invoiced the Carrier cost, and for an Unknown booking up to three likely candidate Open Carrier costs of the same Carrier, ranked by the ERP on reference similarity, amount and delivery date. An allowlist of fields: a new field stays out until someone adds it; no Shipper or Consignee data, no line description and no file contents. Read only. `CarrierInvoiceNotFound` and `CarrierInvoiceLineNotFound` answer 404. | `CarrierInvoices.FinanceAgent.Read` | → `AgentInvoiceLineView` (`X-Correlation-ID`, `X-Tool-Name`) | The Carrier invoice matching agent, through the MCP stand-in locally |
 
 ### Carrier invoices
 
