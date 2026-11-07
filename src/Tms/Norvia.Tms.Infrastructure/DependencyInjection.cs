@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.Tms.Application;
 using Norvia.Tms.Application.Billing;
+using Norvia.Tms.Application.Billing.Release;
 using Norvia.Tms.Application.CarrierBookings;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.Exceptions;
@@ -84,6 +85,7 @@ public static class DependencyInjection
             .ValidateDataAnnotations().ValidateOnStart();
         builder.Services.AddScoped<ExceptionCauses>();
         builder.Services.AddScoped<BillingCheck>();
+        builder.Services.AddScoped<ReleaseEligibilityCheck>();
         builder.Services.AddSingleton(services => new TrackingEventRules(services.GetRequiredService<IOptions<TrackingEventOptions>>().Value.ClockSkew));
         builder.Services.AddOptions<ProofOfDeliveryOptions>().BindConfiguration(ProofOfDeliveryOptions.SectionName)
             .ValidateDataAnnotations().ValidateOnStart();

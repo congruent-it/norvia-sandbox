@@ -85,14 +85,14 @@ public sealed class NotYetBillableTests : TmsWebContext
     public void Release_AsksForARemark_AndSendsItAsTheCustomerServiceRemark()
     {
         var page = RenderWithOneToRelease();
-        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns(new ReleaseWithoutProofOfDeliveryAnswer.Released(BillingState.Billable));
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
         page.WaitForElement("section[aria-label='Release TO-0000043 without Proof of delivery'] fluent-text-area").Input("  CMR by post ");
         Panel(page).QuerySelector("form")!.Submit();
 
-        page.WaitForAssertion(() => Commands.Received(1).ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Commands.Received(1).ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("TO-0000043 is released without a Proof of delivery and is Billable now."));
         page.FindAll("section[aria-label^='Release']").Should().BeEmpty();
     }
@@ -101,7 +101,7 @@ public sealed class NotYetBillableTests : TmsWebContext
     public void Release_ThatLeavesAnotherReason_SaysTheOrderIsNotBillableYet()
     {
         var page = RenderWithOneToRelease();
-        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns(new ReleaseWithoutProofOfDeliveryAnswer.Released(BillingState.NotYetBillable));
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
@@ -123,7 +123,7 @@ public sealed class NotYetBillableTests : TmsWebContext
         Panel(page).QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => Panel(page).QuerySelector(".validation-message")!.TextContent.Should().Contain("Give a remark"));
-        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -136,14 +136,14 @@ public sealed class NotYetBillableTests : TmsWebContext
         Panel(page).QuerySelector("form")!.Submit();
 
         page.WaitForAssertion(() => Panel(page).QuerySelector(".validation-message")!.TextContent.Should().Contain($"at most {TransportOrder.MaxReleaseRemarkLength} characters"));
-        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void Release_TheTmsRefuses_KeepsTheFormOpen_WithTheReason()
     {
         var page = RenderWithOneToRelease();
-        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns(new ReleaseWithoutProofOfDeliveryAnswer.Refused("It was released already."));
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
@@ -158,7 +158,7 @@ public sealed class NotYetBillableTests : TmsWebContext
     public void Release_WhenTheTmsCantBeReached_KeepsTheFormOpen_AndSaysToTryAgain()
     {
         var page = RenderWithOneToRelease();
-        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<CancellationToken>())
+        Commands.ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns<ReleaseWithoutProofOfDeliveryAnswer>(_ => throw new HttpRequestException("The TMS API didn't answer."));
 
         page.Find("fluent-button[aria-label='Release TO-0000043 without Proof of delivery']").Click();
@@ -178,7 +178,7 @@ public sealed class NotYetBillableTests : TmsWebContext
         Click(Panel(page), "Cancel");
 
         page.WaitForAssertion(() => page.FindAll("section[aria-label^='Release']").Should().BeEmpty());
-        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Commands.DidNotReceive().ReleaseWithoutProofOfDeliveryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>());
     }
 
     private IRenderedComponent<NotYetBillable> RenderWithOneToRelease()

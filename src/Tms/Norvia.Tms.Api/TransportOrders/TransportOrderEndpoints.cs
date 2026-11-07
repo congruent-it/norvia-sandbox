@@ -3,6 +3,7 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Agents;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.Billing.ListNotYetBillable;
@@ -284,12 +285,23 @@ public static class TransportOrderEndpoints
             errors[nameof(ReleaseWithoutProofOfDeliveryRequest.ReleasedBy)] = [$"A name is at most {TransportOrder.MaxReleasedByLength} characters."];
         }
 
+        // The Agent's name and run come together or not at all, and are short: they are only for the trace.
+        if (string.IsNullOrWhiteSpace(request.AgentName) != string.IsNullOrWhiteSpace(request.AgentRunId))
+        {
+            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.AgentRunId)] = ["The Agent and its run ID come together."];
+        }
+        else if (request.AgentName?.Length > 100 || request.AgentRunId?.Length > 200)
+        {
+            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.AgentRunId)] = ["The Agent's name is at most 100 characters and its run ID 200."];
+        }
+
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var command = new ReleaseWithoutProofOfDeliveryCommand(transportOrderNumber, request.Remark!, request.ReleasedBy!, CorrelationId.New().Value);
+        var actingOn = string.IsNullOrWhiteSpace(request.AgentName) ? null : new AgentRun(request.AgentName.Trim(), request.AgentRunId!.Trim());
+        var command = new ReleaseWithoutProofOfDeliveryCommand(transportOrderNumber, request.Remark!, request.ReleasedBy!, CorrelationId.New().Value, actingOn);
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)

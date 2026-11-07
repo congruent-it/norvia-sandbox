@@ -187,6 +187,27 @@ public sealed class TransportOrderBillingTests
     }
 
     [Fact]
+    public void ReleaseRefusal_DeliveredOrderNotReleasedYet_IsNullAndChangesNothing()
+    {
+        var order = PlannedRated();
+
+        order.ReleaseRefusal(DeliveredAt).Should().BeNull();
+
+        order.ReleasedWithoutProofOfDelivery.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ReleaseRefusal_IsTheRuleTheReleaseApplies_ForNotDeliveredAndAlreadyReleased()
+    {
+        var order = PlannedRated();
+        order.ReleaseRefusal(null)!.Code.Should().Be(order.ReleaseWithoutProofOfDelivery(null, "CMR", "Jan", BillableAt)!.Code).And.Be(BillingRefusalCode.ShipmentNotDelivered);
+
+        order.ReleaseWithoutProofOfDelivery(DeliveredAt, "CMR", "Jan", BillableAt);
+
+        order.ReleaseRefusal(DeliveredAt)!.Code.Should().Be(BillingRefusalCode.AlreadyReleased);
+    }
+
+    [Fact]
     public void TryBecomeBillable_ReleasedWithoutProofOfDelivery_BecomesBillable()
     {
         var order = PlannedRated();

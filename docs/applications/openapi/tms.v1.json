@@ -3064,6 +3064,37 @@
         }
       }
     },
+    "/v1/agent/customer-service/transport-orders/{transportOrderNumber}/release-eligibility": {
+      "get": {
+        "tags": [
+          "CustomerServiceAgent"
+        ],
+        "summary": "Read whether a Transport Order may be released without a Proof of delivery, as the Customer service agent: the TMS's answer and, if not, every reason that blocks it.",
+        "operationId": "AgentGetReleaseEligibility",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentReleaseEligibilityView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -3753,6 +3784,49 @@
           },
           "field": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentReleaseEligibilityView": {
+        "required": [
+          "transportOrderNumber",
+          "eligible",
+          "shipmentNumber",
+          "deliveredAt",
+          "asOf",
+          "blockingReasons"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "shipmentNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deliveredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "blockingReasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false
@@ -6769,6 +6843,18 @@
             ]
           },
           "releasedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentRunId": {
             "type": [
               "null",
               "string"

@@ -186,6 +186,8 @@ public sealed class AgentRunnerTests
     [InlineData("discard", SuggestedActionKind.Discard)]
     [InlineData("fix-the-cause-first", SuggestedActionKind.FixTheCauseFirst)]
     [InlineData("needs-a-person", SuggestedActionKind.NeedsAPerson)]
+    [InlineData("release", SuggestedActionKind.Release)]
+    [InlineData("wait", SuggestedActionKind.Wait)]
     public async Task RunAsync_TheActionOfTheReply_IsTheSuggestionsKind(string wire, SuggestedActionKind expected)
     {
         var reply = GoodReply.Replace("needs-a-person", wire, StringComparison.Ordinal);

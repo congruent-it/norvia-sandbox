@@ -40,6 +40,30 @@ public sealed class TrackReleaseWithoutProofOfDeliveryInLoggingScopeTests : IDis
     }
 
     [Fact]
+    public async Task Handle_ReleaseMadeFromASuggestion_NamesTheAgentAndItsRun()
+    {
+        var released = new ReleaseWithoutProofOfDeliveryResult("TO-0000007", "SH-0000012", BillingState.Billable, "corr-release");
+
+        await _behaviour.Handle(Release with { ActingOn = new Norvia.Agents.AgentRun("customer-service", "run-7") }, (_, _) => ValueTask.FromResult<Result<ReleaseWithoutProofOfDeliveryResult>>(released), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["agentId"] = "customer-service",
+            ["agentRunId"] = "run-7",
+        });
+    }
+
+    [Fact]
+    public async Task Handle_ReleaseMadeOnTheEmployeesOwn_NamesNoAgent()
+    {
+        var released = new ReleaseWithoutProofOfDeliveryResult("TO-0000007", "SH-0000012", BillingState.Billable, "corr-release");
+
+        await _behaviour.Handle(Release, (_, _) => ValueTask.FromResult<Result<ReleaseWithoutProofOfDeliveryResult>>(released), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Keys.Should().NotContain(["agentId", "agentRunId"]);
+    }
+
+    [Fact]
     public async Task Handle_Refused_LogsTheRefusalWithItsFailureCode()
     {
         var refused = BillingRefused.Because<ReleaseWithoutProofOfDeliveryResult>(new BillingRefusal(BillingRefusalCode.AlreadyBillable, "Transport Order TO-0000007 is Billable already."));

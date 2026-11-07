@@ -105,6 +105,7 @@ public sealed class CustomerServiceAgentViewTests
                 "Text", "AddedAt",
                 "ShipmentNumber", "Status", "WithReservations", "ProofsOfDelivery",
                 "Source", "DeliveryTime", "Condition", "IsCurrent", "ReceivedAt", "FileCount",
+                "TransportOrderNumber", "Eligible", "ShipmentNumber", "DeliveredAt", "AsOf", "BlockingReasons",
             ]);
         names.Should().NotContain(name => name.Contains("Consignee", StringComparison.Ordinal) || name.Contains("Street", StringComparison.Ordinal)
             || name.Contains("Phone", StringComparison.Ordinal) || name.Contains("Email", StringComparison.Ordinal) || name.Contains("Contact", StringComparison.Ordinal)

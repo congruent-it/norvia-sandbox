@@ -554,6 +554,18 @@ public sealed class TmsApiClientTests : IDisposable
         JsonNode.DeepEquals(JsonNode.Parse(_tmsApi.RequestBody!), JsonNode.Parse("""{ "remark": "CMR by post", "releasedBy": "Sanne Bakker" }""")).Should().BeTrue();
     }
 
+    [Fact]
+    public async Task ReleaseWithoutProofOfDeliveryAsync_ActingOnASuggestion_NamesTheAgentAndItsRun()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, ReleasedWithoutProof("Billable"));
+
+        await ReleaseWithoutProofOfDeliveryAsync("TO-0000043", "CMR by post", new Norvia.Agents.AgentRun("customer-service", "run-7"));
+
+        JsonNode.DeepEquals(
+            JsonNode.Parse(_tmsApi.RequestBody!),
+            JsonNode.Parse("""{ "remark": "CMR by post", "releasedBy": "Sanne Bakker", "agentName": "customer-service", "agentRunId": "run-7" }""")).Should().BeTrue();
+    }
+
     [Theory]
     [InlineData("Billable", BillingState.Billable)]
     [InlineData("NotYetBillable", BillingState.NotYetBillable)]
@@ -620,8 +632,8 @@ public sealed class TmsApiClientTests : IDisposable
         await release.Should().ThrowAsync<HttpRequestException>();
     }
 
-    private Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string number, string remark) =>
-        _client.ReleaseWithoutProofOfDeliveryAsync(number, remark, Xunit.TestContext.Current.CancellationToken);
+    private Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string number, string remark, Norvia.Agents.AgentRun? actingOn = null) =>
+        _client.ReleaseWithoutProofOfDeliveryAsync(number, remark, actingOn, Xunit.TestContext.Current.CancellationToken);
 
     // As the TMS API answers a release without a Proof of delivery: ReleaseWithoutProofOfDeliveryResult, with its enums as strings.
     private static string ReleasedWithoutProof(string billingState) =>

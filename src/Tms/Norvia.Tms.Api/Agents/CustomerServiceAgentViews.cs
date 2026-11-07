@@ -113,3 +113,11 @@ public sealed record AgentProofOfDeliveryStatusView(
 /// <param name="Condition">Clean or Reservations.</param>
 /// <param name="FileCount">How many files it holds; their names and contents are not the agent's to read.</param>
 public sealed record AgentProofOfDeliveryView(string Source, DateTimeOffset DeliveryTime, string Condition, bool IsCurrent, DateTimeOffset ReceivedAt, int FileCount);
+
+/// <summary>Whether Customer service may release a Transport Order without a Proof of delivery (<c>get_release_eligibility</c>): the TMS's answer, never the agent's.</summary>
+/// <param name="Eligible">True when the TMS allows the release and nothing else would keep the order from becoming Billable.</param>
+/// <param name="DeliveredAt">When the Shipment was Delivered; null while it isn't.</param>
+/// <param name="AsOf">When the TMS answered, so how long ago the delivery was needs no clock of the agent's.</param>
+/// <param name="BlockingReasons">Empty when eligible. AlreadyBillable, NotBilledSeparately, ShipmentNotDelivered, AlreadyReleased, ProofOfDeliveryReceived, NotRated or OpenException.</param>
+public sealed record AgentReleaseEligibilityView(
+    string TransportOrderNumber, bool Eligible, string? ShipmentNumber, DateTimeOffset? DeliveredAt, DateTimeOffset AsOf, IReadOnlyList<string> BlockingReasons);

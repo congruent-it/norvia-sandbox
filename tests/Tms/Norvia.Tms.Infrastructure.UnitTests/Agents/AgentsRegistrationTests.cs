@@ -108,7 +108,7 @@ public sealed class AgentModelsAndDefinitionsTests
         var definition = AgentDefinitions.Load("customer-service");
 
         definition.Name.Should().Be("customer-service");
-        definition.Tools.Names.Should().Equal("get_rejected_booking", "get_transport_order", "get_shipment_timeline", "get_exceptions", "get_proof_of_delivery_status");
+        definition.Tools.Names.Should().Equal("get_rejected_booking", "get_transport_order", "get_shipment_timeline", "get_exceptions", "get_proof_of_delivery_status", "get_release_eligibility");
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.Agents;
+using Norvia.Tms.Application.Billing.GetReleaseEligibility;
 using Norvia.Tms.Application.ProofsOfDelivery.ListMissing;
 using Norvia.Tms.Application.Shipments.GetByNumber;
 using Norvia.Tms.Application.TrackingEvents.Timeline;
@@ -48,7 +49,24 @@ public static class CustomerServiceAgentEndpoints
         group.MapGet("/shipments/{shipmentNumber}/proof-of-delivery-status", GetProofOfDeliveryStatusAsync)
             .WithName("AgentGetProofOfDeliveryStatus")
             .WithSummary("Read where a Shipment stands for its Proof of delivery: current, superseded, missing, reservations. Never who signed and never a file.");
+        group.MapGet("/transport-orders/{transportOrderNumber}/release-eligibility", GetReleaseEligibilityAsync)
+            .WithName("AgentGetReleaseEligibility")
+            .WithSummary("Read whether a Transport Order may be released without a Proof of delivery, as the Customer service agent: the TMS's answer and, if not, every reason that blocks it.");
         return app;
+    }
+
+    private static async Task<Results<Ok<AgentReleaseEligibilityView>, ProblemHttpResult>> GetReleaseEligibilityAsync(
+        string transportOrderNumber, IMediator mediator, TimeProvider time, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetReleaseEligibilityQuery(transportOrderNumber), cancellationToken);
+        if (result.Status == ResultStatus.NotFound)
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found.");
+        }
+
+        var eligibility = result.Value;
+        return TypedResults.Ok(new AgentReleaseEligibilityView(
+            eligibility.TransportOrderNumber, eligibility.Eligible, eligibility.ShipmentNumber, eligibility.DeliveredAt, time.GetUtcNow(), eligibility.BlockingReasons));
     }
 
     private static async Task<Results<Ok<AgentTransportOrderView>, ProblemHttpResult>> GetTransportOrderAsync(string transportOrderNumber, IMediator mediator, CancellationToken cancellationToken)

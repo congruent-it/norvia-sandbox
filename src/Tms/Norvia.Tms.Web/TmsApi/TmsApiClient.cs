@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Norvia.Agents;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
@@ -197,11 +198,11 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         }
     }
 
-    public async Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, CancellationToken cancellationToken)
+    public async Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, AgentRun? actingOn, CancellationToken cancellationToken)
     {
         using var span = activities.Source.StartActivity("Release without Proof of delivery", ActivityKind.Internal);
         using var request = await CommandAsync($"/v1/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/release-without-proof-of-delivery", cancellationToken);
-        request.Content = JsonContent.Create(new ProofOfDeliveryRelease(remark, CustomerServiceName.Demo), options: Json);
+        request.Content = JsonContent.Create(new ProofOfDeliveryRelease(remark, CustomerServiceName.Demo, actingOn?.AgentName, actingOn?.RunId), options: Json);
 
         using var response = await http.SendAsync(request, cancellationToken);
         switch (response.StatusCode)
@@ -379,7 +380,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     private sealed record Withdrawn(string? ShipmentNumber, string? CorrelationId);
 
     // What the TMS UI asks the TMS API to release a Transport Order without a Proof of delivery with.
-    private sealed record ProofOfDeliveryRelease(string Remark, string ReleasedBy);
+    private sealed record ProofOfDeliveryRelease(string Remark, string ReleasedBy, string? AgentName, string? AgentRunId);
 
     // What the TMS API answers a release without a Proof of delivery, as far as the TMS UI reads it.
     private sealed record ProofOfDeliveryReleased(BillingState BillingState, string? ShipmentNumber, string? CorrelationId);

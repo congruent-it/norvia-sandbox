@@ -18,6 +18,9 @@ public static class TrackingKeys
     /// <summary>The identity of the Agent that made the call (the token's <c>azp</c>), on a call to an agent view.</summary>
     public const string AgentId = "agentId";
 
+    /// <summary>The ID of the Agent run whose Suggestion a person acted on, on the trace of what they did (ADR 0040), next to <see cref="AgentId"/>.</summary>
+    public const string AgentRunId = "agentRunId";
+
     /// <summary>The Agent tool the call was made for, on a call to an agent view.</summary>
     public const string ToolName = "toolName";
 

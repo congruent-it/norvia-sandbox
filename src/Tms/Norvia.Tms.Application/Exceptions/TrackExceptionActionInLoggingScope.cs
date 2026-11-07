@@ -23,6 +23,7 @@ public abstract class TrackExceptionActionInLoggingScope<TCommand, TResult> : IP
         ArgumentNullException.ThrowIfNull(next);
 
         using var trail = Logger.Track(new() { [TrackingKeys.CorrelationId] = CorrelationIdOf(message) });
+        using var extra = Logger.Track(ExtraKeysOf(message));
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
@@ -48,6 +49,9 @@ public abstract class TrackExceptionActionInLoggingScope<TCommand, TResult> : IP
     }
 
     protected abstract ILogger Logger { get; }
+
+    /// <summary>More keys for the whole call, such as the Agent whose Suggestion the action follows. None by default.</summary>
+    protected virtual Dictionary<string, object?> ExtraKeysOf(TCommand command) => [];
 
     protected abstract string CorrelationIdOf(TCommand command);
 

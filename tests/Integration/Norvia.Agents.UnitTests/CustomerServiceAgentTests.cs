@@ -26,7 +26,7 @@ public sealed class CustomerServiceAgentTests
 
         Definition.Name.Should().Be("customer-service");
         Definition.Tools.Server.Should().Be("customer-service").And.Be(contract.Server);
-        Definition.Tools.Names.Should().Equal("get_rejected_booking", "get_transport_order", "get_shipment_timeline", "get_exceptions", "get_proof_of_delivery_status");
+        Definition.Tools.Names.Should().Equal("get_rejected_booking", "get_transport_order", "get_shipment_timeline", "get_exceptions", "get_proof_of_delivery_status", "get_release_eligibility");
         contract.Role.Should().Be("TransportOrders.CustomerServiceAgent.Read");
         contract.Tools.Should().OnlyContain(tool => tool.IsRead);
         contract.Unknown(Definition).Should().BeEmpty();
@@ -245,6 +245,86 @@ public sealed class CustomerServiceAgentTests
 
         result.Suggestion.Confidence.Should().Be(Confidence.Low);
         result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+    }
+
+    private const string Eligible = """{"transportOrderNumber":"TO-0000042","eligible":true,"shipmentNumber":"SH-0000042","deliveredAt":"2026-09-20T10:00:00+00:00","asOf":"2026-09-27T10:00:00+00:00","blockingReasons":[]}""";
+
+    private static async Task<AgentRunResult> RecommendAsync(string eligibility, string proof)
+    {
+        var tools = new FakeToolSource(new Dictionary<string, Func<string>>
+        {
+            ["get_release_eligibility"] = () => eligibility,
+            ["get_proof_of_delivery_status"] = () => proof,
+        });
+        var runner = new AgentRunner(CustomerServiceScript.Model(), tools, new AgentRunnerOptions(TimeSpan.FromSeconds(5)));
+        return await runner.RunAsync(Definition, new AgentQuestion(CustomerServiceQuestions.RecommendRelease("TO-0000042"), "order-1", "run-1"), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReleaseOfAnOrderTheTmsAllowsWhoseProofIsMissing_SuggestsRelease_WithoutDraftingTheRemark()
+    {
+        var result = await RecommendAsync(Eligible, """{"status":"Missing","proofsOfDelivery":[]}""");
+
+        result.ToolCalls.Should().Equal(new ToolCallRecord("r1", "get_release_eligibility"), new ToolCallRecord("r2", "get_proof_of_delivery_status"));
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.Release);
+        result.Suggestion.Cause.Should().Contain("7 day(s) ago");
+        result.Suggestion.Evidence.Select(evidence => evidence.ResultId).Should().Contain(["r1", "r2"]);
+        var text = result.Suggestion.Cause + " " + result.Suggestion.SuggestedAction;
+        text.Should().Contain("You write the remark yourself").And.NotContain("CMR received", because: "the remark records what staff actually did, so staff write it");
+    }
+
+    [Fact]
+    public async Task RunAsync_ReleaseOfAnOrderWhoseProofIsNotDueYet_SuggestsToWait()
+    {
+        var result = await RecommendAsync(Eligible, """{"status":"NotDueYet","proofsOfDelivery":[]}""");
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.Wait);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReleaseWhenTheProofStatusDoesNotSettleIt_NeedsAPerson()
+    {
+        var result = await RecommendAsync(Eligible, """{"status":"Whatever","proofsOfDelivery":[]}""");
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+        result.Suggestion.Confidence.Should().Be(Confidence.Low);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReleaseOfAnOrderTheTmsDoesNotAllow_CannotSuggestRelease_AndSaysWhyWithoutReadingTheProof()
+    {
+        var ineligible = """{"transportOrderNumber":"TO-0000042","eligible":false,"shipmentNumber":"SH-0000042","blockingReasons":["OpenException","NotRated"]}""";
+
+        var result = await RecommendAsync(ineligible, """{"status":"Missing","proofsOfDelivery":[]}""");
+
+        result.ToolCalls.Should().Equal(new ToolCallRecord("r1", "get_release_eligibility"));
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+        result.Suggestion.Cause.Should().Contain("an Exception on its Shipment is still open").And.Contain("it is not rated");
+        result.Suggestion.SuggestedAction.Should().StartWith("Do not release it");
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("""{"shipmentNumber":"SH-1"}""")]
+    public async Task RunAsync_ReleaseWithNoEligibilityAnswer_IsToldWithLowConfidence(string eligibility)
+    {
+        var result = await RecommendAsync(eligibility, "{}");
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+        result.Suggestion.Confidence.Should().Be(Confidence.Low);
+    }
+
+    [Fact]
+    public void TheReleaseQuestion_IsFixed_AndReadsBackToTheOrdersNumber()
+    {
+        CustomerServiceQuestions.ParseRecommendRelease(CustomerServiceQuestions.RecommendRelease("TO-0000042")).Should().Be("TO-0000042");
+        CustomerServiceQuestions.ParseRecommendRelease("Tell me about TO-0000042").Should().BeNull();
+    }
+
+    [Fact]
+    public void TheDefinition_ForbidsDraftingTheRemark_AndLetsTheTmsDecideEligibility()
+    {
+        Definition.Instructions.Should().Contain("Never write the remark").And.Contain("the TMS decides whether the order may be released");
     }
 
     private static async Task<Suggestion> AskAboutAsync(string question, string order) => (await AskAsync(question, order)).Suggestion;

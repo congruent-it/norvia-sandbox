@@ -68,6 +68,18 @@ public static class CustomerServiceQuestions
     /// <summary>The Transport Order number of a not-yet-billable question, or null when the text is another question.</summary>
     public static string? ParseExplainNotYetBillable(string question) => ParseNumber(question, HoldPrefix, HoldSuffix);
 
+    private const string ReleasePrefix = "Recommend whether the Transport Order ";
+    private const string ReleaseSuffix = " should be released without a Proof of delivery, now or later.";
+
+    public static string RecommendRelease(string transportOrderNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
+        return ReleasePrefix + transportOrderNumber + ReleaseSuffix;
+    }
+
+    /// <summary>The Transport Order number of a release recommendation question, or null when the text is another question.</summary>
+    public static string? ParseRecommendRelease(string question) => ParseNumber(question, ReleasePrefix, ReleaseSuffix);
+
     private static string? ParseNumber(string question, string prefix, string suffix)
     {
         ArgumentNullException.ThrowIfNull(question);
