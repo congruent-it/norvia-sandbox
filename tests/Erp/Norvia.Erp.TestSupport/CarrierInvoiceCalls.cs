@@ -14,6 +14,9 @@ public static class CarrierInvoiceCalls
     public const string Carrier = "CAR-0001";
     public const string CarrierName = "Van Dijk Transport";
 
+    /// <summary>The Carrier Rate Card a cost is priced from when a test needs an agreed (not Spot) price. The ERP validates only that the id is present, so it need not exist in the seed.</summary>
+    public const string RateCardId = "CRC-0001";
+
     /// <summary>A Carrier booking reference no other test uses; far from any other in the ERP's ranking of candidates.</summary>
     public static string NewReference() => $"BK-{Guid.NewGuid():N}"[..15].ToUpperInvariant();
 
