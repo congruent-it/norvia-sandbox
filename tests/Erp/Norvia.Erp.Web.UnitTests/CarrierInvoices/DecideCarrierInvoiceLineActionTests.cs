@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Norvia.Agents;
 using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.CarrierInvoices.Decide;
 using Norvia.Erp.Domain.Carriers;
@@ -30,10 +31,30 @@ public sealed class DecideCarrierInvoiceLineActionTests : ErpWebContext
     {
         Answers(Invoice("Approved"));
 
-        var outcome = await Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", 70m, "Agreed", Xunit.TestContext.Current.CancellationToken);
+        var outcome = await Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", 70m, "Agreed", null, Xunit.TestContext.Current.CancellationToken);
 
         outcome.Should().Be(new DecideCarrierInvoiceLineOutcome.Decided(InvoiceApproved: true));
         await Mediator.Received(1).Send(new AcceptCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", 70m, "Agreed"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Accept_FromASuggestion_SendsTheSameCommandPlusTheRunItActsOn()
+    {
+        Answers(Invoice("Received"));
+
+        await Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", null, null, new AgentRun("finance-matching", "run-1"), Xunit.TestContext.Current.CancellationToken);
+
+        await Mediator.Received(1).Send(new AcceptCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", null, null, new AgentRun("finance-matching", "run-1")), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Reject_FromASuggestion_SendsTheSameCommandPlusTheRunItActsOn()
+    {
+        Answers(Invoice("Received"));
+
+        await Action.RejectAsync("CAR-0001", "VDT-1", "TRX-1", "Not ours", new AgentRun("finance-matching", "run-1"), Xunit.TestContext.Current.CancellationToken);
+
+        await Mediator.Received(1).Send(new RejectCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", "Not ours", new AgentRun("finance-matching", "run-1")), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -41,7 +62,7 @@ public sealed class DecideCarrierInvoiceLineActionTests : ErpWebContext
     {
         Answers(Invoice("Received"));
 
-        var outcome = await Action.RejectAsync("CAR-0001", "VDT-1", "TRX-1", "Not ours", Xunit.TestContext.Current.CancellationToken);
+        var outcome = await Action.RejectAsync("CAR-0001", "VDT-1", "TRX-1", "Not ours", null, Xunit.TestContext.Current.CancellationToken);
 
         outcome.Should().Be(new DecideCarrierInvoiceLineOutcome.Decided(InvoiceApproved: false));
         await Mediator.Received(1).Send(new RejectCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", "Not ours"), Arg.Any<CancellationToken>());
@@ -52,7 +73,7 @@ public sealed class DecideCarrierInvoiceLineActionTests : ErpWebContext
     {
         Answers(Result<CarrierInvoiceView>.Invalid(new ValidationError("CarrierInvoice", "Rejecting TRX-1 needs a reason.", "Code", ValidationSeverity.Error)));
 
-        var outcome = await Action.RejectAsync("CAR-0001", "VDT-1", "TRX-1", null, Xunit.TestContext.Current.CancellationToken);
+        var outcome = await Action.RejectAsync("CAR-0001", "VDT-1", "TRX-1", null, null, Xunit.TestContext.Current.CancellationToken);
 
         outcome.Should().Be(new DecideCarrierInvoiceLineOutcome.Refused("Rejecting TRX-1 needs a reason."));
     }
@@ -65,7 +86,7 @@ public sealed class DecideCarrierInvoiceLineActionTests : ErpWebContext
             .Returns<ValueTask<Result<CarrierInvoiceView>>>(_ => throw new InvalidOperationException("database down"));
 #pragma warning restore CA2012
 
-        var outcome = await Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", null, null, Xunit.TestContext.Current.CancellationToken);
+        var outcome = await Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", null, null, null, Xunit.TestContext.Current.CancellationToken);
 
         outcome.Should().BeOfType<DecideCarrierInvoiceLineOutcome.Refused>().Which.Reason.Should().Contain("Nothing was decided");
     }
@@ -78,7 +99,7 @@ public sealed class DecideCarrierInvoiceLineActionTests : ErpWebContext
             .Returns<ValueTask<Result<CarrierInvoiceView>>>(_ => throw new OperationCanceledException());
 #pragma warning restore CA2012
 
-        var run = () => Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", null, null, Xunit.TestContext.Current.CancellationToken);
+        var run = () => Action.AcceptAsync("CAR-0001", "VDT-1", "TRX-1", null, null, null, Xunit.TestContext.Current.CancellationToken);
 
         await run.Should().ThrowAsync<OperationCanceledException>();
     }

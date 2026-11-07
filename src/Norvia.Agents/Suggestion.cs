@@ -18,7 +18,7 @@ public sealed record Suggestion(
 /// <summary>The Agent and the run ID that produced a <see cref="Suggestion"/>.</summary>
 public sealed record AgentRun(string AgentName, string RunId);
 
-/// <summary>What a <see cref="Suggestion"/> suggests. Its wire names are <c>resubmit</c>, <c>discard</c>, <c>fix-the-cause-first</c>, <c>release</c>, <c>wait</c> and <c>needs-a-person</c>.</summary>
+/// <summary>What a <see cref="Suggestion"/> suggests. Its wire names are <c>resubmit</c>, <c>discard</c>, <c>fix-the-cause-first</c>, <c>release</c>, <c>wait</c>, <c>accept</c>, <c>accept-adjusted</c>, <c>reject</c> and <c>needs-a-person</c>.</summary>
 public enum SuggestedActionKind
 {
     Resubmit,
@@ -31,6 +31,15 @@ public enum SuggestedActionKind
 
     /// <summary>Wait: the Carrier may still send its Proof of delivery.</summary>
     Wait,
+
+    /// <summary>Accept a Carrier invoice line at the invoiced amount (E2). The host only pre-selects it: Finance confirms.</summary>
+    Accept,
+
+    /// <summary>Accept a Carrier invoice line at an adjusted amount (E2). Finance enters the amount and writes the remark.</summary>
+    AcceptAdjusted,
+
+    /// <summary>Reject a Carrier invoice line (E2). Finance writes the reason.</summary>
+    Reject,
 }
 
 /// <summary>One claim and the tool result it came from.</summary>

@@ -71,6 +71,7 @@ public sealed class GetAgentInvoiceLineHandlerTests
         view.InvoicedBy.Should().BeNull();
         view.Candidates.Should().BeEmpty();
         view.ResolvesAutomatically.Should().BeFalse();
+        view.AllowedActions.Should().Equal("accept", "accept-adjusted", "reject");
     }
 
     [Fact]
@@ -100,6 +101,7 @@ public sealed class GetAgentInvoiceLineHandlerTests
         view.InvoicedBy.Should().Be(new AgentEarlierLineView("VDT-0", new DateOnly(2026, 10, 19), "TRX-1", "Matched", 70m));
         view.Difference.Should().Be(0m);
         view.ResolvesAutomatically.Should().BeFalse();
+        view.AllowedActions.Should().Equal("reject");
     }
 
     [Fact]
@@ -117,6 +119,7 @@ public sealed class GetAgentInvoiceLineHandlerTests
         view.CarrierCost.Should().BeNull();
         view.Difference.Should().BeNull();
         view.ResolvesAutomatically.Should().BeTrue();
+        view.AllowedActions.Should().Equal("reject", "wait");
         view.Candidates.Select(candidate => (candidate.Rank, candidate.CarrierBookingNumber)).Should().Equal((1, "CB-0000002"), (2, "CB-0000003"));
         view.Candidates[0].Should().BeEquivalentTo(new AgentCandidateView(1, "CB-0000002", "TRX-0042", 80m, 0m, "Rate Card version 2", new DateOnly(2026, 10, 12)));
         view.Candidates[1].Source.Should().Be("Spot");
@@ -175,7 +178,7 @@ public sealed class GetAgentInvoiceLineHandlerTests
 
         Names(typeof(AgentInvoiceLineView)).Should().Equal(
             "CarrierId", "CarrierName", "InvoiceNumber", "InvoiceDate", "CarrierBookingReference", "Result", "Status", "InvoicedAmount", "Currency", "Tolerance", "Difference",
-            "CarrierCost", "InvoicedBy", "Candidates", "ResolvesAutomatically");
+            "CarrierCost", "InvoicedBy", "Candidates", "ResolvesAutomatically", "AllowedActions");
         Names(typeof(AgentCarrierCostView)).Should().Equal("CarrierBookingNumber", "CarrierBookingReference", "Total", "Source", "DeliveredOn", "Status");
         Names(typeof(AgentEarlierLineView)).Should().Equal("InvoiceNumber", "InvoiceDate", "CarrierBookingReference", "Status", "Amount");
         Names(typeof(AgentCandidateView)).Should().Equal("Rank", "CarrierBookingNumber", "CarrierBookingReference", "Total", "Difference", "Source", "DeliveredOn");

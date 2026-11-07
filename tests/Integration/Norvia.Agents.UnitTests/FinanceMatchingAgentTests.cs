@@ -261,4 +261,71 @@ public sealed class FinanceMatchingAgentTests
 
         await run.Should().ThrowAsync<AgentRunException>();
     }
+
+    // The agent view says which actions the ERP allows for the line; the scripted model suggests one of them, or leaves it to a person.
+    private static string Allowing(string view, params string[] actions) =>
+        view.Replace("\"resolvesAutomatically\"", $"\"allowedActions\":[{string.Join(',', actions.Select(action => $"\"{action}\""))}],\"resolvesAutomatically\"", StringComparison.Ordinal);
+
+    [Fact]
+    public async Task RunAsync_APriceMismatchOfARateCardThatMayBeAccepted_SuggestsAcceptingItAdjusted()
+    {
+        var result = await Run(Allowing(PriceMismatchRateCard, "accept", "accept-adjusted", "reject"), out _);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.AcceptAdjusted);
+    }
+
+    [Fact]
+    public async Task RunAsync_APriceMismatchWhoseAcceptTheErpDoesNotAllow_LeavesItToAPerson()
+    {
+        var result = await Run(Allowing(PriceMismatchRateCard, "reject"), out _);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+    }
+
+    [Fact]
+    public async Task RunAsync_APriceMismatchOfASpotPrice_LeavesItToAPersonWhoAsksThePlannerFirst()
+    {
+        var result = await Run(Allowing(PriceMismatchSpot, "accept", "accept-adjusted", "reject"), out _);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+    }
+
+    [Fact]
+    public async Task RunAsync_ADuplicate_SuggestsRejectingIt_OnlyWhenTheErpAllowsIt()
+    {
+        (await Run(Allowing(Duplicate, "reject"), out _)).Suggestion.Action.Should().Be(SuggestedActionKind.Reject);
+        (await Run(Allowing(Duplicate), out _)).Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+    }
+
+    [Fact]
+    public async Task RunAsync_AnUnknownBookingWithCandidates_LeavesItToAPersonWhoChecksWithTheCarrier()
+    {
+        var result = await Run(Allowing(Mangled, "reject", "wait"), out _);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+    }
+
+    [Fact]
+    public async Task RunAsync_AnUnknownBookingWithNoCandidateThatResolvesByItself_SuggestsWaiting_AndNeverAccepting()
+    {
+        var none = Allowing(Mangled.Replace("\"candidates\":[", "\"candidates\":[],\"was\":[", StringComparison.Ordinal), "reject", "wait");
+
+        var result = await Run(none, out _);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.Wait);
+    }
+
+    [Fact]
+    public async Task RunAsync_AnUnknownBookingThatDoesNotResolveByItself_SuggestsRejectingIt()
+    {
+        var none = """{"carrierBookingReference":"TRX-9","result":"UnknownBooking","candidates":[],"allowedActions":["reject"],"resolvesAutomatically":false}""";
+
+        (await Run(none, out _)).Suggestion.Action.Should().Be(SuggestedActionKind.Reject);
+    }
+
+    [Fact]
+    public void TheDefinition_TellsTheModelToSuggestOnlyWhatTheViewAllows_AndNeverToAcceptWhatItCannot()
+    {
+        Definition.Instructions.Should().Contain("allowedActions").And.Contain("accept-adjusted").And.Contain("never an action that is not in allowedActions");
+    }
 }

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Norvia.Agents;
 using Norvia.Erp.Api.CarrierInvoices;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.CarrierInvoices;
@@ -66,6 +67,54 @@ public sealed class CarrierInvoiceDecisionEndpointsTests
 
         await _mediator.Received(1).Send(
             new AcceptCarrierInvoiceLineCommand(new CarrierId("CAR-0001"), "VDT-1", "BK-1", null, null), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Accept_NamingTheAgentAndRunItActsOn_PassesThemToTheCommandForTheTrace()
+    {
+        AnswerAccept(Result<CarrierInvoiceView>.Success((CarrierInvoiceView)null!));
+
+        await CarrierInvoiceEndpoints.AcceptLineAsync(
+            "CAR-0001", "VDT-1", "BK-1", new AcceptCarrierInvoiceLineRequest(null, null, " finance-matching ", " run-1 "), _retrier, CancellationToken.None);
+
+        await _mediator.Received(1).Send(
+            new AcceptCarrierInvoiceLineCommand(new CarrierId("CAR-0001"), "VDT-1", "BK-1", null, null, new AgentRun("finance-matching", "run-1")), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Reject_NamingTheAgentAndRunItActsOn_PassesThemToTheCommandForTheTrace()
+    {
+        AnswerReject(Result<CarrierInvoiceView>.Success((CarrierInvoiceView)null!));
+
+        await CarrierInvoiceEndpoints.RejectLineAsync(
+            "CAR-0001", "VDT-1", "BK-1", new RejectCarrierInvoiceLineRequest("Not ours", "finance-matching", "run-1"), _retrier, CancellationToken.None);
+
+        await _mediator.Received(1).Send(
+            new RejectCarrierInvoiceLineCommand(new CarrierId("CAR-0001"), "VDT-1", "BK-1", "Not ours", new AgentRun("finance-matching", "run-1")), Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData("finance-matching", null)]
+    [InlineData(null, "run-1")]
+    [InlineData("finance-matching", " ")]
+    public async Task Decide_AnAgentWithoutItsRun_OrTheOtherWayRound_IsRefusedAsInvalid_AndDecidesNothing(string? agent, string? run)
+    {
+        var accept = await CarrierInvoiceEndpoints.AcceptLineAsync("CAR-0001", "VDT-1", "BK-1", new AcceptCarrierInvoiceLineRequest(null, null, agent, run), _retrier, CancellationToken.None);
+        var reject = await CarrierInvoiceEndpoints.RejectLineAsync("CAR-0001", "VDT-1", "BK-1", new RejectCarrierInvoiceLineRequest("x", agent, run), _retrier, CancellationToken.None);
+
+        accept.Result.Should().BeOfType<ValidationProblem>();
+        reject.Result.Should().BeOfType<ValidationProblem>();
+        await _mediator.DidNotReceiveWithAnyArgs().Send(Arg.Any<AcceptCarrierInvoiceLineCommand>(), Arg.Any<CancellationToken>());
+        await _mediator.DidNotReceiveWithAnyArgs().Send(Arg.Any<RejectCarrierInvoiceLineCommand>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Decide_AnAgentNameOrRunThatIsTooLong_IsRefusedAsInvalid()
+    {
+        var result = await CarrierInvoiceEndpoints.RejectLineAsync(
+            "CAR-0001", "VDT-1", "BK-1", new RejectCarrierInvoiceLineRequest("x", new string('a', 101), "run-1"), _retrier, CancellationToken.None);
+
+        result.Result.Should().BeOfType<ValidationProblem>();
     }
 
     [Theory]

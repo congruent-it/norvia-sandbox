@@ -118,7 +118,7 @@ public sealed class FinanceAgentViewTests
     public async Task GetInvoiceLine_AFoundLine_IsTheAgentView()
     {
         var mediator = Substitute.For<IMediator>();
-        var view = new AgentInvoiceLineView("CAR-0001", "Van Dijk", "VDT-1", new DateOnly(2026, 10, 19), "TRX-1", "PriceMismatch", "ToDecide", 80m, "EUR", 0m, 10m, null, null, [], false);
+        var view = new AgentInvoiceLineView("CAR-0001", "Van Dijk", "VDT-1", new DateOnly(2026, 10, 19), "TRX-1", "PriceMismatch", "ToDecide", 80m, "EUR", 0m, 10m, null, null, [], false, ["reject"]);
 #pragma warning disable CA2012 // NSubstitute configures the call by reading its return value, which is never consumed.
         mediator.Send(new GetAgentInvoiceLineQuery(new CarrierId("CAR-0001"), "VDT-1", "TRX-1"), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result<AgentInvoiceLineView>.Success(view)));
 #pragma warning restore CA2012

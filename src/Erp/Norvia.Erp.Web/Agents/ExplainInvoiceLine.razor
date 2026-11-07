@@ -46,6 +46,7 @@
                     }
                 </ul>
                 <h4>What you could do</h4>
+                <p>Suggested action: <span data-testid="action-kind">@ActionText.Of(suggestion.Action)</span></p>
                 <p>@suggestion.SuggestedAction</p>
                 <p class="text-muted">Confidence: @suggestion.Confidence.ToString().ToLowerInvariant(). The assistant can be wrong; you decide.</p>
             </div>
@@ -68,17 +69,24 @@
     [Parameter, EditorRequired]
     public string CarrierBookingReference { get; set; } = "";
 
+    /// <summary>Raised with the Suggestion when it arrives, and with null when a new question starts or fails, so the page can pre-select (never execute) the action on the line's decision form.</summary>
+    [Parameter]
+    public EventCallback<Suggestion?> OnSuggested { get; set; }
+
+
     private async Task ExplainAsync()
     {
         _asking = true;
         _unavailable = false;
         _suggestion = null;
+        await OnSuggested.InvokeAsync(null);
         try
         {
             var result = await Requests.ExplainAsync(new ExplainInvoiceLineQuery(new CarrierId(CarrierId), InvoiceNumber, CarrierBookingReference), _lifetime.Token);
             if (result.IsSuccess)
             {
                 _suggestion = result.Value;
+                await OnSuggested.InvokeAsync(_suggestion);
             }
             else
             {

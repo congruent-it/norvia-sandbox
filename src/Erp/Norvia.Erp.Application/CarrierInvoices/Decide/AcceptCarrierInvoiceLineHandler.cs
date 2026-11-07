@@ -30,7 +30,7 @@ public sealed partial class AcceptCarrierInvoiceLineHandler(
             return CarrierInvoiceRefused.Because<CarrierInvoiceView>(CarrierInvoiceRefusal.InvoiceNotFound(command.CarrierId.Value, command.InvoiceNumber));
         }
 
-        using var trail = logger.TrackDecision(invoice);
+        using var trail = logger.TrackDecision(invoice, command.ActingOn);
         var number = invoice.Lines.FirstOrDefault(line => line.CarrierBookingReference == command.CarrierBookingReference)?.CarrierBookingNumber;
         var cost = number is null ? null : await costs.FirstOrDefaultAsync(new CarrierCostByBookingNumberSpec(number), cancellationToken);
 

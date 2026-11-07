@@ -165,7 +165,9 @@ public static class FinanceMatchingScript
                 ],
                 advice,
                 "high",
-                "needs-a-person");
+                // A Spot price is the Planner's to confirm first. A Rate Card price is the agreed one, so accepting at that amount
+                // with a remark is the suggestion, when the ERP allows it.
+                source == "Spot" ? "needs-a-person" : KindIfAllowed(view, "accept-adjusted"));
         }
 
         return Unreadable(result);
@@ -189,7 +191,8 @@ public static class FinanceMatchingScript
                     ? "Wait for the Carrier cost to arrive, or reject the line and ask the Carrier for the right reference."
                     : "Reject the line and ask the Carrier for the right reference.",
                 "medium",
-                "needs-a-person");
+                // Nothing to accept: wait for a Carrier cost that matches it by itself, or reject it.
+                KindIfAllowed(view, resolves ? "wait" : "reject"));
         }
 
         var best = candidates[0];
@@ -226,7 +229,7 @@ public static class FinanceMatchingScript
                 ],
                 $"Reject the line with the reason that it duplicates Carrier invoice {invoice}, unless the Carrier meant a different booking.",
                 "high",
-                "needs-a-person");
+                KindIfAllowed(view, "reject"));
         }
 
         return IntegrationOperationsScript.Json(
@@ -236,6 +239,14 @@ public static class FinanceMatchingScript
             "low",
             "needs-a-person");
     }
+
+    // The ERP's agent view lists the actions it allows. The script suggests one only when it is listed and leaves it to a person
+    // otherwise, as the model is told to (agents/finance-matching.agent.yaml).
+    private static string KindIfAllowed(JsonElement view, string kind) =>
+        view.TryGetProperty("allowedActions", out var allowed) && allowed.ValueKind == JsonValueKind.Array
+        && allowed.EnumerateArray().Any(action => action.ValueKind == JsonValueKind.String && action.GetString() == kind)
+            ? kind
+            : "needs-a-person";
 
     private static string Unreadable(ScriptedToolResult result) =>
         IntegrationOperationsScript.Json(

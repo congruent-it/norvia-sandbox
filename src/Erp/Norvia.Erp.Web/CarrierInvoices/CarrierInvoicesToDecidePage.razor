@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Mediator
 @using Microsoft.Extensions.Options
+@using Norvia.Agents
 @using Norvia.Erp.Application.CarrierInvoices
 @using Norvia.Erp.Web.Agents
 @using Norvia.Erp.Application.CarrierInvoices.List
@@ -61,9 +62,11 @@
                         }
                         @if (line.Status == "ToDecide")
                         {
-                            <ExplainInvoiceLine CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" CarrierBookingReference="@line.CarrierBookingReference" />
+                            <ExplainInvoiceLine CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" CarrierBookingReference="@line.CarrierBookingReference"
+                                         OnSuggested="suggestion => Suggest(item, line, suggestion)" />
                             <DecideCarrierInvoiceLineForm CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" Line="line"
-                                                          CanAccept="@(CostOf(item, line) is { Status: "Open" })" />
+                                                          CanAccept="@(CostOf(item, line) is { Status: "Open" })"
+                                                          Suggested="@SuggestedFor(item, line)" />
                         }
                     </FluentAccordionItem>
                 }
@@ -74,6 +77,27 @@
 
 @code {
     private LiveList<CarrierInvoiceToDecide> _list = null!;
+
+    // What the assistant suggested for each line, kept for the session only: it pre-selects, stores nothing and decides nothing (ADR 0040).
+    private readonly Dictionary<string, SuggestedDecision> _suggested = [];
+
+    private static string KeyOf(CarrierInvoiceToDecide item, CarrierInvoiceLineView line) =>
+        $"{item.Invoice.CarrierId}/{item.Invoice.InvoiceNumber}/{line.CarrierBookingReference}";
+
+    private SuggestedDecision? SuggestedFor(CarrierInvoiceToDecide item, CarrierInvoiceLineView line) =>
+        _suggested.GetValueOrDefault(KeyOf(item, line));
+
+    private void Suggest(CarrierInvoiceToDecide item, CarrierInvoiceLineView line, Suggestion? suggestion)
+    {
+        if (suggestion is not null && SuggestedDecision.From(suggestion) is { } decision)
+        {
+            _suggested[KeyOf(item, line)] = decision;
+        }
+        else
+        {
+            _suggested.Remove(KeyOf(item, line));
+        }
+    }
 
     protected override void OnInitialized()
     {
