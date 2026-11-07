@@ -6,12 +6,17 @@ using Xunit.v3;
 namespace Norvia.Erp.Web.UiTests.FinanceAgent;
 
 /// <summary>
-/// Runs the journeys that read a line through the MCP stand-in last, so the one that stops it goes first. It finds them by the full name of their class, which the compiler checks. Once they have, Aspire may fail to stop the stand-in (its graceful shutdown outlasts the stop command),
+/// Runs the journeys that read a line or an invoice through the MCP stand-in last, so the one that stops it goes first. It finds them by the full name of their class, which the compiler checks. Once they have, Aspire may fail to stop the stand-in (its graceful shutdown outlasts the stop command),
 /// which the journey of an Agent that fails needs. The tests still set up their own data and none relies on another's result.
 /// </summary>
 public sealed class StopsTheAgentFirst : ITestCollectionOrderer
 {
     public IReadOnlyCollection<TTestCollection> OrderTestCollections<TTestCollection>(IReadOnlyCollection<TTestCollection> testCollections)
         where TTestCollection : ITestCollection =>
-        [.. testCollections.OrderBy(collection => collection.TestCollectionDisplayName.Contains(typeof(ExplainJourneyTests).FullName!, StringComparison.Ordinal) ? 1 : 0)];
+        [.. testCollections.OrderBy(collection => ReadsThroughTheStandIn(collection) ? 1 : 0)];
+
+    private static readonly Type[] JourneysThroughTheStandIn = [typeof(ExplainJourneyTests), typeof(ExplainInvoiceJourneyTests)];
+
+    private static bool ReadsThroughTheStandIn(ITestCollection collection) =>
+        JourneysThroughTheStandIn.Any(journeys => collection.TestCollectionDisplayName.Contains(journeys.FullName!, StringComparison.Ordinal));
 }
