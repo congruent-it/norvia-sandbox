@@ -131,6 +131,7 @@
     <Project Path="tests/Erp/Norvia.Erp.Application.UnitTests/Norvia.Erp.Application.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.ArchitectureTests/Norvia.Erp.ArchitectureTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Domain.UnitTests/Norvia.Erp.Domain.UnitTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.Infrastructure.IntegrationTests.FinanceAgent/Norvia.Erp.Infrastructure.IntegrationTests.FinanceAgent.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Infrastructure.UnitTests/Norvia.Erp.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Web.UnitTests/Norvia.Erp.Web.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.TestSupport/Norvia.Erp.TestSupport.csproj" />
