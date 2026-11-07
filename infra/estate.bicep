@@ -192,6 +192,15 @@ resource tmsUiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11
   ]
 }
 
+// The ERP's identity (infra/estate/identities.bicep), by its name, for the same reason: the ERP UI asks its Agent as it.
+resource erpIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  scope: resourceGroup
+  name: 'id-erp-${uniqueString(resourceGroup.id)}'
+  dependsOn: [
+    identities
+  ]
+}
+
 module foundry 'estate/foundry.bicep' = {
   scope: resourceGroup
   params: {
@@ -204,8 +213,8 @@ module foundry 'estate/foundry.bicep' = {
     modelCapacity: foundryModelCapacity
     agentsEnabled: agentsEnabled
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
-    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check, the TMS UI (Explain on a Rejected booking) and the Simulator (its plans' pools of Carrier texts).
-    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, tmsUiIdentity.properties.principalId, identities.outputs.simulatorPrincipalId]
+    // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check, the TMS UI (Explain on a Rejected booking), the ERP UI (Explain on a Carrier invoice line) and the Simulator (its plans' pools of Carrier texts).
+    applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, tmsUiIdentity.properties.principalId, erpIdentity.properties.principalId, identities.outputs.simulatorPrincipalId]
   }
 }
 
@@ -717,6 +726,22 @@ module customerServiceReplyMcp 'estate/customer-service-reply-mcp.bicep' = {
     tmsAgentApiAppId: customerServiceMcp.outputs.tmsAgentApiAppId
     tmsBaseUrl: tmsBaseUrl
   }
+}
+
+// The Carrier invoice matching agent's API Management front over the ERP API's Finance agent view, with its MCP server and the two app
+// registrations that keep it narrow (infra/smoke-test-finance-agent.ps1). Like the others, it has no outputs.
+module financeMatchingMcp 'estate/finance-matching-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    erpBaseUrl: erpBaseUrl
+  }
+  dependsOn: [
+    customerServiceReplyMcp
+  ]
 }
 
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.

@@ -1,3 +1,5 @@
+using Azure.Core;
+using Azure.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,8 +12,9 @@ namespace Norvia.Erp.Infrastructure.Agents;
 public static class AgentsInfrastructure
 {
     /// <summary>
-    /// Registers the ERP UI's <see cref="IAgentClient"/>. Off unless <c>Agents:Enabled</c> is on, as ADR 0040 has it. On, the local runner
-    /// calls the MCP stand-in (ADR 0041). The Foundry client comes with the Azure slice.
+    /// Registers the ERP UI's <see cref="IAgentClient"/>. Off unless <c>Agents:Enabled</c> is on, as ADR 0040 has it. On, the Foundry
+    /// client asks the Agent published in the project the estate named (<c>Agents:Foundry:ProjectEndpoint</c>); without one, the local
+    /// runner calls the MCP stand-in (ADR 0041).
     /// </summary>
     public static IHostApplicationBuilder AddAgentClient(this IHostApplicationBuilder builder)
     {
@@ -26,19 +29,34 @@ public static class AgentsInfrastructure
 
         builder.Services.AddOptions<AgentClientOptions>().BindConfiguration(AgentClientOptions.SectionName)
             .ValidateDataAnnotations()
-            .Validate(options => options.McpAddress is { IsAbsoluteUri: true }, "Agents:McpAddress must be the MCP server's absolute address.")
-            .Validate(options => options.Tokens.IsComplete, "Agents:Tokens needs an Issuer, an Audience, a ClientId, a Role and a SigningKey.")
+            .Validate(options => !options.UsesFoundry || options.Foundry.ProjectEndpoint is { IsAbsoluteUri: true }, "Agents:Foundry:ProjectEndpoint must be the Foundry project's absolute address.")
+            .Validate(options => options.UsesFoundry || options.McpAddress is { IsAbsoluteUri: true }, "Agents:McpAddress must be the MCP server's absolute address.")
+            .Validate(options => options.UsesFoundry || options.Tokens.IsComplete, "Agents:Tokens needs an Issuer, an Audience, a ClientId, a Role and a SigningKey.")
             .ValidateOnStart();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IRunIds, GuidRunIds>();
         builder.Services.TryAddSingleton<AgentActivities>();
-        builder.Services.AddTransient<BearerTokenHandler>();
         // A short timeout and no retry: the client has its own deadline, and the standard resilience handler would retry (ADR 0040).
 #pragma warning disable EXTEXP0001 // RemoveAllResilienceHandlers is the only way to opt a client out of the defaults.
+        if (!string.IsNullOrWhiteSpace(builder.Configuration[$"{AgentClientOptions.SectionName}:Foundry:ProjectEndpoint"]))
+        {
+            builder.Services.TryAddSingleton(AgentCredential);
+            builder.Services.AddHttpClient<IAgentClient, FoundryAgentClient>(http => http.Timeout = Timeout.InfiniteTimeSpan)
+                .RemoveAllResilienceHandlers();
+            return builder;
+        }
+
+        builder.Services.AddTransient<BearerTokenHandler>();
         builder.Services.AddHttpClient<IAgentClient, LocalAgentClient>(http => http.Timeout = Timeout.InfiniteTimeSpan)
             .AddHttpMessageHandler<BearerTokenHandler>()
             .RemoveAllResilienceHandlers();
 #pragma warning restore EXTEXP0001
         return builder;
     }
+
+    /// <summary>The ERP UI asks Foundry as its own managed identity (the user-assigned identity the estate gave it).</summary>
+    private static TokenCredential AgentCredential(IServiceProvider services) =>
+        services.GetRequiredService<IConfiguration>()["AZURE_CLIENT_ID"] is { Length: > 0 } clientId
+            ? new ManagedIdentityCredential(ManagedIdentityId.FromUserAssignedClientId(clientId))
+            : new DefaultAzureCredential(new DefaultAzureCredentialOptions { ExcludeManagedIdentityCredential = true, ExcludeWorkloadIdentityCredential = true });
 }

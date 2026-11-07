@@ -313,6 +313,13 @@ if (-not $tmsAgentApiClientId) { Write-Fail 'The estate has no TMS agent API app
 Set-AzdValue AZURE_ESTATE_TMS_AGENT_API_CLIENT_ID $tmsAgentApiClientId
 Set-AzdParameter estate_tms_agent_api_client_id $tmsAgentApiClientId
 
+# The ERP API's agent API: the app registration API Management's identity calls the Carrier invoice matching agent's view as
+# (infra/estate/finance-matching-mcp.bicep). Found by name, as the estate is at its 64 outputs.
+$erpAgentApiClientId = [string](Get-AzTsvLines ad app list --filter "displayName eq 'Norvia ERP agent API ($envName)'" --query '[0].appId')
+if (-not $erpAgentApiClientId) { Write-Fail 'The estate has no ERP agent API app registration' }
+Set-AzdValue AZURE_ESTATE_ERP_AGENT_API_CLIENT_ID $erpAgentApiClientId
+Set-AzdParameter estate_erp_agent_api_client_id $erpAgentApiClientId
+
 # The Estate health check: its app registration (the one Easy Auth signs operators in to), its agent API's app
 # registration (the audience of the tokens API Management sends it) and its identity (Reader on the resource group). The
 # estate is at its 64 outputs, so they are found by name (infra/estate/health-check.bicep,

@@ -395,9 +395,17 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithEnvironment("Authentication__Schemes__Bearer__Authority", estate.EntraIssuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidIssuer", estate.EntraIssuer)
         .WithEnvironment("Authentication__Schemes__Bearer__ValidAudiences__0", estate.ErpApiClientId)
+        // The Finance agent's view (ADR 0040) takes the Entra token API Management sends for the Agent, from a scheme of its own: the
+        // audience is the agent API's app registration, not the ERP API's, so no token the ERP issues to its callers opens the view.
+        .WithEnvironment("Agents__Api__Issuer", estate.EntraIssuer)
+        .WithEnvironment("Agents__Api__Audience", estate.ErpAgentApiClientId)
+        .WithEnvironment("Agents__Api__GatewayClientId", estate.ApiManagementClientId)
         .WithAzureUserAssignedIdentity(erpIdentity);
     erpWeb.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(erpIdentity)
+        // The Agents (ADR 0040) are on only where the estate says so. The ERP UI asks the Agent published in the Foundry project as its own identity.
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryProjectEndpoint)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.ErpRegistrationClientId, estate.EntraIssuer)));
 
@@ -978,6 +986,10 @@ else
         tmsApi
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__Api__Audience", LocalTokens.TmsAudience);
+        // The ERP API's Finance agent view takes the stand-in's token, which is for the ERP API's audience locally, signed with the same key.
+        erpApi
+            .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Api__Audience", LocalTokens.ErpAudience);
         tmsWeb
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/customer-service"))
@@ -1035,6 +1047,7 @@ else
             (erpWeb.Resource, "Agents__Tokens__SigningKey"),
             (tmsWeb.Resource, "Agents__ReplyTokens__SigningKey"),
             (tmsWeb.Resource, "Agents__Tokens__SigningKey"),
+            (erpApi.Resource, "Agents__Api__SigningKey"),
             (tmsApi.Resource, "Agents__Api__SigningKey"),
             (integrationConsole.Resource, "Agents__Tokens__SigningKey"),
             (integrationConsole.Resource, "Agents__Api__SigningKey"),
