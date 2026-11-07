@@ -14,6 +14,8 @@ public static partial class FinanceQuestions
     private const string InvoicePrefix = "Summarise the Carrier invoice \"";
     private const string InvoiceSuffix = "\": which lines are To decide, grouped by cause with the counts, and which of them may still resolve by themselves.";
     private const string Suffix = "\" did not match, and whether it may still resolve.";
+    private const string RejectionPrefix = "Draft the reason, for the Carrier, for rejecting the line \"";
+    private const string RejectionSuffix = "\".";
 
     public static string ExplainInvoiceLine(string carrierId, string invoiceNumber, string carrierBookingReference)
     {
@@ -28,6 +30,24 @@ public static partial class FinanceQuestions
         ArgumentNullException.ThrowIfNull(carrierId);
         ArgumentNullException.ThrowIfNull(invoiceNumber);
         return InvoicePrefix + invoiceNumber + CarrierIntro + carrierId + InvoiceSuffix;
+    }
+
+    public static string DraftRejectionReason(string carrierId, string invoiceNumber, string carrierBookingReference)
+    {
+        ArgumentNullException.ThrowIfNull(carrierId);
+        ArgumentNullException.ThrowIfNull(invoiceNumber);
+        ArgumentNullException.ThrowIfNull(carrierBookingReference);
+        return RejectionPrefix + carrierBookingReference + InvoiceIntro + invoiceNumber + CarrierIntro + carrierId + RejectionSuffix;
+    }
+
+    /// <summary>The Carrier, invoice number and Carrier booking reference of a draft-the-rejection-reason question, or null when the text is another question.</summary>
+    public static (string CarrierId, string InvoiceNumber, string CarrierBookingReference)? ParseDraftRejectionReason(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        var match = RejectionReason().Match(question);
+        return match.Success
+            ? (match.Groups["carrier"].Value, match.Groups["invoice"].Value, match.Groups["reference"].Value)
+            : null;
     }
 
     /// <summary>The Carrier and invoice number of an Explain-this-invoice question, or null when the text is another question.</summary>
@@ -60,4 +80,8 @@ public static partial class FinanceQuestions
 
     [GeneratedRegex("^Summarise the Carrier invoice \"(?<invoice>[^\"]+)\" of Carrier \"(?<carrier>[^\"]+)\": which lines are To decide, grouped by cause with the counts, and which of them may still resolve by themselves\\.$")]
     private static partial Regex ExplainWholeInvoice();
+
+    // The reference may hold a space (a mangled one), so it is matched up to the closing quote, as in Explain.
+    [GeneratedRegex("^Draft the reason, for the Carrier, for rejecting the line \"(?<reference>[^\"]+)\" of Carrier invoice \"(?<invoice>[^\"]+)\" of Carrier \"(?<carrier>[^\"]+)\"\\.$")]
+    private static partial Regex RejectionReason();
 }

@@ -37,6 +37,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string FinanceAgentId = "norvia-local-agent-finance-matching";
     public const string FinanceRole = "CarrierInvoices.FinanceAgent.Read";
     public const string FinanceAudience = "api://norvia-finance-matching-agent";
+    public const string FinanceRejectionReasonAgentId = "norvia-local-agent-finance-rejection-reason";
+    public const string FinanceRejectionReasonRole = "CarrierInvoices.FinanceRejectionReasonAgent.Read";
+    public const string FinanceRejectionReasonAudience = "api://norvia-finance-rejection-reason-agent";
     public const string ErpAudience = "api://norvia-erp";
 
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
@@ -141,6 +144,20 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
             builder.UseSetting(name, value);
         }
 
+        foreach (var (name, value) in new Dictionary<string, string>
+        {
+            ["AgentMcp:FinanceRejectionReason:Tokens:Issuer"] = Issuer,
+            ["AgentMcp:FinanceRejectionReason:Tokens:Audience"] = FinanceRejectionReasonAudience,
+            ["AgentMcp:FinanceRejectionReason:Tokens:SigningKey"] = signingKey,
+            ["AgentMcp:FinanceRejectionReason:Api"] = "http://erp-api/v1/agent/finance-rejection-reason",
+            ["AgentMcp:FinanceRejectionReason:ApiTokens:Issuer"] = Issuer,
+            ["AgentMcp:FinanceRejectionReason:ApiTokens:Audience"] = ErpAudience,
+            ["AgentMcp:FinanceRejectionReason:ApiTokens:SigningKey"] = signingKey,
+        })
+        {
+            builder.UseSetting(name, value);
+        }
+
         builder.ConfigureTestServices(services =>
         {
             services.AddLogging(logging => logging.AddFakeLogging());
@@ -187,6 +204,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     /// <summary>The Customer service reply agent's token as Entra issues it to its agent identity.</summary>
     public string CustomerServiceReplyToken(string? azp = CustomerServiceReplyAgentId, string[]? roles = null, string? audience = null) =>
         AgentToken(azp, roles ?? [CustomerServiceReplyRole], audience ?? CustomerServiceReplyAudience);
+
+    /// <summary>The Carrier invoice rejection reason agent's token as Entra issues it to its agent identity.</summary>
+    public string FinanceRejectionReasonToken(string? azp = FinanceRejectionReasonAgentId, string[]? roles = null, string? audience = null) =>
+        AgentToken(azp, roles ?? [FinanceRejectionReasonRole], audience ?? FinanceRejectionReasonAudience);
 
     public HttpClient AgentClient(string? token = null)
     {

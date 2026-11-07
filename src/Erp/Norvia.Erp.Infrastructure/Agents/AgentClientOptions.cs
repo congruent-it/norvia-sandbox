@@ -17,11 +17,17 @@ public sealed class AgentClientOptions
     /// <summary>The MCP stand-in's endpoint for the finance-matching server, <c>/mcp/finance-matching</c>.</summary>
     public Uri? McpAddress { get; set; }
 
+    /// <summary>The MCP stand-in's endpoint for the finance-rejection-reason server, <c>/mcp/finance-rejection-reason</c>. Empty, the rejection reason agent is not served.</summary>
+    public Uri? RejectionReasonMcpAddress { get; set; }
+
     /// <summary>A short timeout and no retry: an Agent is never on a critical path (ADR 0040).</summary>
     [Range(1, 300)]
     public int TimeoutSeconds { get; set; } = 20;
 
     public AgentTokenOptions Tokens { get; set; } = new();
+
+    /// <summary>The rejection reason agent's own local identity: another client ID, another audience and another role than <see cref="Tokens"/>.</summary>
+    public AgentTokenOptions RejectionReasonTokens { get; set; } = new();
 
     public AgentModelOptions Model { get; set; } = new();
 

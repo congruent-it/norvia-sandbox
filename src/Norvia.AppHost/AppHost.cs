@@ -973,7 +973,13 @@ else
             .WithEnvironment("AgentMcp__FinanceMatching__Tokens__Audience", LocalTokens.FinanceAgentAudience)
             .WithEnvironment("AgentMcp__FinanceMatching__Api", ReferenceExpression.Create($"{erpApi.GetEndpoint("http")}/v1/agent/finance"))
             .WithEnvironment("AgentMcp__FinanceMatching__ApiTokens__Issuer", LocalTokens.Issuer)
-            .WithEnvironment("AgentMcp__FinanceMatching__ApiTokens__Audience", LocalTokens.ErpAudience);
+            .WithEnvironment("AgentMcp__FinanceMatching__ApiTokens__Audience", LocalTokens.ErpAudience)
+            // The sixth server: the Carrier invoice rejection reason agent's, at /mcp/finance-rejection-reason. Its own audience, role and agent view.
+            .WithEnvironment("AgentMcp__FinanceRejectionReason__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__FinanceRejectionReason__Tokens__Audience", LocalTokens.FinanceRejectionReasonAgentAudience)
+            .WithEnvironment("AgentMcp__FinanceRejectionReason__Api", ReferenceExpression.Create($"{erpApi.GetEndpoint("http")}/v1/agent/finance-rejection-reason"))
+            .WithEnvironment("AgentMcp__FinanceRejectionReason__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__FinanceRejectionReason__ApiTokens__Audience", LocalTokens.ErpAudience);
         // The ERP UI runs the Carrier invoice matching agent in process against the stand-in, signing the Agent's token itself with the local key.
         erpWeb
             .WithEnvironment("Agents__Enabled", "true")
@@ -981,7 +987,12 @@ else
             .WithEnvironment("Agents__Tokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__Tokens__Audience", LocalTokens.FinanceAgentAudience)
             .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.FinanceAgentClientId)
-            .WithEnvironment("Agents__Tokens__Role", LocalTokens.FinanceAgentReadRole);
+            .WithEnvironment("Agents__Tokens__Role", LocalTokens.FinanceAgentReadRole)
+            .WithEnvironment("Agents__RejectionReasonMcpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/finance-rejection-reason"))
+            .WithEnvironment("Agents__RejectionReasonTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__RejectionReasonTokens__Audience", LocalTokens.FinanceRejectionReasonAgentAudience)
+            .WithEnvironment("Agents__RejectionReasonTokens__ClientId", LocalTokens.FinanceRejectionReasonAgentClientId)
+            .WithEnvironment("Agents__RejectionReasonTokens__Role", LocalTokens.FinanceRejectionReasonAgentReadRole);
         // The TMS API's agent view takes the stand-in's token, which is for the TMS API's audience locally, signed with the same key.
         tmsApi
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
@@ -1044,6 +1055,9 @@ else
             (agentMcp.Resource, "AgentMcp__CustomerServiceReply__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceMatching__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceMatching__ApiTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__FinanceRejectionReason__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__FinanceRejectionReason__ApiTokens__SigningKey"),
+            (erpWeb.Resource, "Agents__RejectionReasonTokens__SigningKey"),
             (erpWeb.Resource, "Agents__Tokens__SigningKey"),
             (tmsWeb.Resource, "Agents__ReplyTokens__SigningKey"),
             (tmsWeb.Resource, "Agents__Tokens__SigningKey"),

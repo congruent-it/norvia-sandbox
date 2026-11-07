@@ -1,12 +1,22 @@
+@using Microsoft.Extensions.Options
 @using Norvia.Agents
+@using Norvia.Erp.Application.Agents
+@using Norvia.Erp.Application.Agents.RejectionReason
 @using Norvia.Erp.Application.CarrierInvoices
 @using Norvia.Erp.Domain.CarrierInvoices
+@using Norvia.Erp.Domain.Carriers
+@using Norvia.Erp.Web.Agents
 @inject DecideCarrierInvoiceLineAction Action
+@inject IOptions<AgentsOptions> Agents
+@inject IExplainRequests Requests
+@inject ILogger<DecideCarrierInvoiceLineForm> Logger
+@implements IDisposable
 
 @* Finance's decision on one Carrier invoice line: accept it, accept it at an adjusted amount with a remark, or reject it with a reason.
    Accept is offered only when the line has an Open Carrier cost for the Carrier; an Unknown booking or Duplicate line offers reject only.
    A Suggestion of the assistant only pre-selects: it emphasises the action it suggests and says so. Finance writes the remark or reason
-   and confirms. *@
+   and confirms. The reason goes to the Carrier, so Finance can have it drafted by the rejection reason agent, which sees only what the
+   Carrier can see of the line: the draft prefills the reason, Finance edits it and rejects. Nothing is sent until they do. *@
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
     @if (Preselected is { } preselected)
     {
@@ -21,6 +31,32 @@
         </div>
     }
     <FluentTextArea @bind-Value="_reason" Label="@($"Reason for rejecting {Line.CarrierBookingReference}")" MaxLength="@CarrierInvoice.MaxRemarkLength" Rows="2" />
+    @if (Agents.Value.Enabled)
+    {
+        <div>
+            <FluentButton Appearance="Appearance.Neutral" Disabled="_running || _drafting" OnClick="DraftReasonAsync" aria-label="@($"Draft reason for {Line.CarrierBookingReference}")">Draft reason</FluentButton>
+        </div>
+        @if (_drafting)
+        {
+            <div role="status">
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <FluentProgressRing />
+                    <span>The assistant is drafting…</span>
+                </FluentStack>
+            </div>
+        }
+        else if (_draftUnavailable)
+        {
+            @* Whatever went wrong, Finance sees this and nothing else changes. *@
+            <div role="alert" data-testid="reason-draft-unavailable">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+            </div>
+        }
+        else if (_draft is not null)
+        {
+            <p role="status" data-testid="reason-draft" class="text-muted">The reason above was drafted by the assistant from what the Carrier can see of this line. Edit it, then press Reject. Nothing is sent to the Carrier until you do.</p>
+        }
+    }
     <div>
         <FluentButton Appearance="@(Preselected?.Kind == SuggestedActionKind.Reject ? Appearance.Accent : Appearance.Stealth)" Disabled="_running" OnClick="RejectAsync" aria-label="@($"Reject {Line.CarrierBookingReference}")">Reject</FluentButton>
         <span role="status" class="ml-2">
@@ -38,6 +74,10 @@
     private string? _remark;
     private string? _reason;
     private DecideCarrierInvoiceLineOutcome? _outcome;
+    private bool _drafting;
+    private bool _draftUnavailable;
+    private AgentRun? _draft;
+    private readonly CancellationTokenSource _lifetime = new();
 
     [Parameter, EditorRequired]
     public string CarrierId { get; set; } = "";
@@ -65,8 +105,51 @@
         return RunAsync(() => Action.AcceptAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _adjustedAmount, _remark, Preselected?.RunFor(chosen)));
     }
 
+    // The trace names the run whose text goes to the Carrier when the reason was drafted by the assistant, edited or not. One that Finance
+    // emptied and wrote anew is Finance's own. Otherwise it names the run of a Suggestion to reject, if Finance did what it suggested.
     private Task RejectAsync() =>
-        RunAsync(() => Action.RejectAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _reason, Preselected?.RunFor(SuggestedActionKind.Reject)));
+        RunAsync(() => Action.RejectAsync(
+            CarrierId, InvoiceNumber, Line.CarrierBookingReference, _reason, _draft is not null && !string.IsNullOrWhiteSpace(_reason) ? _draft : Preselected?.RunFor(SuggestedActionKind.Reject)));
+
+    // Prefills the reason; rejects nothing. An Agent is never on a critical path (ADR 0040).
+    private async Task DraftReasonAsync()
+    {
+        _drafting = true;
+        _draftUnavailable = false;
+        try
+        {
+            var result = await Requests.DraftRejectionReasonAsync(new DraftRejectionReasonQuery(new CarrierId(CarrierId), InvoiceNumber, Line.CarrierBookingReference), _lifetime.Token);
+            if (result.IsSuccess)
+            {
+                _reason = result.Value.Cause;
+                _draft = result.Value.Run;
+            }
+            else
+            {
+                _draftUnavailable = true;
+                AgentPageLog.DraftReasonFailed(Logger, Line.CarrierBookingReference, InvoiceNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _draftUnavailable = true;
+            AgentPageLog.DraftReasonCrashed(Logger, exception, Line.CarrierBookingReference, InvoiceNumber);
+        }
+        finally
+        {
+            _drafting = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
 
     private async Task RunAsync(Func<Task<DecideCarrierInvoiceLineOutcome>> decide)
     {

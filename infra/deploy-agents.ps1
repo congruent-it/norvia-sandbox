@@ -109,6 +109,7 @@ foreach ($server in $servers) {
         'health-check' { Set-BackendAddress $server health-check-web health-check-agent-api ESTATE_HEALTH_CHECK_BASE_URL }
         'customer-service' { Set-BackendAddress $server tms-api tms-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service' }
         'finance-matching' { Set-BackendAddress $server erp-api erp-agent-api ESTATE_ERP_BASE_URL -Route '/v1/agent/finance' }
+        'finance-rejection-reason' { Set-BackendAddress $server erp-api erp-rejection-reason-agent-api ESTATE_ERP_BASE_URL -Route '/v1/agent/finance-rejection-reason' }
         'customer-service-reply' { Set-BackendAddress $server tms-api tms-reply-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service-reply' }
         default { }
     }

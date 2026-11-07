@@ -744,6 +744,20 @@ module financeMatchingMcp 'estate/finance-matching-mcp.bicep' = {
   ]
 }
 
+// The Carrier invoice rejection reason agent's MCP server (one tool, the Carrier-visible facts of a line) and the agent view app registration of
+// its own. Its role on the ERP agent API is the second role of the registration financeMatchingMcp makes. The boundary is the tool: the
+// reason leaves Norvia, so that Agent's identity holds no role on the Finance agent view.
+module financeRejectionReasonMcp 'estate/finance-rejection-reason-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    erpAgentApiAppId: financeMatchingMcp.outputs.erpAgentApiAppId
+    erpBaseUrl: erpBaseUrl
+  }
+}
+
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.
 output ESTATE_SERVICE_BUS_NAMESPACE string = messaging.outputs.namespaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName

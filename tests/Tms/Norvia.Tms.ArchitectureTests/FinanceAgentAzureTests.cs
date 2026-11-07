@@ -82,7 +82,7 @@ public sealed class FinanceAgentAzureTests
     }
 
     [Fact]
-    public void TheViewAndTheErpAgentApiHaveOneRoleEach_TheContractsRead_ForApplicationsOnly()
+    public void TheViewHasTheContractsRole_TheErpAgentApiHasItAndTheRejectionReasonAgentsToo_ForApplicationsOnly()
     {
         var apps = Of(McpResources(), "Microsoft.Graph/applications@v1.0").Select(app => app["properties"]!).ToList();
 
@@ -90,7 +90,9 @@ public sealed class FinanceAgentAzureTests
         foreach (var app in apps)
         {
             var roles = app["appRoles"]!.AsArray().Select(role => role!).ToList();
-            roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal(Role);
+            // The ERP agent API is the audience of API Management's token for both Agents' views, with a role for each (#473).
+            roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal(
+                app["displayName"]!.GetValue<string>().StartsWith("Norvia ERP agent API", StringComparison.Ordinal) ? [Role, "CarrierInvoices.FinanceRejectionReasonAgent.Read"] : [Role]);
             roles.Should().OnlyContain(role => role["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>()).SequenceEqual(ApplicationOnly));
             app["api"]!["requestedAccessTokenVersion"]!.GetValue<int>().Should().Be(2, "azp is the caller's client ID in a v2 token");
         }
@@ -114,7 +116,8 @@ public sealed class FinanceAgentAzureTests
     {
         var assignments = Of(McpResources(), "Microsoft.Graph/appRoleAssignedTo@v1.0").ToList();
 
-        assignments.Should().ContainSingle().Which["properties"]!["principalId"]!.GetValue<string>().Should().Be(ApimPrincipal);
+        assignments.Should().HaveCount(2, "API Management's identity holds the role of each of the two Agents' views on the ERP agent API").And
+            .OnlyContain(assignment => assignment["properties"]!["principalId"]!.GetValue<string>() == ApimPrincipal);
         Script("assign-agent-roles.ps1").Should().Contain("appRoleAssignedTo");
         File.ReadAllText(Path.Combine(RepositoryRoot.Path, McpModule)).Should().NotContain("roleAssignments", "the Agent holds no Azure role");
     }

@@ -102,6 +102,15 @@ public static class LocalTokens
     /// <summary>The app role the Carrier invoice matching agent holds on the ERP API's Finance agent view.</summary>
     public const string FinanceAgentReadRole = "CarrierInvoices.FinanceAgent.Read";
 
+    /// <summary>The Carrier invoice rejection reason agent's view audience: its own, so the Carrier invoice matching agent's token is not for it.</summary>
+    public const string FinanceRejectionReasonAgentAudience = "api://norvia-finance-rejection-reason-agent";
+
+    /// <summary>The Carrier invoice rejection reason agent's local identity, which stands in for its Entra agent identity. It holds only its own read role.</summary>
+    public const string FinanceRejectionReasonAgentClientId = "norvia-local-agent-finance-rejection-reason";
+
+    /// <summary>The app role the Carrier invoice rejection reason agent holds on the ERP API's rejection reason agent view.</summary>
+    public const string FinanceRejectionReasonAgentReadRole = "CarrierInvoices.FinanceRejectionReasonAgent.Read";
+
     /// <summary>The app role the Estate health-check agent holds on the health-check API.</summary>
     public const string HealthCheckAgentReadRole = "HealthCheck.Agent.Read";
 

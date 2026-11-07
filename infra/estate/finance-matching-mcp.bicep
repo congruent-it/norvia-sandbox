@@ -28,6 +28,11 @@ var contract = loadJsonContent('../../contracts/agent-mcp/finance-matching.tools
 var role = contract.role
 var viewRoleId = guid('norvia-agent-finance-matching-view', environmentName, role)
 var apiRoleId = guid('norvia-erp-agent-api', environmentName, role)
+// The Carrier invoice rejection reason agent's role (finance-rejection-reason-mcp.bicep) is the second role of the ERP agent API: it has a
+// view of its own in the ERP API (/v1/agent/finance-rejection-reason) and a role requirement of its own there, so the one agent API app
+// registration serves both views while the two Agents' identities hold different roles on different agent views.
+var rejectionReasonRole = loadJsonContent('../../contracts/agent-mcp/finance-rejection-reason.tools.json').role
+var rejectionReasonApiRoleId = guid('norvia-erp-agent-api', environmentName, rejectionReasonRole)
 
 // The agent view: the audience of an Agent's token. Entra issues a token for it only to an identity that holds the role.
 resource view 'Microsoft.Graph/applications@v1.0' = {
@@ -85,6 +90,16 @@ resource erpAgentApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: rejectionReasonApiRoleId
+      value: rejectionReasonRole
+      displayName: 'Read the ERP API\'s rejection reason agent view'
+      description: 'Call /v1/agent/finance-rejection-reason of the ERP API, what the Carrier can see of its own line. API Management\'s identity holds it, on behalf of the rejection reason Agent.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -96,6 +111,12 @@ resource erpAgentApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
 resource apiManagementReadsTheAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: erpAgentApiPrincipal.id
   appRoleId: apiRoleId
+  principalId: apiManagementPrincipalId
+}
+
+resource apiManagementReadsTheRejectionReasonAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpAgentApiPrincipal.id
+  appRoleId: rejectionReasonApiRoleId
   principalId: apiManagementPrincipalId
 }
 
@@ -132,3 +153,6 @@ module server 'agent-mcp-server.bicep' = {
     apiManagementReadsTheAgentApi
   ]
 }
+
+@description('The ERP agent API\'s client ID, the audience of the token API Management sends the ERP API, for the rejection reason Agent\'s server too.')
+output erpAgentApiAppId string = erpAgentApi.appId

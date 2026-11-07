@@ -860,6 +860,53 @@
         }
       }
     },
+    "/v1/agent/finance-rejection-reason/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}/carrier-visible-facts": {
+      "get": {
+        "tags": [
+          "FinanceRejectionReasonAgent"
+        ],
+        "summary": "Read what the Carrier can see of its own Carrier invoice line, as the rejection reason agent: the amounts, the likely correct reference of its own booking and its own earlier invoice of a Duplicate.",
+        "operationId": "AgentGetCarrierVisibleLineFacts",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "carrierBookingReference",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarrierVisibleLineFactsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -1929,6 +1976,67 @@
         },
         "additionalProperties": false
       },
+      "CarrierVisibleLineFactsView": {
+        "required": [
+          "carrierId",
+          "invoiceNumber",
+          "carrierBookingReference",
+          "result",
+          "invoicedAmount",
+          "currency",
+          "agreedCarrierCost",
+          "likelyCorrectReference",
+          "earlierInvoiceNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "carrierBookingReference": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "invoicedAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "agreedCarrierCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "likelyCorrectReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "earlierInvoiceNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "ChargeLineRequest": {
         "required": [
           "type",
@@ -2785,6 +2893,9 @@
     },
     {
       "name": "FinanceAgent"
+    },
+    {
+      "name": "FinanceRejectionReasonAgent"
     },
     {
       "name": "Reset"

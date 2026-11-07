@@ -43,6 +43,12 @@ public sealed class AgentMcpOptions
     /// </summary>
     public HealthCheckServerOptions? FinanceMatching { get; set; }
 
+    /// <summary>
+    /// The Carrier invoice rejection reason agent's MCP server (<c>finance-rejection-reason</c>), served at <c>/mcp/finance-rejection-reason</c>.
+    /// Its own audience and role, so the Carrier invoice matching agent's token opens nothing here. Not configured, the stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? FinanceRejectionReason { get; set; }
+
     /// <summary>Calls per Agent identity in a window, as the policy's <c>rate-limit-by-key</c> allows (60 a minute).</summary>
     [Range(1, 10_000)]
     public int RateLimitCalls { get; set; } = 60;

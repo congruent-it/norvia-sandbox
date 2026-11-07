@@ -33,4 +33,8 @@ internal static class Embedded
     public static string FinanceMatchingDefinition => Read("agents/finance-matching.agent.yaml");
 
     public static string FinanceMatchingTools => Read("agent-mcp/finance-matching.tools.json");
+
+    public static string FinanceRejectionReasonDefinition => Read("agents/finance-rejection-reason.agent.yaml");
+
+    public static string FinanceRejectionReasonTools => Read("agent-mcp/finance-rejection-reason.tools.json");
 }

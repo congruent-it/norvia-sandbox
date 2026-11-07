@@ -132,6 +132,7 @@ app.MapCarrierInvoices();
 app.MapShipperInvoices();
 app.MapCreditNotes();
 app.MapFinanceAgent();
+app.MapFinanceRejectionReasonAgent();
 app.MapReset();
 
 await app.RunAsync();
