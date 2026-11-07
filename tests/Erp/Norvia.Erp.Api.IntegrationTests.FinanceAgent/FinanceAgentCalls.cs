@@ -13,6 +13,7 @@ namespace Norvia.Erp.Api.IntegrationTests.FinanceAgent;
 internal static class FinanceAgentCalls
 {
     public const string Tool = "get_invoice_line";
+    public const string SummaryTool = "get_invoice_summary";
     public const string Carrier = "CAR-0001";
     public const string OtherCarrier = "CAR-0002";
 
@@ -141,6 +142,31 @@ internal static class FinanceAgentCalls
                 {
                     ["name"] = Tool,
                     ["arguments"] = new JsonObject { ["carrierId"] = carrierId, ["invoiceNumber"] = invoiceNumber, ["carrierBookingReference"] = reference },
+                },
+            }),
+        };
+        request.Headers.Add("X-Correlation-ID", correlationId);
+        using var response = await client.SendAsync(request, cancellationToken);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = (await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["result"]!;
+        return (result["isError"]!.GetValue<bool>(), result["content"]![0]!["text"]!.GetValue<string>());
+    }
+
+    /// <summary>Calls <c>get_invoice_summary</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
+    public static async Task<(bool IsError, string Text)> GetInvoiceSummaryAsync(
+        this HttpClient client, string carrierId, string invoiceNumber, string correlationId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(FinanceAgentFixture.McpPath, UriKind.Relative))
+        {
+            Content = JsonContent.Create(new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 1,
+                ["method"] = "tools/call",
+                ["params"] = new JsonObject
+                {
+                    ["name"] = SummaryTool,
+                    ["arguments"] = new JsonObject { ["carrierId"] = carrierId, ["invoiceNumber"] = invoiceNumber },
                 },
             }),
         };
