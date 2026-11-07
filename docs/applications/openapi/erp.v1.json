@@ -801,6 +801,45 @@
         }
       }
     },
+    "/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}": {
+      "get": {
+        "tags": [
+          "FinanceAgent"
+        ],
+        "summary": "Read a whole Carrier invoice as the Carrier invoice matching agent: its lines by result, the totals, the Carrier, the dates and the approved amount so far.",
+        "operationId": "AgentGetInvoiceSummary",
+        "parameters": [
+          {
+            "name": "carrierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentInvoiceSummaryView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -1093,6 +1132,144 @@
           },
           "resolvesAutomatically": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentInvoiceSummaryView": {
+        "required": [
+          "carrierId",
+          "carrierName",
+          "invoiceNumber",
+          "invoiceDate",
+          "receivedAt",
+          "status",
+          "total",
+          "currency",
+          "approvedAmountSoFar",
+          "lines",
+          "toDecide",
+          "resolveAutomatically",
+          "byResult"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "carrierName": {
+            "type": "string"
+          },
+          "invoiceNumber": {
+            "type": "string"
+          },
+          "invoiceDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "approvedAmountSoFar": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "lines": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "toDecide": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "resolveAutomatically": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "byResult": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentLineGroupView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgentLineGroupView": {
+        "required": [
+          "result",
+          "lines",
+          "toDecide",
+          "amount",
+          "resolveAutomatically"
+        ],
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string"
+          },
+          "lines": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "toDecide": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "resolveAutomatically": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         },
         "additionalProperties": false

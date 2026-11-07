@@ -108,7 +108,7 @@ public sealed class AgentModelsAndDefinitionsTests
         var definition = AgentDefinitions.Load("finance-matching");
 
         definition.Name.Should().Be("finance-matching");
-        definition.Tools.Names.Should().Equal("get_invoice_line");
+        definition.Tools.Names.Should().Equal("get_invoice_line", "get_invoice_summary");
     }
 
     [Fact]

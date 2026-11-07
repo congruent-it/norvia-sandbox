@@ -16,6 +16,12 @@ public sealed record CarrierInvoiceLine(
     decimal? DecidedAmount = null,
     string? Remark = null)
 {
+    /// <summary>
+    /// Whether the line is matched again by itself when its Carrier cost arrives: an Unknown booking line that still waits for Finance.
+    /// A Price mismatch or a Duplicate waits for Finance's decision.
+    /// </summary>
+    public bool ResolvesAutomatically => Status == CarrierInvoiceLineStatus.ToDecide && Result == CarrierInvoiceLineResult.UnknownBooking;
+
     /// <summary>What the line contributes to the approved amount: its amount once Matched, Finance's amount once Accepted, nothing otherwise.</summary>
     public decimal? AcceptedAmount => Status switch
     {

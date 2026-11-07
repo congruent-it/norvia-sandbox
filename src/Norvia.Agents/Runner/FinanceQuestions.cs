@@ -11,6 +11,8 @@ public static partial class FinanceQuestions
     private const string Prefix = "Explain why the line \"";
     private const string InvoiceIntro = "\" of Carrier invoice \"";
     private const string CarrierIntro = "\" of Carrier \"";
+    private const string InvoicePrefix = "Summarise the Carrier invoice \"";
+    private const string InvoiceSuffix = "\": which lines are To decide, grouped by cause with the counts, and which of them may still resolve by themselves.";
     private const string Suffix = "\" did not match, and whether it may still resolve.";
 
     public static string ExplainInvoiceLine(string carrierId, string invoiceNumber, string carrierBookingReference)
@@ -19,6 +21,21 @@ public static partial class FinanceQuestions
         ArgumentNullException.ThrowIfNull(invoiceNumber);
         ArgumentNullException.ThrowIfNull(carrierBookingReference);
         return Prefix + carrierBookingReference + InvoiceIntro + invoiceNumber + CarrierIntro + carrierId + Suffix;
+    }
+
+    public static string ExplainInvoice(string carrierId, string invoiceNumber)
+    {
+        ArgumentNullException.ThrowIfNull(carrierId);
+        ArgumentNullException.ThrowIfNull(invoiceNumber);
+        return InvoicePrefix + invoiceNumber + CarrierIntro + carrierId + InvoiceSuffix;
+    }
+
+    /// <summary>The Carrier and invoice number of an Explain-this-invoice question, or null when the text is another question.</summary>
+    public static (string CarrierId, string InvoiceNumber)? ParseExplainInvoice(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        var match = ExplainWholeInvoice().Match(question);
+        return match.Success ? (match.Groups["carrier"].Value, match.Groups["invoice"].Value) : null;
     }
 
     /// <summary>The Carrier, invoice number and Carrier booking reference of an Explain question, or null when the text is another question.</summary>
@@ -40,4 +57,7 @@ public static partial class FinanceQuestions
 
     [GeneratedRegex("^Explain why the line \"(?<reference>[^\"]+)\" of Carrier invoice \"(?<invoice>[^\"]+)\" of Carrier \"(?<carrier>[^\"]+)\" did not match, and whether it may still resolve\\.$")]
     private static partial Regex Explain();
+
+    [GeneratedRegex("^Summarise the Carrier invoice \"(?<invoice>[^\"]+)\" of Carrier \"(?<carrier>[^\"]+)\": which lines are To decide, grouped by cause with the counts, and which of them may still resolve by themselves\\.$")]
+    private static partial Regex ExplainWholeInvoice();
 }

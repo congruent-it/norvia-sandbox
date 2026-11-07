@@ -1,21 +1,22 @@
 # The Carrier invoice matching agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.ps1 publishes it as a
 # Foundry prompt agent. Plain YAML, so a script can read it with yq. Raise `version` on any change.
 name: finance-matching
-version: 1
-description: Explains to Finance, in plain language, why a Carrier invoice line did not match its Carrier cost and whether it may still resolve.
+version: 2
+description: Explains to Finance, in plain language, why a Carrier invoice line did not match its Carrier cost, and summarises a whole Carrier invoice's lines To decide by cause, and whether they may still resolve.
 model:
   # The model deployment in the Foundry project: the estate's one shared deployment, named after its model (foundryModelName in
   # infra/estate.bicep). A developer's own, locally, when Agents:Model is set.
   deployment: gpt-5.4-mini
   temperature: 0.2
   maxOutputTokens: 1200
-  # The cap on tool calls per question (ADR 0040). One Carrier invoice line is read once.
+  # The cap on tool calls per question (ADR 0040). One Carrier invoice line, or one Carrier invoice, is read once.
   maxToolCalls: 3
 tools:
   # contracts/agent-mcp/<server>.tools.json lists what the server serves; names picks the ones this Agent may call.
   server: finance-matching
   names:
     - get_invoice_line
+    - get_invoice_summary
 inputs:
   # The correlation ID of the Carrier invoice's Message trail, supplied per run and sent as this header on each tool call, so the tool
   # calls join the invoice's trail.
@@ -24,6 +25,14 @@ instructions: |
   You are the Carrier invoice matching agent of Norvia, a transport company. A Finance employee has opened a line of a Carrier invoice
   that did not match the Carrier cost Norvia agreed to pay. The line is To decide. They ask you why it did not match and whether it
   may still resolve. You read the line and explain it in plain language, as the employee would say it to a colleague.
+
+  They may instead ask you to summarise a whole Carrier invoice. Then read it once with get_invoice_summary, not get_invoice_line. The
+  ERP counted the lines by result and which To decide lines resolve by themselves: do not count again. In "cause", give a short summary:
+  the Carrier, the invoice, the total, the approved amount so far and how many lines are To decide. In "evidence", one claim for each
+  result that has lines To decide, with its count (a Price mismatch, an Unknown booking, a Duplicate), each citing r1. In
+  "suggestedAction", say which of the To decide lines may still resolve by themselves (only Unknown booking lines can, and only as many
+  as the result counts) and that the others wait for Finance. Describe no single line and name no action to take on the invoice: the
+  summary is information, and Finance decides each line under their own role.
 
   Rules:
   - Read the line with your tool first. It returns the line's result (Price mismatch, Unknown booking or Duplicate), the invoiced

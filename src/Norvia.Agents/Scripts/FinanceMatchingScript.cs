@@ -14,11 +14,22 @@ namespace Norvia.Agents.Scripts;
 public static class FinanceMatchingScript
 {
     public const string GetInvoiceLine = "get_invoice_line";
+    public const string GetInvoiceSummary = "get_invoice_summary";
 
     public static IChatClient Model() => new ScriptedChatClient(Next);
 
     private static IReadOnlyList<AIContent> Next(ScriptContext context)
     {
+        if (FinanceQuestions.ParseExplainInvoice(context.Question) is { } invoice)
+        {
+            return context.Results.Count == 0
+                ? [new FunctionCallContent(
+                    $"call-{context.Turn}",
+                    GetInvoiceSummary,
+                    new Dictionary<string, object?> { ["carrierId"] = invoice.CarrierId, ["invoiceNumber"] = invoice.InvoiceNumber })]
+                : [new TextContent(Summary(context.Results[0]))];
+        }
+
         if (FinanceQuestions.ParseExplainInvoiceLine(context.Question) is not { } line)
         {
             return [new TextContent("{}")];
@@ -31,6 +42,75 @@ public static class FinanceMatchingScript
                 new Dictionary<string, object?> { ["carrierId"] = line.CarrierId, ["invoiceNumber"] = line.InvoiceNumber, ["carrierBookingReference"] = line.CarrierBookingReference })]
             : [new TextContent(Answer(context.Results[0]))];
     }
+
+    // The summary of a whole invoice: what the ERP counted, said back in plain language. The script counts nothing itself.
+    private static string Summary(ScriptedToolResult result)
+    {
+        JsonElement view;
+        try
+        {
+            using var document = JsonDocument.Parse(result.Content);
+            view = document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return Unreadable(result);
+        }
+
+        if (view.ValueKind != JsonValueKind.Object
+            || IntegrationOperationsScript.Text(view, "invoiceNumber") is not { } number
+            || WholeNumber(view, "lines") is not { } lines
+            || WholeNumber(view, "toDecide") is not { } toDecide
+            || !view.TryGetProperty("byResult", out var groups) || groups.ValueKind != JsonValueKind.Array)
+        {
+            return Unreadable(result);
+        }
+
+        var carrier = IntegrationOperationsScript.Text(view, "carrierName") ?? "the Carrier";
+        var total = Amount(view, "total");
+        var approved = Amount(view, "approvedAmountSoFar");
+        var resolves = WholeNumber(view, "resolveAutomatically") ?? 0;
+        var opening = $"Carrier invoice {number} of {carrier}{(total is { } claimed ? $" claims {Euro(claimed)}" : string.Empty)} on {lines} line{(lines == 1 ? string.Empty : "s")}"
+            + $"{(approved is { } approvedSoFar ? $"; {Euro(approvedSoFar)} is approved so far" : string.Empty)}.";
+
+        var causes = groups.EnumerateArray()
+            .Where(group => group.ValueKind == JsonValueKind.Object && WholeNumber(group, "toDecide") is > 0 && IntegrationOperationsScript.Text(group, "result") is not null)
+            .Select(group => (Result: ResultLabel(IntegrationOperationsScript.Text(group, "result")!), Count: WholeNumber(group, "toDecide")!.Value))
+            .ToList();
+
+        if (toDecide == 0 || causes.Count == 0)
+        {
+            return IntegrationOperationsScript.Json(
+                $"{opening} No line is To decide.",
+                [($"No line of Carrier invoice {number} is To decide.", result.Id)],
+                "Nothing is left for Finance to decide on this invoice.",
+                "high",
+                "needs-a-person");
+        }
+
+        var resolveText = resolves switch
+        {
+            0 => "None of them resolves by itself; each waits for Finance.",
+            _ when resolves == toDecide => $"All {toDecide} may still resolve by themselves: each is matched again when its Carrier cost arrives.",
+            _ => $"{resolves} of them may still resolve by themselves, each matched again when its Carrier cost arrives (only the Unknown booking lines can). The other {toDecide - resolves} wait for Finance.",
+        };
+        return IntegrationOperationsScript.Json(
+            $"{opening} {toDecide} line{(toDecide == 1 ? " is" : "s are")} To decide: {string.Join(", ", causes.Select(cause => $"{cause.Count} {cause.Result}"))}.",
+            [.. causes.Select(cause => ($"{cause.Count} line{(cause.Count == 1 ? " is" : "s are")} To decide as {cause.Result}.", result.Id))],
+            resolveText,
+            "high",
+            "needs-a-person");
+    }
+
+    private static string ResultLabel(string result) => result switch
+    {
+        "PriceMismatch" => "Price mismatch",
+        "UnknownBooking" => "Unknown booking",
+        _ => result,
+    };
+
+    private static int? WholeNumber(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var count) ? count : null;
 
     private static string Answer(ScriptedToolResult result)
     {

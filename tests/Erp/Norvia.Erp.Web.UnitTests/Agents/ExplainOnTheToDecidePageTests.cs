@@ -21,14 +21,14 @@ public sealed class ExplainOnTheToDecidePageTests : ErpWebContext
     }
 
     [Fact]
-    public void Render_AgentsOn_OffersExplainOnEachLineToDecide_AndNotOnAMatchedOne()
+    public void Render_AgentsOn_OffersExplainOnTheInvoiceAndOnEachLineToDecide_AndNotOnAMatchedOne()
     {
         AgentSettings.Enabled = true;
 
         var page = Render<CarrierInvoicesToDecidePage>();
 
         page.WaitForAssertion(() => page.Markup.Should().Contain("VDT-1"));
-        page.FindAll("fluent-button[aria-label^='Explain ']").Select(button => button.GetAttribute("aria-label")).Should().Equal("Explain TRX-1", "Explain TRX-2");
+        page.FindAll("fluent-button[aria-label^='Explain ']").Select(button => button.GetAttribute("aria-label")).Should().Equal("Explain invoice VDT-1", "Explain TRX-1", "Explain TRX-2");
     }
 
     [Fact]

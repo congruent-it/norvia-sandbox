@@ -118,7 +118,7 @@ module server 'agent-mcp-server.bicep' = {
   params: {
     apiManagementName: apiManagementName
     serverName: contract.server
-    purpose: 'The Carrier invoice matching agent\'s read-only view of the ERP: one Carrier invoice line, with its result, the invoiced amount, the agreed Carrier cost total and the difference, the matching tolerance, the cost\'s source as a label, the earlier line of a Duplicate and the likely candidate Carrier costs of an Unknown booking, never a Planner\'s remark, never a Shipper or Consignee\'s personal data and never a file\'s contents.'
+    purpose: 'The Carrier invoice matching agent\'s read-only view of the ERP: one Carrier invoice line or a whole Carrier invoice, with its result, the invoiced amount, the agreed Carrier cost total and the difference, the matching tolerance, the cost\'s source as a label, the earlier line of a Duplicate and the likely candidate Carrier costs of an Unknown booking, and for a whole invoice its lines counted by result, never a Planner\'s remark, never a Shipper or Consignee\'s personal data and never a file\'s contents.'
     tools: contract.tools
     audience: view.appId
     requiredRole: role

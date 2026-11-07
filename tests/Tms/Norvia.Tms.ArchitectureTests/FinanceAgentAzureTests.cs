@@ -47,7 +47,7 @@ public sealed class FinanceAgentAzureTests
             .Should().OnlyContain(method => method == "GET");
         Of(resources, "Microsoft.ApiManagement/service/apis/operations").Select(operation => operation["properties"]!["urlTemplate"]!.GetValue<string>())
             .Should().Equal(ContractFile["tools"]!.AsArray().Select(tool => tool!["path"]!.GetValue<string>()));
-        tools.Should().ContainSingle("get_invoice_line is the Agent's one tool");
+        tools.Should().HaveCount(2, "get_invoice_line and get_invoice_summary are the Agent's tools");
     }
 
     [Fact]

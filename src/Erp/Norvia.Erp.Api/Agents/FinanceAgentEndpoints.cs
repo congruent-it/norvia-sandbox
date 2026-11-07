@@ -9,8 +9,8 @@ using Norvia.Erp.Domain.Carriers;
 namespace Norvia.Erp.Api.Agents;
 
 /// <summary>
-/// The Carrier invoice matching agent's view of the ERP (ADR 0040): a narrower read of a Carrier invoice line, which an MCP server
-/// exposes as the agent's one tool (contracts/agent-mcp/finance-matching.tools.json). Reads only; there is no write endpoint. Behind a
+/// The Carrier invoice matching agent's view of the ERP (ADR 0040): a narrower read of a Carrier invoice line and of a whole Carrier invoice, which an MCP server
+/// exposes as the agent's tools (contracts/agent-mcp/finance-matching.tools.json). Reads only; there is no write endpoint. Behind a
 /// token and the one role <see cref="AgentRoles.FinanceRead"/>, which only the agent's identity holds.
 /// </summary>
 public static class FinanceAgentEndpoints
@@ -32,6 +32,10 @@ public static class FinanceAgentEndpoints
         group.MapGet("/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}", GetInvoiceLineAsync)
             .WithName("AgentGetInvoiceLine")
             .WithSummary("Read a Carrier invoice line as the Carrier invoice matching agent: its result, the amounts, the tolerance, and the candidates or the earlier line.");
+
+        group.MapGet("/carriers/{carrierId}/invoices/{invoiceNumber}", GetInvoiceSummaryAsync)
+            .WithName("AgentGetInvoiceSummary")
+            .WithSummary("Read a whole Carrier invoice as the Carrier invoice matching agent: its lines by result, the totals, the Carrier, the dates and the approved amount so far.");
         return app;
     }
 
@@ -42,5 +46,14 @@ public static class FinanceAgentEndpoints
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)
             : TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "There is no such Carrier invoice line.");
+    }
+
+    internal static async Task<Results<Ok<AgentInvoiceSummaryView>, ProblemHttpResult>> GetInvoiceSummaryAsync(
+        string carrierId, string invoiceNumber, IMediator mediator, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetAgentInvoiceSummaryQuery(new CarrierId(carrierId), invoiceNumber), cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(result.Value)
+            : TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "There is no such Carrier invoice.");
     }
 }

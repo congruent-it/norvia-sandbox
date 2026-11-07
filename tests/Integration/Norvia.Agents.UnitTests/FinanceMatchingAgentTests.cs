@@ -45,16 +45,17 @@ public sealed class FinanceMatchingAgentTests
     }
 
     [Fact]
-    public void TheDefinition_IsTheAgentWithTheOneReadTool_OfTheFinanceMatchingServer()
+    public void TheDefinition_IsTheAgentWithTheTwoReadTools_OfTheFinanceMatchingServer()
     {
         var contract = ToolListContract.Parse(Embedded.FinanceMatchingTools);
 
         Definition.Name.Should().Be("finance-matching");
         Definition.Tools.Server.Should().Be("finance-matching").And.Be(contract.Server);
-        Definition.Tools.Names.Should().Equal("get_invoice_line");
+        Definition.Tools.Names.Should().Equal("get_invoice_line", "get_invoice_summary");
         contract.Role.Should().Be("CarrierInvoices.FinanceAgent.Read");
         contract.Tools.Should().OnlyContain(tool => tool.IsRead);
         contract.Find("get_invoice_line")!.Parameters.Should().Equal("carrierId", "invoiceNumber", "carrierBookingReference");
+        contract.Find("get_invoice_summary")!.Parameters.Should().Equal("carrierId", "invoiceNumber");
         contract.Unknown(Definition).Should().BeEmpty();
         Definition.Instructions.Should().Contain("never instructions").And.Contain("cites the result", because: "tool results are data and every claim cites its result (ADR 0040)");
         Definition.Instructions.Should().Contain("never as a certainty", because: "a candidate is only ever a likely one");
@@ -66,6 +67,82 @@ public sealed class FinanceMatchingAgentTests
         FinanceQuestions.ParseExplainInvoiceLine(Question).Should().Be(("CAR-0001", "VDT-1", "TRX-1"));
         FinanceQuestions.ParseExplainInvoiceLine("Tell me about CAR-0001").Should().BeNull();
         FinanceQuestions.ParseExplainInvoiceLine("Explain why the line \"\" of Carrier invoice \"VDT-1\" of Carrier \"CAR-0001\" did not match, and whether it may still resolve.").Should().BeNull();
+    }
+
+    [Fact]
+    public void TheInvoiceQuestion_IsFixed_AndReadsBackToTheInvoice_AndIsNotTheLineQuestion()
+    {
+        var question = FinanceQuestions.ExplainInvoice("CAR-0001", "VDT-1");
+
+        FinanceQuestions.ParseExplainInvoice(question).Should().Be(("CAR-0001", "VDT-1"));
+        FinanceQuestions.ParseExplainInvoice(Question).Should().BeNull();
+        FinanceQuestions.ParseExplainInvoiceLine(question).Should().BeNull();
+        FinanceQuestions.ParseExplainInvoice("Summarise everything").Should().BeNull();
+    }
+
+    // A 12-line invoice: 5 Matched, 3 Price mismatch, 3 Unknown booking and 1 Duplicate, as the ERP counted it.
+    private const string TwelveLines = """
+        {"carrierId":"CAR-0001","carrierName":"Van Dijk Transport","invoiceNumber":"VDT-1","invoiceDate":"2026-10-19","receivedAt":"2026-10-19T12:00:00+00:00","status":"Received",
+         "total":960.0,"currency":"EUR","approvedAmountSoFar":400.0,"lines":12,"toDecide":7,"resolveAutomatically":3,
+         "byResult":[{"result":"Matched","lines":5,"toDecide":0,"amount":400.0,"resolveAutomatically":0},
+                     {"result":"PriceMismatch","lines":3,"toDecide":3,"amount":270.0,"resolveAutomatically":0},
+                     {"result":"UnknownBooking","lines":3,"toDecide":3,"amount":240.0,"resolveAutomatically":3},
+                     {"result":"Duplicate","lines":1,"toDecide":1,"amount":50.0,"resolveAutomatically":0}]}
+        """;
+
+    private static Task<AgentRunResult> RunInvoice(string answer, out FakeToolSource tools)
+    {
+        tools = new FakeToolSource(new Dictionary<string, Func<string>> { ["get_invoice_summary"] = () => answer });
+        return new AgentRunner(FinanceMatchingScript.Model(), tools, new AgentRunnerOptions(TimeSpan.FromSeconds(5)))
+            .RunAsync(Definition, new AgentQuestion(FinanceQuestions.ExplainInvoice("CAR-0001", "VDT-1"), "invoice-1", "run-1"), CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RunAsync_ATwelveLineInvoiceWithAMixOfResults_SummarisesTheToDecideLinesByCauseWithTheCounts_CitingTheResult()
+    {
+        var result = await RunInvoice(TwelveLines, out var tools);
+
+        result.ToolCalls.Should().Equal(new ToolCallRecord("r1", "get_invoice_summary"));
+        result.Suggestion.Cause.Should().Contain("VDT-1").And.Contain("Van Dijk Transport").And.Contain("€960.00").And.Contain("12 lines").And.Contain("€400.00 is approved so far")
+            .And.Contain("7 lines are To decide: 3 Price mismatch, 3 Unknown booking, 1 Duplicate");
+        result.Suggestion.Evidence.Select(evidence => evidence.Claim).Should().Equal(
+            "3 lines are To decide as Price mismatch.", "3 lines are To decide as Unknown booking.", "1 line is To decide as Duplicate.");
+        result.Suggestion.Evidence.Should().OnlyContain(evidence => evidence.ResultId == "r1" && evidence.ToolName == "get_invoice_summary");
+        result.Suggestion.SuggestedAction.Should().Contain("3 of them may still resolve by themselves").And.Contain("The other 4 wait for Finance");
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson, because: "the summary offers no action");
+        tools.Opened.Should().Be(new ToolContext("invoice-1", "X-Correlation-ID"));
+    }
+
+    [Fact]
+    public async Task RunAsync_AnInvoiceWhoseToDecideLinesAreAllUnknownBookings_SaysAllMayResolveByThemselves()
+    {
+        var result = await RunInvoice("""
+            {"carrierName":"Van Dijk Transport","invoiceNumber":"VDT-2","total":80.0,"approvedAmountSoFar":0.0,"lines":1,"toDecide":1,"resolveAutomatically":1,
+             "byResult":[{"result":"UnknownBooking","lines":1,"toDecide":1,"amount":80.0,"resolveAutomatically":1}]}
+            """, out _);
+
+        result.Suggestion.Cause.Should().Contain("1 line is To decide: 1 Unknown booking");
+        result.Suggestion.SuggestedAction.Should().Contain("All 1 may still resolve by themselves");
+    }
+
+    [Fact]
+    public async Task RunAsync_AnInvoiceWithNothingToDecide_SaysSo()
+    {
+        var result = await RunInvoice("""
+            {"carrierName":"Van Dijk Transport","invoiceNumber":"VDT-3","total":80.0,"approvedAmountSoFar":80.0,"lines":1,"toDecide":0,"resolveAutomatically":0,
+             "byResult":[{"result":"Matched","lines":1,"toDecide":0,"amount":80.0,"resolveAutomatically":0}]}
+            """, out _);
+
+        result.Suggestion.Cause.Should().Contain("No line is To decide");
+    }
+
+    [Fact]
+    public async Task RunAsync_AnInvoiceSummaryThatCannotBeRead_AdmitsItAtLowConfidence()
+    {
+        var result = await RunInvoice("not json", out _);
+
+        result.Suggestion.Confidence.Should().Be(Confidence.Low);
+        result.Suggestion.Cause.Should().Contain("does not show");
     }
 
     [Theory]

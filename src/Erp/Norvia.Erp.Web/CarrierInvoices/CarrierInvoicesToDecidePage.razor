@@ -25,6 +25,7 @@
         <section aria-label="@($"Carrier invoice {item.Invoice.InvoiceNumber} of {item.CarrierName}")" @key="@($"{item.Invoice.CarrierId}/{item.Invoice.InvoiceNumber}")">
             <h2>@item.Invoice.InvoiceNumber · @item.CarrierName</h2>
             <p>@item.Invoice.InvoiceDate.ToString("yyyy-MM-dd") · @Money.Format(item.Invoice.Total) without VAT · @LinesText(item.Invoice)</p>
+            <ExplainInvoice CarrierId="@item.Invoice.CarrierId" InvoiceNumber="@item.Invoice.InvoiceNumber" />
             <FluentAccordion>
                 @foreach (var line in item.Invoice.Lines)
                 {
