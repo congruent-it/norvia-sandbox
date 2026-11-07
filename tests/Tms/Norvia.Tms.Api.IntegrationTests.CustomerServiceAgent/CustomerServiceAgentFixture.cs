@@ -17,6 +17,7 @@ namespace Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent;
 public sealed class CustomerServiceAgentFixture : TmsFixture
 {
     public const string McpPath = "/mcp/customer-service";
+    public const string ReplyMcpPath = "/mcp/customer-service-reply";
     public const int RateLimitCalls = 10;
 
     private readonly System.Collections.Concurrent.ConcurrentQueue<TmsLog> _standInLogs = new();
@@ -40,6 +41,13 @@ public sealed class CustomerServiceAgentFixture : TmsFixture
     public string AgentToken(string? agentId = null, string[]? roles = null, string? signingKey = null) =>
         IssueToken(roles ?? [LocalTokens.CustomerServiceAgentReadRole], LocalTokens.CustomerServiceAgentAudience, agentId ?? NewAgentId(), signingKey);
 
+    /// <summary>A token as Entra issues it to the Customer service reply agent's identity for its MCP server; change any part to show what is refused.</summary>
+    public string ReplyAgentToken(string? agentId = null, string[]? roles = null) =>
+        IssueToken(roles ?? [LocalTokens.CustomerServiceReplyAgentReadRole], LocalTokens.CustomerServiceReplyAgentAudience, agentId ?? NewAgentId());
+
+    /// <summary>A token for the TMS API's agent view itself, as the stand-in signs it for the Agent's identity: the TMS API's audience, with the roles given.</summary>
+    public string AgentViewToken(string[] roles, string? agentId = null) => IssueToken(roles, LocalTokens.TmsAudience, agentId ?? NewAgentId());
+
     /// <summary>A client of the stand-in that sends the given token, or none.</summary>
     public HttpClient CreateMcpClient(string? token)
     {
@@ -54,6 +62,9 @@ public sealed class CustomerServiceAgentFixture : TmsFixture
 
     /// <summary>The MCP endpoint a runner connects to.</summary>
     public Uri McpAddress => new(App.GetEndpoint("agent-mcp", "http"), McpPath);
+
+    /// <summary>The MCP endpoint the Customer service reply agent's runner connects to.</summary>
+    public Uri ReplyMcpAddress => new(App.GetEndpoint("agent-mcp", "http"), ReplyMcpPath);
 
     /// <summary>Waits for the stand-in to write a log that matches, as logs arrive a moment after the call.</summary>
     public async Task<TmsLog> StandInLogAsync(Func<TmsLog, bool> match, CancellationToken cancellationToken)
