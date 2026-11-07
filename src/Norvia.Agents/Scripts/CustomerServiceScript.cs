@@ -33,6 +33,11 @@ public static class CustomerServiceScript
             return CustomerServiceOrderScript.NextNotYetBillable(context, held);
         }
 
+        if (CustomerServiceQuestions.ParseRecommendRelease(context.Question) is { } release)
+        {
+            return CustomerServiceOrderScript.NextRelease(context, release);
+        }
+
         if (CustomerServiceQuestions.ParseExplainRejectedBooking(context.Question) is not { } id)
         {
             return [new TextContent("{}")];

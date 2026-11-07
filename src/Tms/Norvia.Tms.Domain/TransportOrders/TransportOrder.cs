@@ -235,6 +235,26 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remark);
         ArgumentException.ThrowIfNullOrWhiteSpace(releasedBy);
+        if (ReleaseRefusal(deliveredAt) is { } refusal)
+        {
+            return refusal;
+        }
+
+        ReleasedWithoutProofOfDelivery = true;
+        ReleasedBy = releasedBy;
+        ReleasedAt = now;
+        ReleaseRemark = remark;
+        return null;
+    }
+
+    /// <summary>
+    /// The rule of P9 for releasing without a Proof of delivery, on its own: why Customer service can't release this order, or null
+    /// when it can. <see cref="ReleaseWithoutProofOfDelivery"/> applies it, and so does whatever tells Customer service, or the
+    /// Customer service agent, whether an order may be released, so there is one copy of the rule.
+    /// </summary>
+    /// <param name="deliveredAt">When the order's Shipment was Delivered; null while it isn't.</param>
+    public BillingRefusal? ReleaseRefusal(DateTimeOffset? deliveredAt)
+    {
         switch (BillingState)
         {
             case TransportOrders.BillingState.Billable:
@@ -250,16 +270,9 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             return new(BillingRefusalCode.ShipmentNotDelivered, Invariant($"The Shipment of Transport Order {Number} isn't Delivered."));
         }
 
-        if (ReleasedWithoutProofOfDelivery)
-        {
-            return new(BillingRefusalCode.AlreadyReleased, Invariant($"Transport Order {Number} was released without a Proof of delivery already."));
-        }
-
-        ReleasedWithoutProofOfDelivery = true;
-        ReleasedBy = releasedBy;
-        ReleasedAt = now;
-        ReleaseRemark = remark;
-        return null;
+        return ReleasedWithoutProofOfDelivery
+            ? new(BillingRefusalCode.AlreadyReleased, Invariant($"Transport Order {Number} was released without a Proof of delivery already."))
+            : null;
     }
 
     private void ApplyRating(RateCard? rateCard, DateTimeOffset ratedAt)

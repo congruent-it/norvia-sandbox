@@ -118,7 +118,7 @@ module server 'agent-mcp-server.bicep' = {
   params: {
     apiManagementName: apiManagementName
     serverName: contract.server
-    purpose: 'The Customer service agent\'s read-only view of the TMS: a Rejected booking\'s reasons, which fields failed and what the Shipper submitted, and a Transport Order\'s rating, Shipment, tracking, Exceptions, Proof of delivery status and billing state, never a Consignee\'s name, address or contact and never a file\'s contents.'
+    purpose: 'The Customer service agent\'s read-only view of the TMS: a Rejected booking\'s reasons, which fields failed and what the Shipper submitted, and a Transport Order\'s rating, Shipment, tracking, Exceptions, Proof of delivery status, billing state and whether an order may be released without a Proof of delivery, never a Consignee\'s name, address or contact and never a file\'s contents.'
     tools: contract.tools
     audience: view.appId
     requiredRole: role

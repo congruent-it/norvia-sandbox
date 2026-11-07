@@ -14,4 +14,6 @@ public interface IExplainRequests
     Task<Result<Suggestion>> ExplainAsync(ExplainRatingFailureQuery query, CancellationToken cancellationToken);
 
     Task<Result<Suggestion>> ExplainAsync(ExplainNotYetBillableQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> RecommendAsync(RecommendReleaseQuery query, CancellationToken cancellationToken);
 }

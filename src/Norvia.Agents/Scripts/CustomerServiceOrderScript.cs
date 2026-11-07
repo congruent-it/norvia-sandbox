@@ -14,6 +14,7 @@ internal static class CustomerServiceOrderScript
     public const string GetShipmentTimeline = "get_shipment_timeline";
     public const string GetExceptions = "get_exceptions";
     public const string GetProofOfDeliveryStatus = "get_proof_of_delivery_status";
+    public const string GetReleaseEligibility = "get_release_eligibility";
 
     public static IReadOnlyList<AIContent> Next(ScriptContext context, string number)
     {
@@ -47,6 +48,123 @@ internal static class CustomerServiceOrderScript
         context.Results.Count == 0
             ? [Call(context, 0, GetTransportOrder, "transportOrderNumber", number)]
             : [new TextContent(NotYetBillableAnswer(number, context.Results[0]))];
+
+    /// <summary>
+    /// Release without a Proof of delivery: the TMS decides eligibility (get_release_eligibility), and only an eligible order is weighed
+    /// further, on how long it has been Delivered and whether the Carrier has sent a Proof of delivery meanwhile. It never drafts the remark.
+    /// </summary>
+    public static IReadOnlyList<AIContent> NextRelease(ScriptContext context, string number)
+    {
+        if (context.Results.Count == 0)
+        {
+            return [Call(context, 0, GetReleaseEligibility, "transportOrderNumber", number)];
+        }
+
+        var eligibility = Parse(context.Results[0].Content);
+        if (context.Results.Count == 1 && Flag(eligibility, "eligible") && Text(eligibility, "shipmentNumber") is { } shipment)
+        {
+            return [Call(context, 1, GetProofOfDeliveryStatus, "shipmentNumber", shipment)];
+        }
+
+        return [new TextContent(ReleaseAnswer(number, context.Results))];
+    }
+
+    private static string ReleaseAnswer(string number, IReadOnlyList<ScriptedToolResult> results)
+    {
+        var result = results[0];
+        var json = Parse(result.Content);
+        if (json.ValueKind != JsonValueKind.Object || !json.TryGetProperty("eligible", out _))
+        {
+            return IntegrationOperationsScript.Json(
+                $"The result shows nothing about whether Transport Order {number} may be released, so nothing can be recommended.",
+                [("The release eligibility came back without an answer.", result.Id)],
+                "Ask a colleague to look at the Transport Order in the TMS.",
+                "low",
+                "needs-a-person");
+        }
+
+        if (!Flag(json, "eligible"))
+        {
+            var reasons = json.TryGetProperty("blockingReasons", out var listed) && listed.ValueKind == JsonValueKind.Array
+                ? listed.EnumerateArray().Where(reason => reason.ValueKind == JsonValueKind.String).Select(reason => reason.GetString()!).ToList()
+                : [];
+            if (reasons.Count == 0)
+            {
+                return IntegrationOperationsScript.Json(
+                    $"The TMS says Transport Order {number} may not be released without a Proof of delivery, but gives no reason.",
+                    [("The release eligibility is false and lists no blocking reason.", result.Id)],
+                    "Do not release it. Ask a colleague to look at the Transport Order in the TMS.",
+                    "low",
+                    "needs-a-person");
+            }
+
+            return IntegrationOperationsScript.Json(
+                $"Transport Order {number} cannot be released without a Proof of delivery now: {string.Join(" and ", reasons.Select(ReleaseBlockerText))}.",
+                reasons.Select(reason => ($"The TMS lists {reason} as blocking the release.", result.Id)),
+                reasons.Contains("OpenException") || reasons.Contains("NotRated")
+                    ? "Do not release it. " + string.Join(" ", reasons.Select(ReleaseBlockerAdvice).OfType<string>())
+                    : "Do not release it: the TMS does not allow it.",
+                "high",
+                "needs-a-person");
+        }
+
+        var evidence = new List<(string, string)> { ("The TMS says the order may be released without a Proof of delivery and nothing else blocks it.", result.Id) };
+        var delivered = Text(json, "deliveredAt");
+        var asOf = Text(json, "asOf");
+        var status = results.Count > 1 ? Text(Parse(results[1].Content), "status") : null;
+        var since = delivered is not null && asOf is not null && DateTimeOffset.TryParse(delivered, out var at) && DateTimeOffset.TryParse(asOf, out var now)
+            ? $"It was delivered {(int)Math.Max(0, (now - at).TotalDays)} day(s) ago. "
+            : string.Empty;
+        if (results.Count > 1)
+        {
+            evidence.Add(($"The Proof of delivery status is {status ?? "unknown"}.", results[1].Id));
+        }
+
+        // Carriers' lateness with Proofs of delivery is not exposed by the TMS, so it is not weighed.
+        return status switch
+        {
+            "Missing" => IntegrationOperationsScript.Json(
+                $"{since}No Carrier has sent a Proof of delivery within the time the TMS allows, and nothing else blocks Transport Order {number}.",
+                evidence,
+                "Release it without a Proof of delivery once you have what you rely on instead. You write the remark yourself and confirm the release.",
+                "medium",
+                "release"),
+            "NotDueYet" => IntegrationOperationsScript.Json(
+                $"{since}The Carrier still has time to send a Proof of delivery for Transport Order {number}.",
+                evidence,
+                "Wait. Look again when the TMS lists the Proof of delivery as missing, and ask the Carrier for it meanwhile.",
+                "medium",
+                "wait"),
+            _ => IntegrationOperationsScript.Json(
+                $"{since}The Proof of delivery status of Transport Order {number} does not say whether the Carrier is late with it.",
+                evidence,
+                "Look at the Shipment yourself before you decide whether to release it.",
+                "low",
+                "needs-a-person"),
+        };
+    }
+
+    private static string ReleaseBlockerText(string reason) => reason switch
+    {
+        "AlreadyBillable" => "it is Billable already",
+        "NotBilledSeparately" => "it is billed through the Fulfilment Contract",
+        "ShipmentNotDelivered" => "its Shipment is not Delivered",
+        "AlreadyReleased" => "it was released already",
+        "ProofOfDeliveryReceived" => "a Proof of delivery has arrived, so there is nothing to release",
+        "NotRated" => "it is not rated",
+        "OpenException" => "an Exception on its Shipment is still open",
+        _ => $"of {reason}",
+    };
+
+    private static string? ReleaseBlockerAdvice(string reason) => reason switch
+    {
+        "NotRated" => "Releasing would not make it billable while it is not rated: open its rating exception first.",
+        "OpenException" => "The open Exception is the Planner's to resolve.",
+        _ => null,
+    };
+
+    private static bool Flag(JsonElement element, string property) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.True;
 
     private static string RatingFailureAnswer(string number, ScriptedToolResult order)
     {

@@ -5,7 +5,7 @@ namespace Norvia.Agents;
 /// suggested action and a confidence. The one result type every Agent uses. It is shown for the session and stored nowhere.
 /// </summary>
 /// <param name="SuggestedAction">What to do, in plain text. Acting on it is the person's own command, under their own role.</param>
-/// <param name="Action">The kind of action it suggests. Resubmit and Discard let the host pre-select the message; nothing executes.</param>
+/// <param name="Action">The kind of action it suggests. Resubmit, Discard and Release let the host pre-select the message or order; nothing executes.</param>
 /// <param name="Run">The Agent run that produced it, set by the client that ran it, for the audit when the person acts on it.</param>
 public sealed record Suggestion(
     string Cause,
@@ -18,13 +18,19 @@ public sealed record Suggestion(
 /// <summary>The Agent and the run ID that produced a <see cref="Suggestion"/>.</summary>
 public sealed record AgentRun(string AgentName, string RunId);
 
-/// <summary>What a <see cref="Suggestion"/> suggests. Its wire names are <c>resubmit</c>, <c>discard</c>, <c>fix-the-cause-first</c> and <c>needs-a-person</c>.</summary>
+/// <summary>What a <see cref="Suggestion"/> suggests. Its wire names are <c>resubmit</c>, <c>discard</c>, <c>fix-the-cause-first</c>, <c>release</c>, <c>wait</c> and <c>needs-a-person</c>.</summary>
 public enum SuggestedActionKind
 {
     Resubmit,
     Discard,
     FixTheCauseFirst,
     NeedsAPerson,
+
+    /// <summary>Release a Delivered order without a Proof of delivery (P9). The host only pre-selects the order: staff write the remark.</summary>
+    Release,
+
+    /// <summary>Wait: the Carrier may still send its Proof of delivery.</summary>
+    Wait,
 }
 
 /// <summary>One claim and the tool result it came from.</summary>

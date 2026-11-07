@@ -1,6 +1,7 @@
 @page "/not-yet-billable"
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
+@using Norvia.Agents
 @using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Application.Billing.ListNotYetBillable
 @implements IAsyncDisposable
@@ -23,7 +24,7 @@
 @if (_releasing is { } releasing)
 {
     @* Keyed by the order, so a new choice starts a new form. *@
-    <ReleaseWithoutProofOfDeliveryPanel @key="releasing" TransportOrderNumber="@releasing" OnClosed="CloseRelease" OnDone="Done" />
+    <ReleaseWithoutProofOfDeliveryPanel @key="releasing" TransportOrderNumber="@releasing" ActingOn="_actingOn" OnClosed="CloseRelease" OnDone="Done" />
 }
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Transport Orders not yet billable"
@@ -53,7 +54,9 @@
                 }
                 @if (context.BlockingReasons.Contains(BillingBlockingReason.NoProofOfDelivery))
                 {
-                    <FluentButton Appearance="Appearance.Outline" OnClick="() => _releasing = context.TransportOrderNumber"
+                    <RecommendRelease TransportOrderNumber="@context.TransportOrderNumber" ForCustomerService="RoleKey == NorviaRole.CustomerService.Key"
+                                      OnReview="run => ReviewRelease(context.TransportOrderNumber, run)" />
+                    <FluentButton Appearance="Appearance.Outline" OnClick="() => Release(context.TransportOrderNumber)"
                                   aria-label="@($"Release {context.TransportOrderNumber} without Proof of delivery")">
                         Release without Proof of delivery
                     </FluentButton>
@@ -66,6 +69,7 @@
 @code {
     private LiveTransportOrderList<TransportOrderNotYetBillableSummary> _list = null!;
     private string? _releasing;
+    private AgentRun? _actingOn;
     private string? _done;
 
     // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
@@ -85,12 +89,31 @@
         _list.Start();
     }
 
-    private void CloseRelease() => _releasing = null;
+    // Staff's own click on the button: no Suggestion behind it, so the trace names no Agent.
+    private void Release(string transportOrderNumber)
+    {
+        _releasing = transportOrderNumber;
+        _actingOn = null;
+    }
+
+    // A Release suggestion only pre-selects the order: the form still asks staff for the remark, and nothing is released until they confirm.
+    private void ReviewRelease(string transportOrderNumber, AgentRun run)
+    {
+        _releasing = transportOrderNumber;
+        _actingOn = run;
+    }
+
+    private void CloseRelease()
+    {
+        _releasing = null;
+        _actingOn = null;
+    }
 
     // The list isn't changed here: it reads again shortly, and then drops the order if it became Billable.
     private void Done(string text)
     {
         _releasing = null;
+        _actingOn = null;
         _done = text;
     }
 

@@ -1,3 +1,4 @@
+using Norvia.Agents;
 using Norvia.Tms.Application.Fleet.Planning;
 using Norvia.Tms.Application.Trips.ReorderStops;
 using Norvia.Tms.Domain.Exceptions;
@@ -66,7 +67,8 @@ public interface ITransportOrderCommands
     /// Releases a Delivered, Not yet billable Transport Order without a Proof of delivery, with the remark every release
     /// needs (P9). The order becomes Billable only when nothing else blocks it.
     /// </summary>
-    Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, CancellationToken cancellationToken);
+    /// <param name="actingOn">The Agent run whose Suggestion Customer service acted on, which the release's trace then names; null when they acted on their own.</param>
+    Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, AgentRun? actingOn, CancellationToken cancellationToken);
 
     /// <summary>The Planner records an Absence for a Driver, for the days from first to last (P10).</summary>
     Task<CapacityAnswer> RecordAbsenceAsync(PeriodEntry entry, CancellationToken cancellationToken);

@@ -31,6 +31,12 @@
       "description": "Returns where a Shipment stands for its Proof of delivery: current, missing or not due, and each Proof of delivery recorded (current or superseded) with its source, delivery time, whether it was taken clean or with reservations, and how many files it holds. Never who signed, a remark, or a file's name or contents.",
       "method": "GET",
       "path": "/shipments/{shipmentNumber}/proof-of-delivery-status"
+    },
+    {
+      "name": "get_release_eligibility",
+      "description": "Returns whether the TMS lets Customer service release a Transport Order without a Proof of delivery: eligible or not, its Shipment's number, when the Shipment was Delivered, the time of the answer and, when not eligible, every reason that blocks it (AlreadyBillable, NotBilledSeparately, ShipmentNotDelivered, AlreadyReleased, ProofOfDeliveryReceived, NotRated, OpenException). The TMS decides; this is the same rule the release checks. Never a Consignee name, address or contact, and never a file's contents.",
+      "method": "GET",
+      "path": "/transport-orders/{transportOrderNumber}/release-eligibility"
     }
   ]
 }

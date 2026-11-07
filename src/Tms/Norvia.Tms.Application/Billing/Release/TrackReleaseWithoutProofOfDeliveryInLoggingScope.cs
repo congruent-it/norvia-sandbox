@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Norvia.Tms.Application.Exceptions;
+using Norvia.Tms.Application.IntegrationEvents;
 
 namespace Norvia.Tms.Application.Billing.Release;
 
@@ -10,6 +11,12 @@ public sealed partial class TrackReleaseWithoutProofOfDeliveryInLoggingScope(ILo
     protected override ILogger Logger => logger;
 
     protected override string CorrelationIdOf(ReleaseWithoutProofOfDeliveryCommand command) => command.CorrelationId;
+
+    // Only a release the employee made from a Suggestion names the Agent and its run (ADR 0040).
+    protected override Dictionary<string, object?> ExtraKeysOf(ReleaseWithoutProofOfDeliveryCommand command) =>
+        command.ActingOn is { } run
+            ? new() { [TrackingKeys.AgentId] = run.AgentName, [TrackingKeys.AgentRunId] = run.RunId }
+            : [];
 
     protected override string ShipmentNumberOf(ReleaseWithoutProofOfDeliveryResult result) => result.ShipmentNumber;
 

@@ -1,4 +1,5 @@
 @using System.ComponentModel.DataAnnotations
+@using Norvia.Agents
 @using Norvia.Tms.Domain.TransportOrders
 @implements IDisposable
 @inject ITransportOrderCommands Commands
@@ -38,6 +39,10 @@
 
     [Parameter, EditorRequired]
     public string TransportOrderNumber { get; set; } = string.Empty;
+
+    /// <summary>The Agent run whose Suggestion Customer service is acting on, which the release's trace names; null when they act on their own.</summary>
+    [Parameter]
+    public AgentRun? ActingOn { get; set; }
 
     /// <summary>Raised when Customer service closes the form without releasing.</summary>
     [Parameter, EditorRequired]
@@ -80,7 +85,7 @@
         _failure = null;
         try
         {
-            switch (await Commands.ReleaseWithoutProofOfDeliveryAsync(TransportOrderNumber, remark, _closed.Token))
+            switch (await Commands.ReleaseWithoutProofOfDeliveryAsync(TransportOrderNumber, remark, ActingOn, _closed.Token))
             {
                 case ReleaseWithoutProofOfDeliveryAnswer.Released { BillingState: BillingState.Billable }:
                     await OnDone.InvokeAsync($"Transport Order {TransportOrderNumber} is released without a Proof of delivery and is Billable now.");
