@@ -14,6 +14,9 @@ public static class CarrierInvoiceCalls
     public const string Carrier = "CAR-0001";
     public const string CarrierName = "Van Dijk Transport";
 
+    /// <summary>The Carrier Rate Card a cost is priced from when a test needs an agreed (not Spot) price. The ERP validates only that the id is present, so it need not exist in the seed.</summary>
+    public const string RateCardId = "CRC-0001";
+
     /// <summary>A Carrier booking reference no other test uses; far from any other in the ERP's ranking of candidates.</summary>
     public static string NewReference() => $"BK-{Guid.NewGuid():N}"[..15].ToUpperInvariant();
 
@@ -28,8 +31,8 @@ public static class CarrierInvoiceCalls
         return client;
     }
 
-    /// <summary>Records a Spot Carrier cost as the Carrier cost Logic App does, and returns its Carrier booking number.</summary>
-    public static async Task<string> RecordCarrierCostAsync(HttpClient client, string reference, decimal total, CancellationToken cancellationToken)
+    /// <summary>Records a Spot Carrier cost as the Carrier cost Logic App does, and returns its Carrier booking number. With <paramref name="rateCardId"/> the cost is priced from that Carrier Rate Card instead.</summary>
+    public static async Task<string> RecordCarrierCostAsync(HttpClient client, string reference, decimal total, string? rateCardId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(client);
         var number = Random.Shared.Next(1_000_000, 10_000_000);
@@ -52,7 +55,9 @@ public static class CarrierInvoiceCalls
                 ["currency"] = "EUR",
                 ["total"] = total,
                 ["chargeLines"] = new JsonArray(new JsonObject { ["type"] = "Freight", ["amount"] = total }),
-                ["source"] = new JsonObject { ["kind"] = "Spot", ["remark"] = "Agreed by phone." },
+                ["source"] = rateCardId is null
+                    ? new JsonObject { ["kind"] = "Spot", ["remark"] = "Agreed by phone." }
+                    : new JsonObject { ["kind"] = "CarrierRateCard", ["rateCardVersion"] = new JsonObject { ["rateCardId"] = rateCardId, ["version"] = 1 } },
                 ["calculatedAt"] = now,
             },
             ["deliveryTime"] = new DateTimeOffset(2026, 10, 16, 10, 45, 0, TimeSpan.FromHours(2)).ToString("O", CultureInfo.InvariantCulture),
