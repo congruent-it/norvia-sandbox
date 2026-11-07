@@ -133,7 +133,9 @@
     <Project Path="tests/Erp/Norvia.Erp.Domain.UnitTests/Norvia.Erp.Domain.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Infrastructure.UnitTests/Norvia.Erp.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Web.UnitTests/Norvia.Erp.Web.UnitTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.TestSupport/Norvia.Erp.TestSupport.csproj" />
     <Project Path="tests/Erp/Norvia.Erp.Web.UiTests/Norvia.Erp.Web.UiTests.csproj" />
+    <Project Path="tests/Erp/Norvia.Erp.Web.UiTests.FinanceAgent/Norvia.Erp.Web.UiTests.FinanceAgent.csproj" />
   </Folder>
   <Folder Name="/tests/DriverApp/">
     <Project Path="tests/DriverApp/Norvia.DriverApp.Api.IntegrationTests/Norvia.DriverApp.Api.IntegrationTests.csproj" />

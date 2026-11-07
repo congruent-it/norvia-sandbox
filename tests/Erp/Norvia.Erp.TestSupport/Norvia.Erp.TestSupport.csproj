@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Helpers the ERP UI test projects share: calls the Logic Apps make on the ERP API, tokens for it, and a Playwright page that keeps a trace and video of a failed test. -->
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+  </ItemGroup>
+</Project>
