@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Playwright;
 using Norvia.AppHost;
+using Norvia.Erp.TestSupport;
 
 [assembly: AssemblyFixture(typeof(Norvia.Erp.Web.UiTests.ErpUiFixture))]
 
@@ -61,7 +62,7 @@ public sealed class ErpUiFixture : IAsyncLifetime
         }
 
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
-            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}"],
+            [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}", "Agents:Enabled=false"],
             startup.Token);
         foreach (var resource in builder.Resources
             .Where(resource => Unneeded.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
@@ -207,6 +208,9 @@ public sealed class ErpUiFixture : IAsyncLifetime
         within.CancelAfter(TimeSpan.FromMinutes(2));
         return within;
     }
+
+    /// <summary>A client of the ERP API that sends the token a Logic App holding <paramref name="role"/> would, such as the Carrier cost and Carrier invoice Logic Apps.</summary>
+    public HttpClient LogicAppClient(string role) => CarrierInvoiceCalls.Authorize(_app!.CreateHttpClient("erp-api"), _tokenSigningKey, role);
 
     private HttpClient ApiAs(string role)
     {

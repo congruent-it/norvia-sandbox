@@ -182,6 +182,9 @@ jobs:
           - application: ERP (Carrier invoice matching agent)
             directory: Erp
             kinds: IntegrationTests.FinanceAgent
+          - application: ERP (UI, Carrier invoice matching agent)
+            directory: Erp
+            kinds: UiTests.FinanceAgent
           - application: Driver app
             directory: DriverApp
             kinds: UnitTests ArchitectureTests IntegrationTests
