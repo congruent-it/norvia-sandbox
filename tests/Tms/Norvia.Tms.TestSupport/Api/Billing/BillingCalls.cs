@@ -104,8 +104,17 @@ internal static class BillingCalls
     }
 
     /// <summary>The body of a release without a Proof of delivery.</summary>
-    public static JsonObject Release(string? remark = "CMR received by post, scanned in the dossier", string? releasedBy = "Jan Jansen") =>
-        new() { ["remark"] = remark, ["releasedBy"] = releasedBy };
+    public static JsonObject Release(string? remark = "CMR received by post, scanned in the dossier", string? releasedBy = "Jan Jansen", string? agentName = null, string? agentRunId = null)
+    {
+        var release = new JsonObject { ["remark"] = remark, ["releasedBy"] = releasedBy };
+        if (agentName is not null)
+        {
+            release["agentName"] = agentName;
+            release["agentRunId"] = agentRunId;
+        }
+
+        return release;
+    }
 
     /// <summary>Releases the Transport Order without a Proof of delivery, which the TMS must accept, and returns what it answered.</summary>
     public static async Task<JsonNode> ReleasedWithoutProofAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken)
