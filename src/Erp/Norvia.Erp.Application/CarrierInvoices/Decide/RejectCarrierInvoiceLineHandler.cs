@@ -25,7 +25,7 @@ public sealed partial class RejectCarrierInvoiceLineHandler(
             return CarrierInvoiceRefused.Because<CarrierInvoiceView>(CarrierInvoiceRefusal.InvoiceNotFound(command.CarrierId.Value, command.InvoiceNumber));
         }
 
-        using var trail = logger.TrackDecision(invoice);
+        using var trail = logger.TrackDecision(invoice, command.ActingOn);
         var at = time.GetUtcNow();
         var (approved, refusal) = invoice.Reject(command.CarrierBookingReference, command.Reason, at);
         if (refusal is not null)

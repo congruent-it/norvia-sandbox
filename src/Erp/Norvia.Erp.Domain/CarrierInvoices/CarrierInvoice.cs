@@ -195,7 +195,7 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
         }
 
         var line = Lines[index];
-        if (cost is null || line.CarrierBookingNumber != cost.Id.CarrierBookingNumber || cost.CarrierId != CarrierId || cost.Status != CarrierCostStatus.Open)
+        if (!CanAccept(line, cost))
         {
             return (false, CarrierInvoiceRefusal.LineHasNoOpenCarrierCost(InvoiceNumber, carrierBookingReference));
         }
@@ -235,6 +235,30 @@ public sealed class CarrierInvoice : EntityBase<CarrierInvoiceId>, IAggregateRoo
 
         return (Decide(index, Lines[index] with { Status = CarrierInvoiceLineStatus.Rejected, Remark = reason.Trim() }, decidedAt), null);
     }
+
+    /// <summary>
+    /// What Finance may do with a line, by the same rules Accept and Reject enforce: only a line To decide can be decided; Accept needs
+    /// an Open Carrier cost of this Carrier that the line was matched against; Wait is for a line that is matched again by itself.
+    /// </summary>
+    public CarrierInvoiceLineActions AllowedActionsOf(string carrierBookingReference, CarrierCost? cost)
+    {
+        var line = Lines.FirstOrDefault(candidate => candidate.CarrierBookingReference == carrierBookingReference);
+        if (line is null || line.Status != CarrierInvoiceLineStatus.ToDecide)
+        {
+            return CarrierInvoiceLineActions.None;
+        }
+
+        var allowed = CarrierInvoiceLineActions.Reject;
+        if (CanAccept(line, cost))
+        {
+            allowed |= CarrierInvoiceLineActions.Accept | CarrierInvoiceLineActions.AcceptAdjusted;
+        }
+
+        return line.ResolvesAutomatically ? allowed | CarrierInvoiceLineActions.Wait : allowed;
+    }
+
+    private bool CanAccept(CarrierInvoiceLine line, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] CarrierCost? cost) =>
+        cost is not null && line.CarrierBookingNumber == cost.Id.CarrierBookingNumber && cost.CarrierId == CarrierId && cost.Status == CarrierCostStatus.Open;
 
     private int IndexOfLineToDecide(string carrierBookingReference, out CarrierInvoiceRefusal? refusal)
     {

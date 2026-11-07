@@ -1050,7 +1050,8 @@
           "carrierCost",
           "invoicedBy",
           "candidates",
-          "resolvesAutomatically"
+          "resolvesAutomatically",
+          "allowedActions"
         ],
         "type": "object",
         "properties": {
@@ -1132,6 +1133,12 @@
           },
           "resolvesAutomatically": {
             "type": "boolean"
+          },
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

@@ -1,21 +1,28 @@
+@using Norvia.Agents
 @using Norvia.Erp.Application.CarrierInvoices
 @using Norvia.Erp.Domain.CarrierInvoices
 @inject DecideCarrierInvoiceLineAction Action
 
 @* Finance's decision on one Carrier invoice line: accept it, accept it at an adjusted amount with a remark, or reject it with a reason.
-   Accept is offered only when the line has an Open Carrier cost for the Carrier; an Unknown booking or Duplicate line offers reject only. *@
+   Accept is offered only when the line has an Open Carrier cost for the Carrier; an Unknown booking or Duplicate line offers reject only.
+   A Suggestion of the assistant only pre-selects: it emphasises the action it suggests and says so. Finance writes the remark or reason
+   and confirms. *@
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="8">
+    @if (Preselected is { } preselected)
+    {
+        <p role="status" data-testid="suggested-decision" class="text-muted">The assistant suggests: @preselected.Label. Nothing is decided until you confirm@(preselected.Kind == SuggestedActionKind.AcceptAdjusted ? "; enter the adjusted amount and a remark" : string.Empty).</p>
+    }
     @if (CanAccept)
     {
         <FluentNumberField TValue="decimal?" @bind-Value="_adjustedAmount" Label="@($"Adjusted amount for {Line.CarrierBookingReference} (without VAT, empty to accept as invoiced)")" Min="0.01" Step="0.01" />
         <FluentTextArea @bind-Value="_remark" Label="@($"Remark on the adjusted amount for {Line.CarrierBookingReference}")" MaxLength="@CarrierInvoice.MaxRemarkLength" Rows="2" />
         <div>
-            <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="AcceptAsync" aria-label="@($"Accept {Line.CarrierBookingReference}")">@(_adjustedAmount is null ? "Accept" : "Accept adjusted")</FluentButton>
+            <FluentButton Appearance="@(Preselected?.Kind == SuggestedActionKind.Reject ? Appearance.Neutral : Appearance.Accent)" Disabled="_running" OnClick="AcceptAsync" aria-label="@($"Accept {Line.CarrierBookingReference}")">@(_adjustedAmount is null ? "Accept" : "Accept adjusted")</FluentButton>
         </div>
     }
     <FluentTextArea @bind-Value="_reason" Label="@($"Reason for rejecting {Line.CarrierBookingReference}")" MaxLength="@CarrierInvoice.MaxRemarkLength" Rows="2" />
     <div>
-        <FluentButton Appearance="Appearance.Stealth" Disabled="_running" OnClick="RejectAsync" aria-label="@($"Reject {Line.CarrierBookingReference}")">Reject</FluentButton>
+        <FluentButton Appearance="@(Preselected?.Kind == SuggestedActionKind.Reject ? Appearance.Accent : Appearance.Stealth)" Disabled="_running" OnClick="RejectAsync" aria-label="@($"Reject {Line.CarrierBookingReference}")">Reject</FluentButton>
         <span role="status" class="ml-2">
             @if (_outcome is DecideCarrierInvoiceLineOutcome.Refused refused)
             {
@@ -45,11 +52,22 @@
     [Parameter]
     public bool CanAccept { get; set; }
 
-    private Task AcceptAsync() =>
-        RunAsync(() => Action.AcceptAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _adjustedAmount, _remark));
+    /// <summary>The assistant's Suggestion that pre-selects an action. Never executes anything.</summary>
+    [Parameter]
+    public SuggestedDecision? Suggested { get; set; }
+
+    // An Accept suggestion for a line that cannot be accepted is ignored: the ERP's own rule holds.
+    private SuggestedDecision? Preselected => Suggested is { Kind: SuggestedActionKind.Reject } || (CanAccept && Suggested is not null) ? Suggested : null;
+
+    // The same command the click always sent, plus the run when Finance does what was suggested.
+    private Task AcceptAsync()
+    {
+        var chosen = _adjustedAmount is null ? SuggestedActionKind.Accept : SuggestedActionKind.AcceptAdjusted;
+        return RunAsync(() => Action.AcceptAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _adjustedAmount, _remark, Preselected?.RunFor(chosen)));
+    }
 
     private Task RejectAsync() =>
-        RunAsync(() => Action.RejectAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _reason));
+        RunAsync(() => Action.RejectAsync(CarrierId, InvoiceNumber, Line.CarrierBookingReference, _reason, Preselected?.RunFor(SuggestedActionKind.Reject)));
 
     private async Task RunAsync(Func<Task<DecideCarrierInvoiceLineOutcome>> decide)
     {

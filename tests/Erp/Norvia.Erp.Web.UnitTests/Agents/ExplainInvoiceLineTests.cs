@@ -19,7 +19,10 @@ public sealed class ExplainInvoiceLineTests : ErpWebContext
         Render<ExplainInvoiceLine>(parameters => parameters
             .Add(component => component.CarrierId, "CAR-0001")
             .Add(component => component.InvoiceNumber, "VDT-1")
-            .Add(component => component.CarrierBookingReference, "TRX-1"));
+            .Add(component => component.CarrierBookingReference, "TRX-1")
+            .Add(component => component.OnSuggested, suggestion => _suggested.Add(suggestion)));
+
+    private readonly List<Suggestion?> _suggested = [];
 
     [Fact]
     public void Render_AgentsOff_ShowsNoButton()
@@ -93,5 +96,37 @@ public sealed class ExplainInvoiceLineTests : ErpWebContext
         page.Find("fluent-button").Click();
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Assistant unavailable"));
+    }
+
+    [Theory]
+    [InlineData(SuggestedActionKind.Accept, "Accept as invoiced")]
+    [InlineData(SuggestedActionKind.AcceptAdjusted, "Accept adjusted")]
+    [InlineData(SuggestedActionKind.Reject, "Reject")]
+    [InlineData(SuggestedActionKind.Wait, "Wait")]
+    [InlineData(SuggestedActionKind.NeedsAPerson, "Needs a person")]
+    public void Explain_ShowsTheKindOfActionItSuggests_AndHandsTheSuggestionToThePageToPreSelect(SuggestedActionKind kind, string label)
+    {
+        AgentSettings.Enabled = true;
+        var suggestion = Answer() with { Action = kind, Run = new AgentRun("finance-matching", "run-1") };
+        Explain.ExplainAsync(Arg.Any<ExplainInvoiceLineQuery>(), Arg.Any<CancellationToken>()).Returns(suggestion);
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.WaitForAssertion(() => page.Find("[data-testid=action-kind]").TextContent.Should().Be(label));
+        _suggested.Should().Contain(suggestion);
+    }
+
+    [Fact]
+    public void Explain_WhenTheAgentIsUnavailable_PreSelectsNothing()
+    {
+        AgentSettings.Enabled = true;
+        Explain.ExplainAsync(Arg.Any<ExplainInvoiceLineQuery>(), Arg.Any<CancellationToken>()).Returns(Result<Suggestion>.Unavailable("AgentUnavailable"));
+        var page = Render();
+
+        page.Find("fluent-button").Click();
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Assistant unavailable"));
+        _suggested.Should().OnlyContain(suggestion => suggestion == null);
     }
 }

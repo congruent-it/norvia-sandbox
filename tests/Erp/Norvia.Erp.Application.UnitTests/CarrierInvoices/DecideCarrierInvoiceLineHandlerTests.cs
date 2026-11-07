@@ -2,9 +2,11 @@ using Ardalis.SharedKernel;
 using Ardalis.Specification;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using Norvia.Agents;
 using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.CarrierInvoices.Decide;
 using Norvia.Erp.Application.IntegrationEvents;
+using Norvia.Erp.Application.UnitTests.BillableLines;
 using Norvia.Erp.Domain.BillableLines;
 using Norvia.Erp.Domain.CarrierCosts;
 using Norvia.Erp.Domain.CarrierInvoices;
@@ -151,5 +153,53 @@ public sealed class DecideCarrierInvoiceLineHandlerTests
         result.Value.Status.Should().Be("Approved");
         result.Value.ApprovedAmount.Should().Be(0m);
         _outbox.Received(1).Add(Arg.Any<CarrierInvoiceApprovedV1>());
+    }
+
+    [Fact]
+    public async Task Accept_ActedOnFromASuggestion_NamesTheAgentAndItsRunInTheTrace()
+    {
+        HaveReceivedInvoice();
+        var logger = new CapturingLogger<AcceptCarrierInvoiceLineHandler>();
+        var handler = new AcceptCarrierInvoiceLineHandler(_invoices, _costs, _outbox, Time, logger);
+
+        await handler.Handle(new AcceptCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", null, null, new AgentRun("finance-matching", "run-7")), CancellationToken.None);
+
+        logger.Scopes.Should().Contain(scope => (string?)scope.GetValueOrDefault("agentId") == "finance-matching" && (string?)scope.GetValueOrDefault("agentRunId") == "run-7");
+    }
+
+    [Fact]
+    public async Task Accept_OnFinancesOwn_NamesNoAgentInTheTrace()
+    {
+        HaveReceivedInvoice();
+        var logger = new CapturingLogger<AcceptCarrierInvoiceLineHandler>();
+        var handler = new AcceptCarrierInvoiceLineHandler(_invoices, _costs, _outbox, Time, logger);
+
+        await handler.Handle(new AcceptCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", null, null), CancellationToken.None);
+
+        logger.Scopes.Should().NotContain(scope => scope.ContainsKey("agentId") || scope.ContainsKey("agentRunId"));
+    }
+
+    [Fact]
+    public async Task Reject_ActedOnFromASuggestion_NamesTheAgentAndItsRunInTheTrace()
+    {
+        HaveReceivedInvoice();
+        var logger = new CapturingLogger<RejectCarrierInvoiceLineHandler>();
+        var handler = new RejectCarrierInvoiceLineHandler(_invoices, _outbox, Time, logger);
+
+        await handler.Handle(new RejectCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-2", "Unknown", new AgentRun("finance-matching", "run-7")), CancellationToken.None);
+
+        logger.Scopes.Should().Contain(scope => (string?)scope.GetValueOrDefault("agentId") == "finance-matching" && (string?)scope.GetValueOrDefault("agentRunId") == "run-7");
+    }
+
+    [Fact]
+    public async Task Reject_OnFinancesOwn_NamesNoAgentInTheTrace()
+    {
+        HaveReceivedInvoice();
+        var logger = new CapturingLogger<RejectCarrierInvoiceLineHandler>();
+        var handler = new RejectCarrierInvoiceLineHandler(_invoices, _outbox, Time, logger);
+
+        await handler.Handle(new RejectCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-2", "Unknown"), CancellationToken.None);
+
+        logger.Scopes.Should().NotContain(scope => scope.ContainsKey("agentId") || scope.ContainsKey("agentRunId"));
     }
 }

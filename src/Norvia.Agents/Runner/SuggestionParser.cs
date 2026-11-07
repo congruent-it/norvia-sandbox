@@ -32,8 +32,11 @@ public static class SuggestionParser
             "fix-the-cause-first" => SuggestedActionKind.FixTheCauseFirst,
             "release" => SuggestedActionKind.Release,
             "wait" => SuggestedActionKind.Wait,
+            "accept" => SuggestedActionKind.Accept,
+            "accept-adjusted" => SuggestedActionKind.AcceptAdjusted,
+            "reject" => SuggestedActionKind.Reject,
             "needs-a-person" => SuggestedActionKind.NeedsAPerson,
-            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first, release, wait or needs-a-person."),
+            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first, release, wait, accept, accept-adjusted, reject or needs-a-person."),
         };
         if (!Enum.TryParse<Confidence>(Text(root, "confidence"), ignoreCase: true, out var confidence))
         {

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Ardalis.Result;
+using Norvia.Agents;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.CarrierInvoices;
 using Norvia.Erp.Application.CarrierInvoices.Decide;
@@ -16,21 +17,21 @@ namespace Norvia.Erp.Web.CarrierInvoices;
 internal sealed partial class DecideCarrierInvoiceLineAction(IServiceScopeFactory scopes, ErpActivities activities, ILogger<DecideCarrierInvoiceLineAction> logger)
 {
     public Task<DecideCarrierInvoiceLineOutcome> AcceptAsync(
-        string carrierId, string invoiceNumber, string carrierBookingReference, decimal? adjustedAmount, string? remark, CancellationToken cancellationToken = default) =>
+        string carrierId, string invoiceNumber, string carrierBookingReference, decimal? adjustedAmount, string? remark, AgentRun? actingOn = null, CancellationToken cancellationToken = default) =>
         RunAsync(
             "Accept Carrier invoice line",
             invoiceNumber,
             carrierBookingReference,
-            new AcceptCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, carrierBookingReference, adjustedAmount, remark),
+            new AcceptCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, carrierBookingReference, adjustedAmount, remark, actingOn),
             cancellationToken);
 
     public Task<DecideCarrierInvoiceLineOutcome> RejectAsync(
-        string carrierId, string invoiceNumber, string carrierBookingReference, string? reason, CancellationToken cancellationToken = default) =>
+        string carrierId, string invoiceNumber, string carrierBookingReference, string? reason, AgentRun? actingOn = null, CancellationToken cancellationToken = default) =>
         RunAsync(
             "Reject Carrier invoice line",
             invoiceNumber,
             carrierBookingReference,
-            new RejectCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, carrierBookingReference, reason),
+            new RejectCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, carrierBookingReference, reason, actingOn),
             cancellationToken);
 
     private async Task<DecideCarrierInvoiceLineOutcome> RunAsync(

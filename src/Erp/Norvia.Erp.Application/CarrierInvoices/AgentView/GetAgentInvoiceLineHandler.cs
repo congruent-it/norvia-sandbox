@@ -57,7 +57,8 @@ public sealed class GetAgentInvoiceLineHandler(
                 ? await EarlierLineAsync(invoice, line, cost, cancellationToken)
                 : null,
             line.Result == CarrierInvoiceLineResult.UnknownBooking ? await CandidatesAsync(invoice, line, cancellationToken) : [],
-            line.ResolvesAutomatically);
+            line.ResolvesAutomatically,
+            AgentActionNames.Of(invoice.AllowedActionsOf(line.CarrierBookingReference, cost)));
     }
 
     // The label is all the Agent gets of a Spot price: the Planner's remark is free text and stays in the TMS and the ERP.

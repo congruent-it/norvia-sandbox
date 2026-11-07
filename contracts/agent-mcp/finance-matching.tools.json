@@ -4,7 +4,7 @@
   "tools": [
     {
       "name": "get_invoice_line",
-      "description": "Returns one line of a Carrier invoice by the Carrier's ID, the Carrier's invoice number and the line's Carrier booking reference: its result (Price mismatch, Unknown booking or Duplicate), the invoiced amount, the agreed Carrier cost total and the difference, the matching tolerance, the cost's source as a label (Rate Card version or Spot, never the Planner's remark), for a Duplicate the earlier invoice and line that Invoiced the Carrier cost, and for an Unknown booking a short list of likely candidate Open Carrier costs of the same Carrier, ranked by the ERP. Never a Shipper or Consignee's personal data and never a file's contents.",
+      "description": "Returns one line of a Carrier invoice by the Carrier's ID, the Carrier's invoice number and the line's Carrier booking reference: its result (Price mismatch, Unknown booking or Duplicate), the invoiced amount, the agreed Carrier cost total and the difference, the matching tolerance, the cost's source as a label (Rate Card version or Spot, never the Planner's remark), for a Duplicate the earlier invoice and line that Invoiced the Carrier cost, and for an Unknown booking a short list of likely candidate Open Carrier costs of the same Carrier, ranked by the ERP, and allowedActions: what the ERP allows Finance to do with the line (accept, accept-adjusted, reject, wait). Never a Shipper or Consignee's personal data and never a file's contents.",
       "method": "GET",
       "path": "/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}"
     },
