@@ -29,6 +29,9 @@ public sealed class FinanceAgentFixture : IAsyncLifetime
     /// <summary>The app role only the Carrier invoice Logic App's managed identity holds, for the Carrier invoices it receives.</summary>
     public const string ReceiveCarrierInvoiceRole = "CarrierInvoices.Receive";
 
+    /// <summary>The app role Finance holds, to decide a Carrier invoice line.</summary>
+    public const string ManageCarrierInvoiceRole = "CarrierInvoices.Manage";
+
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(8);

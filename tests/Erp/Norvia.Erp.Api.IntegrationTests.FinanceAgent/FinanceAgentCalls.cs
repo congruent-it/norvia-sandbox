@@ -103,6 +103,29 @@ internal static class FinanceAgentCalls
     public static JsonObject LineOf(JsonObject invoice, string reference) =>
         invoice["lines"]!.AsArray().Select(line => line!.AsObject()).Single(line => line["carrierBookingReference"]!.GetValue<string>() == reference);
 
+    /// <summary>Finance deciding a line through the ERP API, with the Agent and run whose Suggestion they acted on, or none when they decided by hand.</summary>
+    public static async Task<HttpResponseMessage> DecideAsync(
+        FinanceAgentFixture fixture, string invoiceNumber, string reference, string decision, JsonObject? body, CancellationToken cancellationToken, string carrier = Carrier)
+    {
+        using var client = fixture.ErpAs(FinanceAgentFixture.ManageCarrierInvoiceRole);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-invoices/{carrier}/{invoiceNumber}/lines/{reference}/{decision}", UriKind.Relative));
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+
+        return await client.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>The line as the Agent reads it through the stand-in, with the actions the ERP allows on it.</summary>
+    public static async Task<JsonNode> ReadLineAsync(FinanceAgentFixture fixture, string invoiceNumber, string reference, string correlationId, CancellationToken cancellationToken)
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken());
+        var (isError, text) = await client.GetInvoiceLineAsync(Carrier, invoiceNumber, reference, correlationId, cancellationToken);
+        isError.Should().BeFalse(text);
+        return JsonNode.Parse(text)!;
+    }
+
     /// <summary>A JSON-RPC call of the MCP protocol.</summary>
     public static Task<HttpResponseMessage> CallAsync(this HttpClient client, string method, CancellationToken cancellationToken) =>
         client.PostAsJsonAsync(

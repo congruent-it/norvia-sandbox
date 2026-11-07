@@ -13,7 +13,7 @@ public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
     private static readonly HashSet<string> AllowedProperties =
     [
         "carrierId", "carrierName", "invoiceNumber", "invoiceDate", "carrierBookingReference", "result", "status", "invoicedAmount", "currency", "tolerance", "difference",
-        "carrierCost", "invoicedBy", "candidates", "resolvesAutomatically",
+        "carrierCost", "invoicedBy", "candidates", "resolvesAutomatically", "allowedActions",
         "carrierBookingNumber", "total", "source", "deliveredOn", "amount", "rank",
     ];
 
