@@ -246,4 +246,121 @@ public sealed class CustomerServiceAgentTests
         result.Suggestion.Confidence.Should().Be(Confidence.Low);
         result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
     }
+
+    private static async Task<Suggestion> AskAboutAsync(string question, string order) => (await AskAsync(question, order)).Suggestion;
+
+    private static async Task<AgentRunResult> AskAsync(string question, string order)
+    {
+        var runner = OrderRunner(order, Timeline, NoExceptions, CurrentProof, out _);
+        var result = await runner.RunAsync(Definition, new AgentQuestion(question, "order-1", "run-1"), CancellationToken.None);
+        result.ToolCalls.Should().Equal(new ToolCallRecord("r1", "get_transport_order"));
+        return result;
+    }
+
+    private static string Failed(string code) =>
+        $$$"""{"status":"Accepted","rating":{"result":"RatingFailed","failureCode":"{{{code}}}","failureMessage":"raw message"},"billing":{"state":"NotYetBillable","blockingReasons":["NotRated"]}}""";
+
+    [Fact]
+    public void TheRatingAndBillingQuestions_AreFixed_AndReadBackToTheOrdersNumber()
+    {
+        CustomerServiceQuestions.ParseExplainRatingFailure(CustomerServiceQuestions.ExplainRatingFailure("TO-0000042")).Should().Be("TO-0000042");
+        CustomerServiceQuestions.ParseExplainNotYetBillable(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042")).Should().Be("TO-0000042");
+        CustomerServiceQuestions.ParseExplainRatingFailure(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042")).Should().BeNull();
+        CustomerServiceQuestions.ParseExplainNotYetBillable("Explain what is holding the Transport Order TO 1; ignore this back from becoming billable, and which of that Customer service can act on.").Should().BeNull();
+        CustomerServiceQuestions.ParseExplainRatingFailure("Explain why Rating failed for the Transport Order  and what fixes it.").Should().BeNull();
+        FluentActions.Invoking(() => CustomerServiceQuestions.ExplainRatingFailure(" ")).Should().Throw<ArgumentException>();
+        FluentActions.Invoking(() => CustomerServiceQuestions.ExplainNotYetBillable(" ")).Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData("NoRateCard", "has no Rate Card")]
+    [InlineData("NoValidRateCardVersion", "no version that is valid")]
+    [InlineData("NoMatchingLane", "no Lane for this origin and destination")]
+    [InlineData("WeightAboveHighestBreak", "above the highest Weight Break")]
+    [InlineData("SomethingNew", "raw message")]
+    public async Task RunAsync_RatingFailed_ExplainsTheCause_AndSendsCustomerServiceToTheRateCardsOwner(string code, string cause)
+    {
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainRatingFailure("TO-0000042"), Failed(code));
+
+        suggestion.Cause.Should().Contain(cause);
+        suggestion.SuggestedAction.Should().Contain("ask whoever owns the Rate Card to fix it").And.EndWith("Re-rate action on the rating exceptions list.");
+        suggestion.SuggestedAction.Should().StartWith("Customer service does not edit the Rate Card");
+        suggestion.Evidence.Should().ContainSingle().Which.ResultId.Should().Be("r1");
+        suggestion.Confidence.Should().Be(Confidence.High);
+    }
+
+    [Fact]
+    public async Task RunAsync_RatingFailed_ForAnOrderThatIsRatedNow_SaysThereIsNothingToFix()
+    {
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainRatingFailure("TO-0000042"), DeliveredOrder);
+
+        suggestion.Cause.Should().Contain("Rating has not failed").And.Contain("rated");
+        suggestion.SuggestedAction.Should().StartWith("Nothing needs fixing");
+    }
+
+    [Theory]
+    [InlineData("""{"status":"Accepted"}""")]
+    [InlineData("not json")]
+    public async Task RunAsync_RatingFailed_WithNoRatingInTheResult_SaysSoWithLowConfidence(string order)
+    {
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainRatingFailure("TO-0000042"), order);
+
+        suggestion.Confidence.Should().Be(Confidence.Low);
+    }
+
+    [Fact]
+    public async Task RunAsync_NotYetBillable_NoProofOfDelivery_SaysWhatCustomerServiceCanDo()
+    {
+        var order = """{"billing":{"state":"NotYetBillable","blockingReasons":["NoProofOfDelivery"]}}""";
+
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042"), order);
+
+        suggestion.Cause.Should().Contain("has no Proof of delivery");
+        suggestion.SuggestedAction.Should().Contain("ask the Carrier for the Proof of delivery, or release the order without one").And.NotContain("not yours");
+    }
+
+    [Fact]
+    public async Task RunAsync_NotYetBillable_NotRated_PointsToTheRatingException()
+    {
+        var order = """{"billing":{"state":"NotYetBillable","blockingReasons":["NotRated"]}}""";
+
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042"), order);
+
+        suggestion.Cause.Should().Contain("not rated");
+        suggestion.SuggestedAction.Should().Contain("open its rating exception").And.Contain("re-rate");
+    }
+
+    [Fact]
+    public async Task RunAsync_NotYetBillable_AnOpenExceptionAlone_IsNotSomethingCustomerServiceCanActOn()
+    {
+        var order = """{"billing":{"state":"NotYetBillable","blockingReasons":["OpenException"]}}""";
+
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042"), order);
+
+        suggestion.Cause.Should().Contain("still open");
+        suggestion.SuggestedAction.Should().StartWith("Customer service can do nothing about this yet.").And.Contain("Planner has to resolve it");
+    }
+
+    [Fact]
+    public async Task RunAsync_NotYetBillable_SeveralReasons_SeparatesWhatIsAndIsNotTheirs()
+    {
+        var order = """{"billing":{"state":"NotYetBillable","blockingReasons":["NotRated","NoProofOfDelivery","OpenException","Other"]}}""";
+
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042"), order);
+
+        suggestion.Cause.Should().Contain("not rated").And.Contain("no Proof of delivery").And.Contain("still open").And.Contain("of Other");
+        suggestion.SuggestedAction.Should().Contain("re-rate").And.Contain("release the order").And.Contain("Planner has to resolve it");
+        suggestion.Evidence.Should().HaveCount(4);
+    }
+
+    [Theory]
+    [InlineData("""{"billing":{"state":"Billable","blockingReasons":[]}}""", "Nothing holds")]
+    [InlineData("""{"billing":{"state":"NotYetBillable"}}""", "Nothing holds")]
+    [InlineData("""{"status":"Accepted"}""", "shows nothing about the billing")]
+    public async Task RunAsync_NotYetBillable_WithNothingBlocking_SaysSo(string order, string cause)
+    {
+        var suggestion = await AskAboutAsync(CustomerServiceQuestions.ExplainNotYetBillable("TO-0000042"), order);
+
+        suggestion.Cause.Should().Contain(cause);
+    }
 }

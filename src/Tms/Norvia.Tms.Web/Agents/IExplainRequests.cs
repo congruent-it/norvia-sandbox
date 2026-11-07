@@ -10,4 +10,8 @@ public interface IExplainRequests
     Task<Result<Suggestion>> ExplainAsync(ExplainRejectedBookingQuery query, CancellationToken cancellationToken);
 
     Task<Result<Suggestion>> ExplainAsync(ExplainTransportOrderQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> ExplainAsync(ExplainRatingFailureQuery query, CancellationToken cancellationToken);
+
+    Task<Result<Suggestion>> ExplainAsync(ExplainNotYetBillableQuery query, CancellationToken cancellationToken);
 }

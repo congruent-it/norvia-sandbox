@@ -44,4 +44,40 @@ public static class CustomerServiceQuestions
         var number = question[SummaryPrefix.Length..^SummarySuffix.Length];
         return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
     }
+
+    private const string RatingPrefix = "Explain why Rating failed for the Transport Order ";
+    private const string RatingSuffix = " and what fixes it.";
+    private const string HoldPrefix = "Explain what is holding the Transport Order ";
+    private const string HoldSuffix = " back from becoming billable, and which of that Customer service can act on.";
+
+    public static string ExplainRatingFailure(string transportOrderNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
+        return RatingPrefix + transportOrderNumber + RatingSuffix;
+    }
+
+    /// <summary>The Transport Order number of a rating failure question, or null when the text is another question.</summary>
+    public static string? ParseExplainRatingFailure(string question) => ParseNumber(question, RatingPrefix, RatingSuffix);
+
+    public static string ExplainNotYetBillable(string transportOrderNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
+        return HoldPrefix + transportOrderNumber + HoldSuffix;
+    }
+
+    /// <summary>The Transport Order number of a not-yet-billable question, or null when the text is another question.</summary>
+    public static string? ParseExplainNotYetBillable(string question) => ParseNumber(question, HoldPrefix, HoldSuffix);
+
+    private static string? ParseNumber(string question, string prefix, string suffix)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        if (!question.StartsWith(prefix, StringComparison.Ordinal) || !question.EndsWith(suffix, StringComparison.Ordinal)
+            || question.Length <= prefix.Length + suffix.Length)
+        {
+            return null;
+        }
+
+        var number = question[prefix.Length..^suffix.Length];
+        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+    }
 }

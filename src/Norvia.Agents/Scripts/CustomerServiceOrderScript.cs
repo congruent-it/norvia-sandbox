@@ -36,6 +36,109 @@ internal static class CustomerServiceOrderScript
         return [new TextContent(Answer(number, context.Results))];
     }
 
+    /// <summary>Rating failed: one read of the order, then the cause and what fixes it. The Rate Card is not Customer service's to edit.</summary>
+    public static IReadOnlyList<AIContent> NextRatingFailure(ScriptContext context, string number) =>
+        context.Results.Count == 0
+            ? [Call(context, 0, GetTransportOrder, "transportOrderNumber", number)]
+            : [new TextContent(RatingFailureAnswer(number, context.Results[0]))];
+
+    /// <summary>Not yet billable: one read of the order, then what holds it back and which of that Customer service can act on.</summary>
+    public static IReadOnlyList<AIContent> NextNotYetBillable(ScriptContext context, string number) =>
+        context.Results.Count == 0
+            ? [Call(context, 0, GetTransportOrder, "transportOrderNumber", number)]
+            : [new TextContent(NotYetBillableAnswer(number, context.Results[0]))];
+
+    private static string RatingFailureAnswer(string number, ScriptedToolResult order)
+    {
+        var rating = Object(Parse(order.Content), "rating");
+        if (rating is null || Text(rating.Value, "result") is not { } result)
+        {
+            return IntegrationOperationsScript.Json(
+                $"The result shows nothing about the rating of Transport Order {number}, so a rating failure cannot be explained from it.",
+                [("The Transport Order came back without a rating result.", order.Id)],
+                "Ask a colleague to look at the Transport Order in the TMS.",
+                "low",
+                "needs-a-person");
+        }
+
+        if (result != "RatingFailed")
+        {
+            return IntegrationOperationsScript.Json(
+                $"Rating has not failed for Transport Order {number}; its rating result is {Words(result)}.",
+                [($"The rating result is {result}.", order.Id)],
+                "Nothing needs fixing here. Reload the rating exceptions list: the order should have left it.",
+                "high",
+                "needs-a-person");
+        }
+
+        var code = Text(rating.Value, "failureCode") ?? "Unknown";
+        var message = Text(rating.Value, "failureMessage") ?? "no message";
+        var (cause, fix) = code switch
+        {
+            "NoRateCard" => ("The Shipper has no Rate Card, so there is nothing to price the order from.", "the Shipper's Rate Card is created"),
+            "NoValidRateCardVersion" => ("The Shipper's Rate Card has no version that is valid on the collection date.", "a Rate Card version valid on the collection date is added"),
+            "NoMatchingLane" => ("The Shipper's Rate Card has no Lane for this origin and destination.", "a Lane for this origin and destination is added to the Rate Card"),
+            "WeightAboveHighestBreak" => ("The order's total weight is above the highest Weight Break on its Lane.", "the Lane gets a Weight Break that covers this weight"),
+            _ => ($"Rating failed: {message}", "whatever that message says is corrected"),
+        };
+        return IntegrationOperationsScript.Json(
+            $"Rating failed for Transport Order {number}. {cause}",
+            [($"Rating failed with {code}: {message}", order.Id)],
+            $"Customer service does not edit the Rate Card: ask whoever owns the Rate Card to fix it, so that {fix}, then re-rate the order with the Re-rate action on the rating exceptions list.",
+            "high",
+            "needs-a-person");
+    }
+
+    private static string NotYetBillableAnswer(string number, ScriptedToolResult order)
+    {
+        var json = Parse(order.Content);
+        if (Object(json, "billing") is not { } billing || Text(billing, "state") is not { } state)
+        {
+            return IntegrationOperationsScript.Json(
+                $"The result shows nothing about the billing of Transport Order {number}, so what holds it back cannot be told from it.",
+                [("The Transport Order came back without a billing state.", order.Id)],
+                "Ask a colleague to look at the Transport Order in the TMS.",
+                "low",
+                "needs-a-person");
+        }
+
+        var reasons = billing.TryGetProperty("blockingReasons", out var array) && array.ValueKind == JsonValueKind.Array
+            ? array.EnumerateArray().Where(reason => reason.ValueKind == JsonValueKind.String).Select(reason => reason.GetString()!).ToList()
+            : [];
+        if (state != "NotYetBillable" || reasons.Count == 0)
+        {
+            return IntegrationOperationsScript.Json(
+                $"Nothing holds Transport Order {number} back: its billing state is {Words(state)}.",
+                [($"The billing state is {state} and no blocking reason is listed.", order.Id)],
+                "Nothing needs doing for this Transport Order.",
+                "high",
+                "needs-a-person");
+        }
+
+        var held = reasons.Select(reason => reason switch
+        {
+            "NotRated" => "it is not rated",
+            "NoProofOfDelivery" => "it has no Proof of delivery",
+            "OpenException" => "an Exception on its Shipment is still open",
+            _ => $"of {reason}",
+        });
+        var yours = reasons.Select(reason => reason switch
+        {
+            "NotRated" => "open its rating exception and, once whoever owns the Rate Card has fixed it, re-rate it",
+            "NoProofOfDelivery" => "ask the Carrier for the Proof of delivery, or release the order without one",
+            _ => null,
+        }).OfType<string>().ToList();
+        var notYours = reasons.Contains("OpenException")
+            ? " The open Exception is not yours to act on: the Planner has to resolve it."
+            : string.Empty;
+        return IntegrationOperationsScript.Json(
+            $"Transport Order {number} is not yet billable because {string.Join(" and ", held)}.",
+            reasons.Select(reason => ($"Billing is blocked by {reason}.", order.Id)),
+            (yours.Count == 0 ? "Customer service can do nothing about this yet." : $"You can {string.Join("; and ", yours)}.") + notYours,
+            "high",
+            "needs-a-person");
+    }
+
     private static FunctionCallContent Call(ScriptContext context, int index, string tool, string argument, string value) =>
         new($"call-{context.Turn}-{index}", tool, new Dictionary<string, object?> { [argument] = value });
 
