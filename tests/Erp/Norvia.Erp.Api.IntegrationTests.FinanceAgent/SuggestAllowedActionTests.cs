@@ -73,6 +73,18 @@ public sealed class SuggestAllowedActionTests(FinanceAgentFixture fixture)
     }
 
     [Fact]
+    public async Task AcceptingADuplicateLine_IsRefused_ThoughTheAgentNeverOffersIt()
+    {
+        var (_, reference) = await FinanceAgentCalls.RecordCostAsync(fixture, 100m, _cancellationToken);
+        await ReceiveAsync(reference, 100m);
+        var (invoiceNumber, _) = await ReceiveAsync(reference, 100m);
+
+        using var response = await FinanceAgentCalls.DecideAsync(fixture, invoiceNumber, reference, "accept", null, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, "the Carrier cost is already Invoiced");
+    }
+
+    [Fact]
     public async Task ADecisionMadeFromASuggestion_TracesTheAgentAndItsRunId()
     {
         var (_, reference) = await FinanceAgentCalls.RecordCostAsync(fixture, 80m, _cancellationToken);
