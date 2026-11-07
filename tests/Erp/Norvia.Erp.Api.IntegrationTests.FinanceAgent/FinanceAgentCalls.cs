@@ -20,8 +20,11 @@ internal static class FinanceAgentCalls
     public const string AgentViewFlow = "agent-view-finance-matching";
     public const string StandInFlow = "agent-mcp-finance-matching";
 
-    /// <summary>The Planner's remark a Spot Carrier cost carries, which the Agent may never read.</summary>
-    public const string SpotRemark = "Spot price agreed by phone.";
+    /// <summary>The Planner's remark a Spot Carrier cost carries, which the Agent may never read. It names a person, as free text can.</summary>
+    public const string SpotRemark = "Spot price agreed by phone with Sanne de Vries, +31 30 555 0142, sanne@cafedezwaan.example.";
+
+    /// <summary>The personal data in <see cref="SpotRemark"/>, none of which may reach the Agent.</summary>
+    public static readonly string[] NeverForTheAgent = ["Sanne", "de Vries", "+31 30 555 0142", "cafedezwaan"];
 
     private static int _bookings = Random.Shared.Next(1_000_000, 8_000_000);
 
@@ -95,7 +98,7 @@ internal static class FinanceAgentCalls
         return (await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["invoice"]!.AsObject();
     }
 
-    /// <summary>The line of an invoice as the ERP answered with it when it received it (E2).</summary>
+    /// <summary>The line of an invoice as the ERP answered with it when it received it and matched its lines (E2).</summary>
     public static JsonObject LineOf(JsonObject invoice, string reference) =>
         invoice["lines"]!.AsArray().Select(line => line!.AsObject()).Single(line => line["carrierBookingReference"]!.GetValue<string>() == reference);
 
@@ -104,6 +107,23 @@ internal static class FinanceAgentCalls
         client.PostAsJsonAsync(
             new Uri(FinanceAgentFixture.McpPath, UriKind.Relative),
             new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = new JsonObject() },
+            cancellationToken);
+
+    /// <summary>A <c>tools/call</c> of <c>get_invoice_line</c>, as the response the stand-in answers with, for the checks that refuse it.</summary>
+    public static Task<HttpResponseMessage> CallToolRawAsync(this HttpClient client, CancellationToken cancellationToken) =>
+        client.PostAsJsonAsync(
+            new Uri(FinanceAgentFixture.McpPath, UriKind.Relative),
+            new JsonObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 1,
+                ["method"] = "tools/call",
+                ["params"] = new JsonObject
+                {
+                    ["name"] = Tool,
+                    ["arguments"] = new JsonObject { ["carrierId"] = Carrier, ["invoiceNumber"] = NewInvoiceNumber(), ["carrierBookingReference"] = NewReference() },
+                },
+            },
             cancellationToken);
 
     /// <summary>Calls <c>get_invoice_line</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>

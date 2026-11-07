@@ -1,4 +1,5 @@
 using System.Net;
+using Norvia.AppHost;
 
 namespace Norvia.Erp.Api.IntegrationTests.FinanceAgent;
 
@@ -24,7 +25,7 @@ public sealed class AgentViewAccessTests(FinanceAgentFixture fixture)
     public async Task AReadWithATokenTheErpDoesNotTrust_IsRefused401()
     {
         using var client = fixture.CreateErpClient(
-            fixture.AgentViewToken([Norvia.AppHost.LocalTokens.FinanceAgentReadRole], signingKey: Convert.ToHexString(Guid.NewGuid().ToByteArray())));
+            fixture.AgentViewToken([LocalTokens.FinanceAgentReadRole], signingKey: Convert.ToHexString(Guid.NewGuid().ToByteArray())));
 
         using var response = await client.GetAsync(ViewPath(), _cancellationToken);
 
@@ -47,7 +48,7 @@ public sealed class AgentViewAccessTests(FinanceAgentFixture fixture)
     [Fact]
     public async Task AReadOfALineThatIsNotThere_WithTheAgentsReadRole_Is404()
     {
-        using var client = fixture.CreateErpClient(fixture.AgentViewToken([Norvia.AppHost.LocalTokens.FinanceAgentReadRole]));
+        using var client = fixture.CreateErpClient(fixture.AgentViewToken([LocalTokens.FinanceAgentReadRole]));
 
         using var response = await client.GetAsync(ViewPath(), _cancellationToken);
 

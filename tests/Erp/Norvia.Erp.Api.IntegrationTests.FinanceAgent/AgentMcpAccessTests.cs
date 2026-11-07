@@ -31,6 +31,57 @@ public sealed class AgentMcpAccessTests(FinanceAgentFixture fixture)
     }
 
     [Fact]
+    public async Task ACallWithATokenForAnotherAudience_IsRefused401()
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken(audience: Norvia.AppHost.LocalTokens.ErpAudience));
+
+        using var response = await client.CallAsync("tools/list", _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ACallWithAnExpiredToken_IsRefused401()
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken(lifetime: TimeSpan.FromHours(-1)));
+
+        using var response = await client.CallAsync("tools/list", _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ACallOfTheTool_WithNoToken_IsRefused401()
+    {
+        using var client = fixture.CreateMcpClient(token: null);
+
+        using var response = await client.CallToolRawAsync(_cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task ACallOfTheTool_WithATokenWithoutTheReadRole_IsRefused403()
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken(roles: ["Something.Else"]));
+
+        using var response = await client.CallToolRawAsync(_cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ACallOfTheTool_OverTheRateLimit_IsRefused429()
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken());
+        await UseUpTheLimitAsync(client);
+
+        using var response = await client.CallToolRawAsync(_cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
     public async Task ACallWithATokenWithoutTheReadRole_IsRefused403()
     {
         using var client = fixture.CreateMcpClient(fixture.AgentToken(roles: ["Something.Else"]));

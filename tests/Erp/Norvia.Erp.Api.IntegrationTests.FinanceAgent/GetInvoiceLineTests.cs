@@ -10,7 +10,7 @@ namespace Norvia.Erp.Api.IntegrationTests.FinanceAgent;
 public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
 {
     // Every property the agent view may carry (the records in Norvia.Erp.Application.CarrierInvoices.AgentView); the answer's JSON names no other.
-    private static readonly HashSet<string> Allowed =
+    private static readonly HashSet<string> AllowedProperties =
     [
         "carrierId", "carrierName", "invoiceNumber", "invoiceDate", "carrierBookingReference", "result", "status", "invoicedAmount", "currency", "tolerance", "difference",
         "carrierCost", "invoicedBy", "candidates", "resolvesAutomatically",
@@ -32,11 +32,13 @@ public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
         view["result"]!.GetValue<string>().Should().Be("PriceMismatch").And.Be(found["result"]!.GetValue<string>());
         view["status"]!.GetValue<string>().Should().Be("ToDecide").And.Be(found["status"]!.GetValue<string>());
         view["invoicedAmount"]!.GetValue<decimal>().Should().Be(95m);
-        view["difference"]!.GetValue<decimal>().Should().Be(15m, "the Carrier claims 15 euros more than the agreed total");
+        view["invoicedAmount"]!.GetValue<decimal>().Should().Be(found["amount"]!.GetValue<decimal>());
+        view["difference"]!.GetValue<decimal>().Should().Be(found["amount"]!.GetValue<decimal>() - 80m, "the invoiced amount E2 matched, less the agreed total");
         view["tolerance"]!.GetValue<decimal>().Should().Be(0m);
         view["carrierName"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace();
         view["carrierCost"]!["carrierBookingNumber"]!.GetValue<string>().Should().Be(booking).And.Be(found["carrierBookingNumber"]!.GetValue<string>());
         view["carrierCost"]!["total"]!.GetValue<decimal>().Should().Be(80m);
+        view["carrierCost"]!["status"]!.GetValue<string>().Should().Be("Open");
         view["carrierCost"]!["source"]!.GetValue<string>().Should().Be("Spot");
         view["invoicedBy"].Should().BeNull();
         view["candidates"]!.AsArray().Should().BeEmpty();
@@ -74,10 +76,11 @@ public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
         view["carrierCost"]!["carrierBookingNumber"]!.GetValue<string>().Should().Be(booking);
         view["carrierCost"]!["status"]!.GetValue<string>().Should().Be("Invoiced");
         var invoicedBy = view["invoicedBy"]!;
-        invoicedBy["invoiceNumber"]!.GetValue<string>().Should().Be(earlier);
-        invoicedBy["carrierBookingReference"]!.GetValue<string>().Should().Be(reference);
-        invoicedBy["status"]!.GetValue<string>().Should().Be("Matched");
-        invoicedBy["amount"]!.GetValue<decimal>().Should().Be(100m);
+        var earlierLine = FinanceAgentCalls.LineOf(first, reference);
+        invoicedBy["invoiceNumber"]!.GetValue<string>().Should().Be(first["invoiceNumber"]!.GetValue<string>()).And.Be(earlier);
+        invoicedBy["carrierBookingReference"]!.GetValue<string>().Should().Be(earlierLine["carrierBookingReference"]!.GetValue<string>());
+        invoicedBy["status"]!.GetValue<string>().Should().Be(earlierLine["status"]!.GetValue<string>());
+        invoicedBy["amount"]!.GetValue<decimal>().Should().Be(earlierLine["amount"]!.GetValue<decimal>());
         view["candidates"]!.AsArray().Should().BeEmpty();
         view["resolvesAutomatically"]!.GetValue<bool>().Should().BeFalse();
     }
@@ -103,7 +106,7 @@ public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
         view["invoicedBy"].Should().BeNull();
         view["resolvesAutomatically"]!.GetValue<bool>().Should().BeTrue("the line is matched again when its Carrier cost arrives");
         var candidates = view["candidates"]!.AsArray().Select(candidate => candidate!.AsObject()).ToList();
-        candidates.Count.Should().BeInRange(2, 3, "the ERP offers at most three");
+        candidates.Count.Should().BeInRange(2, 3, "the ERP offers at most three, and the shared database may hold a third likely cost of another test");
         candidates.Select(candidate => candidate["rank"]!.GetValue<int>()).Should().Equal(Enumerable.Range(1, candidates.Count));
         candidates[0]["carrierBookingNumber"]!.GetValue<string>().Should().Be(bestBooking);
         candidates[0]["total"]!.GetValue<decimal>().Should().Be(100m);
@@ -146,8 +149,7 @@ public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
             var (isError, text) = await client.GetInvoiceLineAsync(FinanceAgentCalls.Carrier, invoiceNumber, reference, received["correlationId"]!.GetValue<string>(), _cancellationToken);
 
             isError.Should().BeFalse(text);
-            text.Should().NotContain(FinanceAgentCalls.SpotRemark).And.NotContainEquivalentOf("remark");
-            PropertyNames(JsonNode.Parse(text)).Should().BeSubsetOf(Allowed);
+            ShouldBeOnlyWhatTheAgentMayRead(text);
         }
     }
 
@@ -173,9 +175,16 @@ public sealed class GetInvoiceLineTests(FinanceAgentFixture fixture)
             FinanceAgentCalls.Carrier, invoiceNumber, reference, received["correlationId"]!.GetValue<string>(), _cancellationToken);
 
         isError.Should().BeFalse(text);
-        text.Should().NotContain(FinanceAgentCalls.SpotRemark);
-        PropertyNames(JsonNode.Parse(text)).Should().BeSubsetOf(Allowed);
-        return JsonNode.Parse(text)!;
+        return ShouldBeOnlyWhatTheAgentMayRead(text);
+    }
+
+    // The view names no property off the allowlist and carries nothing of the Planner's remark, a person's name, phone number or email among them.
+    private static JsonNode ShouldBeOnlyWhatTheAgentMayRead(string text)
+    {
+        text.Should().NotContain(FinanceAgentCalls.SpotRemark).And.NotContainAny(FinanceAgentCalls.NeverForTheAgent).And.NotContainEquivalentOf("remark");
+        var view = JsonNode.Parse(text)!;
+        PropertyNames(view).Should().BeSubsetOf(AllowedProperties);
+        return view;
     }
 
     private static IEnumerable<string> PropertyNames(JsonNode? node) => node switch

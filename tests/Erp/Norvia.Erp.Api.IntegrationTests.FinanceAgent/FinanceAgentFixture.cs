@@ -101,8 +101,8 @@ public sealed class FinanceAgentFixture : IAsyncLifetime
     public static string NewAgentId() => $"norvia-test-agent-{Guid.NewGuid():N}";
 
     /// <summary>A token as Entra issues it to the Carrier invoice matching agent's identity for the MCP server; change any part to show what is refused.</summary>
-    public string AgentToken(string? agentId = null, string[]? roles = null, string? signingKey = null) =>
-        IssueToken(roles ?? [LocalTokens.FinanceAgentReadRole], LocalTokens.FinanceAgentAudience, agentId ?? NewAgentId(), signingKey);
+    public string AgentToken(string? agentId = null, string[]? roles = null, string? signingKey = null, string? audience = null, TimeSpan? lifetime = null) =>
+        IssueToken(roles ?? [LocalTokens.FinanceAgentReadRole], audience ?? LocalTokens.FinanceAgentAudience, agentId ?? NewAgentId(), signingKey, lifetime);
 
     /// <summary>A token for the ERP API's agent view itself, as the stand-in signs it for the Agent's identity: the ERP API's audience, with the roles given.</summary>
     public string AgentViewToken(string[] roles, string? agentId = null, string? signingKey = null) => IssueToken(roles, LocalTokens.ErpAudience, agentId ?? NewAgentId(), signingKey);
@@ -155,12 +155,13 @@ public sealed class FinanceAgentFixture : IAsyncLifetime
         return client;
     }
 
-    private string IssueToken(string[] roles, string audience, string clientId, string? signingKey = null) =>
+    private string IssueToken(string[] roles, string audience, string clientId, string? signingKey = null, TimeSpan? lifetime = null) =>
         new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = LocalTokens.Issuer,
             Audience = audience,
-            Expires = DateTime.UtcNow.AddHours(1),
+            NotBefore = DateTime.UtcNow.AddHours(-2),
+            Expires = DateTime.UtcNow + (lifetime ?? TimeSpan.FromHours(1)),
             Claims = new Dictionary<string, object> { ["azp"] = clientId, ["roles"] = roles },
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey ?? _tokenSigningKey)), SecurityAlgorithms.HmacSha256),
         });
