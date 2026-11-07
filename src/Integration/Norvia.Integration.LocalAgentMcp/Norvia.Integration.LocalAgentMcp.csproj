@@ -14,5 +14,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Integration.LocalAgentMcp.UnitTests" />
+    <InternalsVisibleTo Include="Norvia.Erp.Mcp.IntegrationTests.FinanceAgent" />
   </ItemGroup>
 </Project>

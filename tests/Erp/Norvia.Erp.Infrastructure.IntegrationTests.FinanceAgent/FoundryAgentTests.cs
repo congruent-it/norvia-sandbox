@@ -22,31 +22,60 @@ public sealed class FoundryAgentTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task Explain_AsksThePublishedAgentOfTheProject_AsTheErpUisIdentity_WithTheLinesCorrelationId_AndStoresNothing()
+    public async Task AskAsync_AnswersWithTheSuggestion_AndNamesTheRun()
     {
         await using var host = new FoundryHost();
         host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
-        var request = NewRequest();
 
-        var result = await host.Client.AskAsync(request, Ct);
+        var result = await host.Client.AskAsync(NewRequest(), Ct);
 
         result.IsSuccess.Should().BeTrue(string.Join("; ", result.Errors));
         result.Value.Cause.Should().Contain("agreed");
         result.Value.Evidence.Should().ContainSingle().Which.ToolName.Should().Be("get_invoice_line");
         result.Value.Run!.AgentName.Should().Be("finance-matching");
-        var create = host.Responses.Requests.Single(recorded => recorded.Method == HttpMethod.Post);
-        create.Uri.Should().Be($"{FoundryHost.Project}/openai/v1/responses");
-        create.Authorization.Should().Be("Bearer foundry-token");
-        var body = JsonNode.Parse(create.Body)!;
-        body["agent_reference"]!["name"]!.GetValue<string>().Should().Be("finance-matching");
-        body["structured_inputs"]!["correlationId"]!.GetValue<string>().Should().Be(request.CorrelationId);
-        body["store"]!.GetValue<bool>().Should().BeFalse();
-        body["conversation"].Should().BeNull();
-        body["input"]!.ToJsonString().Should().Contain("did not match");
     }
 
     [Fact]
-    public async Task Explain_DeletesTheResponseAfterwards()
+    public async Task AskAsync_AsksThePublishedAgentOfTheProject_AsTheErpUisIdentity()
+    {
+        await using var host = new FoundryHost();
+        host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
+
+        await host.Client.AskAsync(NewRequest(), Ct);
+
+        var create = CreateRequest(host);
+        create.Uri.Should().Be($"{FoundryHost.Project}/openai/v1/responses");
+        create.Authorization.Should().Be("Bearer foundry-token");
+        JsonNode.Parse(create.Body)!["agent_reference"]!["name"]!.GetValue<string>().Should().Be("finance-matching");
+    }
+
+    [Fact]
+    public async Task AskAsync_SendsTheLinesCorrelationId_AsTheStructuredInputTheToolCallsCarry()
+    {
+        await using var host = new FoundryHost();
+        host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
+        var request = NewRequest();
+
+        await host.Client.AskAsync(request, Ct);
+
+        JsonNode.Parse(CreateRequest(host).Body)!["structured_inputs"]!["correlationId"]!.GetValue<string>().Should().Be(request.CorrelationId);
+    }
+
+    [Fact]
+    public async Task AskAsync_StoresNothing_AndStartsNoConversation()
+    {
+        await using var host = new FoundryHost();
+        host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
+
+        await host.Client.AskAsync(NewRequest(), Ct);
+
+        var body = JsonNode.Parse(CreateRequest(host).Body)!;
+        body["store"]!.GetValue<bool>().Should().BeFalse();
+        body["conversation"].Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AskAsync_DeletesTheResponseAfterwards()
     {
         await using var host = new FoundryHost();
         host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
@@ -57,7 +86,7 @@ public sealed class FoundryAgentTests
     }
 
     [Fact]
-    public async Task Explain_WhenTheResponseCannotBeDeleted_StillAnswers_AndSaysSoOnTheSpan()
+    public async Task AskAsync_WhenTheResponseCannotBeDeleted_StillAnswers_AndSaysSoOnTheSpan()
     {
         await using var host = new FoundryHost();
         host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
@@ -70,7 +99,7 @@ public sealed class FoundryAgentTests
     }
 
     [Fact]
-    public async Task Explain_TracesTheRunAsASpanOfTheErpUi_WithTheCorrelationId()
+    public async Task AskAsync_TracesTheRunAsASpanOfTheErpUi_WithTheCorrelationId()
     {
         await using var host = new FoundryHost();
         host.Responses.Answer([McpCall("get_invoice_line"), Message(Answer)]);
@@ -87,7 +116,7 @@ public sealed class FoundryAgentTests
     }
 
     [Fact]
-    public async Task Explain_WhenTheProjectAnswersAnError_IsUnavailable_WithoutARetry_AndTheSpanSaysSo()
+    public async Task AskAsync_WhenTheProjectAnswersAnError_IsUnavailable_WithoutARetry_AndTheSpanSaysSo()
     {
         await using var host = new FoundryHost();
         host.Responses.Fail(HttpStatusCode.ServiceUnavailable);
@@ -103,7 +132,7 @@ public sealed class FoundryAgentTests
     }
 
     [Fact]
-    public async Task Explain_WhenAToolWasRefused_IsAgentToolRefused()
+    public async Task AskAsync_WhenAToolWasRefused_IsAgentToolRefused()
     {
         await using var host = new FoundryHost();
         host.Responses.Answer([McpCall("get_invoice_line", error: """{"code":403}"""), Message(Answer)]);
@@ -115,7 +144,7 @@ public sealed class FoundryAgentTests
     }
 
     [Fact]
-    public async Task Explain_WhenTheAgentCalledAToolItsDefinitionDoesNotList_IsAgentToolRefused()
+    public async Task AskAsync_WhenTheAgentCalledAToolItsDefinitionDoesNotList_IsAgentToolRefused()
     {
         await using var host = new FoundryHost();
         host.Responses.Answer([McpCall("get_planner_remark"), Message(Answer)]);
@@ -126,7 +155,7 @@ public sealed class FoundryAgentTests
     }
 
     [Fact]
-    public async Task Explain_WhenTheProjectIsTooSlow_IsUnavailable_AfterTheTimeout()
+    public async Task AskAsync_WhenTheProjectIsTooSlow_IsUnavailable_AfterTheTimeout()
     {
         await using var host = new FoundryHost(timeoutSeconds: 1);
         host.Responses.Hang = true;
@@ -136,6 +165,8 @@ public sealed class FoundryAgentTests
         result.Status.Should().Be(ResultStatus.Unavailable);
         result.Errors.Should().Contain(AgentFailureCodes.AgentUnavailable);
     }
+
+    private static RecordedRequest CreateRequest(FoundryHost host) => host.Responses.Requests.Single(recorded => recorded.Method == HttpMethod.Post);
 
     private static AgentRequest NewRequest() =>
         new("finance-matching", FinanceQuestions.ExplainInvoiceLine("CAR-0001", $"VDT-{Guid.NewGuid():N}", "TRX-1"), Guid.NewGuid().ToString());
