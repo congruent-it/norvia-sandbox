@@ -1,0 +1,116 @@
+@using Ardalis.Result
+@using Microsoft.Extensions.Options
+@using Norvia.Agents
+@using Norvia.Tms.Application.Agents
+@using Norvia.Tms.Application.Agents.Explain
+@inject IOptions<AgentsOptions> Agents
+@inject IExplainRequests Requests
+@inject ILogger<ExplainOrderHold> Logger
+@implements IDisposable
+
+@* One fixed question about one row of a Customer service list: why Rating failed, or what holds an order back from billing. Off unless
+   Agents:Enabled, and only in the Customer service role view. An Agent is never on a critical path (ADR 0040). *@
+@if (Agents.Value.Enabled && ForCustomerService)
+{
+    <div data-explain="@(Kind == HoldKind.RatingFailure ? "rating-failure" : "not-yet-billable")">
+        <FluentButton Appearance="Appearance.Outline" Disabled="_asking" OnClick="ExplainAsync" aria-label="@($"Explain {TransportOrderNumber}")">Explain</FluentButton>
+
+        @if (_asking)
+        {
+            <div role="status" class="mt-3">
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <FluentProgressRing />
+                    <span>The assistant is reading…</span>
+                </FluentStack>
+            </div>
+        }
+        else if (_unavailable)
+        {
+            <div role="alert" class="mt-3">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+            </div>
+        }
+        else if (_suggestion is { } suggestion)
+        {
+            @* Text only: what the assistant wrote is data, so it is encoded, never rendered as markup. *@
+            <div class="mt-3" data-testid="explanation">
+                <h2 class="text-lg">@(Kind == HoldKind.RatingFailure ? "Why Rating failed" : "What holds it back")</h2>
+                <p>@suggestion.Cause</p>
+                <h2 class="text-lg">Evidence</h2>
+                <ul>
+                    @foreach (var evidence in suggestion.Evidence)
+                    {
+                        <li>@evidence.Claim <cite class="text-muted">[@evidence.ResultId, @evidence.ToolName]</cite></li>
+                    }
+                </ul>
+                <h2 class="text-lg">@(Kind == HoldKind.RatingFailure ? "What fixes it" : "What you can do")</h2>
+                <p>@suggestion.SuggestedAction</p>
+                <p class="text-muted">Confidence: @suggestion.Confidence.ToString().ToLowerInvariant(). The assistant can be wrong; you decide.</p>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _asking;
+    private bool _unavailable;
+    private Suggestion? _suggestion;
+    private readonly CancellationTokenSource _lifetime = new();
+
+    public enum HoldKind
+    {
+        RatingFailure,
+        NotYetBillable,
+    }
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public HoldKind Kind { get; set; }
+
+    /// <summary>Whether the page is the Customer service role's view. The button shows nowhere else.</summary>
+    [Parameter]
+    public bool ForCustomerService { get; set; }
+
+    private async Task ExplainAsync()
+    {
+        _asking = true;
+        _unavailable = false;
+        _suggestion = null;
+        try
+        {
+            var result = Kind == HoldKind.RatingFailure
+                ? await Requests.ExplainAsync(new ExplainRatingFailureQuery(TransportOrderNumber), _lifetime.Token)
+                : await Requests.ExplainAsync(new ExplainNotYetBillableQuery(TransportOrderNumber), _lifetime.Token);
+            if (result.IsSuccess)
+            {
+                _suggestion = result.Value;
+            }
+            else
+            {
+                _unavailable = true;
+                AgentPageLog.ExplainOrderFailed(Logger, TransportOrderNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _unavailable = true;
+            AgentPageLog.ExplainOrderCrashed(Logger, exception, TransportOrderNumber);
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

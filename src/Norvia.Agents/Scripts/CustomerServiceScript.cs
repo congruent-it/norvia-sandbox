@@ -23,6 +23,16 @@ public static class CustomerServiceScript
             return CustomerServiceOrderScript.Next(context, number);
         }
 
+        if (CustomerServiceQuestions.ParseExplainRatingFailure(context.Question) is { } failed)
+        {
+            return CustomerServiceOrderScript.NextRatingFailure(context, failed);
+        }
+
+        if (CustomerServiceQuestions.ParseExplainNotYetBillable(context.Question) is { } held)
+        {
+            return CustomerServiceOrderScript.NextNotYetBillable(context, held);
+        }
+
         if (CustomerServiceQuestions.ParseExplainRejectedBooking(context.Question) is not { } id)
         {
             return [new TextContent("{}")];

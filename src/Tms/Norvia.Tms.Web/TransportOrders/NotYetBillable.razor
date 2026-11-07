@@ -1,6 +1,7 @@
 @page "/not-yet-billable"
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
+@using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Application.Billing.ListNotYetBillable
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
@@ -29,7 +30,7 @@
                 Empty="@("No delivered Transport Order is waiting to become billable. An order appears here once its Shipment is Delivered and something still blocks billing.")" Context="orders">
     @* Oldest delivery first, as the query gives them: what has waited longest is followed up first. *@
     <FluentDataGrid Items="orders.AsQueryable()" TGridItem="TransportOrderNotYetBillableSummary" Class="flatly-table" aria-label="Transport Orders not yet billable"
-                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.4fr 2.2fr 1.3fr 2fr" MultiLine="true">
+                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.4fr 2.2fr 1.3fr 2fr 2fr" MultiLine="true">
         <TemplateColumn Title="Transport Order">
             <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
         </TemplateColumn>
@@ -39,6 +40,9 @@
         <PropertyColumn Title="Blocking reasons" Property="@(order => string.Join(", ", order.BlockingReasons.Select(BillingText.Reason)))" />
         <TemplateColumn Title="Shipment">
             <a href="/shipments/@context.ShipmentNumber">@context.ShipmentNumber</a>
+        </TemplateColumn>
+        <TemplateColumn Title="Explain">
+            <ExplainOrderHold TransportOrderNumber="@context.TransportOrderNumber" Kind="ExplainOrderHold.HoldKind.NotYetBillable" ForCustomerService="RoleKey == NorviaRole.CustomerService.Key" />
         </TemplateColumn>
         @* Only what can lift a blocking reason is offered: the rating exception when the order isn't rated, and the release when the Proof of delivery is missing. *@
         <TemplateColumn Title="Actions">
@@ -64,8 +68,17 @@
     private string? _releasing;
     private string? _done;
 
+    // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
+    // circuit; a page that couldn't read it shows no Explain button.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [PersistentState]
+    public string? RoleKey { get; set; }
+
     protected override void OnInitialized()
     {
+        RoleKey ??= HttpContext is null ? null : NorviaRole.Current(HttpContext.Request).Key;
         _list = new LiveTransportOrderList<TransportOrderNotYetBillableSummary>(
             Queries.ListNotYetBillableAsync, "the Transport Orders not yet billable", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);

@@ -1,6 +1,7 @@
 @page "/rating-exceptions"
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
+@using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Application.TransportOrders.RatingExceptions
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
@@ -26,7 +27,7 @@
     @* Oldest first, as the query gives them: the longest-waiting exception is followed up first. The reason gets the
        most room, since it is what Customer service reads, and long text wraps rather than being cut off. *@
     <FluentDataGrid Items="exceptions.AsQueryable()" TGridItem="RatingExceptionSummary" Class="flatly-table" aria-label="Rating exceptions"
-                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.2fr 3fr 1.3fr auto" MultiLine="true">
+                    GridTemplateColumns="1.4fr 1.2fr 1.3fr 1.2fr 3fr 1.3fr 2fr auto" MultiLine="true">
         <TemplateColumn Title="Transport Order">
             <a href="/transport-orders/@context.TransportOrderNumber">@context.TransportOrderNumber</a>
         </TemplateColumn>
@@ -35,6 +36,9 @@
         <PropertyColumn Title="Failure" Property="@(exception => RatingText.Failure(exception.RatingFailure.Code))" />
         <PropertyColumn Title="Reason" Property="@(exception => exception.RatingFailure.Message)" />
         <PropertyColumn Title="Rating failed" Property="@(exception => NorviaTime.Format(exception.RatingFailedAt))" />
+        <TemplateColumn Title="Explain">
+            <ExplainOrderHold TransportOrderNumber="@context.TransportOrderNumber" Kind="ExplainOrderHold.HoldKind.RatingFailure" ForCustomerService="RoleKey == NorviaRole.CustomerService.Key" />
+        </TemplateColumn>
         <TemplateColumn Title="Action">
             <FluentButton Appearance="Appearance.Outline" OnClick="() => ReRateAsync(context.TransportOrderNumber)"
                           Disabled="_reRating.Contains(context.TransportOrderNumber)"
@@ -51,8 +55,17 @@
     private LiveTransportOrderList<RatingExceptionSummary> _list = null!;
     private (MessageIntent Intent, string Text)? _outcome;
 
+    // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
+    // circuit; a page that couldn't read it shows no Explain button.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [PersistentState]
+    public string? RoleKey { get; set; }
+
     protected override void OnInitialized()
     {
+        RoleKey ??= HttpContext is null ? null : NorviaRole.Current(HttpContext.Request).Key;
         _list = new LiveTransportOrderList<RatingExceptionSummary>(
             Queries.ListRatingExceptionsAsync, "the rating exceptions", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
