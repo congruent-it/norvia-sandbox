@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Extensions.Options;
 using Norvia.Erp.Api.Agents;
 using Norvia.Erp.Application.Agents;
 using Norvia.Erp.Application.CarrierInvoices.AgentView;
@@ -33,9 +34,14 @@ public sealed class FinanceAgentViewTests
         return [.. ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()];
     }
 
-    private static DefaultEndpointFilterInvocationContext ContextOf(string? azp, string? tool)
+    private static DefaultEndpointFilterInvocationContext ContextOf(string? azp, string? tool, string? agentHeader = null)
     {
         var http = new DefaultHttpContext();
+        if (agentHeader is not null)
+        {
+            http.Request.Headers[AgentCallTracking.AgentHeader] = agentHeader;
+        }
+
         if (azp is not null)
         {
             http.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("azp", azp)], "test"));
@@ -138,7 +144,7 @@ public sealed class FinanceAgentViewTests
     [Fact]
     public async Task Invoke_ARead_IsTaggedWithTheAgentFromTheTokenAndTheToolFromTheServer_AndSucceeded()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         var result = await filter.InvokeAsync(ContextOf("norvia-local-agent-finance-matching", "get_invoice_line"), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
 
@@ -149,9 +155,29 @@ public sealed class FinanceAgentViewTests
     }
 
     [Fact]
+    public async Task Invoke_BehindApiManagement_IsTaggedWithTheAgentTheGatewayNames()
+    {
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions { GatewayClientId = "gateway-client" }), _logger);
+
+        await filter.InvokeAsync(ContextOf("gateway-client", "get_invoice_line", "agent-identity"), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
+
+        ScopeOf("Succeeded")["agentId"].Should().Be("agent-identity");
+    }
+
+    [Fact]
+    public async Task Invoke_ACallerThatIsNotTheGateway_CannotNameTheAgentWithAHeader()
+    {
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions { GatewayClientId = "gateway-client" }), _logger);
+
+        await filter.InvokeAsync(ContextOf("someone-else", "get_invoice_line", "agent-identity"), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
+
+        ScopeOf("Succeeded")["agentId"].Should().Be("someone-else");
+    }
+
+    [Fact]
     public async Task Invoke_ANotFound_IsRefused()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         await filter.InvokeAsync(ContextOf("agent", "get_invoice_line"), _ => ValueTask.FromResult<object?>(TypedResults.Problem(statusCode: 404)));
 
@@ -161,7 +187,7 @@ public sealed class FinanceAgentViewTests
     [Fact]
     public async Task Invoke_ACallWithNoAgentOrToolName_LeavesThoseKeysOut()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         await filter.InvokeAsync(ContextOf(null, null), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
 
@@ -171,7 +197,7 @@ public sealed class FinanceAgentViewTests
     [Fact]
     public async Task Invoke_AToolNameThatIsFarTooLong_IsLeftOut()
     {
-        var filter = new AgentCallTracking(_logger);
+        var filter = new AgentCallTracking(Options.Create(new AgentApiOptions()), _logger);
 
         await filter.InvokeAsync(ContextOf("agent", new string('t', 500)), _ => ValueTask.FromResult<object?>(TypedResults.Ok("x")));
 

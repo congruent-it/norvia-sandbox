@@ -25,7 +25,7 @@ public static class FinanceAgentEndpoints
         var group = app.NewVersionedApi("FinanceAgent")
             .MapGroup("/v{version:apiVersion}/agent/finance")
             .HasApiVersion(1)
-            .RequireAuthorization(policy => policy.RequireRole(AgentRoles.FinanceRead))
+            .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AgentApiAuthentication.Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.FinanceRead))
             .WithMetadata(new TrackedFlow(Flow))
             .AddEndpointFilter<AgentCallTracking>();
 

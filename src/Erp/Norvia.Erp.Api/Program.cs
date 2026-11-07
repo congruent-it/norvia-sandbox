@@ -42,6 +42,7 @@ builder.Services.AddScoped<IPipelineBehavior<ReportCreditNoteNotDeliveredCommand
 builder.AddErpInfrastructure();
 // The API serves the Finance agent's view; it never asks an Agent, so its port stays the disabled one (the ERP UI turns it on).
 builder.AddAgentClient();
+builder.AddAgentApi();
 builder.AddErpReset();
 
 // Issuer, audience and keys come from Authentication:Schemes:Bearer: Entra in Azure, the AppHost's local key otherwise.

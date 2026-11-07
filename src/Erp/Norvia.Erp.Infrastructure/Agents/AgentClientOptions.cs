@@ -3,9 +3,10 @@ using System.ComponentModel.DataAnnotations;
 namespace Norvia.Erp.Infrastructure.Agents;
 
 /// <summary>
-/// How the ERP UI reaches an Agent locally (ADR 0040, ADR 0041): it runs the Agent in process. The MCP server to call, the token to
-/// call it with (signed with the AppHost's local key, as the other local tokens are), and optionally a model deployment of the
-/// developer's own. A run may take only so long. The Foundry client comes with the Azure slice.
+/// How the ERP UI reaches an Agent (ADR 0040, ADR 0041). In Azure the Foundry client asks the Agent published in the project at
+/// <see cref="FoundryOptions.ProjectEndpoint"/>. Without a project endpoint the ERP UI runs the Agent in process: the MCP server to
+/// call, the token to call it with (signed with the AppHost's local key, as the other local tokens are), and optionally a model
+/// deployment of the developer's own. Either way a run may take only so long.
 /// </summary>
 public sealed class AgentClientOptions
 {
@@ -23,6 +24,11 @@ public sealed class AgentClientOptions
     public AgentTokenOptions Tokens { get; set; } = new();
 
     public AgentModelOptions Model { get; set; } = new();
+
+    public FoundryOptions Foundry { get; set; } = new();
+
+    /// <summary>Whether the Agents run in Foundry, which is the case wherever the estate gave the ERP UI a project endpoint.</summary>
+    public bool UsesFoundry => Foundry.ProjectEndpoint is not null;
 }
 
 /// <summary>The Agent's local token: the identity it is, the role it holds and the key the MCP stand-in trusts.</summary>

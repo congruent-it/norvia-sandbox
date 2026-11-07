@@ -152,6 +152,9 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>The TMS API's agent API app registration, which is the audience of the tokens the Customer service agent's view accepts. API Management's identity alone holds <c>TransportOrders.CustomerServiceAgent.Read</c> on it.</summary>
     public IResourceBuilder<ParameterResource> TmsAgentApiClientId { get; } = builder.AddParameter("estate-tms-agent-api-client-id");
 
+    /// <summary>The ERP API's agent API app registration, which is the audience of the tokens the Finance agent view accepts. API Management's identity alone holds <c>CarrierInvoices.FinanceAgent.Read</c> on it.</summary>
+    public IResourceBuilder<ParameterResource> ErpAgentApiClientId { get; } = builder.AddParameter("estate-erp-agent-api-client-id");
+
     /// <summary>API Management's identity (its client ID), the one caller of the console's agent API. Its token names the gateway, so the console reads the Agent's identity from the header the gateway sets.</summary>
     public IResourceBuilder<ParameterResource> ApiManagementClientId { get; } = builder.AddParameter("estate-api-management-client-id");
 
