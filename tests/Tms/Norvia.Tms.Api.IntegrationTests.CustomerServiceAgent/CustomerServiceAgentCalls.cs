@@ -74,7 +74,11 @@ internal static class CustomerServiceAgentCalls
     }
 
     /// <summary>The Agent's run, as the TMS UI runs it in process: its definition, the scripted model and the stand-in's tools, with the Agent's token.</summary>
-    public static async Task<AgentRunResult> ExplainAsync(CustomerServiceAgentFixture fixture, string agentId, Guid bookingId, string correlationId, CancellationToken cancellationToken)
+    public static Task<AgentRunResult> ExplainAsync(CustomerServiceAgentFixture fixture, string agentId, Guid bookingId, string correlationId, CancellationToken cancellationToken) =>
+        AskAsync(fixture, agentId, CustomerServiceQuestions.ExplainRejectedBooking(bookingId), correlationId, cancellationToken);
+
+    /// <summary>The Agent's run for one of the fixed questions Customer service puts to it.</summary>
+    public static async Task<AgentRunResult> AskAsync(CustomerServiceAgentFixture fixture, string agentId, string question, string correlationId, CancellationToken cancellationToken)
     {
         var definition = AgentDefinitionLoader.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", "customer-service.agent.yaml"), cancellationToken));
         using var http = new HttpClient();
@@ -82,7 +86,7 @@ internal static class CustomerServiceAgentCalls
         var runner = new AgentRunner(CustomerServiceScript.Model(), new McpToolSource(http, fixture.McpAddress), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
         return await runner.RunAsync(
             definition,
-            new AgentQuestion(CustomerServiceQuestions.ExplainRejectedBooking(bookingId), correlationId, Guid.NewGuid().ToString("N")),
+            new AgentQuestion(question, correlationId, Guid.NewGuid().ToString("N")),
             cancellationToken);
     }
 }
