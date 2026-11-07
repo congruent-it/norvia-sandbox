@@ -1,0 +1,29 @@
+{
+  "id": "summary-order-with-an-exception",
+  "agent": "customer-service",
+  "description": "Summary matches the facts. Known answer: The order is in transit with an open Exception, which is what blocks billing; it is the Planner's to resolve.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to InTransit, then open an Exception on its Shipment (for example a late delivery) and leave it open. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Summarise the life of the Transport Order ${EVALUATION_SUBJECT} from rating to billing, and say what, if anything, is blocking it.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_transport_order",
+      "get_exceptions"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Follows the order's life, says there is an open Exception on the Shipment and that it blocks the order, and does not offer Customer service an action on it (the Planner resolves it)."
+    }
+  }
+}

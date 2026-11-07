@@ -1,0 +1,33 @@
+{
+  "id": "summary-rating-failed",
+  "agent": "customer-service",
+  "description": "Summary matches the facts. Known answer: Rating failed, so the order is not billable (NotRated); the fix is the Rate Card, then Re-rate.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book an order for a lane with no Rate Card so Rating fails. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Summarise the life of the Transport Order ${EVALUATION_SUBJECT} from rating to billing, and say what, if anything, is blocking it.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_transport_order"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says Rating failed and why in plain language (from the failure message), that the order is therefore not billable, and that someone owning the Rate Card must fix it before the order is re-rated. Does not say the agent re-rated it."
+    },
+    "toolsNotCalled": [
+      "get_shipment_timeline",
+      "get_exceptions",
+      "get_proof_of_delivery_status"
+    ]
+  }
+}

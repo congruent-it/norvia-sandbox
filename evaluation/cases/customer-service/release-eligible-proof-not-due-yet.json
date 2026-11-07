@@ -1,0 +1,31 @@
+{
+  "id": "release-eligible-proof-not-due-yet",
+  "agent": "customer-service",
+  "description": "Release suggestion. Known answer: Eligible and the Proof of delivery is NotDueYet: Wait.",
+  "setup": {
+    "fault": "none",
+    "seed": "Deliver an order and ask straight away, before a Proof of delivery is due. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Recommend whether the Transport Order ${EVALUATION_SUBJECT} should be released without a Proof of delivery, now or later.",
+  "expect": {
+    "fields": {
+      "action": "wait"
+    },
+    "toolsCalled": [
+      "get_release_eligibility",
+      "get_proof_of_delivery_status"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100",
+      "CMR received",
+      "Remark:"
+    ],
+    "explanation": {
+      "field": "suggestedAction",
+      "rubric": "Recommends waiting, with the facts: the delivery time, that a Proof of delivery is not yet due. Does not write the remark of the release."
+    }
+  }
+}

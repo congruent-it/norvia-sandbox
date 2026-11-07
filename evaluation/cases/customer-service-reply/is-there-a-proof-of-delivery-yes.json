@@ -1,0 +1,22 @@
+{
+  "id": "is-there-a-proof-of-delivery-yes",
+  "agent": "customer-service-reply",
+  "description": "Known answer: says it is available, with the delivery time and condition.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to Delivered with a clean Proof of delivery. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Draft a reply, in English, to the Shipper of the Transport Order ${EVALUATION_SUBJECT}, who asks: \"Is there a Proof of delivery?\"",
+  "expect": {
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says a Proof of delivery is available, with its delivery time and that the goods were received clean. Does not say who signed."
+    },
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_view"
+    ]
+  }
+}

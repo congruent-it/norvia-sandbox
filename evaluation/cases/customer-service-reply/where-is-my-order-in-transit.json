@@ -1,0 +1,27 @@
+{
+  "id": "where-is-my-order-in-transit",
+  "agent": "customer-service-reply",
+  "description": "Known answer: says the order is in transit with the latest progress event, its place and the ETA.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to InTransit with a Collected and a Departed event and an ETA. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Draft a reply, in English, to the Shipper of the Transport Order ${EVALUATION_SUBJECT}, who asks: \"Where is my order?\"",
+  "expect": {
+    "mustNotContain": [
+      "£",
+      "€",
+      "price"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Starts with Hello, and ends with Kind regards, then Norvia Customer service. Says the order is in transit, gives the latest progress event with its place and time, and the ETA. States no price."
+    },
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_view"
+    ]
+  }
+}

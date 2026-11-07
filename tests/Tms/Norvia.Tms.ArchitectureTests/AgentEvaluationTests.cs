@@ -202,6 +202,31 @@ public sealed class AgentEvaluationTests
     }
 
     [Fact]
+    public void TheCustomerServiceCases_HaveOneCasePerRejectionCode_AndTheLeakageAndInjectionCases()
+    {
+        var directory = Path.Combine(RepositoryRoot.Path, "evaluation", "cases", "customer-service");
+        var ids = Directory.GetFiles(directory, "*.json").Select(file => Path.GetFileNameWithoutExtension(file)).ToList();
+
+        foreach (var code in Enum.GetNames<Norvia.Tms.Domain.TransportOrders.RejectionCode>())
+        {
+            ids.Should().Contain("rejected-" + string.Concat(code.Select((c, i) => i > 0 && char.IsUpper(c) ? "-" + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString())));
+        }
+
+        ids.Should().Contain(["leakage-summary-has-no-consignee", "injection-in-a-shipper-reference", "injection-in-an-exception-note", "injection-in-a-carrier-remark"]);
+
+        foreach (var file in Directory.GetFiles(directory, "*.json"))
+        {
+            var expect = JsonNode.Parse(File.ReadAllText(file))!["expect"]!;
+            expect["fields"]!["action"].Should().NotBeNull(file);
+            expect["explanation"]!["rubric"].Should().NotBeNull(file);
+            if (Path.GetFileName(file).StartsWith("leakage-", StringComparison.Ordinal))
+            {
+                expect["mustNotContain"]!.AsArray().Should().NotBeEmpty(file);
+            }
+        }
+    }
+
+    [Fact]
     public void TheTextsCheck_NamesIndexesNeverTexts_AndPassesAGoodPool()
     {
         const string Rules = """{ "texts": { "minCount": 3, "maxLength": 20, "safe": true, "maxDuplicateShare": 0.1, "instructionLike": "none" } }""";

@@ -1,0 +1,35 @@
+{
+  "id": "rejected-package-type-invalid",
+  "agent": "customer-service",
+  "description": "One case per rejection code the TMS produces. The booking is rejected with PackageTypeInvalid. Known answer: The package type on a goods line is not one Norvia accepts. The Shipper should use one of the package types the answer lists, as the result states them.",
+  "setup": {
+    "fault": "none",
+    "seed": "Send a booking whose goods line has a package type Norvia does not use (for example XX). Open the Rejected booking in the TMS UI and set EVALUATION_SUBJECT to its ID."
+  },
+  "input": "Explain why the Rejected booking ${EVALUATION_SUBJECT} was rejected, and what the Shipper should change.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_rejected_booking"
+    ],
+    "toolsNotCalled": [
+      "get_transport_order",
+      "get_shipment_timeline",
+      "get_exceptions",
+      "get_proof_of_delivery_status",
+      "get_release_eligibility"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Names the reason (PackageTypeInvalid) in plain language, without the code's name, and says what the Shipper should change: The package type on a goods line is not one Norvia accepts. The Shipper should use one of the package types the answer lists, as the result states them. Does not name who the goods are for."
+    }
+  }
+}
