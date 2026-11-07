@@ -36,4 +36,29 @@ public sealed class ExplainFailureJourneyTests(FinanceAgentUiFixture fixture) : 
             await Agent.StartAgentAsync(Ct);
         }
     }
+
+    [Fact]
+    public async Task ExplainInvoice_WhenTheAgentFails_ShowsAssistantUnavailableAndTheLinesAreStillFinancesToDecide()
+    {
+        var reference = CarrierInvoiceCalls.NewReference();
+        await RecordCostAsync(reference, 80m);
+        var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
+        await ReceiveInvoiceAsync(invoiceNumber, (reference, 95m));
+        var invoice = await OpenLineAsync(invoiceNumber, reference);
+
+        await Agent.StopAgentAsync(Ct);
+        try
+        {
+            await ExplainInvoiceButton(invoice, invoiceNumber).ClickAsync();
+
+            await Expect(invoice.GetByRole(AriaRole.Alert)).ToContainTextAsync("Assistant unavailable", new() { Timeout = AgentTimeout });
+            await Expect(InvoiceExplanationOf(invoice, invoiceNumber)).ToHaveCountAsync(0);
+            await Expect(ExplainInvoiceButton(invoice, invoiceNumber)).ToBeEnabledAsync();
+            await Expect(invoice.GetByLabel($"Line {reference}")).ToContainTextAsync("To decide");
+        }
+        finally
+        {
+            await Agent.StartAgentAsync(Ct);
+        }
+    }
 }
