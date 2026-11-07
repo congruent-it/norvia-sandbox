@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Norvia.Erp.TestSupport;
 using static Microsoft.Playwright.Assertions;
@@ -34,9 +33,11 @@ public sealed class ExplainInvoiceJourneyTests(FinanceAgentUiFixture fixture) : 
         await Expect(explanation).ToBeVisibleAsync(new() { Timeout = AgentTimeout });
         await Expect(explanation).ToContainTextAsync($"Carrier invoice {invoiceNumber} of Van Dijk Transport claims €325.00 on 4 lines");
         await Expect(explanation).ToContainTextAsync("3 lines are To decide: 1 Price mismatch, 1 Unknown booking, 1 Duplicate.");
-        await Expect(explanation.GetByRole(AriaRole.Listitem).Filter(new() { HasText = "1 line is To decide as Price mismatch." })).ToContainTextAsync("get_invoice_summary");
-        await Expect(explanation.GetByRole(AriaRole.Listitem).Filter(new() { HasText = "1 line is To decide as Unknown booking." })).ToContainTextAsync("get_invoice_summary");
-        await Expect(explanation.GetByRole(AriaRole.Listitem).Filter(new() { HasText = "1 line is To decide as Duplicate." })).ToContainTextAsync("get_invoice_summary");
+        foreach (var cause in new[] { "Price mismatch", "Unknown booking", "Duplicate" })
+        {
+            await Expect(explanation.GetByRole(AriaRole.Listitem).Filter(new() { HasText = $"1 line is To decide as {cause}." })).ToContainTextAsync("get_invoice_summary");
+        }
+
         await Expect(explanation).ToContainTextAsync("1 of them may still resolve by themselves, each matched again when its Carrier cost arrives (only the Unknown booking lines can). The other 2 wait for Finance.");
         await Expect(explanation).ToContainTextAsync("Confidence: high. The assistant can be wrong; you decide.");
 
@@ -47,16 +48,13 @@ public sealed class ExplainInvoiceJourneyTests(FinanceAgentUiFixture fixture) : 
     [Fact]
     public async Task ExplainInvoice_ChangesNothing_TheLinesAreStillToDecideAndFinanceCanAskAgain()
     {
-        var reference = CarrierInvoiceCalls.NewReference();
-        await RecordCostAsync(reference, 80m);
-        var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
-        await ReceiveInvoiceAsync(invoiceNumber, (reference, 95m));
+        var (invoiceNumber, reference) = await ReceivePriceMismatchAsync();
         var invoice = await OpenInvoiceAsync(invoiceNumber);
 
         await ExplainInvoiceButton(invoice, invoiceNumber).ClickAsync();
 
         await Expect(InvoiceExplanationOf(invoice, invoiceNumber)).ToBeVisibleAsync(new() { Timeout = AgentTimeout });
-        await invoice.GetByRole(AriaRole.Button, new() { NameRegex = new Regex($"^{Regex.Escape(reference)} ") }).ClickAsync();
+        await LineButton(invoice, reference).ClickAsync();
         await Expect(invoice.GetByLabel($"Line {reference}")).ToContainTextAsync("To decide");
         await Expect(ExplainInvoiceButton(invoice, invoiceNumber)).ToBeEnabledAsync();
     }
@@ -64,10 +62,7 @@ public sealed class ExplainInvoiceJourneyTests(FinanceAgentUiFixture fixture) : 
     [Fact]
     public async Task ExplainInvoice_WhileTheAssistantReads_ShowsItIsReading_AndThenTheAnswer()
     {
-        var reference = CarrierInvoiceCalls.NewReference();
-        await RecordCostAsync(reference, 80m);
-        var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
-        await ReceiveInvoiceAsync(invoiceNumber, (reference, 95m));
+        var (invoiceNumber, reference) = await ReceivePriceMismatchAsync();
         var invoice = await OpenInvoiceAsync(invoiceNumber);
 
         // The fake answers in milliseconds, so the page records that it showed the reading state rather than the test racing it.

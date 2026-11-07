@@ -43,8 +43,21 @@ public abstract class ToDecidePage(FinanceAgentUiFixture fixture) : TracedPage(f
     protected async Task<ILocator> OpenLineAsync(string invoiceNumber, string reference)
     {
         var invoice = await OpenInvoiceAsync(invoiceNumber);
-        await invoice.GetByRole(AriaRole.Button, new() { NameRegex = new Regex($"^{Regex.Escape(reference)} ") }).ClickAsync();
+        await LineButton(invoice, reference).ClickAsync();
         return invoice;
+    }
+
+    /// <summary>The button that opens a line in the invoice's section.</summary>
+    protected static ILocator LineButton(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Button, new() { NameRegex = new Regex($"^{Regex.Escape(reference)} ") });
+
+    /// <summary>Records a Spot Carrier cost of €80.00 and receives a Carrier invoice that claims €95.00 for it: one line that is To decide as a Price mismatch.</summary>
+    protected async Task<(string InvoiceNumber, string Reference)> ReceivePriceMismatchAsync()
+    {
+        var reference = CarrierInvoiceCalls.NewReference();
+        await RecordCostAsync(reference, 80m);
+        var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
+        await ReceiveInvoiceAsync(invoiceNumber, (reference, 95m));
+        return (invoiceNumber, reference);
     }
 
     /// <summary>The Explain button of a line, in the invoice's section.</summary>

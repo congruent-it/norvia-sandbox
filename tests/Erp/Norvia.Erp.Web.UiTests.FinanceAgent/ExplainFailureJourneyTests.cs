@@ -13,10 +13,7 @@ public sealed class ExplainFailureJourneyTests(FinanceAgentUiFixture fixture) : 
     [Fact]
     public async Task Explain_WhenTheAgentFails_ShowsAssistantUnavailableAndFinanceCanStillDecide()
     {
-        var reference = CarrierInvoiceCalls.NewReference();
-        await RecordCostAsync(reference, 80m);
-        var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
-        await ReceiveInvoiceAsync(invoiceNumber, (reference, 95m));
+        var (invoiceNumber, reference) = await ReceivePriceMismatchAsync();
         var invoice = await OpenLineAsync(invoiceNumber, reference);
 
         await Agent.StopAgentAsync(Ct);
@@ -40,10 +37,7 @@ public sealed class ExplainFailureJourneyTests(FinanceAgentUiFixture fixture) : 
     [Fact]
     public async Task ExplainInvoice_WhenTheAgentFails_ShowsAssistantUnavailableAndTheLinesAreStillFinancesToDecide()
     {
-        var reference = CarrierInvoiceCalls.NewReference();
-        await RecordCostAsync(reference, 80m);
-        var invoiceNumber = CarrierInvoiceCalls.NewInvoiceNumber();
-        await ReceiveInvoiceAsync(invoiceNumber, (reference, 95m));
+        var (invoiceNumber, reference) = await ReceivePriceMismatchAsync();
         var invoice = await OpenLineAsync(invoiceNumber, reference);
 
         await Agent.StopAgentAsync(Ct);
