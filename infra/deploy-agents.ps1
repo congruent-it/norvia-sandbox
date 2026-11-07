@@ -108,6 +108,7 @@ foreach ($server in $servers) {
         'integration-operations' { Set-BackendAddress $server integration-console-web integration-console-agent-api ESTATE_INTEGRATION_CONSOLE_BASE_URL }
         'health-check' { Set-BackendAddress $server health-check-web health-check-agent-api ESTATE_HEALTH_CHECK_BASE_URL }
         'customer-service' { Set-BackendAddress $server tms-api tms-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service' }
+        'customer-service-reply' { Set-BackendAddress $server tms-api tms-reply-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service-reply' }
         default { }
     }
 }

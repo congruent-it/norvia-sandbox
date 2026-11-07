@@ -1,0 +1,12 @@
+{
+  "server": "customer-service-reply",
+  "role": "TransportOrders.CustomerServiceReplyAgent.Read",
+  "tools": [
+    {
+      "name": "get_shipper_view",
+      "description": "Returns what the Shipper sees of a Transport Order, by its number, and nothing else: the Tracking status (Received, Scheduled, Collected, InTransit or Delivered), the collection and delivery places and the delivery window, the ETA and last update, the progress events, whether a Proof of delivery is available (with its delivery time and condition), the time of the answer, and the Shipper notifications the Planner already sent. Never a Carrier, a Shipment number, an Exception, a remark, who signed, a file, a Consignee or a price.",
+      "method": "GET",
+      "path": "/transport-orders/{transportOrderNumber}/shipper-view"
+    }
+  ]
+}

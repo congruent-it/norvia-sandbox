@@ -706,6 +706,19 @@ module customerServiceMcp 'estate/customer-service-mcp.bicep' = {
   ]
 }
 
+// The Customer service reply agent's MCP server (one tool, the Shipper view) and the agent view app registration of its own. Its role on the
+// TMS agent API is the second role of the registration customerServiceMcp makes.
+module customerServiceReplyMcp 'estate/customer-service-reply-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    tmsAgentApiAppId: customerServiceMcp.outputs.tmsAgentApiAppId
+    tmsBaseUrl: tmsBaseUrl
+  }
+}
+
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.
 output ESTATE_SERVICE_BUS_NAMESPACE string = messaging.outputs.namespaceName
 output ESTATE_LOG_ANALYTICS_WORKSPACE string = monitoring.outputs.workspaceName

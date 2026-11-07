@@ -12,5 +12,7 @@ internal static class AgentModels
     public static IChatClient For(AgentDefinition definition, AgentModelOptions model) =>
         model.Endpoint is { } endpoint
             ? new AzureOpenAIClient(endpoint, new DefaultAzureCredential()).GetChatClient(string.IsNullOrWhiteSpace(model.Deployment) ? definition.Model.Deployment : model.Deployment).AsIChatClient()
-            : definition.Name == "customer-service" ? CustomerServiceScript.Model() : throw new InvalidOperationException($"There is no scripted model for the Agent '{definition.Name}'.");
+            : definition.Name == "customer-service" ? CustomerServiceScript.Model()
+            : definition.Name == "customer-service-reply" ? CustomerServiceReplyScript.Model()
+            : throw new InvalidOperationException($"There is no scripted model for the Agent '{definition.Name}'.");
 }

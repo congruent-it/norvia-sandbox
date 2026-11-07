@@ -3095,6 +3095,37 @@
         }
       }
     },
+    "/v1/agent/customer-service-reply/transport-orders/{transportOrderNumber}/shipper-view": {
+      "get": {
+        "tags": [
+          "CustomerServiceReplyAgent"
+        ],
+        "summary": "Read what the Shipper sees of a Transport Order, as the Customer service reply agent: Tracking status, progress, Proof of delivery availability and the Shipper notifications already sent.",
+        "operationId": "AgentGetShipperView",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplyAgentTrackingView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -6930,6 +6961,212 @@
         },
         "additionalProperties": false
       },
+      "ReplyAgentNotificationView": {
+        "required": [
+          "sentAt",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplyAgentPlaceView": {
+        "required": [
+          "city",
+          "country"
+        ],
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplyAgentProgressView": {
+        "required": [
+          "type",
+          "eventTime",
+          "place"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "eventTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "place": {
+            "$ref": "#/components/schemas/ReplyAgentPlaceView"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplyAgentProofOfDeliveryView": {
+        "required": [
+          "available",
+          "deliveryTime",
+          "condition"
+        ],
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "deliveryTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "condition": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplyAgentTrackingView": {
+        "required": [
+          "transportOrderNumber",
+          "shipperReference",
+          "trackingStatus",
+          "asOf",
+          "collection",
+          "delivery",
+          "deliveryWindow",
+          "eta",
+          "lastUpdate",
+          "progress",
+          "proofOfDelivery",
+          "notifications"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "shipperReference": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "trackingStatus": {
+            "type": "string"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplyAgentPlaceView"
+              }
+            ]
+          },
+          "delivery": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplyAgentPlaceView"
+              }
+            ]
+          },
+          "deliveryWindow": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplyAgentWindowView"
+              }
+            ]
+          },
+          "eta": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastUpdate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "progress": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplyAgentProgressView"
+            }
+          },
+          "proofOfDelivery": {
+            "$ref": "#/components/schemas/ReplyAgentProofOfDeliveryView"
+          },
+          "notifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReplyAgentNotificationView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplyAgentWindowView": {
+        "required": [
+          "earliest",
+          "latest"
+        ],
+        "type": "object",
+        "properties": {
+          "earliest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "latest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "ResetReadiness": {
         "required": [
           "enabled",
@@ -8930,6 +9167,9 @@
     },
     {
       "name": "CustomerServiceAgent"
+    },
+    {
+      "name": "CustomerServiceReplyAgent"
     },
     {
       "name": "Reset"

@@ -1,0 +1,122 @@
+@using Ardalis.Result
+@using Microsoft.Extensions.Options
+@using Norvia.Agents.Runner
+@using Norvia.Tms.Application.Agents
+@using Norvia.Tms.Application.Agents.Reply
+@inject IOptions<AgentsOptions> Agents
+@inject IExplainRequests Requests
+@inject ILogger<DraftShipperReply> Logger
+@implements IDisposable
+
+@* A draft reply to the Shipper, from the Shipper's own view of the order only (ADR 0011): the reply agent has one tool and cannot name the
+   Carrier or an internal Exception. Staff choose one of three questions, edit the draft and send it themselves, outside the TMS. The TMS
+   sends nothing and stores nothing. Off unless Agents:Enabled, and only in the Customer service role view (ADR 0040). *@
+@if (Agents.Value.Enabled && ForCustomerService)
+{
+    <div data-explain="shipper-reply" class="mb-4">
+        <h2 class="text-lg">Reply to the Shipper</h2>
+        <FluentStack VerticalAlignment="VerticalAlignment.Bottom">
+            <FluentSelect TOption="string" Label="The Shipper asks" @bind-Value="_question" Width="18rem">
+                @foreach (var (value, text) in Questions)
+                {
+                    <FluentOption TOption="string" Value="@value">@text</FluentOption>
+                }
+            </FluentSelect>
+            <FluentButton Appearance="Appearance.Accent" Disabled="_asking" OnClick="DraftAsync" aria-label="Draft a reply to the Shipper">Draft a reply</FluentButton>
+        </FluentStack>
+
+        @if (_asking)
+        {
+            <div role="status" class="mt-3">
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <FluentProgressRing />
+                    <span>The assistant is drafting…</span>
+                </FluentStack>
+            </div>
+        }
+        else if (_unavailable)
+        {
+            <div role="alert" class="mt-3">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+            </div>
+        }
+        else if (_draft is not null)
+        {
+            @* The draft is editable text in a text area, which encodes it: what the assistant wrote is data, never markup. *@
+            <div class="mt-3" data-testid="reply-draft">
+                <FluentTextArea @bind-Value="_draft" Immediate="true" Label="Draft reply (English)" Rows="10" Style="width: 100%;" aria-label="Draft reply" />
+                <p class="text-muted">
+                    This is a draft written from what the Shipper sees of the order. Edit it, then send it to the Shipper yourself: the TMS sends nothing and keeps nothing.
+                    @if (_confidence is { } confidence)
+                    {
+                        <span> Confidence: @confidence.</span>
+                    }
+                </p>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private static readonly (string Value, string Text)[] Questions =
+    [
+        (nameof(ShipperQuestion.WhereIsMyOrder), "Where is my order?"),
+        (nameof(ShipperQuestion.HasItBeenDelivered), "Has it been delivered?"),
+        (nameof(ShipperQuestion.IsThereProofOfDelivery), "Is there a Proof of delivery?"),
+    ];
+
+    private bool _asking;
+    private bool _unavailable;
+    private string? _draft;
+    private string? _confidence;
+    private string _question = nameof(ShipperQuestion.WhereIsMyOrder);
+    private readonly CancellationTokenSource _lifetime = new();
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    /// <summary>Whether the page is the Customer service role's view. The panel shows nowhere else.</summary>
+    [Parameter]
+    public bool ForCustomerService { get; set; }
+
+    private async Task DraftAsync()
+    {
+        _asking = true;
+        _unavailable = false;
+        _draft = null;
+        try
+        {
+            var question = Enum.Parse<ShipperQuestion>(_question);
+            var result = await Requests.DraftAsync(new DraftShipperReplyQuery(TransportOrderNumber, question), _lifetime.Token);
+            if (result.IsSuccess)
+            {
+                _draft = result.Value.Cause;
+                _confidence = result.Value.Confidence.ToString().ToLowerInvariant();
+            }
+            else
+            {
+                _unavailable = true;
+                AgentPageLog.DraftFailed(Logger, TransportOrderNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _unavailable = true;
+            AgentPageLog.DraftCrashed(Logger, exception, TransportOrderNumber);
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

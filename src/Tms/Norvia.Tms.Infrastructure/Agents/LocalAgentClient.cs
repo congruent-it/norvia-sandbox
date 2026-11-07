@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using Ardalis.Result;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,11 +19,14 @@ internal sealed partial class LocalAgentClient(
     HttpClient http,
     IOptions<AgentClientOptions> options,
     IRunIds runIds,
+    TimeProvider time,
     AgentActivities activities,
     ILogger<LocalAgentClient> logger) : IAgentClient
 {
     /// <summary>The <c>flow</c> of an Agent run on the Rejected booking.</summary>
     public const string Flow = "customer-service-agent";
+
+    private const string ReplyAgentName = "customer-service-reply";
 
     public async Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken)
     {
@@ -39,9 +43,20 @@ internal sealed partial class LocalAgentClient(
         try
         {
             var definition = AgentDefinitions.Load(request.AgentName);
+            // The reply agent is its own identity: its own server, its own role, so it holds none of the Customer service agent's.
+            var reply = request.AgentName == ReplyAgentName;
+            if (reply)
+            {
+                http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                    "Bearer",
+                    settings.ReplyTokens.IsComplete ? AgentToken.Create(settings.ReplyTokens, time) : throw new InvalidOperationException("Agents:ReplyTokens is not set."));
+            }
+
             var runner = new AgentRunner(
                 AgentModels.For(definition, settings.Model),
-                new McpToolSource(http, settings.McpAddress ?? throw new InvalidOperationException("Agents:McpAddress is not set.")),
+                new McpToolSource(
+                    http,
+                    (reply ? settings.ReplyMcpAddress : settings.McpAddress) ?? throw new InvalidOperationException(reply ? "Agents:ReplyMcpAddress is not set." : "Agents:McpAddress is not set.")),
                 new AgentRunnerOptions(TimeSpan.FromSeconds(settings.TimeoutSeconds)));
             var result = await runner.RunAsync(definition, new AgentQuestion(request.Question, request.CorrelationId, runId), cancellationToken);
 

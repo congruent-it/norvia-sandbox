@@ -202,6 +202,7 @@ app.MapTrips();
 app.MapShipperNotifications();
 app.MapShipperTracking();
 app.MapCustomerServiceAgent();
+app.MapCustomerServiceReplyAgent();
 app.MapReset();
 // The presenter panel's fault switches, guarded by the Demo.Fault role: MapFaults has no unguarded way to map them.
 app.NewVersionedApi("Faults")

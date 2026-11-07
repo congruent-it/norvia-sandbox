@@ -14,8 +14,11 @@ public sealed class CustomerServiceAgentAzureTests
     private const string McpModule = "infra/estate/customer-service-mcp.bicep";
     private const string Contract = "contracts/agent-mcp/customer-service.tools.json";
     private const string Role = "TransportOrders.CustomerServiceAgent.Read";
+    private const string ReplyRole = "TransportOrders.CustomerServiceReplyAgent.Read";
     private const string ApimPrincipal = "00000000-0000-0000-0000-000000000001";
     private const string ApimClient = "00000000-0000-0000-0000-000000000002";
+
+    private static readonly string[] ApplicationOnly = ["Application"];
 
     private static readonly JsonNode ContractFile = JsonNode.Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Path, Contract)))!;
 
@@ -80,7 +83,7 @@ public sealed class CustomerServiceAgentAzureTests
     }
 
     [Fact]
-    public void BothAgentAppRegistrations_HaveOneRole_TheContractsRead_ForApplicationsOnly()
+    public void TheViewHasOneRole_TheContractsRead_AndTheTmsAgentApiHasThatAndTheReplyAgentsRole_ForApplicationsOnly()
     {
         var apps = Of(McpResources(), "Microsoft.Graph/applications@v1.0").Select(app => app["properties"]!).ToList();
 
@@ -88,9 +91,9 @@ public sealed class CustomerServiceAgentAzureTests
         foreach (var app in apps)
         {
             var roles = app["appRoles"]!.AsArray().Select(role => role!).ToList();
-            roles.Should().ContainSingle();
-            roles[0]["value"]!.GetValue<string>().Should().Be(Role);
-            roles[0]["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>()).Should().Equal("Application");
+            var isTmsApi = app["displayName"]!.GetValue<string>() == "Norvia TMS agent API (env)";
+            roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal(isTmsApi ? [Role, ReplyRole] : [Role]);
+            roles.Should().OnlyContain(role => role["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>()).SequenceEqual(ApplicationOnly));
             app["api"]!["requestedAccessTokenVersion"]!.GetValue<int>().Should().Be(2, "azp is the caller's client ID in a v2 token");
         }
 
@@ -113,7 +116,8 @@ public sealed class CustomerServiceAgentAzureTests
     {
         var assignments = Of(McpResources(), "Microsoft.Graph/appRoleAssignedTo@v1.0").ToList();
 
-        assignments.Should().ContainSingle().Which["properties"]!["principalId"]!.GetValue<string>().Should().Be(ApimPrincipal);
+        assignments.Should().HaveCount(2, "the Customer service agent's role and the reply agent's, both on the TMS agent API")
+            .And.OnlyContain(assignment => assignment["properties"]!["principalId"]!.GetValue<string>() == ApimPrincipal);
         Script("assign-agent-roles.ps1").Should().Contain("appRoleAssignedTo");
         File.ReadAllText(Path.Combine(RepositoryRoot.Path, McpModule)).Should().NotContain("roleAssignments", "the Agent holds no Azure role");
     }

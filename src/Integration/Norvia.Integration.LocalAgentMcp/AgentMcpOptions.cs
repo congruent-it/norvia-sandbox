@@ -31,6 +31,12 @@ public sealed class AgentMcpOptions
     /// </summary>
     public HealthCheckServerOptions? CustomerService { get; set; }
 
+    /// <summary>
+    /// The Customer service reply agent's MCP server (<c>customer-service-reply</c>), served at <c>/mcp/customer-service-reply</c>. Its
+    /// own audience and role, so the Customer service agent's token opens nothing here. Not configured, the stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? CustomerServiceReply { get; set; }
+
     /// <summary>Calls per Agent identity in a window, as the policy's <c>rate-limit-by-key</c> allows (60 a minute).</summary>
     [Range(1, 10_000)]
     public int RateLimitCalls { get; set; } = 60;

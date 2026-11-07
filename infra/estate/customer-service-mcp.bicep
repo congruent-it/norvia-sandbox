@@ -28,6 +28,11 @@ var contract = loadJsonContent('../../contracts/agent-mcp/customer-service.tools
 var role = contract.role
 var viewRoleId = guid('norvia-agent-customer-service-view', environmentName, role)
 var apiRoleId = guid('norvia-tms-agent-api', environmentName, role)
+// The Customer service reply agent's role (customer-service-reply-mcp.bicep) is the second role of the TMS agent API: it has a view of its
+// own in the TMS API (/v1/agent/customer-service-reply) and a role requirement of its own there, so the one agent API app registration
+// serves both views while the two Agents' identities hold different roles on different agent views.
+var replyRole = loadJsonContent('../../contracts/agent-mcp/customer-service-reply.tools.json').role
+var replyApiRoleId = guid('norvia-tms-agent-api', environmentName, replyRole)
 
 // The agent view: the audience of an Agent's token. Entra issues a token for it only to an identity that holds the role.
 resource view 'Microsoft.Graph/applications@v1.0' = {
@@ -85,6 +90,16 @@ resource tmsAgentApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: replyApiRoleId
+      value: replyRole
+      displayName: 'Read the TMS API\'s Customer service reply agent view'
+      description: 'Call /v1/agent/customer-service-reply of the TMS API, the Shipper view. API Management\'s identity holds it, on behalf of the reply Agent.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -96,6 +111,12 @@ resource tmsAgentApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
 resource apiManagementReadsTheAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsAgentApiPrincipal.id
   appRoleId: apiRoleId
+  principalId: apiManagementPrincipalId
+}
+
+resource apiManagementReadsTheReplyAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsAgentApiPrincipal.id
+  appRoleId: replyApiRoleId
   principalId: apiManagementPrincipalId
 }
 
@@ -132,3 +153,7 @@ module server 'agent-mcp-server.bicep' = {
     apiManagementReadsTheAgentApi
   ]
 }
+
+@description('The TMS agent API\'s client ID, the audience of the token API Management sends the TMS API, for the reply Agent\'s server too.')
+output tmsAgentApiAppId string = tmsAgentApi.appId
+

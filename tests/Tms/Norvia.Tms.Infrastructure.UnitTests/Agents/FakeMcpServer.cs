@@ -21,6 +21,8 @@ internal sealed class FakeMcpServer : HttpMessageHandler
 
     public List<string> CorrelationIds { get; } = [];
 
+    public List<string> Addresses { get; } = [];
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         if (Unreachable is not null)
@@ -28,6 +30,7 @@ internal sealed class FakeMcpServer : HttpMessageHandler
             throw Unreachable;
         }
 
+        Addresses.Add(request.RequestUri!.ToString());
         Authorizations.AddRange(request.Headers.Authorization is { } authorization ? [authorization.ToString()] : []);
         CorrelationIds.AddRange(request.Headers.TryGetValues("X-Correlation-ID", out var ids) ? ids : []);
         if (request.Method != HttpMethod.Post)
@@ -47,7 +50,8 @@ internal sealed class FakeMcpServer : HttpMessageHandler
             "initialize" => JsonNode.Parse("""{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"fake","version":"1"}}"""),
             "tools/list" => JsonNode.Parse("""
                 {"tools":[
-                  {"name":"get_rejected_booking","description":"d","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}}]}
+                  {"name":"get_rejected_booking","description":"d","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}},
+                  {"name":"get_shipper_view","description":"d","inputSchema":{"type":"object","properties":{"transportOrderNumber":{"type":"string"}},"required":["transportOrderNumber"]}}]}
                 """),
             "tools/call" => new JsonObject
             {

@@ -45,6 +45,7 @@ else if (_transportOrder is null)
 else
 {
     <ExplainTransportOrder TransportOrderNumber="@TransportOrderNumber" ForCustomerService="RoleKey == NorviaRole.CustomerService.Key" />
+    <DraftShipperReply TransportOrderNumber="@TransportOrderNumber" ForCustomerService="RoleKey == NorviaRole.CustomerService.Key" />
 
     @if (_transportOrder.RatingResult is { } ratingResult)
     {
