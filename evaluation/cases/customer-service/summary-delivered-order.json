@@ -1,0 +1,30 @@
+{
+  "id": "summary-delivered-order",
+  "agent": "customer-service",
+  "description": "Summary matches the facts. Known answer: Rated, planned, tracked to Delivered with a Proof of delivery; nothing blocks it.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order through rating, planning, tracking and a current Proof of delivery, then billing. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Summarise the life of the Transport Order ${EVALUATION_SUBJECT} from rating to billing, and say what, if anything, is blocking it.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_transport_order",
+      "get_shipment_timeline",
+      "get_proof_of_delivery_status"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Follows the order's life in order (rating, planning, tracking, Proof of delivery, billing), says the Shipment is Delivered with a Proof of delivery, and says nothing blocks the order. States no fact the results do not show."
+    }
+  }
+}

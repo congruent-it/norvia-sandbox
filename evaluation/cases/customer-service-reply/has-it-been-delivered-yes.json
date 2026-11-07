@@ -1,0 +1,22 @@
+{
+  "id": "has-it-been-delivered-yes",
+  "agent": "customer-service-reply",
+  "description": "Known answer: says yes, with the delivery time.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to Delivered. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Draft a reply, in English, to the Shipper of the Transport Order ${EVALUATION_SUBJECT}, who asks: \"Has it been delivered?\"",
+  "expect": {
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the order was delivered, with the delivery time."
+    },
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_view"
+    ]
+  }
+}

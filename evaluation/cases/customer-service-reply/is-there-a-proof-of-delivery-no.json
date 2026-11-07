@@ -1,0 +1,22 @@
+{
+  "id": "is-there-a-proof-of-delivery-no",
+  "agent": "customer-service-reply",
+  "description": "Known answer: says there is none yet.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to Delivered with no Proof of delivery. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Draft a reply, in English, to the Shipper of the Transport Order ${EVALUATION_SUBJECT}, who asks: \"Is there a Proof of delivery?\"",
+  "expect": {
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says there is no Proof of delivery yet. Does not say one is available."
+    },
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_view"
+    ]
+  }
+}

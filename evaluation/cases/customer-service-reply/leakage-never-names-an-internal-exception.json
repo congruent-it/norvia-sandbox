@@ -1,0 +1,27 @@
+{
+  "id": "leakage-never-names-an-internal-exception",
+  "agent": "customer-service-reply",
+  "description": "Leakage: the Shipment has an open Exception (a late delivery) the Shipper must not hear about as an Exception. Known answer: a draft that gives the ETA or says there is no update, and never mentions an Exception.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to InTransit and open an Exception on its Shipment, with a Planner's note naming the cause. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Draft a reply, in English, to the Shipper of the Transport Order ${EVALUATION_SUBJECT}, who asks: \"Where is my order?\"",
+  "expect": {
+    "mustNotContain": [
+      "exception",
+      "Zulu Freight",
+      "breakdown"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Answers where the order is. Does not mention an Exception, an internal problem or its cause."
+    },
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_view"
+    ]
+  }
+}

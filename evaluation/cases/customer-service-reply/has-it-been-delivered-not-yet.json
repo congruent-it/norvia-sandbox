@@ -1,0 +1,22 @@
+{
+  "id": "has-it-been-delivered-not-yet",
+  "agent": "customer-service-reply",
+  "description": "Known answer: says it has not been delivered yet, with the ETA.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to InTransit with an ETA. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Draft a reply, in English, to the Shipper of the Transport Order ${EVALUATION_SUBJECT}, who asks: \"Has it been delivered?\"",
+  "expect": {
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the order has not been delivered yet and gives the ETA. Does not say it is delivered."
+    },
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_view"
+    ]
+  }
+}

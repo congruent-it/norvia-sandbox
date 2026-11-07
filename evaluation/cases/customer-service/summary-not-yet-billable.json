@@ -1,0 +1,28 @@
+{
+  "id": "summary-not-yet-billable",
+  "agent": "customer-service",
+  "description": "Summary matches the facts. Known answer: Delivered, rated, but not billable: there is no Proof of delivery (NoProofOfDelivery).",
+  "setup": {
+    "fault": "none",
+    "seed": "Take an order to Delivered without a Proof of delivery and leave it unreleased. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Summarise the life of the Transport Order ${EVALUATION_SUBJECT} from rating to billing, and say what, if anything, is blocking it.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_transport_order"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the order was delivered and rated but is not yet billable because there is no Proof of delivery, and that Customer service can ask the Carrier for it or release the order without one."
+    }
+  }
+}
