@@ -43,4 +43,27 @@ public sealed class SuggestedDecisionTests
         decision.RunFor(SuggestedActionKind.Accept).Should().BeNull();
         decision.RunFor(SuggestedActionKind.AcceptAdjusted).Should().BeNull();
     }
+
+    [Theory]
+    [InlineData(SuggestedActionKind.Accept, SuggestedActionKind.AcceptAdjusted)]
+    [InlineData(SuggestedActionKind.AcceptAdjusted, SuggestedActionKind.Accept)]
+    public void RunFor_AcceptingTheLineEitherWay_IsActingOnASuggestionToAccept(SuggestedActionKind suggested, SuggestedActionKind chosen)
+    {
+        // The amount is Finance's to enter: changing it does not make accepting the line another decision.
+        new SuggestedDecision(suggested, Run).RunFor(chosen).Should().Be(Run);
+    }
+
+    [Fact]
+    public void RunFor_RejectingWhenAcceptWasSuggested_NamesNoRun()
+    {
+        new SuggestedDecision(SuggestedActionKind.AcceptAdjusted, Run).RunFor(SuggestedActionKind.Reject).Should().BeNull();
+    }
+
+    [Fact]
+    public void WhenAllowed_AnAcceptSuggestionForALineThatCannotBeAccepted_IsDropped_ARejectOneIsKept()
+    {
+        new SuggestedDecision(SuggestedActionKind.Accept, Run).WhenAllowed(canAccept: false).Should().BeNull();
+        new SuggestedDecision(SuggestedActionKind.Accept, Run).WhenAllowed(canAccept: true).Should().NotBeNull();
+        new SuggestedDecision(SuggestedActionKind.Reject, Run).WhenAllowed(canAccept: false).Should().NotBeNull();
+    }
 }

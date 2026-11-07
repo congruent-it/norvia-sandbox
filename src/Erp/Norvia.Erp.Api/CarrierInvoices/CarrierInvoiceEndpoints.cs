@@ -1,4 +1,5 @@
 using Mediator;
+using Norvia.Agents;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Norvia.Erp.Api.Tracking;
@@ -79,7 +80,7 @@ public static class CarrierInvoiceEndpoints
                 + "cost becomes Invoiced; when it is the last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in "
                 + "the same transaction. Answers 200 with the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound "
                 + "(404), CarrierInvoiceLineAlreadyDecided (409), CarrierInvoiceLineHasNoOpenCarrierCost (422), CarrierInvoiceAdjustedAmountNotAboveZero and "
-                + "CarrierInvoiceAdjustedAmountNeedsRemark (400).");
+                + "CarrierInvoiceAdjustedAmountNeedsRemark (400). The optional agentName and agentRunId, together, name the Agent whose Suggestion Finance acted on, for the trace.");
 
         carrierInvoices.MapPost("/{carrierId}/{invoiceNumber}/lines/{bookingReference}/reject", RejectLineAsync)
             .WithName("RejectCarrierInvoiceLine")
@@ -95,7 +96,7 @@ public static class CarrierInvoiceEndpoints
         return app;
     }
 
-    internal static async Task<Results<Ok<CarrierInvoiceView>, ProblemHttpResult>> AcceptLineAsync(
+    internal static async Task<Results<Ok<CarrierInvoiceView>, ProblemHttpResult, ValidationProblem>> AcceptLineAsync(
         string carrierId,
         string invoiceNumber,
         string bookingReference,
@@ -103,13 +104,18 @@ public static class CarrierInvoiceEndpoints
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
+        if (ActingOn(request?.AgentName, request?.AgentRunId, out var actingOn) is { } invalid)
+        {
+            return invalid;
+        }
+
         var result = await retrier.RunAsync(
             mediator => mediator.Send(
-                new AcceptCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, bookingReference, request?.AdjustedAmount, request?.Remark), cancellationToken).AsTask());
+                new AcceptCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, bookingReference, request?.AdjustedAmount, request?.Remark, actingOn), cancellationToken).AsTask());
         return DecisionAnswer(result, "The Carrier invoice line can't be accepted.");
     }
 
-    internal static async Task<Results<Ok<CarrierInvoiceView>, ProblemHttpResult>> RejectLineAsync(
+    internal static async Task<Results<Ok<CarrierInvoiceView>, ProblemHttpResult, ValidationProblem>> RejectLineAsync(
         string carrierId,
         string invoiceNumber,
         string bookingReference,
@@ -117,12 +123,35 @@ public static class CarrierInvoiceEndpoints
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
+        if (ActingOn(request?.AgentName, request?.AgentRunId, out var actingOn) is { } invalid)
+        {
+            return invalid;
+        }
+
         var result = await retrier.RunAsync(
-            mediator => mediator.Send(new RejectCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, bookingReference, request?.Reason), cancellationToken).AsTask());
+            mediator => mediator.Send(new RejectCarrierInvoiceLineCommand(new CarrierId(carrierId), invoiceNumber, bookingReference, request?.Reason, actingOn), cancellationToken).AsTask());
         return DecisionAnswer(result, "The Carrier invoice line can't be rejected.");
     }
 
-    private static Results<Ok<CarrierInvoiceView>, ProblemHttpResult> DecisionAnswer(Ardalis.Result.Result<CarrierInvoiceView> result, string title) =>
+    // The Agent's name and run come together or not at all, and are short: they are only for the trace (ADR 0040).
+    private static ValidationProblem? ActingOn(string? agentName, string? agentRunId, out AgentRun? actingOn)
+    {
+        actingOn = null;
+        if (string.IsNullOrWhiteSpace(agentName) != string.IsNullOrWhiteSpace(agentRunId))
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(AcceptCarrierInvoiceLineRequest.AgentRunId)] = ["The Agent and its run ID come together."] });
+        }
+
+        if (agentName?.Length > 100 || agentRunId?.Length > 200)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]> { [nameof(AcceptCarrierInvoiceLineRequest.AgentRunId)] = ["The Agent's name is at most 100 characters and its run ID 200."] });
+        }
+
+        actingOn = string.IsNullOrWhiteSpace(agentName) ? null : new AgentRun(agentName.Trim(), agentRunId!.Trim());
+        return null;
+    }
+
+    private static Results<Ok<CarrierInvoiceView>, ProblemHttpResult, ValidationProblem> DecisionAnswer(Ardalis.Result.Result<CarrierInvoiceView> result, string title) =>
         result.IsSuccess
             ? TypedResults.Ok(result.Value)
             : RefusalProblem.Of<CarrierInvoiceRefusalCode, CarrierInvoiceView>(
@@ -229,7 +258,11 @@ public static class CarrierInvoiceEndpoints
 public sealed record CarrierInvoiceOutcomeNotDeliveredRequest(int? StatusCode, string? Message);
 
 /// <summary>Finance accepting a Carrier invoice line: at the invoiced amount, or at an adjusted amount with a remark.</summary>
-public sealed record AcceptCarrierInvoiceLineRequest(decimal? AdjustedAmount, string? Remark);
+/// <param name="AgentName">Optional, with <paramref name="AgentRunId"/>: the Agent whose Suggestion Finance acted on, which the decision's trace then names.</param>
+/// <param name="AgentRunId">Optional, with <paramref name="AgentName"/>: that Agent's run.</param>
+public sealed record AcceptCarrierInvoiceLineRequest(decimal? AdjustedAmount, string? Remark, string? AgentName = null, string? AgentRunId = null);
 
 /// <summary>Finance rejecting a Carrier invoice line, with a reason.</summary>
-public sealed record RejectCarrierInvoiceLineRequest(string? Reason);
+/// <param name="AgentName">Optional, with <paramref name="AgentRunId"/>: the Agent whose Suggestion Finance acted on, which the decision's trace then names.</param>
+/// <param name="AgentRunId">Optional, with <paramref name="AgentName"/>: that Agent's run.</param>
+public sealed record RejectCarrierInvoiceLineRequest(string? Reason, string? AgentName = null, string? AgentRunId = null);

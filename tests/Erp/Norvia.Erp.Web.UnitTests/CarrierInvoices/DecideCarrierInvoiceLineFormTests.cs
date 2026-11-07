@@ -171,7 +171,7 @@ public sealed class DecideCarrierInvoiceLineFormTests : ErpWebContext
     }
 
     [Fact]
-    public void Accept_AtAnAdjustedAmountWhenAcceptWasSuggested_IsAnotherActionSoNamesNoAgent()
+    public void Accept_AtAnAdjustedAmountWhenAcceptWasSuggested_StillActsOnTheSuggestionToAccept()
     {
         AnswerAccept(Invoice("Received"));
         var form = RenderForm(canAccept: true, new SuggestedDecision(SuggestedActionKind.Accept, Run));
@@ -181,7 +181,7 @@ public sealed class DecideCarrierInvoiceLineFormTests : ErpWebContext
         form.Find("fluent-button[aria-label='Accept TRX-1']").Click();
 
         form.WaitForAssertion(() => Mediator.ReceivedCalls().Select(call => call.GetArguments()[0]).Should()
-            .Contain(new AcceptCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", 70.5m, "Agreed rate")));
+            .Contain(new AcceptCarrierInvoiceLineCommand(Carrier, "VDT-1", "TRX-1", 70.5m, "Agreed rate", Run)));
     }
 
     [Fact]

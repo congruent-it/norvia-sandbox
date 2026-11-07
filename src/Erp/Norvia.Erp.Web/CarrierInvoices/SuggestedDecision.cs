@@ -19,8 +19,16 @@ public sealed record SuggestedDecision(SuggestedActionKind Kind, AgentRun Run)
             : null;
     }
 
-    /// <summary>The run to name in the trace of a decision of this kind: the Suggestion's own when Finance did what it suggested, none otherwise.</summary>
-    public AgentRun? RunFor(SuggestedActionKind chosen) => chosen == Kind ? Run : null;
+    /// <summary>
+    /// The run to name in the trace of a decision of this kind: the Suggestion's own when Finance did what it suggested, none otherwise.
+    /// Accepting the line counts as acting on a suggestion to accept it, at the invoiced amount or another: the amount is Finance's.
+    /// </summary>
+    public AgentRun? RunFor(SuggestedActionKind chosen) => IsAccept(chosen) && IsAccept(Kind) || chosen == Kind ? Run : null;
+
+    /// <summary>This pre-selection when the line allows it, or null: an Accept suggestion for a line that cannot be accepted is ignored, as the ERP's own rule holds.</summary>
+    public SuggestedDecision? WhenAllowed(bool canAccept) => Kind == SuggestedActionKind.Reject || canAccept ? this : null;
+
+    private static bool IsAccept(SuggestedActionKind kind) => kind is SuggestedActionKind.Accept or SuggestedActionKind.AcceptAdjusted;
 
     public string Label => ActionText.Of(Kind);
 }

@@ -56,8 +56,7 @@
     [Parameter]
     public SuggestedDecision? Suggested { get; set; }
 
-    // An Accept suggestion for a line that cannot be accepted is ignored: the ERP's own rule holds.
-    private SuggestedDecision? Preselected => Suggested is { Kind: SuggestedActionKind.Reject } || (CanAccept && Suggested is not null) ? Suggested : null;
+    private SuggestedDecision? Preselected => Suggested?.WhenAllowed(CanAccept);
 
     // The same command the click always sent, plus the run when Finance does what was suggested.
     private Task AcceptAsync()

@@ -310,7 +310,7 @@
           "CarrierInvoices"
         ],
         "summary": "Accept a Carrier invoice line that waits for Finance, at the invoiced amount or an adjusted one.",
-        "description": "What Finance's Accept button does in the ERP UI, through the same command. The optional adjusted amount needs a remark. The line's Carrier cost becomes Invoiced; when it is the last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in the same transaction. Answers 200 with the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound (404), CarrierInvoiceLineAlreadyDecided (409), CarrierInvoiceLineHasNoOpenCarrierCost (422), CarrierInvoiceAdjustedAmountNotAboveZero and CarrierInvoiceAdjustedAmountNeedsRemark (400).",
+        "description": "What Finance's Accept button does in the ERP UI, through the same command. The optional adjusted amount needs a remark. The line's Carrier cost becomes Invoiced; when it is the last line to decide, the invoice becomes Approved and CarrierInvoiceApproved is published, once, in the same transaction. Answers 200 with the invoice. Refusals carry the stable code: CarrierInvoiceNotFound and CarrierInvoiceLineNotFound (404), CarrierInvoiceLineAlreadyDecided (409), CarrierInvoiceLineHasNoOpenCarrierCost (422), CarrierInvoiceAdjustedAmountNotAboveZero and CarrierInvoiceAdjustedAmountNeedsRemark (400). The optional agentName and agentRunId, together, name the Agent whose Suggestion Finance acted on, for the trace.",
         "operationId": "AcceptCarrierInvoiceLine",
         "parameters": [
           {
@@ -361,6 +361,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CarrierInvoiceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -425,6 +435,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CarrierInvoiceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -902,6 +922,18 @@
             "format": "double"
           },
           "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentRunId": {
             "type": [
               "null",
               "string"
@@ -2412,6 +2444,18 @@
         "type": "object",
         "properties": {
           "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentRunId": {
             "type": [
               "null",
               "string"

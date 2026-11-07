@@ -6,7 +6,7 @@ namespace Norvia.Erp.Application.CarrierInvoices.AgentView;
 /// <summary>The wire names of the actions the ERP allows on a Carrier invoice line, and which Suggestion kind each one is.</summary>
 public static class AgentActionNames
 {
-    public static IReadOnlyList<string> Of(CarrierInvoiceLineActions actions)
+    public static IReadOnlyList<string> NamesOf(CarrierInvoiceLineActions actions)
     {
         var names = new List<string>();
         foreach (var (flag, name, _) in Map)
