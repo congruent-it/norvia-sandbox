@@ -64,10 +64,11 @@ public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
     /// Plans a new Transport Order to the Carrier and releases it, and waits until its request is sent to the Carrier's inbox.
     /// Leaves the Page on the TMS's list of bookings awaiting an answer.
     /// </summary>
-    protected async Task<(string ShipmentNumber, string BookingNumber)> ReleaseToCarrierAsync(string carrierName)
+    protected async Task<(string ShipmentNumber, string BookingNumber)> ReleaseToCarrierAsync(string carrierName, Func<JsonObject, JsonObject>? shape = null)
     {
         var shipperReference = $"UI-{Guid.NewGuid():N}"[..20];
-        var number = await SubmitAcceptedAsync(Bookings.Valid(shipperReference));
+        var booking = Bookings.Valid(shipperReference);
+        var number = await SubmitAcceptedAsync(shape is null ? booking : shape(booking));
 
         await Page.GotoAsync("/");
         await Page.GetByRole(AriaRole.Button, new() { Name = "Planner" }).ClickAsync();
@@ -99,16 +100,16 @@ public abstract class BrowserPage(TmsUiFixture tms) : IAsyncLifetime
     }
 
     /// <summary>Releases a new Transport Order to Van Dijk Transport, has it confirm the booking and report the Shipment In transit.</summary>
-    protected async Task<(string ShipmentNumber, string Reference)> InTransitShipmentAsync()
+    protected async Task<(string ShipmentNumber, string Reference)> InTransitShipmentAsync(Func<JsonObject, JsonObject>? shape = null, TimeSpan? startedAgo = null)
     {
-        var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("Van Dijk Transport");
+        var (shipmentNumber, bookingNumber) = await ReleaseToCarrierAsync("Van Dijk Transport", shape);
         var reference = $"VDT-{Guid.NewGuid():N}"[..12];
         using (var confirmed = await tms.ConfirmAsync(VanDijkId, bookingNumber, reference, TestContext.Current.CancellationToken))
         {
             confirmed.StatusCode.Should().Be(HttpStatusCode.OK, await confirmed.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow - (startedAgo ?? TimeSpan.Zero);
         await RecordRotterdamTrackingAsync("Collected", reference, now.AddMinutes(-40));
         await RecordRotterdamTrackingAsync("Departed", reference, now.AddMinutes(-30));
         return (shipmentNumber, reference);
