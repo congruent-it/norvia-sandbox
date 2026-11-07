@@ -103,12 +103,12 @@ internal static class FinanceAgentCalls
     public static JsonObject LineOf(JsonObject invoice, string reference) =>
         invoice["lines"]!.AsArray().Select(line => line!.AsObject()).Single(line => line["carrierBookingReference"]!.GetValue<string>() == reference);
 
-    /// <summary>Finance deciding a line through the ERP API, with the Agent and run whose Suggestion they acted on, or none when they decided by hand.</summary>
+    /// <summary>Finance deciding a line through the ERP API; the body carries the Agent and run whose Suggestion they acted on, or none when they decided by hand.</summary>
     public static async Task<HttpResponseMessage> DecideAsync(
-        FinanceAgentFixture fixture, string invoiceNumber, string reference, string decision, JsonObject? body, CancellationToken cancellationToken, string carrier = Carrier)
+        FinanceAgentFixture fixture, string invoiceNumber, string reference, string decision, JsonObject? body, CancellationToken cancellationToken)
     {
         using var client = fixture.ErpAs(FinanceAgentFixture.ManageCarrierInvoiceRole);
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-invoices/{carrier}/{invoiceNumber}/lines/{reference}/{decision}", UriKind.Relative));
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/carrier-invoices/{Carrier}/{invoiceNumber}/lines/{reference}/{decision}", UriKind.Relative));
         if (body is not null)
         {
             request.Content = JsonContent.Create(body);

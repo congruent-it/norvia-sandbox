@@ -58,6 +58,7 @@ public sealed class SuggestAllowedActionTests(FinanceAgentFixture fixture)
         var view = await FinanceAgentCalls.ReadLineAsync(fixture, invoiceNumber, reference, CorrelationOf(received), _cancellationToken);
 
         view["result"]!.GetValue<string>().Should().Be("Duplicate");
+        view["carrierCost"]!["status"]!.GetValue<string>().Should().Be("Invoiced", "a cost that is not Open can't be accepted");
         ActionsOf(view).Should().BeEquivalentTo("reject");
     }
 
@@ -82,23 +83,36 @@ public sealed class SuggestAllowedActionTests(FinanceAgentFixture fixture)
         using var response = await FinanceAgentCalls.DecideAsync(fixture, invoiceNumber, reference, "accept", null, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, "the Carrier cost is already Invoiced");
+        using var adjusted = await FinanceAgentCalls.DecideAsync(
+            fixture, invoiceNumber, reference, "accept", new JsonObject { ["adjustedAmount"] = 90m, ["remark"] = "Too high." }, _cancellationToken);
+        adjusted.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    [Fact]
-    public async Task ADecisionMadeFromASuggestion_TracesTheAgentAndItsRunId()
+    [Theory]
+    [InlineData("accept")]
+    [InlineData("accept-adjusted")]
+    [InlineData("reject")]
+    public async Task ADecisionMadeFromASuggestion_TracesTheAgentAndTheRunIdOfTheRunThatMadeIt(string action)
     {
         var (_, reference) = await FinanceAgentCalls.RecordCostAsync(fixture, 80m, _cancellationToken);
         var (invoiceNumber, received) = await ReceiveAsync(reference, 95m);
-        var agentName = "carrier-invoice-matching-" + Guid.NewGuid().ToString("N")[..8];
-        var runId = Guid.NewGuid().ToString("N");
+        var correlationId = CorrelationOf(received);
+        var agentId = FinanceAgentFixture.NewAgentId();
+        var run = await FinanceAgentCalls.ExplainAsync(fixture, agentId, FinanceAgentCalls.Carrier, invoiceNumber, reference, correlationId, _cancellationToken);
+        var (decision, body) = action switch
+        {
+            "accept" => ("accept", new JsonObject { ["adjustedAmount"] = null, ["remark"] = null }),
+            "accept-adjusted" => ("accept", new JsonObject { ["adjustedAmount"] = 85m, ["remark"] = "Waiting time was not agreed." }),
+            _ => ("reject", new JsonObject { ["reason"] = "Not what we agreed." }),
+        };
+        body["agentName"] = agentId;
+        body["agentRunId"] = run.RunId;
 
-        using var response = await FinanceAgentCalls.DecideAsync(
-            fixture, invoiceNumber, reference, "reject", new JsonObject { ["reason"] = "Not what we agreed.", ["agentName"] = agentName, ["agentRunId"] = runId }, _cancellationToken);
+        using var response = await FinanceAgentCalls.DecideAsync(fixture, invoiceNumber, reference, decision, body, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(_cancellationToken));
-        var trace = await fixture.ErpLogAsync(log => IsDecision(log, CorrelationOf(received)) && log["agentRunId"] == runId, _cancellationToken);
-        trace["agentId"].Should().Be(agentName);
-        trace["partyId"].Should().Be(FinanceAgentCalls.Carrier);
+        var trace = await fixture.ErpLogAsync(log => IsDecision(log, correlationId) && log["agentRunId"] == run.RunId, _cancellationToken);
+        trace["agentId"].Should().Be(agentId);
         trace["documentNumber"].Should().Be(invoiceNumber);
     }
 
@@ -113,7 +127,9 @@ public sealed class SuggestAllowedActionTests(FinanceAgentFixture fixture)
 
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(_cancellationToken));
         await fixture.ErpLogAsync(log => IsDecision(log, correlationId), _cancellationToken);
-        fixture.ErpLogs.Where(log => IsDecision(log, correlationId)).Should().OnlyContain(log => log["agentId"] == null && log["agentRunId"] == null);
+        var decisions = fixture.ErpLogs.Where(log => IsDecision(log, correlationId)).ToList();
+        decisions.Should().NotBeEmpty("the decision was traced, so the check below is not vacuous");
+        decisions.Should().OnlyContain(log => !log.Scope.ContainsKey("agentId") && !log.Scope.ContainsKey("agentRunId"));
     }
 
     [Fact]
@@ -126,6 +142,7 @@ public sealed class SuggestAllowedActionTests(FinanceAgentFixture fixture)
         var run = await FinanceAgentCalls.ExplainAsync(fixture, FinanceAgentFixture.NewAgentId(), FinanceAgentCalls.Carrier, invoiceNumber, reference, correlationId, _cancellationToken);
 
         run.Suggestion.Should().NotBeNull("the Agent answered");
+        run.RunId.Should().NotBeNullOrEmpty();
         var view = await FinanceAgentCalls.ReadLineAsync(fixture, invoiceNumber, reference, correlationId, _cancellationToken);
         view["status"]!.GetValue<string>().Should().Be("ToDecide");
         view["carrierCost"]!["status"]!.GetValue<string>().Should().Be("Open");
