@@ -66,6 +66,14 @@ What the Shipper doesn't see, each with its reason:
 
 The last update is how a Shipper notices the headline incident: "In transit, last update 4 days ago".
 
+## Replying to a Shipper (Customer service)
+
+When a Shipper asks Customer service about an order by phone or email, Customer service can have a reply drafted from what the Shipper sees, and nothing else ([ADR 0011](../../adr/0011-shippers-see-a-tracking-status-not-the-shipments-workings.md), [ADR 0040](../../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)). On a Transport Order's detail page, in the Customer service view, they choose one of three questions, "Where is my order?", "Has it been delivered?" or "Is there a Proof of delivery?", and press **Draft a reply**. They get an editable draft in English.
+
+- **The boundary is a tool.** The draft comes from the Customer service reply agent (`customer-service-reply`), a separate agent definition and identity with one tool, `get_shipper_view`. The tool returns the same Shipper tracking read model the Shipper's own tracking call returns (the five Tracking statuses, progress events, whether a Proof of delivery is available) and the Shipper notifications the Planner already sent. The agent cannot name the Carrier or an internal Exception because nothing it can call returns one; the Customer service agent's tools are behind a different role it does not hold ([identity matrix](../../architecture/identity-and-access.md#agents)).
+- **A Suggestion, not a message.** Staff edit the draft and send it themselves, outside the TMS. The TMS sends nothing and stores nothing.
+- **No guessing.** The draft states no price (a displayed price reads as a commitment) and says "we have no update" for anything the Shipper view does not show.
+
 ## Steps
 
 1. **Ask.** The presenter plays a Shipper Persona in the Partner portal and opens its tracking screen, or the screen polls (see [Partner portal](#partner-portal)). The portal calls API Management with the Persona's token and subscription key.

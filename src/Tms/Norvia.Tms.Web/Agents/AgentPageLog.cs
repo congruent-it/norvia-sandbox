@@ -20,4 +20,10 @@ internal static partial class AgentPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Explaining Transport Order {TransportOrderNumber} failed")]
     public static partial void ExplainOrderCrashed(ILogger logger, Exception exception, string transportOrderNumber);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Drafting a reply about Transport Order {TransportOrderNumber} failed with {FailureCode}")]
+    public static partial void DraftFailed(ILogger logger, string transportOrderNumber, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Drafting a reply about Transport Order {TransportOrderNumber} failed")]
+    public static partial void DraftCrashed(ILogger logger, Exception exception, string transportOrderNumber);
 }

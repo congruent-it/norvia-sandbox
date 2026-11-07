@@ -18,6 +18,9 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
 
     public const string CustomerService = "customer-service";
 
+    /// <summary>The Customer service reply agent's server, <c>/mcp/customer-service-reply</c>: one tool, the Shipper view, and a role of its own.</summary>
+    public const string CustomerServiceReply = "customer-service-reply";
+
     /// <summary>The server, or null when the stand-in doesn't serve one by that name (or it isn't configured).</summary>
     public AgentServer? Find(string? name)
     {
@@ -31,6 +34,7 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
                 Default when settings.ConsoleAgentApi is { } api => new AgentServer(contract, settings.Tokens, api, settings.ConsoleTokens),
                 HealthCheck when settings.HealthCheck is { Api: { } api } health => new AgentServer(contract, health.Tokens, api, health.ApiTokens),
                 CustomerService when settings.CustomerService is { Api: { } api } customerService => new AgentServer(contract, customerService.Tokens, api, customerService.ApiTokens),
+                CustomerServiceReply when settings.CustomerServiceReply is { Api: { } api } reply => new AgentServer(contract, reply.Tokens, api, reply.ApiTokens),
                 _ => null,
             };
     }

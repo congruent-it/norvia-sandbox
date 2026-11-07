@@ -951,7 +951,13 @@ else
             .WithEnvironment("AgentMcp__CustomerService__Tokens__Audience", LocalTokens.CustomerServiceAgentAudience)
             .WithEnvironment("AgentMcp__CustomerService__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/customer-service"))
             .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Issuer", LocalTokens.Issuer)
-            .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Audience", LocalTokens.TmsAudience);
+            .WithEnvironment("AgentMcp__CustomerService__ApiTokens__Audience", LocalTokens.TmsAudience)
+            // The fourth server: the Customer service reply agent's, at /mcp/customer-service-reply. Its own audience, role and agent view.
+            .WithEnvironment("AgentMcp__CustomerServiceReply__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__CustomerServiceReply__Tokens__Audience", LocalTokens.CustomerServiceReplyAgentAudience)
+            .WithEnvironment("AgentMcp__CustomerServiceReply__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/customer-service-reply"))
+            .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Audience", LocalTokens.TmsAudience);
         // The TMS API's agent view takes the stand-in's token, which is for the TMS API's audience locally, signed with the same key.
         tmsApi
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
@@ -962,7 +968,12 @@ else
             .WithEnvironment("Agents__Tokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__Tokens__Audience", LocalTokens.CustomerServiceAgentAudience)
             .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.CustomerServiceAgentClientId)
-            .WithEnvironment("Agents__Tokens__Role", LocalTokens.CustomerServiceAgentReadRole);
+            .WithEnvironment("Agents__Tokens__Role", LocalTokens.CustomerServiceAgentReadRole)
+            .WithEnvironment("Agents__ReplyMcpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/customer-service-reply"))
+            .WithEnvironment("Agents__ReplyTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__ReplyTokens__Audience", LocalTokens.CustomerServiceReplyAgentAudience)
+            .WithEnvironment("Agents__ReplyTokens__ClientId", LocalTokens.CustomerServiceReplyAgentClientId)
+            .WithEnvironment("Agents__ReplyTokens__Role", LocalTokens.CustomerServiceReplyAgentReadRole);
         healthCheck
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/health-check"))
@@ -1001,6 +1012,9 @@ else
             (agentMcp.Resource, "AgentMcp__HealthCheck__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerService__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerService__ApiTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__CustomerServiceReply__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__CustomerServiceReply__ApiTokens__SigningKey"),
+            (tmsWeb.Resource, "Agents__ReplyTokens__SigningKey"),
             (tmsWeb.Resource, "Agents__Tokens__SigningKey"),
             (tmsApi.Resource, "Agents__Api__SigningKey"),
             (integrationConsole.Resource, "Agents__Tokens__SigningKey"),

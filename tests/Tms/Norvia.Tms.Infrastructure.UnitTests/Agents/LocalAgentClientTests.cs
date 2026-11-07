@@ -45,6 +45,7 @@ public sealed class LocalAgentClientTests : IDisposable
             _http,
             Microsoft.Extensions.Options.Options.Create(options ?? new AgentClientOptions { McpAddress = new Uri("http://mcp.test/mcp/customer-service"), TimeoutSeconds = 5 }),
             new FixedRunIds("run-42"),
+            TimeProvider.System,
             _activities,
             new FakeLogger<LocalAgentClient>(_logs));
 
@@ -71,7 +72,7 @@ public sealed class LocalAgentClientTests : IDisposable
     {
         var withToken = new HttpClient(new BearerTokenHandler(Microsoft.Extensions.Options.Options.Create(SignedOptions()), TimeProvider.System) { InnerHandler = _mcp });
         var client = new LocalAgentClient(
-            withToken, Microsoft.Extensions.Options.Options.Create(SignedOptions()), new FixedRunIds("run-42"), _activities, new FakeLogger<LocalAgentClient>(_logs));
+            withToken, Microsoft.Extensions.Options.Options.Create(SignedOptions()), new FixedRunIds("run-42"), TimeProvider.System, _activities, new FakeLogger<LocalAgentClient>(_logs));
 
         await client.AskAsync(Request, TestContext.Current.CancellationToken);
 
@@ -80,6 +81,53 @@ public sealed class LocalAgentClientTests : IDisposable
         token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal("TransportOrders.CustomerServiceAgent.Read");
         token.Audiences.Should().Equal("api://norvia-customer-service-agent");
         token.Issuer.Should().Be("https://norvia.local/tokens");
+    }
+
+    private static readonly AgentRequest ReplyRequest = new("customer-service-reply", CustomerServiceQuestions.DraftReply("TO-0000042", ShipperQuestion.WhereIsMyOrder), CorrelationId);
+
+    private static AgentClientOptions ReplyOptions() => SignedOptions().With(options =>
+    {
+        options.ReplyMcpAddress = new Uri("http://mcp.test/mcp/customer-service-reply");
+        options.ReplyTokens = new AgentTokenOptions
+        {
+            Issuer = "https://norvia.local/tokens",
+            Audience = "api://norvia-customer-service-reply-agent",
+            ClientId = "norvia-local-agent-customer-service-reply",
+            Role = "TransportOrders.CustomerServiceReplyAgent.Read",
+            SigningKey = Convert.ToBase64String(new byte[64].Select((_, index) => (byte)(index + 1)).ToArray()),
+        };
+    });
+
+    [Fact]
+    public async Task AskAsync_TheReplyAgent_CallsItsOwnServer_AsItsOwnIdentity_AndDraftsFromTheShipperView()
+    {
+        _mcp.TrailAnswer = """{"transportOrderNumber":"TO-0000042","trackingStatus":"Collected","progress":[],"proofOfDelivery":{"available":false}}""";
+        var options = Microsoft.Extensions.Options.Options.Create(ReplyOptions());
+        // The pipeline of the registration: the handler sets the Customer service agent's token only where the client set none.
+        var http = new HttpClient(new BearerTokenHandler(options, TimeProvider.System) { InnerHandler = _mcp });
+        var client = new LocalAgentClient(http, options, new FixedRunIds("run-42"), TimeProvider.System, _activities, new FakeLogger<LocalAgentClient>(_logs));
+
+        var result = await client.AskAsync(ReplyRequest, TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Cause.Should().StartWith("Hello,").And.Contain("collected");
+        result.Value.Evidence.Should().OnlyContain(evidence => evidence.ToolName == "get_shipper_view");
+        result.Value.Run.Should().Be(new AgentRun("customer-service-reply", "run-42"));
+        _mcp.Addresses.Should().OnlyContain(address => address == "http://mcp.test/mcp/customer-service-reply");
+        var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(_mcp.Authorizations.First()["Bearer ".Length..]);
+        token.GetClaim("azp").Value.Should().Be("norvia-local-agent-customer-service-reply");
+        token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal("TransportOrders.CustomerServiceReplyAgent.Read");
+        token.Audiences.Should().Equal("api://norvia-customer-service-reply-agent");
+    }
+
+    [Fact]
+    public async Task AskAsync_TheReplyAgent_WithoutItsOwnServerOrTokens_IsAgentUnavailable_AndNeverUsesTheOtherAgentsToken()
+    {
+        var result = await Client(SignedOptions()).AskAsync(ReplyRequest, TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(Ardalis.Result.ResultStatus.Unavailable);
+        result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+        _mcp.Authorizations.Should().BeEmpty();
     }
 
     [Fact]
@@ -173,5 +221,14 @@ internal static class EnvironmentExtensions
     {
         environment.ApplicationName.Returns(name);
         return environment;
+    }
+}
+
+internal static class AgentClientOptionsExtensions
+{
+    public static AgentClientOptions With(this AgentClientOptions options, Action<AgentClientOptions> change)
+    {
+        change(options);
+        return options;
     }
 }

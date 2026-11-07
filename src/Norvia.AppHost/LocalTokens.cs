@@ -83,6 +83,15 @@ public static class LocalTokens
     /// <summary>The app role the Customer service agent holds on the TMS API's agent view.</summary>
     public const string CustomerServiceAgentReadRole = "TransportOrders.CustomerServiceAgent.Read";
 
+    /// <summary>The Customer service reply agent's view audience: its own, so the Customer service agent's token is not for it.</summary>
+    public const string CustomerServiceReplyAgentAudience = "api://norvia-customer-service-reply-agent";
+
+    /// <summary>The Customer service reply agent's local identity, which stands in for its Entra agent identity. It holds only its own read role.</summary>
+    public const string CustomerServiceReplyAgentClientId = "norvia-local-agent-customer-service-reply";
+
+    /// <summary>The app role the Customer service reply agent holds on the TMS API's reply agent view.</summary>
+    public const string CustomerServiceReplyAgentReadRole = "TransportOrders.CustomerServiceReplyAgent.Read";
+
     /// <summary>The app role the Estate health-check agent holds on the health-check API.</summary>
     public const string HealthCheckAgentReadRole = "HealthCheck.Agent.Read";
 

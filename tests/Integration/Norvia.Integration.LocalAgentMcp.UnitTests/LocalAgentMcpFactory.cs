@@ -30,6 +30,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string CustomerServiceAgentId = "norvia-local-agent-customer-service";
     public const string CustomerServiceRole = "TransportOrders.CustomerServiceAgent.Read";
     public const string CustomerServiceAudience = "api://norvia-customer-service-agent";
+    public const string CustomerServiceReplyAgentId = "norvia-local-agent-customer-service-reply";
+    public const string CustomerServiceReplyRole = "TransportOrders.CustomerServiceReplyAgent.Read";
+    public const string CustomerServiceReplyAudience = "api://norvia-customer-service-reply-agent";
     public const string TmsAudience = "api://norvia-tms";
 
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
@@ -100,6 +103,20 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
             }
         }
 
+        foreach (var (name, value) in new Dictionary<string, string>
+        {
+            ["AgentMcp:CustomerServiceReply:Tokens:Issuer"] = Issuer,
+            ["AgentMcp:CustomerServiceReply:Tokens:Audience"] = CustomerServiceReplyAudience,
+            ["AgentMcp:CustomerServiceReply:Tokens:SigningKey"] = signingKey,
+            ["AgentMcp:CustomerServiceReply:Api"] = "http://tms-api/v1/agent/customer-service-reply",
+            ["AgentMcp:CustomerServiceReply:ApiTokens:Issuer"] = Issuer,
+            ["AgentMcp:CustomerServiceReply:ApiTokens:Audience"] = TmsAudience,
+            ["AgentMcp:CustomerServiceReply:ApiTokens:SigningKey"] = signingKey,
+        })
+        {
+            builder.UseSetting(name, value);
+        }
+
         builder.ConfigureTestServices(services =>
         {
             services.AddLogging(logging => logging.AddFakeLogging());
@@ -138,6 +155,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     /// <summary>The Customer service agent's token as Entra issues it to its agent identity.</summary>
     public string CustomerServiceToken(string? azp = CustomerServiceAgentId, string[]? roles = null) =>
         AgentToken(azp, roles ?? [CustomerServiceRole], CustomerServiceAudience);
+
+    /// <summary>The Customer service reply agent's token as Entra issues it to its agent identity.</summary>
+    public string CustomerServiceReplyToken(string? azp = CustomerServiceReplyAgentId, string[]? roles = null, string? audience = null) =>
+        AgentToken(azp, roles ?? [CustomerServiceReplyRole], audience ?? CustomerServiceReplyAudience);
 
     public HttpClient AgentClient(string? token = null)
     {

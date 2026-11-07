@@ -19,6 +19,9 @@ builder.Services.AddOptions<AgentMcpOptions>().BindConfiguration(AgentMcpOptions
     .Validate(
         options => options.CustomerService is null || (options.CustomerService.Api is { IsAbsoluteUri: true } && options.CustomerService.Tokens.IsComplete && options.CustomerService.ApiTokens.IsComplete),
         "AgentMcp:CustomerService needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
+    .Validate(
+        options => options.CustomerServiceReply is null || (options.CustomerServiceReply.Api is { IsAbsoluteUri: true } && options.CustomerServiceReply.Tokens.IsComplete && options.CustomerServiceReply.ApiTokens.IsComplete),
+        "AgentMcp:CustomerServiceReply needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AgentRateLimit>();
@@ -26,6 +29,7 @@ builder.Services.AddSingleton<AgentRateLimit>();
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("integration-operations.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("health-check.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service.tools.json")));
+builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service-reply.tools.json")));
 builder.Services.AddSingleton<AgentServers>();
 
 // A short wait and no retry: an Agent is never on a critical path, and the standard resilience handler would retry (ADR 0040).

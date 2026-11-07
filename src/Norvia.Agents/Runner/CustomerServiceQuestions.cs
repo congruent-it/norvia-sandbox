@@ -80,6 +80,36 @@ public static class CustomerServiceQuestions
     /// <summary>The Transport Order number of a release recommendation question, or null when the text is another question.</summary>
     public static string? ParseRecommendRelease(string question) => ParseNumber(question, ReleasePrefix, ReleaseSuffix);
 
+    private const string DraftPrefix = "Draft a reply, in English, to the Shipper of the Transport Order ";
+
+    private static readonly (ShipperQuestion Question, string Suffix)[] DraftSuffixes =
+    [
+        (ShipperQuestion.WhereIsMyOrder, ", who asks: \"Where is my order?\""),
+        (ShipperQuestion.HasItBeenDelivered, ", who asks: \"Has it been delivered?\""),
+        (ShipperQuestion.IsThereProofOfDelivery, ", who asks: \"Is there a Proof of delivery?\""),
+    ];
+
+    public static string DraftReply(string transportOrderNumber, ShipperQuestion question)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
+        return DraftPrefix + transportOrderNumber + DraftSuffixes.Single(suffix => suffix.Question == question).Suffix;
+    }
+
+    /// <summary>The Transport Order number and the Shipper's question of a draft-a-reply question, or null when the text is another question.</summary>
+    public static (string TransportOrderNumber, ShipperQuestion Question)? ParseDraftReply(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        foreach (var (shipperQuestion, suffix) in DraftSuffixes)
+        {
+            if (ParseNumber(question, DraftPrefix, suffix) is { } number)
+            {
+                return (number, shipperQuestion);
+            }
+        }
+
+        return null;
+    }
+
     private static string? ParseNumber(string question, string prefix, string suffix)
     {
         ArgumentNullException.ThrowIfNull(question);
@@ -92,4 +122,17 @@ public static class CustomerServiceQuestions
         var number = question[prefix.Length..^suffix.Length];
         return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
     }
+}
+
+/// <summary>The questions Customer service may have a reply drafted to. A fixed list: nothing free-form reaches the model (ADR 0040).</summary>
+public enum ShipperQuestion
+{
+    /// <summary>"Where is my order?"</summary>
+    WhereIsMyOrder,
+
+    /// <summary>"Has it been delivered?"</summary>
+    HasItBeenDelivered,
+
+    /// <summary>"Is there a Proof of delivery?"</summary>
+    IsThereProofOfDelivery,
 }
