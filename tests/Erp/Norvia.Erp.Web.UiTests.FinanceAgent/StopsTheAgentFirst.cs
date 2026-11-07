@@ -15,7 +15,7 @@ public sealed class StopsTheAgentFirst : ITestCollectionOrderer
         where TTestCollection : ITestCollection =>
         [.. testCollections.OrderBy(collection => ReadsThroughTheStandIn(collection) ? 1 : 0)];
 
-    private static readonly Type[] JourneysThroughTheStandIn = [typeof(ExplainJourneyTests), typeof(ExplainInvoiceJourneyTests)];
+    private static readonly Type[] JourneysThroughTheStandIn = [typeof(ExplainJourneyTests), typeof(ExplainInvoiceJourneyTests), typeof(SuggestionJourneyTests)];
 
     private static bool ReadsThroughTheStandIn(ITestCollection collection) =>
         JourneysThroughTheStandIn.Any(journeys => collection.TestCollectionDisplayName.Contains(journeys.FullName!, StringComparison.Ordinal));
