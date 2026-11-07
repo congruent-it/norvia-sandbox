@@ -13,7 +13,15 @@ internal sealed class FakeMcpServer : HttpMessageHandler
          "invoicedBy":null,"candidates":[],"resolvesAutomatically":false}
         """;
 
+    public const string MangledFacts = """
+        {"carrierId":"CAR-0001","invoiceNumber":"VDT-1","carrierBookingReference":"TRX-1","result":"UnknownBooking","invoicedAmount":80.0,"currency":"EUR",
+         "agreedCarrierCost":null,"likelyCorrectReference":"0001-TRX","earlierInvoiceNumber":null}
+        """;
+
     public string TrailAnswer { get; set; } = PriceMismatch;
+
+    /// <summary>The one tool the server lists: the matching agent's, or the rejection reason agent's.</summary>
+    public string ToolName { get; set; } = "get_invoice_line";
 
     public bool ToolsRefused { get; set; }
 
@@ -50,7 +58,7 @@ internal sealed class FakeMcpServer : HttpMessageHandler
             "tools/list" => JsonNode.Parse("""
                 {"tools":[
                   {"name":"get_invoice_line","description":"d","inputSchema":{"type":"object","properties":{"carrierId":{"type":"string"},"invoiceNumber":{"type":"string"},"carrierBookingReference":{"type":"string"}},"required":["carrierId","invoiceNumber","carrierBookingReference"]}}]}
-                """),
+                """.Replace("get_invoice_line", ToolName, StringComparison.Ordinal)),
             "tools/call" => new JsonObject
             {
                 ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = ToolsRefused ? "The agent view answered 403." : TrailAnswer }),

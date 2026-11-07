@@ -27,6 +27,8 @@
     <EmbeddedResource Include="..\..\..\agents\customer-service.agent.yaml" LogicalName="customer-service.agent.yaml" />
     <EmbeddedResource Include="..\..\..\contracts\agent-mcp\finance-matching.tools.json" LogicalName="finance-matching.tools.json" />
     <EmbeddedResource Include="..\..\..\agents\finance-matching.agent.yaml" LogicalName="finance-matching.agent.yaml" />
+    <EmbeddedResource Include="..\..\..\contracts\agent-mcp\finance-rejection-reason.tools.json" LogicalName="finance-rejection-reason.tools.json" />
+    <EmbeddedResource Include="..\..\..\agents\finance-rejection-reason.agent.yaml" LogicalName="finance-rejection-reason.agent.yaml" />
     <EmbeddedResource Include="..\..\..\contracts\agent-mcp\customer-service-reply.tools.json" LogicalName="customer-service-reply.tools.json" />
     <EmbeddedResource Include="..\..\..\agents\customer-service-reply.agent.yaml" LogicalName="customer-service-reply.agent.yaml" />
   </ItemGroup>

@@ -39,7 +39,8 @@ public sealed class FinanceAgentRulesTests
     public void TheAgent_HoldsTheOneReadRole_AndEveryToolIsOnTheAgentViewOfTheErpApi()
     {
         Contract().Role.Should().Be(AgentRoles.FinanceRead);
-        typeof(AgentRoles).GetFields().Select(field => field.Name).Should().Equal([nameof(AgentRoles.FinanceRead)], "the Agent holds one role on the ERP API");
+        typeof(AgentRoles).GetFields().Select(field => field.Name).Should().Equal(
+            [nameof(AgentRoles.FinanceRead), nameof(AgentRoles.FinanceRejectionReasonRead)], "each of the two Agents holds one role of its own on the ERP API");
         FinanceAgentEndpoints.Flow.Should().StartWith("agent-view-");
         Contract().Tools.Should().OnlyContain(tool => tool.Path.StartsWith("/carriers/", StringComparison.Ordinal));
     }

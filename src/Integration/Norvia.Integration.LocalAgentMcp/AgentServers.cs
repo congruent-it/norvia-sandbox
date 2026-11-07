@@ -24,6 +24,9 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
     /// <summary>The Carrier invoice matching agent's server, <c>/mcp/finance-matching</c>: it calls the ERP API's Finance agent view.</summary>
     public const string FinanceMatching = "finance-matching";
 
+    /// <summary>The Carrier invoice rejection reason agent's server, <c>/mcp/finance-rejection-reason</c>: one tool, the Carrier-visible facts of a line, and a role of its own.</summary>
+    public const string FinanceRejectionReason = "finance-rejection-reason";
+
     /// <summary>The server, or null when the stand-in doesn't serve one by that name (or it isn't configured).</summary>
     public AgentServer? Find(string? name)
     {
@@ -39,6 +42,7 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
                 CustomerService when settings.CustomerService is { Api: { } api } customerService => new AgentServer(contract, customerService.Tokens, api, customerService.ApiTokens),
                 CustomerServiceReply when settings.CustomerServiceReply is { Api: { } api } reply => new AgentServer(contract, reply.Tokens, api, reply.ApiTokens),
                 FinanceMatching when settings.FinanceMatching is { Api: { } api } finance => new AgentServer(contract, finance.Tokens, api, finance.ApiTokens),
+                FinanceRejectionReason when settings.FinanceRejectionReason is { Api: { } api } reason => new AgentServer(contract, reason.Tokens, api, reason.ApiTokens),
                 _ => null,
             };
     }

@@ -377,6 +377,10 @@ _Avoid_: margin, threshold
 An Open Carrier cost of the same Carrier that an Unknown booking line may be about, offered by the ERP in the Carrier invoice matching agent's view. The ERP ranks the candidates (at most three) on how alike the references are, the amount and the delivery date, never the model, and the Agent describes one only as a likely candidate, never as a certainty: the Carrier may have mangled its reference, or the Carrier cost for the line may not have arrived yet.
 _Avoid_: match (that is the result of Matching), suggested match
 
+**Carrier-visible facts**:
+What the Carrier itself can see of one of its Carrier invoice lines, and nothing else: its own invoice number, line and booking reference, the invoiced amount, the agreed Carrier cost it accepted when it confirmed, the likely correct reference only when it is one of that Carrier's own bookings, and for a Duplicate its own earlier invoice number. The one tool (`get_carrier_visible_line_facts`) of the Carrier invoice rejection reason agent, which drafts the reason Finance sends the Carrier, so the Planner's Spot remark, the Rate Card version and other Carriers' references can never reach that text.
+_Avoid_: agent view of a line (that is the Carrier invoice matching agent's, which is wider)
+
 ## Systems
 
 **TMS**:

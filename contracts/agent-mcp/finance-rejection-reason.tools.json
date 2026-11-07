@@ -1,0 +1,12 @@
+{
+  "server": "finance-rejection-reason",
+  "role": "CarrierInvoices.FinanceRejectionReasonAgent.Read",
+  "tools": [
+    {
+      "name": "get_carrier_visible_line_facts",
+      "description": "Returns what the Carrier itself can see of one of its Carrier invoice lines, by the Carrier's ID, the Carrier's invoice number and the line's Carrier booking reference, and nothing else: the Carrier's own invoice number, line and booking reference, the invoiced amount, the agreed Carrier cost the Carrier accepted when it confirmed, the likely correct reference only when it is one of that Carrier's own bookings, and for a Duplicate the Carrier's own earlier invoice number. Never the Rate Card or its version, never the Planner's remark, never the matching tolerance, never another Carrier's reference or data, never a Shipper or Consignee's personal data and never a file's contents.",
+      "method": "GET",
+      "path": "/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}/carrier-visible-facts"
+    }
+  ]
+}

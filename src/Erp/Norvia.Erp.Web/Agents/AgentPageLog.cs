@@ -14,4 +14,10 @@ internal static partial class AgentPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Explaining Carrier invoice {InvoiceNumber} failed")]
     public static partial void ExplainInvoiceCrashed(ILogger logger, Exception exception, string invoiceNumber);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Drafting the rejection reason of line {CarrierBookingReference} of Carrier invoice {InvoiceNumber} failed with {FailureCode}")]
+    public static partial void DraftReasonFailed(ILogger logger, string carrierBookingReference, string invoiceNumber, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Drafting the rejection reason of line {CarrierBookingReference} of Carrier invoice {InvoiceNumber} failed")]
+    public static partial void DraftReasonCrashed(ILogger logger, Exception exception, string carrierBookingReference, string invoiceNumber);
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using Ardalis.Result;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,11 +19,14 @@ internal sealed partial class LocalAgentClient(
     HttpClient http,
     IOptions<AgentClientOptions> options,
     IRunIds runIds,
+    TimeProvider time,
     AgentActivities activities,
     ILogger<LocalAgentClient> logger) : IAgentClient
 {
     /// <summary>The <c>flow</c> of an Agent run on the Carrier invoice line.</summary>
     public const string Flow = "finance-matching-agent";
+
+    private const string RejectionReasonAgentName = "finance-rejection-reason";
 
     public async Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken)
     {
@@ -39,9 +43,21 @@ internal sealed partial class LocalAgentClient(
         try
         {
             var definition = AgentDefinitions.Load(request.AgentName);
+            // The rejection reason agent is its own identity: its own server, its own role, so it holds none of the matching agent's.
+            var rejectionReason = request.AgentName == RejectionReasonAgentName;
+            if (rejectionReason)
+            {
+                http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+                    "Bearer",
+                    settings.RejectionReasonTokens.IsComplete ? AgentToken.Create(settings.RejectionReasonTokens, time) : throw new InvalidOperationException("Agents:RejectionReasonTokens is not set."));
+            }
+
             var runner = new AgentRunner(
                 AgentModels.For(definition, settings.Model),
-                new McpToolSource(http, settings.McpAddress ?? throw new InvalidOperationException("Agents:McpAddress is not set.")),
+                new McpToolSource(
+                    http,
+                    (rejectionReason ? settings.RejectionReasonMcpAddress : settings.McpAddress)
+                        ?? throw new InvalidOperationException(rejectionReason ? "Agents:RejectionReasonMcpAddress is not set." : "Agents:McpAddress is not set.")),
                 new AgentRunnerOptions(TimeSpan.FromSeconds(settings.TimeoutSeconds)));
             var result = await runner.RunAsync(definition, new AgentQuestion(request.Question, request.CorrelationId, runId), cancellationToken);
 

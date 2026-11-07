@@ -45,6 +45,7 @@ public sealed class LocalAgentClientTests : IDisposable
             _http,
             Microsoft.Extensions.Options.Options.Create(options ?? new AgentClientOptions { McpAddress = new Uri("http://mcp.test/mcp/finance-matching"), TimeoutSeconds = 5 }),
             new FixedRunIds("run-42"),
+            TimeProvider.System,
             _activities,
             new FakeLogger<LocalAgentClient>(_logs));
 
@@ -71,7 +72,7 @@ public sealed class LocalAgentClientTests : IDisposable
     {
         var withToken = new HttpClient(new BearerTokenHandler(Microsoft.Extensions.Options.Options.Create(SignedOptions()), TimeProvider.System) { InnerHandler = _mcp });
         var client = new LocalAgentClient(
-            withToken, Microsoft.Extensions.Options.Options.Create(SignedOptions()), new FixedRunIds("run-42"), _activities, new FakeLogger<LocalAgentClient>(_logs));
+            withToken, Microsoft.Extensions.Options.Options.Create(SignedOptions()), new FixedRunIds("run-42"), TimeProvider.System, _activities, new FakeLogger<LocalAgentClient>(_logs));
 
         await client.AskAsync(Request, TestContext.Current.CancellationToken);
 
@@ -145,6 +146,51 @@ public sealed class LocalAgentClientTests : IDisposable
         var result = await Client().AskAsync(Request with { AgentName = "no-such-agent" }, TestContext.Current.CancellationToken);
 
         result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+    }
+
+    [Fact]
+    public async Task AskAsync_TheRejectionReasonAgent_IsItsOwnIdentity_OnItsOwnServer_WithItsOwnRole()
+    {
+        _mcp.ToolName = "get_carrier_visible_line_facts";
+        _mcp.TrailAnswer = FakeMcpServer.MangledFacts;
+        var options = SignedOptions();
+        options.RejectionReasonMcpAddress = new Uri("http://mcp.test/mcp/finance-rejection-reason");
+        options.RejectionReasonTokens = new AgentTokenOptions
+        {
+            Issuer = "https://norvia.local/tokens",
+            Audience = "api://norvia-finance-rejection-reason-agent",
+            ClientId = "norvia-local-agent-finance-rejection-reason",
+            Role = "CarrierInvoices.FinanceRejectionReasonAgent.Read",
+            SigningKey = options.Tokens.SigningKey,
+        };
+        var withToken = new HttpClient(new BearerTokenHandler(Microsoft.Extensions.Options.Options.Create(options), TimeProvider.System) { InnerHandler = _mcp });
+        var client = new LocalAgentClient(
+            withToken, Microsoft.Extensions.Options.Options.Create(options), new FixedRunIds("run-43"), TimeProvider.System, _activities, new FakeLogger<LocalAgentClient>(_logs));
+
+        var result = await client.AskAsync(
+            new AgentRequest("finance-rejection-reason", FinanceQuestions.DraftRejectionReason("CAR-0001", "VDT-1", "TRX-1"), CorrelationId),
+            TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Cause.Should().StartWith("Hello,").And.Contain("may be 0001-TRX");
+        result.Value.Evidence.Should().OnlyContain(evidence => evidence.ToolName == "get_carrier_visible_line_facts");
+        result.Value.Run.Should().Be(new AgentRun("finance-rejection-reason", "run-43"));
+        var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(_mcp.Authorizations.First()["Bearer ".Length..]);
+        token.GetClaim("azp").Value.Should().Be("norvia-local-agent-finance-rejection-reason");
+        token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal("CarrierInvoices.FinanceRejectionReasonAgent.Read");
+        token.Audiences.Should().Equal("api://norvia-finance-rejection-reason-agent");
+        _mcp.Authorizations.Should().OnlyContain(authorization => authorization == "Bearer " + token.EncodedToken, "every call is the rejection reason agent's, never the matching agent's token");
+    }
+
+    [Fact]
+    public async Task AskAsync_TheRejectionReasonAgent_WithoutItsOwnServerOrToken_IsAgentUnavailable_NeverTheMatchingAgentsDoor()
+    {
+        var result = await Client().AskAsync(
+            new AgentRequest("finance-rejection-reason", FinanceQuestions.DraftRejectionReason("CAR-0001", "VDT-1", "TRX-1"), CorrelationId),
+            TestContext.Current.CancellationToken);
+
+        result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+        _mcp.Authorizations.Should().BeEmpty();
     }
 
     private static AgentClientOptions SignedOptions() => new()

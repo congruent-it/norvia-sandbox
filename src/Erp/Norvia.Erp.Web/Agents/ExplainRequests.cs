@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Mediator;
 using Norvia.Agents;
 using Norvia.Erp.Application.Agents.Explain;
+using Norvia.Erp.Application.Agents.RejectionReason;
 
 namespace Norvia.Erp.Web.Agents;
 
@@ -11,6 +12,8 @@ internal sealed class ExplainRequests(IServiceScopeFactory scopes) : IExplainReq
     public Task<Result<Suggestion>> ExplainAsync(ExplainInvoiceLineQuery query, CancellationToken cancellationToken) => SendAsync(query, cancellationToken);
 
     public Task<Result<Suggestion>> ExplainAsync(ExplainInvoiceQuery query, CancellationToken cancellationToken) => SendAsync(query, cancellationToken);
+
+    public Task<Result<Suggestion>> DraftRejectionReasonAsync(DraftRejectionReasonQuery query, CancellationToken cancellationToken) => SendAsync(query, cancellationToken);
 
     private async Task<Result<Suggestion>> SendAsync(IQuery<Result<Suggestion>> query, CancellationToken cancellationToken)
     {

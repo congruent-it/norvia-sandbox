@@ -110,7 +110,7 @@ public sealed class FinanceAgentViewTests
     {
         AgentRoles.FinanceRead.Should().Be("CarrierInvoices.FinanceAgent.Read");
         PersonsAndWorkersRoles.Should().NotContain(AgentRoles.FinanceRead);
-        typeof(AgentRoles).GetFields().Select(field => field.Name).Should().Equal([nameof(AgentRoles.FinanceRead)], "the agent holds one role and no other");
+        typeof(AgentRoles).GetFields().Select(field => field.Name).Should().Equal([nameof(AgentRoles.FinanceRead), nameof(AgentRoles.FinanceRejectionReasonRead)], "each of the two Agents holds one role of its own");
         FinanceAgentEndpoints.Flow.Should().Be("agent-view-finance-matching");
     }
 
