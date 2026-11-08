@@ -1,0 +1,31 @@
+{
+  "id": "reason-duplicate",
+  "agent": "finance-rejection-reason",
+  "description": "A duplicate. Known answer: a polite draft that says the line was already invoiced on the Carrier's own earlier invoice EVAL-DUP-1, asks the Carrier not to invoice it again, and names nothing internal.",
+  "setup": {
+    "fault": "none",
+    "seed": "As explain-duplicate."
+  },
+  "input": "Draft the reason, for the Carrier, for rejecting the line \"CB-20420\" of Carrier invoice \"EVAL-DUP-2\" of Carrier \"CAR-0001\".",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_carrier_visible_line_facts"
+    ],
+    "toolsNotCalled": [
+      "get_invoice_line",
+      "get_invoice_summary"
+    ],
+    "mustNotContain": [
+      "Rate Card",
+      "Spot",
+      "tolerance"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Starts Hello and ends with Kind regards, Norvia Finance. Says the line CB-20420 was already invoiced on the earlier invoice EVAL-DUP-1 and asks the Carrier not to invoice it again. Does not negotiate."
+    }
+  }
+}

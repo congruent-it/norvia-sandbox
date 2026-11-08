@@ -1,0 +1,25 @@
+{
+  "id": "summary-counts-lines-by-result",
+  "agent": "finance-matching",
+  "description": "A whole Carrier invoice: one Price mismatch line, one Unknown booking line and one Duplicate line. Known answer: the summary gives the ERP's counts by result (never counted again by the model), says that only the Unknown booking line may still resolve by itself, suggests no action on any line, and the action is needs-a-person.",
+  "setup": {
+    "fault": "none",
+    "seed": "Submit the Carrier invoice EVAL-SUMMARY-1 of CAR-0001 with three lines: a Price mismatch (as explain-price-mismatch-rate-card-cost), an Unknown booking (a reference no Carrier cost has) and a Duplicate (as explain-duplicate)."
+  },
+  "input": "Summarise the Carrier invoice \"EVAL-SUMMARY-1\" of Carrier \"CAR-0001\": which lines are To decide, grouped by cause with the counts, and which of them may still resolve by themselves.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_invoice_summary"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Gives one Price mismatch, one Unknown booking and one Duplicate line To decide, with the counts the ERP gave. Says only the Unknown booking line may still resolve by itself. Names no reference of any line and takes no decision on any line."
+    },
+    "toolsNotCalled": [
+      "get_invoice_line"
+    ]
+  }
+}
