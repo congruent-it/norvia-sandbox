@@ -13,19 +13,11 @@ namespace Norvia.Erp.Web.UiTests.FinanceAgent;
 /// </summary>
 public sealed class SuggestionJourneyTests(FinanceAgentUiFixture fixture) : ToDecidePage(fixture)
 {
-    // The second line of every invoice: a Spot cost of 10.00 claimed at 15.00, a Price mismatch that nobody decides.
-    private const decimal SecondLineCost = 10m;
-    private const decimal SecondLineClaim = 15m;
-
     private static ILocator Suggested(ILocator invoice) => invoice.GetByTestId("suggested-decision");
 
     private static ILocator SuggestedKind(ILocator invoice, string reference) => ExplanationOf(invoice, reference).GetByTestId("action-kind");
 
-    private static ILocator LineOf(ILocator invoice, string reference) => invoice.GetByLabel($"Line {reference}");
-
     private static ILocator AcceptButton(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Button, new() { Name = $"Accept {reference}" });
-
-    private static ILocator RejectButton(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Button, new() { Name = $"Reject {reference}" });
 
     /// <summary>Receives an invoice of the line and of a second one that is To decide and stays so.</summary>
     private async Task<string> ReceiveWithSecondLineAsync(string reference, decimal claim)

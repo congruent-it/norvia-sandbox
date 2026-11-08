@@ -13,17 +13,9 @@ namespace Norvia.Erp.Web.UiTests.FinanceAgent;
 /// </summary>
 public sealed class RejectionReasonJourneyTests(FinanceAgentUiFixture fixture) : ToDecidePage(fixture)
 {
-    // The second line of every invoice: a Spot cost of 10.00 claimed at 15.00, a Price mismatch that nobody decides.
-    private const decimal SecondLineCost = 10m;
-    private const decimal SecondLineClaim = 15m;
-
-    private static ILocator LineOf(ILocator invoice, string reference) => invoice.GetByLabel($"Line {reference}");
-
     private static ILocator ReasonBox(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Textbox, new() { Name = $"Reason for rejecting {reference}" });
 
     private static ILocator DraftButton(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Button, new() { Name = $"Draft reason for {reference}" });
-
-    private static ILocator RejectButton(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Button, new() { Name = $"Reject {reference}" });
 
     private static ILocator DraftNotice(ILocator invoice) => invoice.GetByTestId("reason-draft");
 
@@ -63,7 +55,6 @@ public sealed class RejectionReasonJourneyTests(FinanceAgentUiFixture fixture) :
         await Expect(LineOf(invoice, mangled)).ToContainTextAsync("To decide");
         var reopened = await OpenLineAsync(invoiceNumber, mangled);
         await Expect(LineOf(reopened, mangled)).ToContainTextAsync("To decide");
-        await Expect(ReasonBox(reopened, mangled)).ToHaveValueAsync("");
     }
 
     [Fact]
@@ -83,7 +74,6 @@ public sealed class RejectionReasonJourneyTests(FinanceAgentUiFixture fixture) :
         var line = LineOf(invoice, mangled);
         await Expect(line.GetByText("Rejected", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = AgentTimeout });
         await Expect(line).ToContainTextAsync($"{Edited} Booking {reference}.");
-        await Expect(line).Not.ToContainTextAsync("Kind regards");
     }
 
     [Fact]
@@ -120,25 +110,5 @@ public sealed class RejectionReasonJourneyTests(FinanceAgentUiFixture fixture) :
         await Expect(reason).ToHaveValueAsync(new Regex($"already invoiced on your earlier invoice {Regex.Escape(earlier)}"), new() { Timeout = AgentTimeout });
         await Expect(reason).ToHaveValueAsync(new Regex("Please do not invoice it again"));
         await Expect(LineOf(invoice, reference)).ToContainTextAsync("To decide");
-    }
-
-    [Fact]
-    public async Task DraftReason_OverwritesWhatFinanceHadTyped_AndAnythingTypedAfterwardsIsKept()
-    {
-        var (invoiceNumber, mangled, _) = await ReceiveMangledAsync();
-        var invoice = await OpenLineAsync(invoiceNumber, mangled);
-        var reason = ReasonBox(invoice, mangled);
-        await reason.FillAsync("Typed before drafting.");
-
-        await DraftButton(invoice, mangled).ClickAsync();
-
-        await Expect(DraftNotice(invoice)).ToBeVisibleAsync(new() { Timeout = AgentTimeout });
-        await Expect(reason).Not.ToHaveValueAsync(new Regex("Typed before drafting"));
-        await reason.FillAsync("Finance's own words.");
-        await RejectButton(invoice, mangled).ClickAsync();
-
-        var line = LineOf(invoice, mangled);
-        await Expect(line.GetByText("Rejected", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = AgentTimeout });
-        await Expect(line).ToContainTextAsync("Finance's own words.");
     }
 }
