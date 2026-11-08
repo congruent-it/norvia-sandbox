@@ -19,6 +19,9 @@
   <ItemGroup>
     <!-- The Agent's definition, which the tests run the in-process runner with, as the ERP UI does. -->
     <None Include="..\..\..\agents\finance-matching.agent.yaml" Link="agents\finance-matching.agent.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\agents\finance-rejection-reason.agent.yaml" Link="agents\finance-rejection-reason.agent.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The tool lists of every Agent's MCP server (the contract files the Bicep reads too), so the tests refuse each tool of the other servers. -->
+    <None Include="..\..\..\contracts\agent-mcp\*.tools.json" Link="contracts\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- One AppHost for the whole project (SQL Server and the Service Bus emulator in Docker). -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

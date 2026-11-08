@@ -21,6 +21,9 @@ namespace Norvia.Erp.Api.IntegrationTests.FinanceAgent;
 public sealed class FinanceAgentFixture : IAsyncLifetime
 {
     public const string McpPath = "/mcp/finance-matching";
+
+    /// <summary>The rejection reason agent's server on the same stand-in: its own path, audience and read role.</summary>
+    public const string RejectionReasonMcpPath = "/mcp/finance-rejection-reason";
     public const int RateLimitCalls = 10;
 
     /// <summary>The app role only the Carrier cost Logic App's managed identity holds.</summary>
@@ -107,6 +110,10 @@ public sealed class FinanceAgentFixture : IAsyncLifetime
     public string AgentToken(string? agentId = null, string[]? roles = null, string? signingKey = null, string? audience = null, TimeSpan? lifetime = null) =>
         IssueToken(roles ?? [LocalTokens.FinanceAgentReadRole], audience ?? LocalTokens.FinanceAgentAudience, agentId ?? NewAgentId(), signingKey, lifetime);
 
+    /// <summary>A token as Entra issues it to the Carrier invoice rejection reason agent's identity for its MCP server; change any part to show what is refused.</summary>
+    public string RejectionReasonToken(string? agentId = null, string[]? roles = null) =>
+        IssueToken(roles ?? [LocalTokens.FinanceRejectionReasonAgentReadRole], LocalTokens.FinanceRejectionReasonAgentAudience, agentId ?? NewAgentId());
+
     /// <summary>A token for the ERP API's agent view itself, as the stand-in signs it for the Agent's identity: the ERP API's audience, with the roles given.</summary>
     public string AgentViewToken(string[] roles, string? agentId = null, string? signingKey = null) => IssueToken(roles, LocalTokens.ErpAudience, agentId ?? NewAgentId(), signingKey);
 
@@ -121,6 +128,9 @@ public sealed class FinanceAgentFixture : IAsyncLifetime
 
     /// <summary>The MCP endpoint a runner connects to.</summary>
     public Uri McpAddress => new(_app!.GetEndpoint("agent-mcp", "http"), McpPath);
+
+    /// <summary>The MCP endpoint the rejection reason agent's runner connects to.</summary>
+    public Uri RejectionReasonMcpAddress => new(_app!.GetEndpoint("agent-mcp", "http"), RejectionReasonMcpPath);
 
     /// <summary>Waits for the stand-in to write a log that matches, as logs arrive a moment after the call.</summary>
     public Task<TrailLog> StandInLogAsync(Func<TrailLog, bool> match, CancellationToken cancellationToken) => WaitForAsync(_standInLogs, match, cancellationToken);
