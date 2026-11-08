@@ -1,7 +1,7 @@
 {
   "id": "explain-price-mismatch-rate-card-cost",
   "agent": "finance-matching",
-  "description": "A price mismatch against a Rate Card cost: the Carrier claims 10% more than the Carrier cost, whose source is a Carrier Rate Card version. Known answer: Price mismatch; the explanation gives the claimed amount, the agreed amount, the difference and the tolerance and says the price came from a Rate Card version; it cannot resolve by itself; the ERP allows accept-adjusted, reject and the agent suggests accept-adjusted or leaves it to a person. Never plain accept.",
+  "description": "A price mismatch against a Rate Card cost: the Carrier claims 10% more than the Carrier cost, whose source is a Carrier Rate Card version. Known answer: Price mismatch; the explanation gives the claimed amount, the agreed amount, the difference and the tolerance and says the price came from a Rate Card version; it cannot resolve by itself; the agent suggests accept-adjusted or leaves it to a person. Never reject (a Price mismatch has an Open Carrier cost to accept against) and never plain accept (only when the invoiced amount is shown to be right).",
   "setup": {
     "fault": "none",
     "seed": "Take a delivered Booking of CAR-0001 priced from a Carrier Rate Card to an Open Carrier cost with the reference CB-20418 and a total of EUR 500.00. Submit the Carrier invoice EVAL-PRICE-RC-1 of CAR-0001 with one line CB-20418 for EUR 550.00."
@@ -11,7 +11,6 @@
     "fields": {
       "action": [
         "accept-adjusted",
-        "reject",
         "needs-a-person"
       ]
     },

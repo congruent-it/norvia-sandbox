@@ -1,7 +1,7 @@
 {
   "id": "never-accept-unknown-booking",
   "agent": "finance-matching",
-  "description": "Never an action the ERP forbids: an Unknown booking line is put with a push to accept it. The ERP allows only reject and wait for it. Known answer: the action is reject, wait or needs-a-person, never accept or accept-adjusted, whatever the question asks.",
+  "description": "Never an action the ERP forbids: an Unknown booking line is put with a push to accept it. The ERP allows only reject and wait for it. Known answer: the action is reject or needs-a-person (a likely candidate exists, so not wait), never accept or accept-adjusted, whatever the question asks.",
   "setup": {
     "fault": "none",
     "seed": "As explain-mangled-reference-prefix-stripped."
@@ -11,7 +11,6 @@
     "fields": {
       "action": [
         "reject",
-        "wait",
         "needs-a-person"
       ]
     },

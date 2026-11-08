@@ -118,8 +118,8 @@ The cases of [#474](https://github.com/congruent-it/norvia-sandbox/issues/474) f
 
 | Cases | Known answer |
 |---|---|
-| `explain-mangled-reference-prefix-stripped` | Unknown booking; the Carrier's own `CB-20417` is a likely candidate, never a certainty; reject, wait or needs-a-person |
-| `explain-price-mismatch-rate-card-cost` | Price mismatch, both amounts, the difference and that the price is a Rate Card version; accept-adjusted, reject or needs-a-person; never plain accept |
+| `explain-mangled-reference-prefix-stripped` | Unknown booking; the Carrier's own `CB-20417` is a likely candidate, never a certainty; reject or needs-a-person (not wait: a candidate exists) |
+| `explain-price-mismatch-rate-card-cost` | Price mismatch, both amounts, the difference and that the price is a Rate Card version; accept-adjusted or needs-a-person; never reject or plain accept |
 | `explain-price-mismatch-spot-price` | Price mismatch against a Spot price; needs-a-person (ask the Planner); the Planner's remark is nowhere in the answer |
 | `explain-duplicate` | Duplicate of line `CB-20420` of the earlier invoice; reject |
 | `explain-unknown-booking-cost-arrives-late` | Unknown booking that is matched again by itself when its Carrier cost arrives; wait |

@@ -1,7 +1,7 @@
 {
   "id": "explain-mangled-reference-prefix-stripped",
   "agent": "finance-matching",
-  "description": "A mangled reference: the Carrier's booking reference arrives with its prefix stripped (E2's design: the Carrier invoice Logic App mangles it), so the line is an Unknown booking while an Open Carrier cost of the same Carrier with the full reference exists and ranks as a likely candidate. Known answer: Unknown booking, the candidate described as a likely candidate and never as certain, no Accept (the ERP allows only reject and wait), so reject, wait or needs-a-person.",
+  "description": "A mangled reference: the Carrier's booking reference arrives with its prefix stripped (E2's design: the Carrier invoice Logic App mangles it), so the line is an Unknown booking while an Open Carrier cost of the same Carrier with the full reference exists and ranks as a likely candidate. Known answer: Unknown booking, the candidate described as a likely candidate and never as certain, no Accept (the ERP allows only reject and wait). A likely candidate exists, so waiting for a cost under the stripped reference is not the answer: reject or needs-a-person.",
   "setup": {
     "fault": "none",
     "seed": "Take a delivered Booking of CAR-0001 to an Open Carrier cost with the reference CB-20417. Submit the Carrier invoice EVAL-MANGLED-1 of CAR-0001 through the Partner API with one line whose reference is 20417 (prefix stripped) and the amount of the Carrier cost."
@@ -11,7 +11,6 @@
     "fields": {
       "action": [
         "reject",
-        "wait",
         "needs-a-person"
       ]
     },
