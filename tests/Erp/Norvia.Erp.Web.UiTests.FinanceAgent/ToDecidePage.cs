@@ -14,6 +14,10 @@ public abstract class ToDecidePage(FinanceAgentUiFixture fixture) : TracedPage(f
     // The assistant reads the line through the MCP stand-in and the model before it answers; the first call on a cold host takes longer than a page does.
     protected const float AgentTimeout = 30_000;
 
+    // The second line of every invoice: a Spot cost of 10.00 claimed at 15.00, a Price mismatch that nobody decides.
+    protected const decimal SecondLineCost = 10m;
+    protected const decimal SecondLineClaim = 15m;
+
     protected FinanceAgentUiFixture Agent { get; } = fixture;
 
     /// <summary>Records a Spot Carrier cost as the Carrier cost Logic App does.</summary>
@@ -78,4 +82,10 @@ public abstract class ToDecidePage(FinanceAgentUiFixture fixture) : TracedPage(f
 
     /// <summary>The explanation of a whole invoice, once the assistant has answered.</summary>
     protected static ILocator InvoiceExplanationOf(ILocator invoice, string invoiceNumber) => invoice.GetByTestId($"invoice-explanation-{invoiceNumber}");
+
+    /// <summary>The region of a line, in the invoice's section.</summary>
+    protected static ILocator LineOf(ILocator invoice, string reference) => invoice.GetByLabel($"Line {reference}");
+
+    /// <summary>The Reject button of a line, in the invoice's section.</summary>
+    protected static ILocator RejectButton(ILocator invoice, string reference) => invoice.GetByRole(AriaRole.Button, new() { Name = $"Reject {reference}" });
 }
