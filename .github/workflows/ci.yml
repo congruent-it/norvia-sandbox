@@ -194,6 +194,9 @@ jobs:
           - application: Integration console
             directory: IntegrationConsole
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Integration
+            directory: Integration
+            kinds: IntegrationTests
           - application: Estate health check
             directory: HealthCheck
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
