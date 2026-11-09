@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Options;
+using Norvia.Agents.Scripts;
+using Norvia.Integration.BookingDraft;
 using Norvia.Integration.LocalPartnerApi;
 
 // Locally there is no API Management and no intake or Carrier-answer Logic App, so this plays them for the Partner portal (ADR 0023).
@@ -29,8 +31,8 @@ builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.Sec
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<DraftRateLimit>();
 // Locally the Intake agent runs in process with the scripted fake model (ADR 0041); an Azure host gives the extractor its Foundry client instead.
-builder.Services.AddSingleton(services => new Norvia.Integration.BookingDraft.BookingDraftExtractor(
-    Norvia.Agents.Scripts.BookingIntakeScript.Model(),
+builder.Services.AddSingleton(services => new BookingDraftExtractor(
+    BookingIntakeScript.Model(),
     TimeSpan.FromSeconds(services.GetRequiredService<IOptions<AgentsOptions>>().Value.TimeoutSeconds)));
 builder.Services.AddSingleton<PartnerEdge>();
 builder.Services.AddSingleton<TrackingRateLimit>();

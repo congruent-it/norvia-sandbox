@@ -164,4 +164,31 @@ public sealed class BookingDraftExtractorTests
 
         BookingDraftSchema.Errors(outcome.Draft!.ToJson()).Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task A_value_whose_numbers_are_not_in_its_quote_is_dropped_and_flagged()
+    {
+        // The quote is in the text, but "5 t" is not what "3 pallets" says.
+        var reply = Reply(
+            new JsonObject { ["items"] = new JsonArray(new JsonObject { ["packaging"] = "PX", ["count"] = 3, ["weight"] = "5 t" }) },
+            new JsonObject { ["items.0.packaging"] = "3 pallets", ["items.0.count"] = "3 pallets", ["items.0.weight"] = "3 pallets" });
+
+        var outcome = await Replying(reply).ExtractAsync(BookingIntakeSamples.Partial, "corr-1", CancellationToken.None);
+
+        var item = outcome.Draft!.Booking["items"]!.AsArray()[0]!.AsObject();
+        item["count"]!.GetValue<int>().Should().Be(3);
+        item.ContainsKey("weight").Should().BeFalse();
+        outcome.Draft.Missing.Select(m => m.Field).Should().Contain("items.0.weight");
+    }
+
+    [Fact]
+    public async Task A_date_written_with_a_month_name_keeps_its_day_year_and_time()
+    {
+        var text = "Please collect on 14 November 2030 at 8:00 in Utrecht.";
+        var kept = Reply(new JsonObject { ["pickupFrom"] = "14-11-2030 08:00" }, new JsonObject { ["pickupFrom"] = "14 November 2030 at 8:00" });
+        var wrongDay = Reply(new JsonObject { ["pickupFrom"] = "15-11-2030 08:00" }, new JsonObject { ["pickupFrom"] = "14 November 2030 at 8:00" });
+
+        (await Replying(kept).ExtractAsync(text, "corr-1", CancellationToken.None)).Draft!.Booking.ContainsKey("pickupFrom").Should().BeTrue();
+        (await Replying(wrongDay).ExtractAsync(text, "corr-1", CancellationToken.None)).Draft!.Booking.ContainsKey("pickupFrom").Should().BeFalse();
+    }
 }

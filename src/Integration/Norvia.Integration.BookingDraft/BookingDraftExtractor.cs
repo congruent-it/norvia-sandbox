@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using Norvia.Agents.Runner;
 
@@ -69,8 +70,12 @@ public sealed class BookingDraftExtractor(IChatClient model, TimeSpan timeout)
         var kept = new Dictionary<string, string>(StringComparer.Ordinal);
         var booking = new JsonObject();
 
-        bool Holds(string path) =>
-            quotes.TryGetValue(path, out var quote) && Normalize(quote) is { Length: > 0 } normalized && haystack.Contains(normalized, StringComparison.Ordinal);
+        // The quote is in the text, and every number of the value is in the quote: "5 t" cannot hide behind the quote "2 pallets".
+        bool Holds(string path, JsonNode? value) =>
+            quotes.TryGetValue(path, out var quote)
+            && Normalize(quote) is { Length: > 0 } normalized
+            && haystack.Contains(normalized, StringComparison.Ordinal)
+            && NumbersOfValue(value, path).All(NumbersIn(quote).Contains);
 
         void Drop(string path)
         {
@@ -92,7 +97,7 @@ public sealed class BookingDraftExtractor(IChatClient model, TimeSpan timeout)
                     foreach (var (itemName, itemValue) in item!.AsObject())
                     {
                         var path = $"items.{index}.{itemName}";
-                        if (Holds(path))
+                        if (Holds(path, itemValue))
                         {
                             keptItem[itemName] = itemValue!.DeepClone();
                             kept[path] = quotes[path];
@@ -116,7 +121,7 @@ public sealed class BookingDraftExtractor(IChatClient model, TimeSpan timeout)
                     booking["items"] = items;
                 }
             }
-            else if (Holds(name))
+            else if (Holds(name, value))
             {
                 booking[name] = value!.DeepClone();
                 kept[name] = quotes[name];
@@ -129,6 +134,25 @@ public sealed class BookingDraftExtractor(IChatClient model, TimeSpan timeout)
 
         return new BookingDraft(booking, kept, missing);
     }
+
+    private static readonly string[] DateFields = ["pickupFrom", "pickupUntil", "deliverFrom", "deliverUntil"];
+
+    // The numbers a value has to find in its quote. A date leaves out its month (dd-MM-yyyy HH:mm), which a text may write as a name
+    // ("14 November 2030"): the day, the year and the time still have to be there.
+    private static List<string> NumbersOfValue(JsonNode? value, string path)
+    {
+        var numbers = NumbersIn(value?.ToString() ?? string.Empty);
+        if (DateFields.Contains(path, StringComparer.Ordinal) && numbers.Count == 5)
+        {
+            numbers.RemoveAt(1);
+        }
+
+        return numbers;
+    }
+
+    // Numbers without leading zeros, so "08:00" and "8:00" agree.
+    private static List<string> NumbersIn(string text) =>
+        [.. Regex.Matches(text, "[0-9]+").Select(match => match.Value.TrimStart('0') is { Length: > 0 } trimmed ? trimmed : "0")];
 
     // Case and white space (line breaks in an email) do not matter when a quote is looked up.
     private static string Normalize(string value)

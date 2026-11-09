@@ -58,18 +58,19 @@ internal static partial class CreateBookingDraft
 
         using var party = logger.BeginScope(new Dictionary<string, object?> { [TrackingKeys.PartyId] = shipperId });
 
+        // A switched-off assistant uses no one's rate limit.
+        var agents = options.Value;
+        if (!agents.Enabled)
+        {
+            return Refuse(logger, correlationId, StatusCodes.Status503ServiceUnavailable, AgentsDisabled, "The assistant is unavailable.");
+        }
+
         // One counter per subscription, after the checks, so a refusal is not counted.
         if (rateLimit.Count(context.Request.Headers["Ocp-Apim-Subscription-Key"].ToString()) is { } retryAfter)
         {
             var seconds = (int)Math.Ceiling(retryAfter.TotalSeconds);
             context.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Refuse(logger, correlationId, StatusCodes.Status429TooManyRequests, "RateLimitExceeded", $"Rate limit is exceeded. Try again in {seconds} seconds.");
-        }
-
-        var agents = options.Value;
-        if (!agents.Enabled)
-        {
-            return Refuse(logger, correlationId, StatusCodes.Status503ServiceUnavailable, AgentsDisabled, "The assistant is unavailable.");
         }
 
         var text = await ReadTextAsync(context, agents.MaxInputCharacters);
@@ -117,20 +118,18 @@ internal static partial class CreateBookingDraft
     {
         using var refused = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Refused, failureCode));
         LogRefused(logger, statusCode, failureCode);
-        return Answer(statusCode, new JsonObject { ["messageId"] = correlationId, ["failureCode"] = failureCode, ["text"] = text });
+        return Answer(statusCode, ErrorBody(correlationId, failureCode, text));
     }
 
     private static ContentHttpResult Fail(ILogger logger, string correlationId, string failureCode)
     {
         using var failed = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, failureCode));
         LogFailed(logger, failureCode);
-        return Answer(StatusCodes.Status503ServiceUnavailable, new JsonObject
-        {
-            ["messageId"] = correlationId,
-            ["failureCode"] = failureCode,
-            ["text"] = "The assistant is unavailable.",
-        });
+        return Answer(StatusCodes.Status503ServiceUnavailable, ErrorBody(correlationId, failureCode, "The assistant is unavailable."));
     }
+
+    private static JsonObject ErrorBody(string correlationId, string failureCode, string text) =>
+        new() { ["messageId"] = correlationId, ["failureCode"] = failureCode, ["text"] = text };
 
     private static ContentHttpResult Answer(int statusCode, JsonObject body) =>
         TypedResults.Content(body.ToJsonString(), "application/json", statusCode: statusCode);

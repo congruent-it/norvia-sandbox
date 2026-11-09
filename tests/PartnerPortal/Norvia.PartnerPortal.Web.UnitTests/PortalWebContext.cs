@@ -19,7 +19,7 @@ public abstract class PortalWebContext : BunitContext
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddFluentUIComponents();
         Services.AddSingleton(Portal);
-        Services.AddScoped<Norvia.PartnerPortal.Web.Bookings.BookingDraftHandoff>();
+        Services.AddScoped<BookingDraftHandoff>();
         Services.AddSingleton<TimeProvider>(Time);
         Portal.ListDriverSignInsAsync(Arg.Any<CancellationToken>()).Returns(new DriverSignInsView(null, []));
         Portal.ListPersonasAsync(Arg.Any<CancellationToken>()).Returns(Samples.Personas);
