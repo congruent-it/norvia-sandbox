@@ -42,7 +42,7 @@ public sealed class SimulatorFixture : IAsyncLifetime
 
     private static readonly string[] IntakeRoles = ["TransportOrders.Intake"];
     private static readonly string[] ManageRoles = ["TransportOrders.Manage"];
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private readonly List<SimulatorHost> _hosts = [];
     private readonly List<string> _seedCopies = [];

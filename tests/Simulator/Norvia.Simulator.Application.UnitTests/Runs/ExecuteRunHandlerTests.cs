@@ -18,7 +18,7 @@ public sealed class ExecuteRunHandlerTests
     private readonly ITmsApi _tms = Substitute.For<ITmsApi>();
     private readonly IDriverApp _drivers = Substitute.For<IDriverApp>();
     private readonly IWorldSource _world = Substitute.For<IWorldSource>();
-    private readonly FakeTimeProvider _time = new(TestData.Now);
+    private readonly TimerCountingTimeProvider _time = new(TestData.Now);
     private readonly List<LogEntry> _lines = [];
 
     public ExecuteRunHandlerTests()
@@ -185,6 +185,8 @@ public sealed class ExecuteRunHandlerTests
         SentCount().Should().Be(1, "the second booking is due two minutes in");
         for (var expected = 2; expected <= 4; expected++)
         {
+            // The handler works out how long to wait and then starts its timer; time moved in between would leave the timer a whole wait too far ahead.
+            await WaitUntilAsync(() => _time.TimersCreated >= expected - 1);
             _time.Advance(TimeSpan.FromMinutes(2));
             await WaitUntilAsync(() => SentCount() == expected);
         }
@@ -233,6 +235,22 @@ public sealed class ExecuteRunHandlerTests
             }
 
             await Task.Yield();
+        }
+    }
+
+    /// <summary>A fake clock that counts the timers made on it, so a test can wait until the code under test is waiting before it moves time.</summary>
+    private sealed class TimerCountingTimeProvider(DateTimeOffset start) : FakeTimeProvider(start)
+    {
+        private int _timersCreated;
+
+        public int TimersCreated => Volatile.Read(ref _timersCreated);
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            // Counted once the timer is set, as time moved before that would leave it a whole wait too far ahead.
+            var timer = base.CreateTimer(callback, state, dueTime, period);
+            Interlocked.Increment(ref _timersCreated);
+            return timer;
         }
     }
 

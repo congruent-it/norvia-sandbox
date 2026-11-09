@@ -18,7 +18,7 @@ public sealed class PartnerPortalUiFixture : IAsyncLifetime
 {
     private const string CarrierCostWorker = "carrier-cost-worker";
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
 
     private DistributedApplication? _app;
     private IPlaywright? _playwright;

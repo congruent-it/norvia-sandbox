@@ -41,9 +41,9 @@ public sealed class FinanceMcpServerTests
             $"param rateLimitCalls = {RateLimitOfTheModuleCall()}",
             "param tenantId = 'tenant-1'");
 
-    // A parameters file takes Bicep, not JSON: single-quoted strings and one property to a line.
+    // A parameters file takes Bicep, not JSON: single-quoted strings, one property to a line and one array element to a line.
     private static string BicepArray(JsonArray tools) =>
-        "[" + string.Join(' ', tools.Select(tool => "{\n" + string.Join('\n', tool!.AsObject().Select(property => $"  {property.Key}: '{property.Value!.GetValue<string>().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal)}'")) + "\n}")) + "]";
+        "[\n" + string.Join('\n', tools.Select(tool => "{\n" + string.Join('\n', tool!.AsObject().Select(property => $"  {property.Key}: '{property.Value!.GetValue<string>().Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal)}'")) + "\n}")) + "]";
 
     private static XElement Inbound() =>
         XElement.Parse(ServerResources().Single(resource => resource["type"]!.GetValue<string>() == "Microsoft.ApiManagement/service/apis/policies")["properties"]!["value"]!.GetValue<string>())

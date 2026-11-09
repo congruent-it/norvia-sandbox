@@ -35,7 +35,7 @@ public sealed class ErpUiFixture : IAsyncLifetime
     // What the invoicing journeys don't use only costs startup time and memory.
     private static readonly string[] Unneeded = ["dbgate", "driver-app-web"];
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(60);
 
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));

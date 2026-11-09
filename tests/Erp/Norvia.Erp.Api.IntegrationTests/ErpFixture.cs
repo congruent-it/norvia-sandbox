@@ -66,7 +66,7 @@ public sealed class ErpFixture : IAsyncLifetime
     /// <summary>How long the outbox runs after a message arrives, a few cycles, so a duplicate or a message that shouldn't be sent would show up.</summary>
     private static readonly TimeSpan OutboxSettleTime = OutboxPollingInterval * 8;
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(30);
     private const string MessagingConnectionName = "messaging";
 

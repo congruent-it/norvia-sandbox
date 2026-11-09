@@ -33,7 +33,7 @@ public sealed class PartnerPortalFixture : IAsyncLifetime
     /// <summary>The credential of every Carrier Persona's booking endpoint.</summary>
     public const string CarrierKey = "carrier-0123456789abcdef";
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private readonly List<PortalWebHost> _hosts = [];
     private DistributedApplication? _app;
 

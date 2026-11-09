@@ -127,6 +127,8 @@ public sealed class SubmittedInvoicesTests : PortalWebContext
         var page = RenderPage();
 
         Time.Advance(SubmittedInvoices.RefreshInterval);
+        // Ticks that come while a refresh is still running are one tick, so the next one waits for the failed read.
+        page.WaitForAssertion(() => Portal.Received(2).ListCarrierInvoicesAsync(Carrier, Arg.Any<CancellationToken>()));
         page.FindAll("article").Should().ContainSingle();
         Time.Advance(SubmittedInvoices.RefreshInterval);
 

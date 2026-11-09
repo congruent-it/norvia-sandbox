@@ -125,13 +125,23 @@ public sealed partial class HostileProfileTests(SimulatorFixture fixture)
     public async Task ADeliveryFailedRemarkFromAHostileCarrier_ReachesTheTms_OnTheTimelineAsAnOrdinaryRemark()
     {
         await using var simulator = await PricedSimulatorAsync();
-        var settings = Runs.Carried(orders: 16, Runs.NextSeed(), Exceptions) with { HostileCarrierIds = [HostileCarrier] };
 
-        var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);
+        // Which Carrier the Planner gives the Shipments that fail a delivery is up to the seed, and about one run in five gives the chosen Carrier none. Such a
+        // run has nothing to check, so it is run again with another seed.
+        Guid runId;
+        List<LogLine> failed;
+        var attempt = 0;
+        do
+        {
+            var settings = Runs.Carried(orders: 16, Runs.NextSeed(), Exceptions) with { HostileCarrierIds = [HostileCarrier] };
+            var (_, run, log) = await simulator.RunToEndAsync(settings, Ct);
+            runId = run.Id;
+            failed = [.. log.Where(line => line.Outcome == LogOutcome.TrackingSent
+                && (line.Detail ?? string.Empty).Contains("(DeliveryFailed)", StringComparison.Ordinal) && HostileReference().IsMatch(line.Detail!))];
+        }
+        while (failed.Count == 0 && ++attempt < 10);
 
-        var plan = await PlanOfAsync(simulator, run.Id);
-        var failed = log.Where(line => line.Outcome == LogOutcome.TrackingSent
-            && (line.Detail ?? string.Empty).Contains("(DeliveryFailed)", StringComparison.Ordinal) && HostileReference().IsMatch(line.Detail!)).ToList();
+        var plan = await PlanOfAsync(simulator, runId);
         failed.Should().NotBeEmpty("the Exceptions are dealt in turn and the chosen Carrier is one of those that fail a delivery");
         foreach (var line in failed)
         {

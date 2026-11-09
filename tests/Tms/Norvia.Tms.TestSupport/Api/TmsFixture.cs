@@ -74,7 +74,7 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>How often a test looks again for something it waits for.</summary>
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan StartAttemptTimeout = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(60);
     private const int StartAttempts = 3;

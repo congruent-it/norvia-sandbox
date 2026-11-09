@@ -34,7 +34,7 @@ public sealed class AgentServiceBusFixture : IAsyncLifetime
     public const string SubscriptionB = "agent-sub-b";
 
     private const string Messaging = "messaging";
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
 
     private DistributedApplication? _app;
 

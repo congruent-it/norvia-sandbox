@@ -298,7 +298,7 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
 
     private async Task ChooseAsync(string filter, string option)
     {
-        await Page.GetByRole(AriaRole.Search, new() { Name = "Filter Transport Orders" }).GetByRole(AriaRole.Combobox, new() { Name = filter }).ClickAsync();
+        await Page.GetByRole(AriaRole.Search, new() { Name = "Filter Transport Orders" }).GetByRole(AriaRole.Combobox, new() { Name = filter, Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Option, new() { Name = option, Exact = true }).ClickAsync();
     }
 
