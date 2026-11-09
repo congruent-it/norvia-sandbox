@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Intake agent's extraction and schema validation (ADR 0040), a library as IntakeMap is, so the same code runs in LocalPartnerApi and
+    in an Azure host. It references the Agents' library and no Azure SDK: the Foundry client belongs to a host's Infrastructure.
+  -->
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+    <ProjectReference Include="..\..\Norvia.Agents\Norvia.Agents.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\agents\booking-intake.agent.yaml" LogicalName="agents/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\booking.v1.schema.json" LogicalName="contracts/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\partner-api\booking-draft.v1.schema.json" LogicalName="contracts/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Integration.BookingDraft.UnitTests" />
+  </ItemGroup>
+</Project>

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Options;
+using Norvia.Agents.Scripts;
+using Norvia.Integration.BookingDraft;
 using Norvia.Integration.LocalPartnerApi;
 
 // Locally there is no API Management and no intake or Carrier-answer Logic App, so this plays them for the Partner portal (ADR 0023).
@@ -25,7 +27,13 @@ builder.Services.AddOptions<CarrierInvoiceOptions>().BindConfiguration(CarrierIn
     .Validate(options => options.Tokens.IsComplete, "CarrierInvoice:Tokens needs an Issuer, an Audience and a SigningKey.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.Tokens.ClientId), "CarrierInvoice:Tokens:ClientId must name API Management's client.")
     .ValidateOnStart();
+builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<DraftRateLimit>();
+// Locally the Intake agent runs in process with the scripted fake model (ADR 0041); an Azure host gives the extractor its Foundry client instead.
+builder.Services.AddSingleton(services => new BookingDraftExtractor(
+    BookingIntakeScript.Model(),
+    TimeSpan.FromSeconds(services.GetRequiredService<IOptions<AgentsOptions>>().Value.TimeoutSeconds)));
 builder.Services.AddSingleton<PartnerEdge>();
 builder.Services.AddSingleton<TrackingRateLimit>();
 builder.Services.AddSingleton<ShipperTrackingMap>();
@@ -62,6 +70,7 @@ var app = builder.Build();
 
 app.MapDefaultEndpoints();
 app.MapSubmitTransportOrder();
+app.MapCreateBookingDraft();
 app.MapAnswerCarrierBooking();
 app.MapSubmitCarrierInvoice();
 app.MapSubmitCarrierTracking();

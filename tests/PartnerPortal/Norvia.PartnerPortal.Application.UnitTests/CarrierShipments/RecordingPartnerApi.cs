@@ -1,4 +1,5 @@
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.Bookings.DraftFromText;
 using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
@@ -28,6 +29,8 @@ internal sealed class RecordingPartnerApi : INorviaPartnerApi
         ProofsOfDelivery.Add((persona, shipmentNumber, proof));
         return Task.FromResult(Reply);
     }
+
+    public Task<BookingDraftAnswer> DraftBookingFromTextAsync(Persona persona, string text, CancellationToken cancellationToken) => throw new NotSupportedException();
 
     public Task<NorviaAnswer> SubmitAsync(Persona persona, BookingRequest booking, CancellationToken cancellationToken) => throw new NotSupportedException();
 

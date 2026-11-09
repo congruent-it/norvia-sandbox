@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.Bookings.DraftFromText;
 using Norvia.PartnerPortal.Application.CarrierBookings;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierBookings.AnswerSettings;
@@ -29,6 +30,12 @@ public interface IPartnerPortal
 
     /// <summary>A new booking for the Persona, filled in from its address book; null when there is no such Persona.</summary>
     Task<BookingRequest?> DraftBookingAsync(PersonaId personaId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Asks Norvia's Intake agent for a Booking draft from the text the Persona pasted; null when there is no such Persona. A refusal or
+    /// failure is an answer: <see cref="BookingDraftOutcome.Unavailable"/>. The text is not kept.
+    /// </summary>
+    Task<BookingDraftAnswer?> DraftBookingFromTextAsync(PersonaId personaId, string text, CancellationToken cancellationToken);
 
     /// <summary>Sends the booking to Norvia as the Persona and returns Norvia's answer; null when there is no such Persona.</summary>
     Task<BookingView?> SubmitBookingAsync(PersonaId personaId, BookingRequest booking, CancellationToken cancellationToken);

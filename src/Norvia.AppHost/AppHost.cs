@@ -872,6 +872,8 @@ else
             partnerApi.WithEnvironment($"PartnerApi__ShippersByClientId__{LocalTokens.PersonaClientId(persona.Id)}", persona.PartyId);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.SubmitRole);
             partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__1", LocalTokens.TrackingReadRole);
+            // The Shipper Personas may use the Intake agent's Booking drafts; the stand-in refuses them unless Agents:Enabled is on.
+            partnerPortal.WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__2", LocalTokens.DraftRole);
             // The Simulator books as the Shipper Personas, with the submit role and the same subscription key.
             simulator.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", subscriptionKey)
                 .WithEnvironment($"PartnerApi__LocalTokens__Roles__{persona.Id}__0", LocalTokens.SubmitRole);
@@ -1031,6 +1033,8 @@ else
             .WithEnvironment("Agents__Tokens__Role", LocalTokens.AgentReadRole)
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__Api__Audience", LocalTokens.ConsoleAgentApiAudience);
+        // The Intake agent's Booking drafts: the Partner API stand-in runs it in process with the scripted fake. It has no tools, so it needs no token.
+        partnerApi.WithEnvironment("Agents__Enabled", "true");
         // The Simulator's plans get their pools of Carrier texts from the personas agent, which has no tools: it needs no stand-in and no token.
         simulator.WithEnvironment("Agents__Enabled", "true");
         // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).

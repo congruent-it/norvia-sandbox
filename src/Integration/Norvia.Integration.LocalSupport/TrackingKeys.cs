@@ -66,6 +66,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Shipper's tracking query, from the edge to the TMS's answer.</summary>
     public const string ShipperTracking = "shipper-tracking";
 
+    /// <summary>The <see cref="Flow"/> of a Shipper's Booking draft request, from the edge to the Intake agent's answer.</summary>
+    public const string BookingDraft = "booking-draft";
+
     /// <summary>The <see cref="Outcome"/>s the stand-ins record.</summary>
     public const string Succeeded = "Succeeded";
     public const string Refused = "Refused";

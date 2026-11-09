@@ -21,6 +21,15 @@ internal sealed record EdgeRule(
         "No Shipper is registered for this client.",
         "NoShipperForClient");
 
+    /// <summary>The Intake agent's Booking draft, for a Shipper. Its API Management policy comes with the Azure slice.</summary>
+    public static EdgeRule DraftBooking { get; } = new(
+        "TransportOrders.Draft",
+        "This client may not draft bookings from text.",
+        "NotAllowedToDraft",
+        options => options.ShippersByClientId,
+        "No Shipper is registered for this client.",
+        "NoShipperForClient");
+
     /// <summary>infra/estate/partner-api/answer-carrier-booking.policy.xml</summary>
     public static EdgeRule AnswerCarrierBooking { get; } = new(
         "CarrierBookings.Respond",

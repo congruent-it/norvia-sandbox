@@ -169,6 +169,16 @@ Designed in this document and not built yet:
 | Alerts on P1 | None built: failed requests on the Partner API and failed runs of the intake Logic App are planned only ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
 | The Integration console's failed runs and dead-letter panels for P1 | Planned, slice 2. Finding the Hops and opening the run are built |
 
+## Booking draft from pasted text
+
+The Intake agent ([ADR 0040](../../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md), #458) is a way to a Booking, not a channel: a Shipper Persona pastes an email into the Partner portal's **Fill from an email** screen and gets a **Booking draft** that prefills the booking form, with the missing or ambiguous fields flagged. The Shipper reviews it and submits it through the path above with the Persona's token, so the Intake channel stays "Shipper API". The draft is not part of the booking: no link back, and it is stored nowhere.
+
+- **Operation:** `POST /partner/v1/booking-drafts`, contract in [contracts/partner-api](../../../contracts/partner-api/README.md#booking-draft). Checks in the order of the other operations (key, token, `TransportOrders.Draft`, a Shipper for the `azp`, rate limit), then the guards: `Agents:Enabled` (off by default), `Agents:MaxInputCharacters`, no retry, and a stricter rate limit (`Agents:DraftsPerMinute`).
+- **Agent:** `booking-intake` ([agents/booking-intake.agent.yaml](../../../agents/booking-intake.agent.yaml)): no tools, structured output against the draft schema. The text is data, never instructions. It never invents a Shipper reference, a date, a weight or a quantity, and makes no Lane check (Rating decides after acceptance). Text describing more than one booking is refused with `MultipleBookingsInText`. The code is `Norvia.Integration.BookingDraft`, a library as `IntakeMap` is.
+- **Output check:** the reply is validated against the draft schema, and a value whose quote is not in the text is dropped and flagged. A reply that does not match is `AgentUnavailable`: the portal says "Assistant unavailable" and the form is filled in by hand.
+- **Personal data:** the email holds Consignee personal data by nature. Request and response bodies are not logged, traces carry keys (`flow` `booking-draft`, `partyId`, `correlationId`, `outcome`, `failureCode`) and never the text, and the samples are synthetic.
+- **Locally** the stand-in runs the agent in process with the scripted fake (`BookingIntakeScript`), which replays a draft for three synthetic emails (`BookingIntakeSamples`): a good English one, a partial Dutch one and one with two bookings. Any other text gets an empty draft that flags everything. Turn it on with `Agents:Enabled` (AppHost user secrets). The Azure host, the Foundry client and the API Management policy are the Azure slice.
+
 ## Deferred
 
 These were left out on purpose while designing P1, each with its reason.

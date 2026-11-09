@@ -30,6 +30,8 @@ builder.Services.AddMediator(options =>
     options.Assemblies = [typeof(SubmitBookingCommand), typeof(Booking)];
 });
 builder.Services.AddSingleton<IPartnerPortal, PartnerPortalRequests>();
+// Carries a Booking draft from "Fill from an email" to the booking form within the circuit. It is never stored.
+builder.Services.AddScoped<BookingDraftHandoff>();
 // Carrier Personas that answer automatically do so through this worker, which the Carrier booking endpoint wakes.
 builder.Services.AddSingleton<AutoAnswerWorker>();
 builder.Services.AddSingleton<IAutoAnswerSignal>(services => services.GetRequiredService<AutoAnswerWorker>());

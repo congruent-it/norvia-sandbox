@@ -32,6 +32,12 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
 
     public LocalPartnerApiFactory() => ProofOfDeliveryQueue = new(InboundProofsOfDelivery);
 
+    /// <summary>Whether the Intake agent is switched on (<c>Agents:Enabled</c>); set before the first client is made.</summary>
+    public bool AgentsEnabled { get; set; }
+
+    /// <summary>The Booking draft operation's rate limit (<c>Agents:DraftsPerMinute</c>); set before the first client is made.</summary>
+    public int DraftsPerMinute { get; set; } = 10;
+
     public byte[] SigningKey { get; } = RandomNumberGenerator.GetBytes(64);
 
     public StubTms Tms { get; } = new();
@@ -70,6 +76,8 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
             ["Tms:Tokens:SigningKey"] = signingKey,
             ["Tms:AnswerClientId"] = AnswerClientId,
             ["Tms:ShipperTrackingClientId"] = ApiManagementClientId,
+            ["Agents:Enabled"] = AgentsEnabled.ToString(),
+            ["Agents:DraftsPerMinute"] = DraftsPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["CarrierInvoice:BaseAddress"] = "http://carrier-invoice-worker",
             ["CarrierInvoice:Tokens:Issuer"] = Issuer,
             ["CarrierInvoice:Tokens:Audience"] = CarrierInvoiceTriggerAudience,

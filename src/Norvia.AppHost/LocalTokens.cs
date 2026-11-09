@@ -117,6 +117,9 @@ public static class LocalTokens
     /// <summary>The app role a Shipper Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>
     public const string SubmitRole = "TransportOrders.Submit";
 
+    /// <summary>The app role a Shipper Persona holds on the Norvia Partner API to ask the Intake agent for a Booking draft.</summary>
+    public const string DraftRole = "TransportOrders.Draft";
+
     /// <summary>The app role a Carrier Persona holds on the Norvia Partner API, as the estate grants it in Entra.</summary>
     public const string RespondRole = "CarrierBookings.Respond";
 

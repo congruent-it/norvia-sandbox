@@ -32,6 +32,10 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
     public Task<TextsRunResult> RunTextsAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken) =>
         GuardedAsync(definition, question, transcript => new TextsRunResult(question.RunId, TextsParser.Parse(transcript.Reply)), cancellationToken);
 
+    /// <summary>Runs the loop of an Agent without tools to its final reply as it came, for a caller that reads and checks the reply itself.</summary>
+    public Task<ReplyRunResult> RunReplyAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken) =>
+        GuardedAsync(definition, question, transcript => new ReplyRunResult(question.RunId, JsonReplies.WithoutFence(transcript.Reply)), cancellationToken);
+
     private async Task<T> GuardedAsync<T>(Definitions.AgentDefinition definition, AgentQuestion question, Func<Transcript, T> finish, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(definition);

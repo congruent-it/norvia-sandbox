@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.Bookings;
+using Norvia.PartnerPortal.Application.Bookings.DraftFromText;
 using Norvia.PartnerPortal.Application.CarrierBookings.Answer;
 using Norvia.PartnerPortal.Application.CarrierInvoices;
 using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
@@ -63,6 +64,47 @@ internal sealed partial class NorviaPartnerApiClient(
         using (logger.BeginScope(TrackingKeysOf(persona, answer)))
         {
             LogAnswered(persona.Id.Value, answer.Result);
+        }
+
+        return answer;
+    }
+
+    public async Task<BookingDraftAnswer> DraftBookingFromTextAsync(Persona persona, string text, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+        ArgumentNullException.ThrowIfNull(text);
+
+        using var span = activities.Source.StartActivity("Draft booking from text", ActivityKind.Internal);
+        BookingDraftAnswer answer;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("booking-drafts", UriKind.Relative))
+            {
+                Content = JsonContent.Create(new { text }),
+            };
+            request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            answer = PartnerBookingDraftFormat.Read((int)response.StatusCode, body, CorrelationIdOf(response));
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, or no token to call with. Only the exception's type is logged: never the text.
+            LogDraftNotAsked(persona.Id.Value, exception.GetType().Name);
+            answer = BookingDraftAnswer.Refused(BookingDraftOutcome.Unavailable, messageId: null);
+        }
+
+        var draftKeys = new Dictionary<string, object?> { ["flow"] = "booking-draft", ["partyId"] = persona.PartyId, ["outcome"] = answer.Outcome == BookingDraftOutcome.Drafted ? "Succeeded" : "Refused" };
+        if (answer.MessageId is { } draftCorrelationId)
+        {
+            draftKeys["correlationId"] = draftCorrelationId;
+        }
+
+        using (logger.BeginScope(draftKeys))
+        {
+            LogDraftAnswered(persona.Id.Value, answer.Outcome);
         }
 
         return answer;
@@ -407,6 +449,12 @@ internal sealed partial class NorviaPartnerApiClient(
 
     private static string? CorrelationIdOf(HttpResponseMessage response) =>
         response.Headers.TryGetValues("X-Correlation-ID", out var values) ? values.FirstOrDefault() : null;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "A draft request by Persona {PersonaId} failed before Norvia answered ({ExceptionType})")]
+    private partial void LogDraftNotAsked(string personaId, string exceptionType);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Norvia answered a draft request by Persona {PersonaId}: {Outcome}")]
+    private partial void LogDraftAnswered(string personaId, BookingDraftOutcome outcome);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "A booking by Persona {PersonaId} didn't reach the Norvia Partner API")]
     private partial void LogNotSent(Exception exception, string personaId);

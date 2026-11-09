@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Mediator;
 using Norvia.PartnerPortal.Application.Bookings;
 using Norvia.PartnerPortal.Application.Bookings.Draft;
+using Norvia.PartnerPortal.Application.Bookings.DraftFromText;
 using Norvia.PartnerPortal.Application.Bookings.List;
 using Norvia.PartnerPortal.Application.Bookings.Submit;
 using Norvia.PartnerPortal.Application.CarrierBookings;
@@ -59,6 +60,9 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
 
     public async Task<BookingRequest?> DraftBookingAsync(PersonaId personaId, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new DraftBookingQuery(personaId), cancellationToken));
+
+    public async Task<BookingDraftAnswer?> DraftBookingFromTextAsync(PersonaId personaId, string text, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new DraftBookingFromTextQuery(personaId, text), cancellationToken));
 
     public async Task<BookingView?> SubmitBookingAsync(PersonaId personaId, BookingRequest booking, CancellationToken cancellationToken)
     {

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/partner-api/booking-draft.v1.schema.json",
+  "title": "Booking draft",
+  "description": "A Booking the Intake agent filled in from a Shipper's pasted text (version 1). It is not a Booking until the Shipper reviews and submits it. A value the text does not give is left out of the booking and listed as missing; every value that is there has the quote it came from.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["booking", "quotes", "missing"],
+  "properties": {
+    "booking": {
+      "description": "The booking's fields as the booking schema has them. Every field is optional.",
+      "$ref": "https://norvia.example/partner-api/booking.v1.schema.json"
+    },
+    "quotes": {
+      "description": "For each field that is filled in, the words of the text it came from, verbatim. The key is the field's name, or items.<index>.<name> for a field of an item.",
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "missing": {
+      "description": "The fields the text does not give or gives ambiguously, each with the reason. The key is named as in quotes.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "reason"],
+        "properties": {
+          "field": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 300 }
+        }
+      }
+    }
+  }
+}
