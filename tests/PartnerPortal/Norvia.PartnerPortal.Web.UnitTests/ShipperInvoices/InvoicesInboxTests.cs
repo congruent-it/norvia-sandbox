@@ -99,6 +99,8 @@ public sealed class InvoicesInboxTests : PortalWebContext
         var page = RenderPage();
 
         Time.Advance(InvoicesInbox.RefreshInterval);
+        // Ticks that come while a refresh is still running are one tick, so the next one waits for the failed read.
+        page.WaitForAssertion(() => Portal.Received(2).ListShipperInvoicesAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()));
         page.FindAll("article").Should().ContainSingle();
         Time.Advance(InvoicesInbox.RefreshInterval);
 

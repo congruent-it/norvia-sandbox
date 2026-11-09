@@ -139,6 +139,8 @@ public sealed class BookingRequestsTests : PortalWebContext
         var page = RenderPage();
 
         Time.Advance(BookingRequests.RefreshInterval);
+        // Ticks that come while a refresh is still running are one tick, so the next one waits for the failed read.
+        page.WaitForAssertion(() => Portal.Received(2).ListCarrierBookingRequestsAsync(new PersonaId("van-dijk-transport"), Arg.Any<CancellationToken>()));
         page.FindAll("tbody tr").Should().ContainSingle();
         page.FindAll("[role=alert]").Should().BeEmpty();
 

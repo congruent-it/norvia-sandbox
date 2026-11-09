@@ -82,6 +82,8 @@ public sealed class NotificationInboxTests : PortalWebContext
         var page = RenderPage();
 
         Time.Advance(NotificationInbox.RefreshInterval);
+        // Ticks that come while a refresh is still running are one tick, so the next one waits for the failed read.
+        page.WaitForAssertion(() => Portal.Received(2).ListShipperNotificationsAsync(new PersonaId("brouwer-dranken"), Arg.Any<CancellationToken>()));
         page.FindAll("tbody tr").Should().ContainSingle();
         Time.Advance(NotificationInbox.RefreshInterval);
 

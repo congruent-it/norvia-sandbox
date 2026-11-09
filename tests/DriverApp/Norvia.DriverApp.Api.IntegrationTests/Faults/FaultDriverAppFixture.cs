@@ -19,6 +19,10 @@ public sealed class FaultDriverAppFixture : DriverAppFixture
         // Aspire sets the formatter under this exact name, and environment names are case-sensitive on Linux.
         ["LOGGING__CONSOLE__FORMATTERNAME"] = "json",
         ["Logging__Console__FormatterOptions__IncludeScopes"] = "true",
+
+        // A test run has no dashboard to take the Driver app's telemetry, and a Driver app that stops keeps trying to flush it there for longer than a restart waits.
+        // The tests read its console logs instead.
+        ["OTEL_EXPORTER_OTLP_ENDPOINT"] = "",
     };
 
     /// <summary>Restarts the Driver app's API, as a deployment does. Its database is kept; its faults, which live in its process, are not.</summary>
