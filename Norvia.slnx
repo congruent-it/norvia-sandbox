@@ -88,6 +88,7 @@
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/Norvia.Integration.BookingDraft.IntegrationTests/Norvia.Integration.BookingDraft.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.CarrierBooking.UnitTests/Norvia.Integration.CarrierBooking.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.CarrierInvoice.IntegrationTests/Norvia.Integration.CarrierInvoice.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalBookingWorker.UnitTests/Norvia.Integration.LocalBookingWorker.UnitTests.csproj" />
