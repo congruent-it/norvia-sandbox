@@ -1,0 +1,130 @@
+@page "/personas/{PersonaId}/bookings/from-email"
+@*
+    Interactive and not prerendered, like the booking form: what is typed in a prerendered form is lost. The pasted text holds a Consignee's
+    personal data by nature, so this page never logs or keeps it: it goes to Norvia's Intake agent and the draft goes to the booking form.
+*@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Norvia.PartnerPortal.Application.Bookings.DraftFromText
+@inject IPartnerPortal Portal
+@inject BookingDraftHandoff Handoff
+@inject NavigationManager Navigation
+@inject ILogger<FillFromEmail> Logger
+
+<PageTitle>Partner portal · @(_persona?.DisplayName ?? PersonaId) · Fill from an email</PageTitle>
+
+<h1>Fill from an email</h1>
+
+@if (_loadFailed)
+{
+    <div role="alert">
+        <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+            The page couldn't be loaded. Reload the page to try again.
+        </FluentMessageBar>
+    </div>
+}
+else if (_persona is null)
+{
+    <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+        <FluentProgressRing />
+        <span>Loading…</span>
+    </FluentStack>
+}
+else
+{
+    <p class="mb-8 max-w-3xl">
+        As <strong>@_persona.DisplayName</strong>, paste the email that asks for a transport, in English or Dutch. Norvia's assistant fills in a
+        booking from it and flags what the email does not give. You review the booking and send it yourself; nothing is booked until you do.
+        Paste one booking at a time.
+    </p>
+
+    <fieldset class="lux-fieldset">
+        <legend>Email</legend>
+        <div class="max-w-3xl">
+            <FluentTextArea Label="The email's text" @bind-Value="_text" Rows="12" MaxLength="@MaxLength" Style="width: 100%;" />
+        </div>
+    </fieldset>
+
+    @if (_message is not null)
+    {
+        <div role="alert" class="mb-6">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@_message</FluentMessageBar>
+        </div>
+    }
+
+    <div class="flex flex-wrap items-center gap-4">
+        <FluentButton Appearance="Appearance.Accent" Disabled="_asking || string.IsNullOrWhiteSpace(_text)" OnClick="AskAsync">Fill the booking</FluentButton>
+        <FluentAnchor Href="@PersonaChoice.NewBookingPath(PersonaId)" Appearance="Appearance.Outline">Fill in the form myself</FluentAnchor>
+        @if (_asking)
+        {
+            <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status" Width="auto">
+                <FluentProgressRing />
+                <span>Reading the email…</span>
+            </FluentStack>
+        }
+    </div>
+}
+
+@code {
+    private const int MaxLength = 8000;
+
+    private PersonaView? _persona;
+    private string? _text;
+    private string? _message;
+    private bool _loadFailed;
+    private bool _asking;
+
+    [Parameter]
+    public string PersonaId { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _persona = PersonaChoice.Find(PersonaId, await Portal.ListPersonasAsync(CancellationToken.None));
+            if (_persona is null)
+            {
+                Navigation.NotFound();
+            }
+        }
+        catch (Exception exception)
+        {
+            PageLog.LoadFailed(Logger, exception, PersonaId);
+            _loadFailed = true;
+        }
+    }
+
+    private async Task AskAsync()
+    {
+        _asking = true;
+        _message = null;
+        try
+        {
+            var answer = await Portal.DraftBookingFromTextAsync(new PersonaId(PersonaId), _text!, CancellationToken.None);
+            switch (answer?.Outcome)
+            {
+                case BookingDraftOutcome.Drafted:
+                    Handoff.Put(answer);
+                    Navigation.NavigateTo(PersonaChoice.NewBookingPath(PersonaId));
+                    break;
+                case BookingDraftOutcome.MultipleBookings:
+                    _message = "The text describes more than one booking. Paste one at a time.";
+                    break;
+                case BookingDraftOutcome.TooLarge:
+                    _message = "The text is too long. Paste only the part that describes the booking.";
+                    break;
+                default:
+                    _message = "Assistant unavailable. Fill in the booking form yourself.";
+                    break;
+            }
+        }
+        catch (Exception exception)
+        {
+            PageLog.DraftFromTextFailed(Logger, exception, PersonaId);
+            _message = "Assistant unavailable. Fill in the booking form yourself.";
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+}

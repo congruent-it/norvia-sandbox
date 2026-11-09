@@ -101,6 +101,7 @@ API Management validates the Persona's token for each operation, takes the Shipp
 | Role | Held by | Guards (Norvia Partner API) | Process |
 |---|---|---|---|
 | `TransportOrders.Submit` | Shipper Personas | Book a Transport Order | [P1](../processes/tms/p1-transport-order-intake.md) |
+| `TransportOrders.Draft` | Shipper Personas | Ask the Intake agent for a Booking draft from pasted text. Built in the local Partner API stand-in; the Azure slice adds the app role and the API Management policy | [P1](../processes/tms/p1-transport-order-intake.md#booking-draft-from-pasted-text) |
 | `Tracking.Read` | Shipper Personas | Read a Shipper's Transport Orders with their Tracking status, and Proof of delivery files | [P8](../processes/tms/p8-shipper-visibility.md) |
 | `CarrierBookings.Respond` | Carrier Personas | Confirm or reject a Carrier booking | [P4](../processes/tms/p4-carrier-booking.md) |
 | `Tracking.Submit` | Carrier Personas | Report a Tracking event | [P5](../processes/tms/p5-shipment-tracking.md) |
@@ -111,8 +112,8 @@ The Personas come from [norvia.seed.json](../../seed/norvia.seed.json); each is 
 
 | Persona | Party | Roles |
 |---|---|---|
-| Brouwer Dranken | Shipper SHP-0001 | `TransportOrders.Submit`, `Tracking.Read` |
-| Tuincentrum Groenrijk | Shipper SHP-0003 | `TransportOrders.Submit`, `Tracking.Read` |
+| Brouwer Dranken | Shipper SHP-0001 | `TransportOrders.Submit`, `Tracking.Read` (and, locally, `TransportOrders.Draft`) |
+| Tuincentrum Groenrijk | Shipper SHP-0003 | `TransportOrders.Submit`, `Tracking.Read` (and, locally, `TransportOrders.Draft`) |
 | Van Dijk Transport | Carrier CAR-0001 | `CarrierBookings.Respond`, `Tracking.Submit`, `ProofsOfDelivery.Submit` |
 | Kessler Spedition | Carrier CAR-0002 | as Van Dijk Transport |
 | PakketPunt Express | Carrier CAR-0003 | as Van Dijk Transport |
@@ -233,10 +234,10 @@ Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management
 | Planner notification agent | Two tools, the notification template and the Shipper view | A role of its own, only for those tools |
 | Carrier invoice matching agent | The ERP API's agent view for Finance (`/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}`, the tool `get_invoice_line`; and `/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}`, the tool `get_invoice_summary`, which counts a Carrier invoice's lines by result and names none): a Carrier invoice line's result, amounts, difference, tolerance, the Carrier cost's source as a label (never the Planner's remark of a Spot price), the earlier line of a Duplicate and the ranked likely candidates of an Unknown booking; no Shipper or Consignee personal data and no file contents. Built locally and in Azure (below) | `CarrierInvoices.FinanceAgent.Read`, held by the agent's identity only, never by the ERP UI's Finance users, the Simulator's `CarrierInvoices.Manage` identity or a person |
 | Carrier invoice rejection reason agent | One tool, `get_carrier_visible_line_facts`: what the Carrier can see of its own Carrier invoice line (the ERP API's `/v1/agent/finance-rejection-reason/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}/carrier-visible-facts`: the Carrier's own invoice number, line and reference, the invoiced amount, the agreed Carrier cost, the likely correct reference only when it is one of that Carrier's own bookings, and for a Duplicate the Carrier's own earlier invoice number), never the Rate Card or its version, the source of a price, the Planner's remark, the Matching tolerance or another Carrier's data. Built locally and in Azure | `CarrierInvoices.FinanceRejectionReasonAgent.Read`, a role of its own that only this Agent's identity holds and that opens none of the Carrier invoice matching agent's tools |
-| Intake agent | Nothing: it has no tools | None |
+| Intake agent | Nothing: it has no tools, and its identity holds no roles. The Shipper Persona's `TransportOrders.Draft` guards the operation that runs it | None |
 | Simulator personas agent | Nothing: it has no tools | None |
 
-People get roles for the Agents' screens too: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check (locally the AppHost signs in a local operator holding both; in Azure they are app roles of `Norvia Estate health check (<env>)`, for users only, and the presenter holds both), and, planned, `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's booking drafts. Every runtime Fault switch needs `Demo.Fault`, on the application that owns the Fault.
+People get roles for the Agents' screens too: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check (locally the AppHost signs in a local operator holding both; in Azure they are app roles of `Norvia Estate health check (<env>)`, for users only, and the presenter holds both), and `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's Booking drafts (granted locally by the AppHost; the Azure app role is the Azure slice's). Every runtime Fault switch needs `Demo.Fault`, on the application that owns the Fault.
 
 ## The Logic App switch role
 

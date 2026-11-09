@@ -6,6 +6,9 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Loading the booking form for Persona {PersonaId} failed")]
     public static partial void LoadFailed(ILogger logger, Exception exception, string personaId);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Asking for a Booking draft for Persona {PersonaId} failed")]
+    public static partial void DraftFromTextFailed(ILogger logger, Exception exception, string personaId);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Sending or recording a booking by Persona {PersonaId} failed")]
     public static partial void SubmitFailed(ILogger logger, Exception exception, string personaId);
 

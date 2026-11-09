@@ -5,7 +5,9 @@
 *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Diagnostics
+@using Norvia.PartnerPortal.Application.Bookings.DraftFromText
 @inject IPartnerPortal Portal
+@inject BookingDraftHandoff Handoff
 @inject NavigationManager Navigation
 @inject ILogger<NewBooking> Logger
 
@@ -34,6 +36,25 @@ else
         As <strong>@_persona!.DisplayName</strong>, ask Norvia to move goods from A to B. Norvia answers straight away: with a
         Transport Order number, or with every reason it can't take the booking.
     </p>
+
+    <p class="mb-6">
+        <FluentAnchor Href="@PersonaChoice.FillFromEmailPath(PersonaId)" Appearance="Appearance.Lightweight">Fill from an email</FluentAnchor>
+    </p>
+
+    @if (_flags.Count > 0)
+    {
+        <div role="status" class="mb-6 max-w-3xl">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
+                The assistant filled in what the email gives. Check these before you send the booking:
+                <ul class="list-disc pl-6" data-testid="draft-flags">
+                    @foreach (var flag in _flags)
+                    {
+                        <li><strong>@DraftFieldLabels.Of(flag.Field)</strong>: @flag.Reason</li>
+                    }
+                </ul>
+            </FluentMessageBar>
+        </div>
+    }
 
     <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="booking">
         <BookingFormValidator />
@@ -130,6 +151,7 @@ else
     private bool _sending;
     private bool _submitFailed;
     private string? _traceId;
+    private IReadOnlyList<FlaggedField> _flags = [];
 
     [Parameter]
     public string PersonaId { get; set; } = string.Empty;
@@ -158,8 +180,19 @@ else
 
     private async Task StartNewAsync()
     {
-        var draft = await Portal.DraftBookingAsync(new PersonaId(PersonaId), CancellationToken.None);
-        _form = draft is null ? null : BookingForm.From(draft);
+        // A Booking draft from an email, once; otherwise the Persona's own address book. The draft is not part of the booking.
+        if (Handoff.Take() is { Booking: { } fromEmail } emailDraft)
+        {
+            _form = BookingForm.From(fromEmail);
+            _flags = emailDraft.Flags;
+        }
+        else
+        {
+            var draft = await Portal.DraftBookingAsync(new PersonaId(PersonaId), CancellationToken.None);
+            _form = draft is null ? null : BookingForm.From(draft);
+            _flags = [];
+        }
+
         _answer = null;
         _submitFailed = false;
     }

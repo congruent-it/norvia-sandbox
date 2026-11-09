@@ -5,6 +5,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | Schema | What it is |
 |---|---|
 | [booking.v1](booking.v1.schema.json) | A booking, as the Shipper sends it |
+| [booking-draft.v1](booking-draft.v1.schema.json) | A Booking draft the Intake agent fills in from a Shipper's pasted text (see [Booking draft](#booking-draft)) |
 | [booking-response.v1](booking-response.v1.schema.json) | Norvia's answer: Accepted, Already booked, Rejected or Not received |
 | [carrier-booking.v1](carrier-booking.v1.schema.json) | A booking request, as Norvia's P4 booking Logic App sends it to a Carrier's booking endpoint (the other direction: see [Carrier booking](#carrier-booking)) |
 | [carrier-answer.v1](carrier-answer.v1.schema.json) | A Carrier's confirmation or rejection of a booking request, as the Carrier sends it to the Norvia Partner API (see [Carrier answer](#carrier-answer)) |
@@ -325,3 +326,26 @@ The TMS's refusals (`TransportOrderNotFound`, `ProofOfDeliveryNotFound`, a bad q
 | `proofOfDelivery`: `receivedBy`, `condition` (`Clean`, `Reservations`), `files[]`: `id`, `name`, `contentType`, `sizeBytes` | `proofOfDelivery`: `receivedBy`, `condition` (`CLEAN`, `RESERVATIONS`), `files[]`: `fileId`, `name`, `contentType`, `sizeBytes` | Renames and translates; left out when there is none |
 
 Countries are ISO 3166-1 alpha-2 codes. The map knows the countries of Europe, each on its mainland's clocks (so the Azores and the Canary Islands are on their country's mainland clocks), and puts an unknown country on UTC. A value the Shipper format has no code for, such as an unknown Tracking status, gives an empty code that the schemas refuse. The templates read the body as API Management hands it over with `parse-date="false"`, and use Pascal case filter names because `set-body` runs Liquid in C# mode.
+
+## Booking draft
+
+`POST /partner/v1/booking-drafts` with `{"text": "..."}` answers a [booking-draft.v1](booking-draft.v1.schema.json) for the Shipper Persona's pasted text, usually an email in English or Dutch:
+
+- `booking`: the booking's fields as [booking.v1](booking.v1.schema.json) has them (the draft schema references it, so the two stay in step). Every field is optional, and a value the text does not give is left out.
+- `quotes`: for each filled field, the words of the text it came from. A value without a quote that is in the text is thrown away and listed as missing: the Intake agent cannot invent a Shipper reference, a date, a weight or a quantity.
+- `missing`: the fields the text does not give or gives ambiguously, each with a reason. A field of an item is named `items.<index>.<name>`.
+
+It is not a Booking: the Shipper reviews the draft in the booking form and submits it through the ordinary `POST /partner/v1/transport-orders`. The draft is stateless and stored nowhere.
+
+The checks are those of the other operations, in the same order: the subscription key (401), a token for the Norvia Partner API (401), the role `TransportOrders.Draft` (403), a Shipper for the token's `azp` (403), then the rate limit (429, stricter than a booking's). Then:
+
+| Status | `failureCode` | When |
+|---|---|---|
+| 200 | | A draft |
+| 400 | `TextRequired` | No text |
+| 413 | `InputTooLarge` | More than `Agents:MaxInputCharacters` characters (8000) |
+| 422 | `MultipleBookingsInText` | The text describes more than one booking: paste one at a time |
+| 503 | `AgentsDisabled` | `Agents:Enabled` is off (the default) |
+| 503 | `AgentUnavailable` | The model failed, was too slow, or its reply did not match the draft schema |
+
+The request and the response bodies are never logged, the traces carry keys and never the text, and the sample inputs are synthetic.

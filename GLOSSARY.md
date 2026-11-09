@@ -68,6 +68,10 @@ _Avoid_: order, booking, job
 What a Shipper sends Norvia through the Norvia Partner API to ask for a transport, in the partner format. Norvia takes it in as a Transport Order, or keeps it as a Rejected booking. The Partner portal keeps every booking a Persona sent, with Norvia's answer, as the outside party's own records.
 _Avoid_: order, Transport Order (that is Norvia's, once accepted), Carrier booking (that is Norvia's request to a Carrier)
 
+**Booking draft**:
+A Booking the Intake agent filled in from a Shipper's pasted text, with the quote each value came from and the fields that are missing or ambiguous. It is not a Booking until the Shipper reviews it and submits it through the existing path. It is stateless and stored nowhere, and a Booking holds no link back to it.
+_Avoid_: pre-booking, parsed booking
+
 **Shipper reference**:
 The Shipper's own reference for a booking. It is unique per Shipper: an Accepted Transport Order holds it, so the same booking sent again is a repeat that gets the original Transport Order back, and the reference sent with different content is rejected. A Rejected booking holds no reference.
 _Avoid_: order reference, customer reference, idempotency key

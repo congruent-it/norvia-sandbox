@@ -17,6 +17,8 @@ public static class PersonaChoice
 
     public static string NewBookingPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/bookings/new";
 
+    public static string FillFromEmailPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/bookings/from-email";
+
     public static string BookingsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/bookings";
 
     public static string BookingRequestsPath(string personaId) => $"/personas/{Uri.EscapeDataString(personaId)}/booking-requests";

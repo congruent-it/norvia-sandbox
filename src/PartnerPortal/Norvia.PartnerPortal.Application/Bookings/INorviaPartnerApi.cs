@@ -17,6 +17,13 @@ public interface INorviaPartnerApi
     Task<NorviaAnswer> SubmitAsync(Persona persona, BookingRequest booking, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Asks the Intake agent for a Booking draft from a Shipper's pasted text, as the Persona, with its own token and subscription key.
+    /// The text is sent and not kept or logged. A refusal or a failure, Norvia unreachable too, is an answer, not an error:
+    /// <see cref="DraftFromText.BookingDraftOutcome.Unavailable"/>.
+    /// </summary>
+    Task<DraftFromText.BookingDraftAnswer> DraftBookingFromTextAsync(Persona persona, string text, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Sends a Carrier's answer to a booking request as the Persona, with its own token and subscription key. The Carrier is
     /// the one in the token, never named by the answer (ADR 0005). The Shipment number is for the portal's own
     /// trace, so it can be followed by the Shipment and the Carrier booking: it is not sent. Norvia unreachable is a reply, not an error:
