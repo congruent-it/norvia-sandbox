@@ -63,6 +63,13 @@ public static class TestAppHost
     private static void Remove(this IDistributedApplicationTestingBuilder builder, string[] unneeded)
     {
         ArgumentNullException.ThrowIfNull(builder);
+
+        // The Estate health check reads the Integration console's address, so without the console it would stay Starting for ever, and with it the start of the AppHost.
+        if (unneeded.Contains("integration-console-web"))
+        {
+            unneeded = [.. unneeded, "health-check-web"];
+        }
+
         foreach (var resource in builder.Resources
             .Where(resource => unneeded.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
             .ToList())

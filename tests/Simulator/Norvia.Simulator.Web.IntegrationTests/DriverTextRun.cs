@@ -4,9 +4,13 @@ using Ardalis.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Log;
+using Norvia.Simulator.Application.Ports;
 using Norvia.Simulator.Domain.Personas;
+using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.Domain.Trips;
+using Norvia.Simulator.Domain.Worlds;
 using SimulatorWeb::Norvia.Simulator.Web;
 
 namespace Norvia.Simulator.Web.IntegrationTests;
@@ -28,9 +32,12 @@ public sealed partial class DriverTextRun(SimulatorFixture fixture) : IAsyncLife
 
     public Guid RunId { get; private set; }
 
-    public SimulationSettings Settings { get; } = Runs.Tripped(
-        orders: 10, Runs.NextSeed(), collectedTodayPercent: 100,
-        new DriverShares(CollectionFailedPercent: 20, DeliveryFailedPercent: 40, DamagedPercent: 30, ReservationsPercent: 0));
+    /// <summary>The run's settings: the seed is one whose Loads put enough Shipments on the Driver's Trip (see <see cref="FillsTheTrip"/>).</summary>
+    public SimulationSettings Settings { get; private set; } = null!;
+
+    // The Driver's shares are of the Shipments on today's Trip, rounded: 20% of fewer than three is none, and the Van carries four pallets, so how many Shipments
+    // the Trip holds depends on the Loads the seed draws.
+    private const int MinimumShipmentsOnTheTrip = 3;
 
     /// <summary>The Driver actions that carry a text, with the kind of text each draws.</summary>
     public IReadOnlyList<(string Action, TextCategory Category)> Kinds { get; } =
@@ -50,9 +57,51 @@ public sealed partial class DriverTextRun(SimulatorFixture fixture) : IAsyncLife
         _worksToday = await fixture.WorkTodayAsync(Driver, ct);
         Simulator = await fixture.StartSimulatorWithAgentsAsync(
             configureServices: null, ct, SeedEdits.OnlyShippers(Shipper), SeedEdits.OwnFleetOf(Vehicle, Driver));
+        Settings = SettingsWithATripToFill(Simulator.Services.GetRequiredService<IWorldSource>().Load());
         var (_, run, _) = await Simulator.RunToEndAsync(Settings, ct, Runs.TripPatience);
         run.Status.Should().Be(SimulationRunStatus.Completed);
         RunId = run.Id;
+    }
+
+    private static SimulationSettings SettingsWithATripToFill(SimulationWorld world)
+    {
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            var settings = Runs.Tripped(
+                orders: 10, Runs.NextSeed(), collectedTodayPercent: 100,
+                new DriverShares(CollectionFailedPercent: 20, DeliveryFailedPercent: 40, DamagedPercent: 30, ReservationsPercent: 0));
+            if (FillsTheTrip(settings, world))
+            {
+                return settings;
+            }
+        }
+
+        throw new InvalidOperationException($"No seed of 200 puts {MinimumShipmentsOnTheTrip} Shipments on the Driver's Trip.");
+    }
+
+    /// <summary>
+    /// Whether the plan of the settings puts enough Shipments on the Trip of the Own fleet's Vehicle, built as the Planner builds it. The TMS numbers the Shipments
+    /// in the order it receives the bookings, which the run's concurrency leaves open, so it has to hold for either order of the Shipments collected at one time.
+    /// </summary>
+    private static bool FillsTheTrip(SimulationSettings settings, SimulationWorld world)
+    {
+        var now = TimeProvider.System.GetUtcNow();
+        var plan = BookingPlanGenerator.Generate(settings, world, runNumber: 1);
+        var shipments = plan.Bookings.Where(booking => booking.Bad is null).Select(booking => (booking.Step, From: booking.Slot.Resolve(now).From, booking.Load)).ToList();
+        var shift = new DriverShift(Driver, new TimeOnly(7, 0), new TimeOnly(15, 30));
+        foreach (var numberedBackwards in new[] { false, true })
+        {
+            var build = TripBuilder.Build(
+                DateOnly.FromDateTime(now.LocalDateTime),
+                shipments.Select(shipment => new TripShipment($"SH-{(numberedBackwards ? 1000 - shipment.Step : shipment.Step):0000000}", shipment.Load, shipment.From)),
+                world.OwnFleetVehicles, world.OwnFleetDrivers, [shift]);
+            if (build.Drafts.Count == 0 || build.Drafts[0].Shipments.Count < MinimumShipmentsOnTheTrip)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public async ValueTask DisposeAsync()

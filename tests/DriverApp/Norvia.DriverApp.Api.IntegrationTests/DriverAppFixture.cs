@@ -41,7 +41,7 @@ public class DriverAppFixture : IAsyncLifetime
     private static readonly string[] Unneeded =
     [
         "dbgate", "tms", "tms-migrations", "tms-api", "tms-web", "partner-portal", "partner-portal-migrations", "partner-portal-web",
-        "integration-console-web", "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
+        "integration-console-web", "health-check-web", "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker",
         "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
         "billing-worker", "shipper-invoice-worker", "carrier-cost-worker", "carrier-invoice-worker", "carrier-invoice-outcome-worker",
         "erp-migrations", "erp-api", "erp-web",

@@ -10,7 +10,9 @@ namespace Norvia.Simulator.Web.UiTests.Personas;
 /// </summary>
 public sealed class HostileProfileJourneyTests(SimulatorUiFixture simulator) : BrowserPage(simulator)
 {
-    private const int Orders = 4;
+    // The Planner chooses the Carrier of each Shipment, and the seed is random: of four orders the chosen Carrier gets none about a quarter of the time. With sixteen it
+    // does so about once in several hundred runs.
+    private const int Orders = 16;
     private const string Carrier = "CAR-0001";
 
     private readonly SimulatorUiFixture _simulator = simulator;
@@ -31,6 +33,7 @@ public sealed class HostileProfileJourneyTests(SimulatorUiFixture simulator) : B
 
         // Every Preset, picked in turn, leaves the choices as they were.
         await Page.GetByRole(AriaRole.Combobox, new() { Name = "Preset" }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Option).First).ToBeVisibleAsync();
         var presets = await Page.GetByRole(AriaRole.Option).AllInnerTextsAsync();
         await Page.Keyboard.PressAsync("Escape");
         presets.Should().NotBeEmpty();

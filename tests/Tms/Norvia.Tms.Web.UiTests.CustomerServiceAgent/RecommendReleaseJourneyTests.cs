@@ -29,12 +29,14 @@ public sealed class RecommendReleaseJourneyTests(CustomerServiceAgentUiFixture a
         await Expect(row).ToContainTextAsync("No Proof of delivery");
         var number = await OrderNumberAsync(row);
 
-        var recommendation = await RecommendAsync(row, number);
-        await Expect(recommendation.GetByTestId("action-kind")).ToHaveTextAsync("Release", new() { Timeout = AgentTimeout });
-        await Expect(recommendation.GetByRole(AriaRole.Heading, new() { Name = "Evidence" })).ToBeVisibleAsync();
-        await Expect(recommendation.Locator("cite").First).ToContainTextAsync("get_release_eligibility");
-        await Expect(recommendation).ToContainTextAsync("You write the remark yourself and confirm the release");
-        await Expect(recommendation).ToContainTextAsync("you decide, and you write the remark");
+        var recommendation = await RecommendAsync(row, number, async recommendation =>
+        {
+            await Expect(recommendation.GetByTestId("action-kind")).ToHaveTextAsync("Release", new() { Timeout = AgentTimeout });
+            await Expect(recommendation.GetByRole(AriaRole.Heading, new() { Name = "Evidence" })).ToBeVisibleAsync();
+            await Expect(recommendation.Locator("cite").First).ToContainTextAsync("get_release_eligibility");
+            await Expect(recommendation).ToContainTextAsync("You write the remark yourself and confirm the release");
+            await Expect(recommendation).ToContainTextAsync("you decide, and you write the remark");
+        });
 
         // The text drafts no remark, and the suggestion released nothing: no form is open and the order is still listed with no Proof of delivery.
         await Expect(recommendation).Not.ToContainTextAsync("CMR");
@@ -100,8 +102,9 @@ public sealed class RecommendReleaseJourneyTests(CustomerServiceAgentUiFixture a
         return Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipmentNumber });
     }
 
-    // The list reads itself again every second and a row it redraws starts over, so an answer that was still on its way when that happened never shows. Ask again then, as staff would.
-    private static async Task<ILocator> RecommendAsync(ILocator row, string number)
+    // The list reads itself again every second and a row it redraws starts over, so an answer that was still on its way when that happened never shows, and one that showed can be gone
+    // before the checks on it are done. Ask again then, as staff would; the checks run inside the attempt for that reason.
+    private static async Task<ILocator> RecommendAsync(ILocator row, string number, Func<ILocator, Task>? check = null)
     {
         var recommendation = row.GetByTestId("recommendation");
         for (var attempt = 1; ; attempt++)
@@ -110,6 +113,11 @@ public sealed class RecommendReleaseJourneyTests(CustomerServiceAgentUiFixture a
             try
             {
                 await Expect(recommendation).ToBeVisibleAsync(new() { Timeout = attempt < MaxAttempts ? AttemptTimeout : AgentTimeout });
+                if (check is not null)
+                {
+                    await check(recommendation);
+                }
+
                 return recommendation;
             }
             catch (PlaywrightException) when (attempt < MaxAttempts)
