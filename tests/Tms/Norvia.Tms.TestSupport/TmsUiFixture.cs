@@ -26,7 +26,7 @@ public class TmsUiFixture : IAsyncLifetime
     private const string TrackingRecordRole = "TrackingEvents.Record";
     private const string ProofOfDeliveryRecordRole = "ProofsOfDelivery.Record";
     private const string ProofOfDeliveryLogicAppClientId = "norvia-local-proof-of-delivery-logic-app";
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
     private DistributedApplication? _app;

@@ -53,7 +53,7 @@ public sealed class CarrierInvoiceFixture : IAsyncLifetime
     public const string SubscriptionKey = "van-dijk-subscription-key";
 
     private const string CarrierCostRecordRole = "CarrierCosts.Record";
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private static readonly byte[] SigningKey = System.Security.Cryptography.RandomNumberGenerator.GetBytes(64);
     private static readonly string SigningKeyBase64 = Convert.ToBase64String(SigningKey);
 

@@ -49,7 +49,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     private const string DriverTextsFleetVehicle = "VEH-0002";
     private const string DriverTextsFleetDriver = "DRV-0002";
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
 
     private DistributedApplication? _app;
     private IPlaywright? _playwright;

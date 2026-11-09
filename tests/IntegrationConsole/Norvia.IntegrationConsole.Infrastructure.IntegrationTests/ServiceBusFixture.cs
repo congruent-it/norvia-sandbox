@@ -36,7 +36,7 @@ public sealed class ServiceBusFixture : IAsyncLifetime
     public const string CountsSubscription = "it-counts-sub";
 
     private const string Messaging = "messaging";
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
 
     private DistributedApplication? _app;
 

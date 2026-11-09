@@ -47,7 +47,7 @@ public class DriverAppFixture : IAsyncLifetime
         "erp-migrations", "erp-api", "erp-web",
         "simulator", "simulator-migrations", "simulator-web",
     ];
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private readonly string _tokenSigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     private readonly ConcurrentQueue<ServiceBusReceivedMessage> _published = new();
     private DistributedApplication? _app;

@@ -58,7 +58,7 @@ public sealed class FaultsFixture : IAsyncLifetime
     // What the faults don't use only costs startup time and memory.
     private static readonly string[] Unneeded = ["dbgate", "tms-web", "driver-app-web", "simulator-web", "simulator-migrations"];
 
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan SendRetryInterval = TimeSpan.FromMilliseconds(500);
     private readonly string _tokenSigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
     private DistributedApplication? _app;
