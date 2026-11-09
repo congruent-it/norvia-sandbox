@@ -19,7 +19,7 @@
     <ProjectReference Include="..\..\..\src\Integration\Norvia.Integration.LocalPartnerApi\Norvia.Integration.LocalPartnerApi.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Every test builds a Partner API host of its own, so the classes may run side by side, but not many at once. -->
+    <!-- Every test builds a Partner API host of its own. They run one at a time: the host's span listener hears every host in the process. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

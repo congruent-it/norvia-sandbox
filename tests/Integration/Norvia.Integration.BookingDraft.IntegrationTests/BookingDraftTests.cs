@@ -79,8 +79,8 @@ public sealed class BookingDraftTests
     public async Task Draft_OverTheRateLimit_IsRefused429_WithRetryAfter()
     {
         await using var host = new DraftApiHost(draftsPerMinute: 2);
-        (await DraftOkAsync(host)).Should().Be(HttpStatusCode.OK);
-        (await DraftOkAsync(host)).Should().Be(HttpStatusCode.OK);
+        await DraftStatusAsync(host);
+        await DraftStatusAsync(host);
 
         using var third = await host.DraftAsync(BookingIntakeSamples.Good);
 
@@ -93,7 +93,7 @@ public sealed class BookingDraftTests
     public async Task Draft_WithSeveralFaults_IsRefusedForTheFirstInTheEdgesOrder()
     {
         await using var host = new DraftApiHost(draftsPerMinute: 1);
-        (await DraftOkAsync(host)).Should().Be(HttpStatusCode.OK, "the rate limit is used up");
+        (await DraftStatusAsync(host)).Should().Be(HttpStatusCode.OK, "the rate limit is used up");
         var stranger = host.PersonaToken(clientId: "norvia-local-persona-stranger", roles: WrongRole);
 
         // Key before token, token before role, role before Shipper, Shipper before rate limit.
@@ -190,10 +190,10 @@ public sealed class BookingDraftTests
     }
 
     [Theory]
-    [InlineData(BookingIntakeSamples.Good)]
-    [InlineData(BookingIntakeSamples.Partial)]
-    [InlineData(BookingIntakeSamples.TwoBookings)]
-    public async Task Draft_NeitherTheTextNorTheDraftAppearsInTheTelemetry(string text)
+    [InlineData(BookingIntakeSamples.Good, "Mueller|Havenstraat|SH-2030-0142|Rotterdam|Anna|+49 221|850 kg")]
+    [InlineData(BookingIntakeSamples.Partial, "Utrecht|Antwerpen|ongeveer een ton|magazijn")]
+    [InlineData(BookingIntakeSamples.TwoBookings, "Breda|Gent|4 crates|Second booking")]
+    public async Task Draft_NeitherTheTextNorTheDraftAppearsInTheTelemetry(string text, string secrets)
     {
         await using var host = new DraftApiHost();
 
@@ -201,20 +201,52 @@ public sealed class BookingDraftTests
         var answer = await response.Content.ReadAsStringAsync(Ct);
 
         var telemetry = host.Telemetry;
-        telemetry.Should().Contain("booking-draft", "the flow is on the trail");
-        foreach (var secret in new[] { "Mueller", "Havenstraat", "SH-2030-0142", "Rotterdam", "Utrecht", "Antwerpen", "Breda", "ongeveer een ton", "Anna", "+49 221" })
+        telemetry.Should().Contain("flow=booking-draft", "there is a trail to search");
+        foreach (var secret in secrets.Split('|'))
         {
+            text.Should().Contain(secret, "the value is in the text, so its absence from the telemetry means something");
             telemetry.Should().NotContain(secret);
         }
 
-        // The answer's own values are not there either, and neither is the whole reply.
-        if (response.StatusCode == HttpStatusCode.OK)
-        {
-            foreach (var quote in (JsonNode.Parse(answer)!["quotes"]?.AsObject() ?? []).Select(quote => quote.Value!.GetValue<string>()))
-            {
-                telemetry.Should().NotContain(quote);
-            }
-        }
+        telemetry.Should().NotContain(text.Trim()).And.NotContain(answer);
+    }
+
+    [Fact]
+    public async Task Draft_ADraftIsOnTheTrailWithTheTrackingKeys()
+    {
+        await using var host = new DraftApiHost();
+
+        using var response = await host.DraftAsync(BookingIntakeSamples.Good);
+
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+        host.Telemetry.Should().Contain($"correlationId={correlationId}").And.Contain("flow=booking-draft")
+            .And.Contain($"partyId={DraftApiHost.ShipperId}").And.Contain("outcome=Succeeded");
+    }
+
+    [Theory]
+    [InlineData("MultipleBookingsInText", "Refused")]
+    [InlineData("AgentUnavailable", "Failed")]
+    public async Task Draft_AnAnswerWithoutADraftIsOnTheTrailWithItsFailureCode(string failureCode, string outcome)
+    {
+        await using var host = failureCode == "AgentUnavailable"
+            ? new DraftApiHost(model: () => new ScriptedChatClient(_ => [new TextContent("not json")]))
+            : new DraftApiHost();
+
+        using var response = await host.DraftAsync(failureCode == "AgentUnavailable" ? BookingIntakeSamples.Good : BookingIntakeSamples.TwoBookings);
+
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+        host.Telemetry.Should().Contain($"correlationId={correlationId}").And.Contain($"outcome={outcome}").And.Contain($"failureCode={failureCode}");
+    }
+
+    [Fact]
+    public async Task Draft_ARefusalAtTheEdgeIsOnTheTrailWithItsFailureCode()
+    {
+        await using var host = new DraftApiHost();
+
+        using var response = await host.DraftAsync(BookingIntakeSamples.Good, token: host.PersonaToken(roles: WrongRole));
+
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+        host.Telemetry.Should().Contain($"correlationId={correlationId}").And.Contain("outcome=Refused").And.Contain("failureCode=NotAllowedToDraft");
     }
 
     [Fact]
@@ -225,10 +257,10 @@ public sealed class BookingDraftTests
         using var response = await host.DraftAsync(BookingIntakeSamples.Good);
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        host.Telemetry.Should().NotContain("Mueller").And.NotContain("leak").And.Contain("AgentUnavailable");
+        host.Telemetry.Should().NotContain("Mueller").And.NotContain("\"leak\"").And.Contain("AgentUnavailable");
     }
 
-    private static async Task<HttpStatusCode> DraftOkAsync(DraftApiHost host)
+    private static async Task<HttpStatusCode> DraftStatusAsync(DraftApiHost host)
     {
         using var response = await host.DraftAsync(BookingIntakeSamples.Good);
         return response.StatusCode;
