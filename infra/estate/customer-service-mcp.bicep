@@ -34,6 +34,11 @@ var apiRoleId = guid('norvia-tms-agent-api', environmentName, role)
 var replyRole = loadJsonContent('../../contracts/agent-mcp/customer-service-reply.tools.json').role
 var replyApiRoleId = guid('norvia-tms-agent-api', environmentName, replyRole)
 
+// The Planner agent's role (planner-mcp.bicep) is the third role of the TMS agent API, for the same reason: a view of its own at
+// /v1/agent/planner and a role requirement of its own there.
+var plannerRole = loadJsonContent('../../contracts/agent-mcp/planner.tools.json').role
+var plannerApiRoleId = guid('norvia-tms-agent-api', environmentName, plannerRole)
+
 // The agent view: the audience of an Agent's token. Entra issues a token for it only to an identity that holds the role.
 resource view 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-agent-${contract.server}-view-${environmentName}'
@@ -100,6 +105,16 @@ resource tmsAgentApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: plannerApiRoleId
+      value: plannerRole
+      displayName: 'Read the TMS API\'s Planner agent view'
+      description: 'Call /v1/agent/planner of the TMS API, the assignment options of a Transport Order. API Management\'s identity holds it, on behalf of the Planner Agent.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -117,6 +132,12 @@ resource apiManagementReadsTheAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' 
 resource apiManagementReadsTheReplyAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsAgentApiPrincipal.id
   appRoleId: replyApiRoleId
+  principalId: apiManagementPrincipalId
+}
+
+resource apiManagementReadsThePlannerAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsAgentApiPrincipal.id
+  appRoleId: plannerApiRoleId
   principalId: apiManagementPrincipalId
 }
 

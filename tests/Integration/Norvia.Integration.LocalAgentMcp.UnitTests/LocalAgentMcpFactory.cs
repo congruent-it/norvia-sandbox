@@ -33,6 +33,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string CustomerServiceReplyAgentId = "norvia-local-agent-customer-service-reply";
     public const string CustomerServiceReplyRole = "TransportOrders.CustomerServiceReplyAgent.Read";
     public const string CustomerServiceReplyAudience = "api://norvia-customer-service-reply-agent";
+    public const string PlannerAgentId = "norvia-local-agent-planner";
+    public const string PlannerRole = "TransportOrders.PlannerAgent.Read";
+    public const string PlannerAudience = "api://norvia-planner-agent";
     public const string TmsAudience = "api://norvia-tms";
     public const string FinanceAgentId = "norvia-local-agent-finance-matching";
     public const string FinanceRole = "CarrierInvoices.FinanceAgent.Read";
@@ -139,6 +142,13 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
             ["AgentMcp:CustomerServiceReply:ApiTokens:Issuer"] = Issuer,
             ["AgentMcp:CustomerServiceReply:ApiTokens:Audience"] = TmsAudience,
             ["AgentMcp:CustomerServiceReply:ApiTokens:SigningKey"] = signingKey,
+            ["AgentMcp:Planner:Tokens:Issuer"] = Issuer,
+            ["AgentMcp:Planner:Tokens:Audience"] = PlannerAudience,
+            ["AgentMcp:Planner:Tokens:SigningKey"] = signingKey,
+            ["AgentMcp:Planner:Api"] = "http://tms-api/v1/agent/planner",
+            ["AgentMcp:Planner:ApiTokens:Issuer"] = Issuer,
+            ["AgentMcp:Planner:ApiTokens:Audience"] = TmsAudience,
+            ["AgentMcp:Planner:ApiTokens:SigningKey"] = signingKey,
         })
         {
             builder.UseSetting(name, value);
@@ -200,6 +210,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     /// <summary>The Carrier invoice matching agent's token as Entra issues it to its agent identity.</summary>
     public string FinanceToken(string? azp = FinanceAgentId, string[]? roles = null) =>
         AgentToken(azp, roles ?? [FinanceRole], FinanceAudience);
+
+    /// <summary>The Planner agent's token as Entra issues it to its agent identity.</summary>
+    public string PlannerToken(string? azp = PlannerAgentId, string[]? roles = null, string? audience = null) =>
+        AgentToken(azp, roles ?? [PlannerRole], audience ?? PlannerAudience);
 
     /// <summary>The Customer service reply agent's token as Entra issues it to its agent identity.</summary>
     public string CustomerServiceReplyToken(string? azp = CustomerServiceReplyAgentId, string[]? roles = null, string? audience = null) =>

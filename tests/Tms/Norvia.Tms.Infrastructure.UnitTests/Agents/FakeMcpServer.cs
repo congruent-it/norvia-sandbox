@@ -51,7 +51,8 @@ internal sealed class FakeMcpServer : HttpMessageHandler
             "tools/list" => JsonNode.Parse("""
                 {"tools":[
                   {"name":"get_rejected_booking","description":"d","inputSchema":{"type":"object","properties":{"id":{"type":"string"}},"required":["id"]}},
-                  {"name":"get_shipper_view","description":"d","inputSchema":{"type":"object","properties":{"transportOrderNumber":{"type":"string"}},"required":["transportOrderNumber"]}}]}
+                  {"name":"get_shipper_view","description":"d","inputSchema":{"type":"object","properties":{"transportOrderNumber":{"type":"string"}},"required":["transportOrderNumber"]}},
+                  {"name":"get_assignment_options","description":"d","inputSchema":{"type":"object","properties":{"transportOrderNumber":{"type":"string"}},"required":["transportOrderNumber"]}}]}
                 """),
             "tools/call" => new JsonObject
             {

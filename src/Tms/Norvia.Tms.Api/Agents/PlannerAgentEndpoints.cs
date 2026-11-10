@@ -1,0 +1,45 @@
+using Ardalis.Result;
+using Mediator;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Norvia.Tms.Api.Tracking;
+using Norvia.Tms.Application.Agents;
+using Norvia.Tms.Application.Agents.Planner;
+
+namespace Norvia.Tms.Api.Agents;
+
+/// <summary>
+/// The Planner agent's view of the TMS (ADR 0040): one read, where a Transport Order waiting for planning can go. A group of its own behind
+/// a role of its own, <see cref="AgentRoles.PlannerRead"/>, which only the Planner agent's identity holds. The TMS computes the options and
+/// the agent chooses (#372); there is no write endpoint, and the narrowing is in the mapping: no street address, no Consignee, no file.
+/// </summary>
+public static class PlannerAgentEndpoints
+{
+    /// <summary>The <c>flow</c> of a call on the agent view, as the MCP stand-in names the server's.</summary>
+    public const string Flow = "agent-view-planner";
+
+    public static IEndpointRouteBuilder MapPlannerAgent(this IEndpointRouteBuilder app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        var group = app.NewVersionedApi("PlannerAgent")
+            .MapGroup("/v{version:apiVersion}/agent/planner")
+            .HasApiVersion(1)
+            .RequireAuthorization(policy => policy.AddAuthenticationSchemes(AgentApiAuthentication.Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.PlannerRead))
+            .WithMetadata(new TrackedFlow(Flow))
+            .AddEndpointFilter<AgentCallTracking>();
+
+        group.MapGet("/transport-orders/{transportOrderNumber}/assignment-options", GetAssignmentOptionsAsync)
+            .WithName("AgentGetAssignmentOptions")
+            .WithSummary("Read where a Transport Order can go, as the Planner agent: whether Own fleet fits, and each active Carrier's Carrier cost or why it cannot be priced, with the Assignment rules each meets.");
+        return app;
+    }
+
+    private static async Task<Results<Ok<PlannerAgentAssignmentOptionsView>, ProblemHttpResult>> GetAssignmentOptionsAsync(
+        string transportOrderNumber, IMediator mediator, TimeProvider time, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetAssignmentOptionsQuery(transportOrderNumber), cancellationToken);
+        return result.Status == ResultStatus.NotFound
+            ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Transport Order {transportOrderNumber} not found.")
+            : TypedResults.Ok(PlannerAgentMapping.Of(result.Value, time.GetUtcNow()));
+    }
+}

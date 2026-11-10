@@ -130,6 +130,52 @@ public sealed class LocalAgentClientTests : IDisposable
         _mcp.Authorizations.Should().BeEmpty();
     }
 
+    private static readonly AgentRequest PlannerRequest = new("planner", PlannerQuestions.SuggestAssignment("TO-0000042"), CorrelationId);
+
+    private static AgentClientOptions PlannerOptions() => SignedOptions().With(options =>
+    {
+        options.PlannerMcpAddress = new Uri("http://mcp.test/mcp/planner");
+        options.PlannerTokens = new AgentTokenOptions
+        {
+            Issuer = "https://norvia.local/tokens",
+            Audience = "api://norvia-planner-agent",
+            ClientId = "norvia-local-agent-planner",
+            Role = "TransportOrders.PlannerAgent.Read",
+            SigningKey = Convert.ToBase64String(new byte[64].Select((_, index) => (byte)(index + 1)).ToArray()),
+        };
+    });
+
+    [Fact]
+    public async Task AskAsync_ThePlannerAgent_CallsItsOwnServer_AsItsOwnIdentity_AndRecommendsFromTheOptions()
+    {
+        _mcp.TrailAnswer = """{"transportOrderNumber":"TO-0000042","ownFleet":{"meetsAssignmentRules":true,"fit":"Fits"},"carriers":[]}""";
+        var options = Microsoft.Extensions.Options.Options.Create(PlannerOptions());
+        var http = new HttpClient(new BearerTokenHandler(options, TimeProvider.System) { InnerHandler = _mcp });
+        var client = new LocalAgentClient(http, options, new FixedRunIds("run-42"), TimeProvider.System, _activities, new FakeLogger<LocalAgentClient>(_logs));
+
+        var result = await client.AskAsync(PlannerRequest, TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.SuggestedAction.Should().StartWith("Assign to Own fleet");
+        result.Value.Evidence.Should().OnlyContain(evidence => evidence.ToolName == "get_assignment_options");
+        result.Value.Run.Should().Be(new AgentRun("planner", "run-42"));
+        _mcp.Addresses.Should().OnlyContain(address => address == "http://mcp.test/mcp/planner");
+        var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(_mcp.Authorizations.First()["Bearer ".Length..]);
+        token.GetClaim("azp").Value.Should().Be("norvia-local-agent-planner");
+        token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal("TransportOrders.PlannerAgent.Read");
+        token.Audiences.Should().Equal("api://norvia-planner-agent");
+    }
+
+    [Fact]
+    public async Task AskAsync_ThePlannerAgent_WithoutItsOwnServerOrTokens_IsAgentUnavailable_AndNeverUsesTheOtherAgentsToken()
+    {
+        var result = await Client(SignedOptions()).AskAsync(PlannerRequest, TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(Ardalis.Result.ResultStatus.Unavailable);
+        result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+        _mcp.Authorizations.Should().BeEmpty();
+    }
+
     [Fact]
     public async Task AskAsync_IsASpanOfTheConsole_WithTheRunId_AndTheTrailsCorrelationId()
     {

@@ -1,0 +1,12 @@
+{
+  "server": "planner",
+  "role": "TransportOrders.PlannerAgent.Read",
+  "tools": [
+    {
+      "name": "get_assignment_options",
+      "description": "Returns where a Transport Order waiting for planning can go, by its number: the order itself narrowed (places as city, postcode area and country, goods as a total weight and pallet count, the collection and delivery windows, the Shipper's business name and the Rating result), Own fleet (whether it fits on the collection day: Fits, OverCapacity, OutsideHorizon, DayNotOpen or NoDriverWithDrivingHoursLeft; the load check with the order counted; the Over capacity or out-of-horizon warning; the Vehicles and Drivers available; the Driving hours left; whether it meets the Assignment rules), and each active Carrier (its Carrier cost from its Carrier Rate Card, or why it cannot be priced such as NoMatchingLane, and whether it meets the Assignment rules). Never a street address, a Consignee, an instruction or a file.",
+      "method": "GET",
+      "path": "/transport-orders/{transportOrderNumber}/assignment-options"
+    }
+  ]
+}

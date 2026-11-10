@@ -1,0 +1,107 @@
+@using Ardalis.Result
+@using Microsoft.Extensions.Options
+@using Norvia.Agents
+@using Norvia.Tms.Application.Agents
+@using Norvia.Tms.Application.Agents.Planner
+@inject IOptions<AgentsOptions> Agents
+@inject IExplainRequests Requests
+@inject ILogger<SuggestAssignment> Logger
+@implements IDisposable
+
+@* One fixed question about one row of the Planner's waiting-for-planning list: who should carry this Transport Order? The TMS computes the
+   options and the assistant chooses among them; it recommends one option the Assignment rules allow, with the trade-off and any warning it
+   accepts. The answer is shown only: nothing is pre-selected or assigned. Off unless Agents:Enabled, and only in the Planner role view. An
+   Agent is never on a critical path (ADR 0040). *@
+@if (Agents.Value.Enabled && ForPlanner)
+{
+    <div data-explain="suggest-assignment">
+        <FluentButton Appearance="Appearance.Outline" Disabled="_asking" OnClick="SuggestAsync" aria-label="@($"Suggest for {TransportOrderNumber}")">Suggest</FluentButton>
+
+        @if (_asking)
+        {
+            <div role="status" class="mt-3">
+                <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                    <FluentProgressRing />
+                    <span>The assistant is reading…</span>
+                </FluentStack>
+            </div>
+        }
+        else if (_unavailable)
+        {
+            <div role="alert" class="mt-3">
+                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+            </div>
+        }
+        else if (_suggestion is { } suggestion)
+        {
+            @* Text only: what the assistant wrote is data, so it is encoded, never rendered as markup. *@
+            <div class="mt-3" data-testid="suggestion">
+                <h2 class="text-lg">Suggestion</h2>
+                <p data-testid="suggested-action">@suggestion.SuggestedAction</p>
+                <h2 class="text-lg">Why</h2>
+                <p>@suggestion.Cause</p>
+                <h2 class="text-lg">Evidence</h2>
+                <ul>
+                    @foreach (var evidence in suggestion.Evidence)
+                    {
+                        <li>@evidence.Claim <cite class="text-muted">[@evidence.ResultId, @evidence.ToolName]</cite></li>
+                    }
+                </ul>
+                <p class="text-muted">Confidence: @suggestion.Confidence.ToString().ToLowerInvariant(). The assistant can be wrong; you decide, and nothing is assigned until you do.</p>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _asking;
+    private bool _unavailable;
+    private Suggestion? _suggestion;
+    private readonly CancellationTokenSource _lifetime = new();
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    /// <summary>Whether the page is the Planner role's view. The button shows nowhere else.</summary>
+    [Parameter]
+    public bool ForPlanner { get; set; }
+
+    private async Task SuggestAsync()
+    {
+        _asking = true;
+        _unavailable = false;
+        _suggestion = null;
+        try
+        {
+            var result = await Requests.SuggestAsync(new SuggestAssignmentQuery(TransportOrderNumber), _lifetime.Token);
+            if (result.IsSuccess)
+            {
+                _suggestion = result.Value;
+            }
+            else
+            {
+                _unavailable = true;
+                AgentPageLog.SuggestFailed(Logger, TransportOrderNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _unavailable = true;
+            AgentPageLog.SuggestCrashed(Logger, exception, TransportOrderNumber);
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

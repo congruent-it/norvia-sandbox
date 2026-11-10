@@ -1030,7 +1030,12 @@ else
             .WithEnvironment("Agents__ReplyTokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__ReplyTokens__Audience", LocalTokens.CustomerServiceReplyAgentAudience)
             .WithEnvironment("Agents__ReplyTokens__ClientId", LocalTokens.CustomerServiceReplyAgentClientId)
-            .WithEnvironment("Agents__ReplyTokens__Role", LocalTokens.CustomerServiceReplyAgentReadRole);
+            .WithEnvironment("Agents__ReplyTokens__Role", LocalTokens.CustomerServiceReplyAgentReadRole)
+            .WithEnvironment("Agents__PlannerMcpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/planner"))
+            .WithEnvironment("Agents__PlannerTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__PlannerTokens__Audience", LocalTokens.PlannerAgentAudience)
+            .WithEnvironment("Agents__PlannerTokens__ClientId", LocalTokens.PlannerAgentClientId)
+            .WithEnvironment("Agents__PlannerTokens__Role", LocalTokens.PlannerAgentReadRole);
         healthCheck
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/health-check"))
@@ -1073,6 +1078,9 @@ else
             (agentMcp.Resource, "AgentMcp__CustomerService__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerServiceReply__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerServiceReply__ApiTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__Planner__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__Planner__ApiTokens__SigningKey"),
+            (tmsWeb.Resource, "Agents__PlannerTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceMatching__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceMatching__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceRejectionReason__Tokens__SigningKey"),

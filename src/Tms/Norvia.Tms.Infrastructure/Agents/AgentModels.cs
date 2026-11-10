@@ -14,5 +14,6 @@ internal static class AgentModels
             ? new AzureOpenAIClient(endpoint, new DefaultAzureCredential()).GetChatClient(string.IsNullOrWhiteSpace(model.Deployment) ? definition.Model.Deployment : model.Deployment).AsIChatClient()
             : definition.Name == "customer-service" ? CustomerServiceScript.Model()
             : definition.Name == "customer-service-reply" ? CustomerServiceReplyScript.Model()
+            : definition.Name == "planner" ? PlannerScript.Model()
             : throw new InvalidOperationException($"There is no scripted model for the Agent '{definition.Name}'.");
 }

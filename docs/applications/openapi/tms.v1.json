@@ -3126,6 +3126,37 @@
         }
       }
     },
+    "/v1/agent/planner/transport-orders/{transportOrderNumber}/assignment-options": {
+      "get": {
+        "tags": [
+          "PlannerAgent"
+        ],
+        "summary": "Read where a Transport Order can go, as the Planner agent: whether Own fleet fits, and each active Carrier's Carrier cost or why it cannot be priced, with the Assignment rules each meets.",
+        "operationId": "AgentGetAssignmentOptions",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerAgentAssignmentOptionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -6072,6 +6103,357 @@
                 "$ref": "#/components/schemas/ShipperNotificationStatus"
               }
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentAssignmentOptionsView": {
+        "required": [
+          "transportOrderNumber",
+          "status",
+          "shipper",
+          "ratingResult",
+          "asOf",
+          "collection",
+          "delivery",
+          "collectionWindow",
+          "deliveryWindow",
+          "goods",
+          "ownFleet",
+          "carriers"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "shipper": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ratingResult": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "collection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlannerAgentPlaceView"
+              }
+            ]
+          },
+          "delivery": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlannerAgentPlaceView"
+              }
+            ]
+          },
+          "collectionWindow": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlannerAgentWindowView"
+              }
+            ]
+          },
+          "deliveryWindow": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlannerAgentWindowView"
+              }
+            ]
+          },
+          "goods": {
+            "$ref": "#/components/schemas/PlannerAgentGoodsView"
+          },
+          "ownFleet": {
+            "$ref": "#/components/schemas/PlannerAgentOwnFleetView"
+          },
+          "carriers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentCarrierView"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentCarrierView": {
+        "required": [
+          "carrierId",
+          "name",
+          "meetsAssignmentRules",
+          "ruleBroken",
+          "carrierCost",
+          "notPriced"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "meetsAssignmentRules": {
+            "type": "boolean"
+          },
+          "ruleBroken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "carrierCost": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "notPriced": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentGoodsView": {
+        "required": [
+          "totalWeightKg",
+          "palletPlaces"
+        ],
+        "type": "object",
+        "properties": {
+          "totalWeightKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "palletPlaces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentLoadView": {
+        "required": [
+          "capacityKg",
+          "capacityPalletPlaces",
+          "demandKg",
+          "demandPalletPlaces",
+          "over"
+        ],
+        "type": "object",
+        "properties": {
+          "capacityKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "capacityPalletPlaces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "demandKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "demandPalletPlaces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "over": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentOwnFleetView": {
+        "required": [
+          "meetsAssignmentRules",
+          "ruleBroken",
+          "fit",
+          "collectionDay",
+          "warning",
+          "load",
+          "availableVehicles",
+          "availableDrivers",
+          "driversWithDrivingHoursLeft",
+          "mostDrivingHoursLeft"
+        ],
+        "type": "object",
+        "properties": {
+          "meetsAssignmentRules": {
+            "type": "boolean"
+          },
+          "ruleBroken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fit": {
+            "type": "string"
+          },
+          "collectionDay": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "warning": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "load": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlannerAgentLoadView"
+              }
+            ]
+          },
+          "availableVehicles": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "availableDrivers": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "driversWithDrivingHoursLeft": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "mostDrivingHoursLeft": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentPlaceView": {
+        "required": [
+          "city",
+          "postcodeArea",
+          "country"
+        ],
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "postcodeArea": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "country": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentWindowView": {
+        "required": [
+          "earliest",
+          "latest"
+        ],
+        "type": "object",
+        "properties": {
+          "earliest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "latest": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -9170,6 +9552,9 @@
     },
     {
       "name": "CustomerServiceReplyAgent"
+    },
+    {
+      "name": "PlannerAgent"
     },
     {
       "name": "Reset"

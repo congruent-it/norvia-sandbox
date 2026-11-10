@@ -11,4 +11,10 @@ public static class AgentRoles
     /// role of its own, so the reply agent's identity cannot call the tools of <see cref="CustomerServiceRead"/>, and the other way round.
     /// </summary>
     public const string CustomerServiceReplyRead = "TransportOrders.CustomerServiceReplyAgent.Read";
+
+    /// <summary>
+    /// Read the Planner agent's narrow view of a Transport Order and its assignment options: places as city, postcode area and country, goods as
+    /// totals, no street address, no Consignee and no file. Held only by the Planner agent's identity (ADR 0040).
+    /// </summary>
+    public const string PlannerRead = "TransportOrders.PlannerAgent.Read";
 }

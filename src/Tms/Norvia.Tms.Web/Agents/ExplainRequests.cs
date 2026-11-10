@@ -2,6 +2,7 @@ using Ardalis.Result;
 using Mediator;
 using Norvia.Agents;
 using Norvia.Tms.Application.Agents.Explain;
+using Norvia.Tms.Application.Agents.Planner;
 using Norvia.Tms.Application.Agents.Reply;
 
 namespace Norvia.Tms.Web.Agents;
@@ -25,6 +26,9 @@ internal sealed class ExplainRequests(IServiceScopeFactory scopes) : IExplainReq
         SendAsync(query, cancellationToken);
 
     public Task<Result<Suggestion>> DraftAsync(DraftShipperReplyQuery query, CancellationToken cancellationToken) =>
+        SendAsync(query, cancellationToken);
+
+    public Task<Result<Suggestion>> SuggestAsync(SuggestAssignmentQuery query, CancellationToken cancellationToken) =>
         SendAsync(query, cancellationToken);
 
     private async Task<Result<Suggestion>> SendAsync(IQuery<Result<Suggestion>> query, CancellationToken cancellationToken)

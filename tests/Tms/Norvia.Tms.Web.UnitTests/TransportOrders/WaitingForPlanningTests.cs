@@ -43,7 +43,21 @@ public sealed class WaitingForPlanningTests : TmsWebContext
             "Rotterdam, NL",
             "Utrecht, NL",
             "Sat 26 Sep 2026, 06:00–10:00",
-            "Not yet rated");
+            "Not yet rated",
+            string.Empty); // The Suggest button, which shows only with Agents:Enabled on.
+    }
+
+    [Fact]
+    public void Render_WhenThePageCouldNotReadTheRole_OffersNoSuggest_EvenWithAgentsOn()
+    {
+        // The role comes from the request's cookie; the Planner view's Suggest button itself is covered by SuggestAssignmentTests and the UI tests.
+        Queries.ListWaitingForPlanningAsync(Arg.Any<CancellationToken>()).Returns([Samples.ToPlan("TO-0000042")]);
+        AgentSettings.Enabled = true;
+
+        var page = Render<WaitingForPlanning>();
+
+        page.WaitForElement("tr:has(a[href='/transport-orders/TO-0000042'])");
+        page.FindAll("[data-explain=suggest-assignment]").Should().BeEmpty();
     }
 
     [Fact]
@@ -382,7 +396,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
         [.. page.FindAll("ul[aria-label='Assignment outcomes'] li .fluent-messagebar-message")
             .Select(message => string.Join(' ', message.TextContent.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)))];
 
-    // The last cell of the Transport Order's row.
+    // The last cell but one of the Transport Order's row: the last is the Suggest button.
     private static string RatingResultOf(IRenderedComponent<WaitingForPlanning> page, string number) =>
-        page.Find($"tr:has(a[href='/transport-orders/{number}'])").QuerySelectorAll("td")[^1].TextContent.Trim();
+        page.Find($"tr:has(a[href='/transport-orders/{number}'])").QuerySelectorAll("td")[^2].TextContent.Trim();
 }

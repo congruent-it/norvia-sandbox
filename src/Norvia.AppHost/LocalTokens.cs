@@ -111,6 +111,15 @@ public static class LocalTokens
     /// <summary>The app role the Carrier invoice rejection reason agent holds on the ERP API's rejection reason agent view.</summary>
     public const string FinanceRejectionReasonAgentReadRole = "CarrierInvoices.FinanceRejectionReasonAgent.Read";
 
+    /// <summary>The Planner agent's view audience: its own, so no other Agent's token is for it.</summary>
+    public const string PlannerAgentAudience = "api://norvia-planner-agent";
+
+    /// <summary>The Planner agent's local identity, which stands in for its Entra agent identity. It holds only its own read role.</summary>
+    public const string PlannerAgentClientId = "norvia-local-agent-planner";
+
+    /// <summary>The app role the Planner agent holds on the TMS API's planner agent view.</summary>
+    public const string PlannerAgentReadRole = "TransportOrders.PlannerAgent.Read";
+
     /// <summary>The app role the Estate health-check agent holds on the health-check API.</summary>
     public const string HealthCheckAgentReadRole = "HealthCheck.Agent.Read";
 
