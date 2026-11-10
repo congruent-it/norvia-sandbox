@@ -51,10 +51,10 @@ public static class TestAppHost
         builder.Remove(["dbgate", "integration-console-web", "tracking-worker", "proof-of-delivery-worker", "simulator", "simulator-migrations", "simulator-web"]);
 
     /// <summary>
-    /// Takes the resources the Customer service agent's tests don't use out of the AppHost. They keep the TMS (API and UI), its database, the MCP stand-in that plays API Management's
+    /// Takes the resources the TMS agents' integration tests (Customer service, Planner) don't use out of the AppHost. They keep the TMS (API and UI), its database, the MCP stand-in that plays API Management's
     /// MCP server, and the Integration console, which the stand-in waits for and serves its first server from.
     /// </summary>
-    public static void RemoveWhatTheCustomerServiceAgentTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
+    public static void RemoveWhatTheTmsAgentTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
         builder.Remove([.. Unneeded.Where(name => name is not "integration-console-web")]);
 
     /// <summary>Takes the resources the TMS API's tests don't use out of the AppHost, so it starts the TMS (with its UI, which the demo seed test needs), its database and the Service Bus emulator.</summary>
