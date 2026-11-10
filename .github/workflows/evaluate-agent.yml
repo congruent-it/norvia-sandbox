@@ -11,6 +11,10 @@ on:
       runs:
         description: Runs per case; more than one shows a flaky case as a pass rate
         default: "1"
+      submit:
+        description: "booking-intake only: also send each draft through the booking path (makes real Transport Orders in the estate)"
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
@@ -30,12 +34,14 @@ jobs:
       - name: Run the cases
         env:
           FOUNDRY_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+          FOUNDRY_INTAKE_PROJECT_ENDPOINT: ${{ vars.FOUNDRY_INTAKE_PROJECT_ENDPOINT }}
+          SUBMIT: ${{ inputs.submit }}
           EVALUATION_JUDGE_MODEL: ${{ vars.EVALUATION_JUDGE_MODEL }}
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AGENT: ${{ inputs.agent }}
           RUNS: ${{ inputs.runs }}
         shell: pwsh
-        run: ./infra/run-agent-evaluation.ps1 -Agent $env:AGENT -Runs ([int] $env:RUNS) -Out "$env:RUNNER_TEMP/result.json"
+        run: ./infra/run-agent-evaluation.ps1 -Agent $env:AGENT -Runs ([int] $env:RUNS) -Submit:($env:SUBMIT -eq 'true') -Out "$env:RUNNER_TEMP/result.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
