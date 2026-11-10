@@ -62,8 +62,18 @@ public static class SuggestionParser
             evidence.Add(new Evidence(Text(item, "claim"), resultId, toolName));
         }
 
-        // Only an assign-carrier reply names a Carrier, and it must.
-        var carrierId = kind == SuggestedActionKind.AssignCarrier ? Text(root, "carrierId") : null;
+        // Only an assign-carrier reply names a Carrier. One that names none is still advice worth showing, but it
+        // pre-selects nothing, so it reads as needs-a-person.
+        string? carrierId = null;
+        if (kind == SuggestedActionKind.AssignCarrier)
+        {
+            carrierId = root.TryGetProperty("carrierId", out _) ? Text(root, "carrierId") : null;
+            if (carrierId is null)
+            {
+                kind = SuggestedActionKind.NeedsAPerson;
+            }
+        }
+
         return new Suggestion(cause, evidence, action, confidence, kind, CarrierId: carrierId);
     }
 

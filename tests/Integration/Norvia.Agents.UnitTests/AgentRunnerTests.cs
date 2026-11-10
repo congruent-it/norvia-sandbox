@@ -213,13 +213,14 @@ public sealed class AgentRunnerTests
     }
 
     [Fact]
-    public async Task RunAsync_AnAssignCarrierReplyNamingNoCarrier_IsAgentUnavailable()
+    public async Task RunAsync_AnAssignCarrierReplyNamingNoCarrier_ReadsAsNeedsAPerson()
     {
         var reply = GoodReply.Replace("needs-a-person", "assign-carrier", StringComparison.Ordinal);
 
-        var act = () => Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
+        var result = await Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
 
-        (await act.Should().ThrowAsync<AgentRunException>()).Which.FailureCode.Should().Be(AgentFailureCodes.AgentUnavailable);
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+        result.Suggestion.CarrierId.Should().BeNull();
     }
 
     [Fact]
