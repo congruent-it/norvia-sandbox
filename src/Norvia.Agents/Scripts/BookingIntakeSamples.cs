@@ -11,7 +11,8 @@ public static class BookingIntakeSamples
         "Hi Norvia,\n\n" +
         "Please collect 2 pallets (850 kg in total, 120x80x150 cm each) at Havenstraat 12, 3011 AB Rotterdam, Netherlands on 14-11-2030 between 08:00 and 12:00.\n" +
         "Deliver to Mueller GmbH, Lindenallee 5, 50667 Koeln, Germany. Contact: Anna Mueller, +49 221 555 0100.\n" +
-        "Our reference is SH-2030-0142.\n\nThanks,\nJo";
+        "Our reference is SH-2030-0142.\n\nThanks,\nJo\n\n" +
+        "This email is confidential and meant only for Norvia. If it reached you by mistake, please delete it.";
 
     /// <summary>A Dutch email that leaves most things out and gives a weight that is no weight.</summary>
     public const string Partial =

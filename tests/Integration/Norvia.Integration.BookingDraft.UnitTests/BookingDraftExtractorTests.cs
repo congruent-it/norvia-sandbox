@@ -225,10 +225,12 @@ public sealed class BookingDraftExtractorTests
     }
 
     [Fact]
-    public async Task The_scripted_good_email_ignores_its_signature()
+    public async Task The_scripted_good_email_ignores_its_signature_and_disclaimer()
     {
         var outcome = await Scripted().ExtractAsync(BookingIntakeSamples.Good, "corr-1", CancellationToken.None);
 
-        outcome.Draft!.Ignored.Should().Equal("Thanks,\nJo");
+        outcome.Draft!.Ignored.Should().Equal(
+            "Thanks,\nJo",
+            "This email is confidential and meant only for Norvia. If it reached you by mistake, please delete it.");
     }
 }

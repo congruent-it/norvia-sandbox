@@ -67,7 +67,7 @@ public static class BookingIntakeScript
             ["items.0.dimensions"] = "120x80x150 cm",
         },
         ["missing"] = new JsonArray(),
-        ["ignored"] = new JsonArray("Thanks,\nJo"),
+        ["ignored"] = new JsonArray("Thanks,\nJo", "This email is confidential and meant only for Norvia. If it reached you by mistake, please delete it."),
     };
 
     private static JsonObject Partial() => new()

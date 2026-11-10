@@ -31,7 +31,8 @@ public sealed partial class FillFromEmailJourneyTests(IntakeAgentUiFixture norvi
         await Expect(Field("Goods line 1", "Quantity")).ToHaveValueAsync("2");
         await Expect(Field("Goods line 1", "Weight (kg)")).ToHaveValueAsync("850");
         // Nothing is missing, so nothing is flagged.
-        await Expect(Flags()).ToHaveCountAsync(0);
+        await Expect(Flags()).ToContainTextAsync("Every flagged field is handled.");
+        await Expect(Flags().GetByRole(AriaRole.Listitem)).ToHaveCountAsync(0);
 
         // The Shipper reviews the form and sends it as it does any booking; a reference of its own keeps this test independent of any other run.
         await Field("Booking", "Shipper reference").FillAsync(NewReference());
