@@ -1,7 +1,7 @@
+using Microsoft.Extensions.Time.Testing;
 using Norvia.HealthCheck.Application.Checks;
 using Norvia.HealthCheck.Application.Estate;
 using Norvia.HealthCheck.Application.Run;
-using Microsoft.Extensions.Time.Testing;
 
 namespace Norvia.HealthCheck.Application.UnitTests.Run;
 

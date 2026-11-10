@@ -68,7 +68,7 @@ public sealed class BookingDraftExtractor(IAgentClient agent)
         var haystack = Normalize(text);
         var quotes = reply["quotes"]!.AsObject().ToDictionary(quote => quote.Key, quote => quote.Value!.GetValue<string>(), StringComparer.Ordinal);
         var missing = reply["missing"]!.AsArray()
-            .Select(field => new MissingField(field!["field"]!.GetValue<string>(), field["reason"]!.GetValue<string>()))
+            .Select(field => new MissingField(field!["field"]!.GetValue<string>(), field["reason"]!.GetValue<string>(), field["kind"]?.GetValue<string>() == "ambiguous"))
             .ToList();
         var kept = new Dictionary<string, string>(StringComparer.Ordinal);
         var booking = new JsonObject();
@@ -135,8 +135,15 @@ public sealed class BookingDraftExtractor(IAgentClient agent)
             }
         }
 
-        return new BookingDraft(booking, kept, missing);
+        return new BookingDraft(booking, kept, missing, Ignored(reply, haystack));
     }
+
+    // What the agent says it left out, as far as the text holds it: a snippet that is not in the text is not shown as if it were.
+    private static List<string> Ignored(JsonObject reply, string haystack) =>
+        [.. (reply["ignored"] as JsonArray ?? [])
+            .Select(snippet => snippet!.GetValue<string>().Trim())
+            .Where(snippet => snippet.Length > 0 && haystack.Contains(Normalize(snippet), StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)];
 
     private static readonly string[] DateFields = ["pickupFrom", "pickupUntil", "deliverFrom", "deliverUntil"];
 

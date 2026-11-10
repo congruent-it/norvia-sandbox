@@ -10,7 +10,7 @@ namespace Norvia.PartnerPortal.Infrastructure.PartnerApi;
 /// <summary>
 /// Reads the Norvia Partner API's <c>booking-draft</c> (contracts/partner-api/booking-draft.v1.schema.json) into a booking the form
 /// can hold, the opposite way of <see cref="PartnerBookingFormat"/>. A value the form cannot hold (a weight in a unit it cannot read)
-/// is left empty and flagged, never guessed. The quotes are not read: they are for the agent's own check.
+/// is left empty and flagged, never guessed. The quotes and the ignored text are kept for the review screen; they are not part of the booking.
 /// </summary>
 internal static partial class PartnerBookingDraftFormat
 {
@@ -30,7 +30,7 @@ internal static partial class PartnerBookingDraftFormat
 
         if (statusCode == 200 && json is JsonObject { } document && document["booking"] is JsonObject booking)
         {
-            return Draft(booking, document["missing"] as JsonArray, messageId);
+            return Draft(booking, document, messageId);
         }
 
         var code = json?["failureCode"]?.GetValue<string>();
@@ -43,14 +43,14 @@ internal static partial class PartnerBookingDraftFormat
         return BookingDraftAnswer.Refused(outcome, messageId ?? json?["messageId"]?.GetValue<string>());
     }
 
-    private static BookingDraftAnswer Draft(JsonObject json, JsonArray? missing, string? messageId)
+    private static BookingDraftAnswer Draft(JsonObject json, JsonObject document, string? messageId)
     {
         var flags = new List<FlaggedField>();
-        foreach (var field in missing ?? [])
+        foreach (var field in document["missing"] as JsonArray ?? [])
         {
             if (field?["field"]?.GetValue<string>() is { } name && field["reason"]?.GetValue<string>() is { } reason)
             {
-                flags.Add(new FlaggedField(name, reason));
+                flags.Add(new FlaggedField(name, reason, field["kind"]?.GetValue<string>() == "ambiguous"));
             }
         }
 
@@ -67,8 +67,27 @@ internal static partial class PartnerBookingDraftFormat
             GoodsLines = [.. (json["items"] as JsonArray ?? []).Select((item, index) => Line(item as JsonObject ?? [], index, flags))],
             Instructions = Text(json, "remarks"),
         };
-        return new BookingDraftAnswer(BookingDraftOutcome.Drafted, request, flags, messageId);
+        return new BookingDraftAnswer(BookingDraftOutcome.Drafted, request, flags, messageId, Quotes(document), Ignored(document));
     }
+
+    private static Dictionary<string, string> Quotes(JsonObject document)
+    {
+        var quotes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (field, quote) in document["quotes"] as JsonObject ?? [])
+        {
+            if (quote is JsonValue { } value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text))
+            {
+                quotes[field] = text;
+            }
+        }
+
+        return quotes;
+    }
+
+    private static List<string> Ignored(JsonObject document) =>
+        [.. (document["ignored"] as JsonArray ?? [])
+            .Select(snippet => snippet is JsonValue { } value && value.TryGetValue<string>(out var text) ? text.Trim() : string.Empty)
+            .Where(text => text.Length > 0)];
 
     private static BookingGoodsLine Line(JsonObject item, int index, List<FlaggedField> flags)
     {
@@ -94,7 +113,7 @@ internal static partial class PartnerBookingDraftFormat
         var match = WeightPattern().Match(text);
         if (!match.Success)
         {
-            flags.Add(new FlaggedField($"items.{index}.weight", $"The weight '{text}' could not be read."));
+            flags.Add(new FlaggedField($"items.{index}.weight", $"The weight '{text}' could not be read.", CheckThis: true));
             return null;
         }
 
@@ -117,7 +136,7 @@ internal static partial class PartnerBookingDraftFormat
         var match = DimensionsPattern().Match(text);
         if (!match.Success)
         {
-            flags.Add(new FlaggedField($"items.{index}.dimensions", $"The dimensions '{text}' could not be read."));
+            flags.Add(new FlaggedField($"items.{index}.dimensions", $"The dimensions '{text}' could not be read.", CheckThis: true));
             return null;
         }
 
@@ -143,7 +162,7 @@ internal static partial class PartnerBookingDraftFormat
             return time;
         }
 
-        flags.Add(new FlaggedField(name, $"The time '{text}' could not be read."));
+        flags.Add(new FlaggedField(name, $"The time '{text}' could not be read.", CheckThis: true));
         return null;
     }
 

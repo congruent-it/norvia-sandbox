@@ -257,7 +257,7 @@ public sealed class BookingWorkflowTests
     {
         var connections = BookingWorkflow.ConnectionsFile["serviceProviderConnections"]!.AsObject();
 
-        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault");        foreach (var (_, connection) in connections)
+        connections.Select(connection => connection.Key).Should().BeEquivalentTo("keyVault"); foreach (var (_, connection) in connections)
         {
             var authProvider = connection!["parameterValues"]!["authProvider"]!;
             authProvider["Type"]!.GetValue<string>().Should().Be("ManagedServiceIdentity");

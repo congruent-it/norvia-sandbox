@@ -43,6 +43,10 @@ public sealed class BookingDraftExtractorTests
         draft.Booking["items"]!.AsArray()[0]!.AsObject().ContainsKey("weight").Should().BeFalse();
         draft.Missing.Select(m => m.Field).Should().Contain(["bookingRef", "pickupFrom", "items.0.weight"]);
         draft.Missing.Single(m => m.Field == "items.0.weight").Reason.Should().Contain("ambiguous");
+        draft.Missing.Single(m => m.Field == "items.0.weight").Ambiguous.Should().BeTrue();
+        draft.Missing.Single(m => m.Field == "bookingRef").Ambiguous.Should().BeFalse();
+        BookingDraftSchema.Errors(draft.ToJson()).Should().BeEmpty();
+        draft.ToJson()["missing"]!.AsArray().Single(m => m!["field"]!.GetValue<string>() == "items.0.weight")!["kind"]!.GetValue<string>().Should().Be("ambiguous");
     }
 
     [Fact]
@@ -190,5 +194,41 @@ public sealed class BookingDraftExtractorTests
 
         (await Replying(kept).ExtractAsync(text, "corr-1", CancellationToken.None)).Draft!.Booking.ContainsKey("pickupFrom").Should().BeTrue();
         (await Replying(wrongDay).ExtractAsync(text, "corr-1", CancellationToken.None)).Draft!.Booking.ContainsKey("pickupFrom").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Text_the_agent_did_not_use_is_listed_when_the_text_holds_it()
+    {
+        var reply = new JsonObject
+        {
+            ["booking"] = new JsonObject { ["pickupCity"] = "Utrecht" },
+            ["quotes"] = new JsonObject { ["pickupCity"] = "Utrecht" },
+            ["missing"] = new JsonArray(),
+            ["ignored"] = new JsonArray("groet,\njan", "Dit bericht is vertrouwelijk"),
+        }.ToJsonString();
+
+        var outcome = await Replying(reply).ExtractAsync(BookingIntakeSamples.Partial, "corr-1", CancellationToken.None);
+
+        outcome.Draft!.Ignored.Should().Equal("groet,\njan");
+        BookingDraftSchema.Errors(outcome.Draft.ToJson()).Should().BeEmpty();
+        outcome.Draft.ToJson()["ignored"]!.AsArray().Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task A_reply_without_an_ignored_list_gives_an_empty_one()
+    {
+        var reply = Reply(new JsonObject { ["pickupCity"] = "Utrecht" }, new JsonObject { ["pickupCity"] = "Utrecht" });
+
+        var outcome = await Replying(reply).ExtractAsync(BookingIntakeSamples.Partial, "corr-1", CancellationToken.None);
+
+        outcome.Draft!.Ignored.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_scripted_good_email_ignores_its_signature()
+    {
+        var outcome = await Scripted().ExtractAsync(BookingIntakeSamples.Good, "corr-1", CancellationToken.None);
+
+        outcome.Draft!.Ignored.Should().Equal("Thanks,\nJo");
     }
 }

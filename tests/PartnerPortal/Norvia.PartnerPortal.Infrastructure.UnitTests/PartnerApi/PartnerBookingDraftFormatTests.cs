@@ -41,6 +41,56 @@ public sealed class PartnerBookingDraftFormatTests
         answer.Flags.Should().Equal(new FlaggedField("receiverEmail", "The text gives no email."));
     }
 
+    [Fact]
+    public void Read_ADraft_KeepsTheQuotesAndWhatTheAgentIgnored()
+    {
+        var answer = PartnerBookingDraftFormat.Read(
+            200,
+            """
+            {"booking": {"pickupCity": "Utrecht"}, "quotes": {"pickupCity": "ons magazijn in Utrecht", "bookingRef": "  "}, "missing": [], "ignored": ["Groet, Jan", " ", "Vertrouwelijk"]}
+            """,
+            null);
+
+        answer.Quotes.Should().Equal(new Dictionary<string, string> { ["pickupCity"] = "ons magazijn in Utrecht" });
+        answer.Ignored.Should().Equal("Groet, Jan", "Vertrouwelijk");
+    }
+
+    [Fact]
+    public void Read_AnAmbiguousField_IsFlaggedToCheck_AndAMissingOneIsNot()
+    {
+        var answer = PartnerBookingDraftFormat.Read(
+            200,
+            """
+            {"booking": {}, "quotes": {}, "missing": [
+              {"field": "items.0.weight", "reason": "850 kg and 900 kg.", "kind": "ambiguous"},
+              {"field": "receiverEmail", "reason": "No email.", "kind": "missing"},
+              {"field": "bookingRef", "reason": "No reference."}]}
+            """,
+            null);
+
+        answer.Flags.Should().Equal(
+            new FlaggedField("items.0.weight", "850 kg and 900 kg.", CheckThis: true),
+            new FlaggedField("receiverEmail", "No email."),
+            new FlaggedField("bookingRef", "No reference."));
+    }
+
+    [Fact]
+    public void Read_AValueTheFormCannotRead_IsFlaggedToCheck()
+    {
+        var answer = PartnerBookingDraftFormat.Read(200, """{"booking": {"items": [{"weight": "heavy"}]}, "quotes": {}, "missing": []}""", null);
+
+        answer.Flags.Should().Equal(new FlaggedField("items.0.weight", "The weight 'heavy' could not be read.", CheckThis: true));
+    }
+
+    [Fact]
+    public void Read_ADraftWithoutQuotesOrIgnored_HasNone()
+    {
+        var answer = PartnerBookingDraftFormat.Read(200, """{"booking": {}, "missing": []}""", null);
+
+        answer.Quotes.Should().BeEmpty();
+        answer.Ignored.Should().BeEmpty();
+    }
+
     [Theory]
     [InlineData("2,5 t", 2500)]
     [InlineData("850 lb", 385.554)]

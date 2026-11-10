@@ -95,7 +95,7 @@ public sealed class AgentsRegistrationTests
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         builder.Configuration.AddInMemoryCollection(settings);
-                builder.AddAgentClient();
+        builder.AddAgentClient();
         return builder.Services.BuildServiceProvider();
     }
 }

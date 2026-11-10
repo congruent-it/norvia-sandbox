@@ -1,0 +1,68 @@
+@*
+    What the review shows under a field of the booking form that came from a Booking draft: the quote the value came from and, when the
+    Intake agent flagged the field, why and a way to confirm it. Shows nothing for a form that did not come from a draft.
+*@
+@implements IDisposable
+
+@if (Review is not null && (Review.QuoteOf(Field) is not null || Review.FlagOf(Field) is not null))
+{
+    var quote = Review.QuoteOf(Field);
+    var flag = Review.FlagOf(Field);
+    var label = DraftFieldLabels.Of(Field);
+    <div class="mt-1 text-xs" data-draft-field="@Field">
+        @if (quote is not null)
+        {
+            <p class="italic" title="@($"The words of the email that {label} came from")">From the email: “@quote”</p>
+        }
+        @if (flag is not null && !Review.IsHandled(Field))
+        {
+            <p role="status" class="font-semibold">
+                @flag.Title: @flag.Reason
+            </p>
+            <FluentButton Appearance="Appearance.Outline" OnClick="@(() => Review.Confirm(Field))"
+                          aria-label="@($"{flag.ConfirmText} {label}")">
+                @flag.ConfirmText
+            </FluentButton>
+        }
+        else if (flag is not null)
+        {
+            <p>@flag.HandledText</p>
+        }
+    </div>
+}
+
+@code {
+    private DraftReview? _subscribed;
+
+    /// <summary>The field's name as the Partner API names it, such as <c>pickupCity</c> or <c>items.0.weight</c>.</summary>
+    [Parameter, EditorRequired]
+    public string Field { get; set; } = string.Empty;
+
+    [CascadingParameter]
+    public DraftReview? Review { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(_subscribed, Review))
+        {
+            Unsubscribe();
+            _subscribed = Review;
+            if (_subscribed is not null)
+            {
+                _subscribed.Changed += Refresh;
+            }
+        }
+    }
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+
+    private void Unsubscribe()
+    {
+        if (_subscribed is not null)
+        {
+            _subscribed.Changed -= Refresh;
+        }
+    }
+
+    public void Dispose() => Unsubscribe();
+}

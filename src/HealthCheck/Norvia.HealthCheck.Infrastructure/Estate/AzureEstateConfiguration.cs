@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
-using System.Text.RegularExpressions;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Azure.Core;
 using Microsoft.Extensions.Options;
 using Norvia.HealthCheck.Application.Estate;
