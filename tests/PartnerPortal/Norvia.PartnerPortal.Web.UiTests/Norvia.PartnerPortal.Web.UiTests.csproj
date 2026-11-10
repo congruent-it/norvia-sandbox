@@ -14,5 +14,6 @@
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\Norvia.Agents\Norvia.Agents.csproj" />
   </ItemGroup>
 </Project>
