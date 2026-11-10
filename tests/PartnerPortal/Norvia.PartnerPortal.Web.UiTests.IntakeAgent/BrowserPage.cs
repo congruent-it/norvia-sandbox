@@ -91,7 +91,7 @@ public abstract class BrowserPage(IntakeAgentUiFixture norvia) : IAsyncLifetime
     protected ILocator Answer() => Portal.GetByRole(AriaRole.Region, new() { Name = "Norvia's answer" });
 
     /// <summary>The warning above the prefilled form that lists what the email did not give.</summary>
-    protected ILocator Flags() => Portal.GetByRole(AriaRole.Status).Filter(new() { HasText = "The assistant filled in what the email gives" });
+    protected ILocator Flags() => Portal.GetByRole(AriaRole.Status).Filter(new() { HasText = "The Intake agent filled in what the email gives" });
 
     // Unique per test run and short, as Norvia keeps each Shipper reference once per Shipper.
     protected static string NewReference() => $"UI-{Guid.NewGuid():N}"[..20];
