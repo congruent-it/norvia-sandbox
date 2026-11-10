@@ -45,8 +45,6 @@ $tmsUi = Get-AppUrl tms-web -ResourceGroup $resourceGroup
 if (-not $endpoint) { Write-Fail 'no Foundry project endpoint: has the estate been deployed (azd provision)?' }
 if ($Number -notmatch '^TO-[0-9]+$') { Write-Fail 'usage: smoke-test-planner-agent.ps1 <Transport Order number>, such as TO-0000042 (waiting for planning, collecting on the Over capacity day: see smoke-test-over-capacity-day.ps1)' }
 $workspace = Get-LogAnalyticsWorkspaceId -WorkspaceName $env:AZURE_ESTATE_LOG_ANALYTICS_WORKSPACE -ResourceGroup $resourceGroup
-function Get-FoundryHeader { @{ Authorization = "Bearer $(Get-AzAccessToken https://ai.azure.com)" } }
-function Get-Graph([string] $Path) { Invoke-AzRest -Method get -Url "https://graph.microsoft.com/v1.0$Path" }
 
 # 1. The identities and their roles.
 $published = Invoke-RestMethod -Uri "$endpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck -StatusCodeVariable publishedStatus
@@ -63,6 +61,11 @@ if (-not ($held.Count -eq 1 -and $held[0].resource -eq $viewId -and $held[0].rol
     Write-Fail "the Agent's identity does not hold exactly $role on the Planner agent view: $($held | ConvertTo-Json -Compress)"
 }
 Write-Pass "the Agent's identity $identityClient holds $role on the Planner agent view and nothing else"
+
+# It holds no Azure role either: the Agent reaches the estate through API Management's MCP server and nothing else.
+$azureRoles = @((Invoke-Az role assignment list --all --assignee-object-id $identityPrincipal --query '[].roleDefinitionName' --output json | Out-String | ConvertFrom-Json))
+if ($azureRoles.Count -ne 0) { Write-Fail "the Agent's identity holds Azure role(s): $($azureRoles -join ', ')" }
+Write-Pass "the Agent's identity holds no Azure role"
 
 # The TMS agent API has a role for each of the TMS's Agents; the Planner's is held by API Management's identity alone.
 $api = Get-Graph "/servicePrincipals?`$filter=displayName eq 'Norvia TMS agent API ($($env:AZURE_ENV_NAME))'&`$select=id,appRoles"

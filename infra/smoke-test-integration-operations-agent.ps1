@@ -40,8 +40,6 @@ $role = $contract.role
 
 if (-not $endpoint) { Write-Fail 'no Foundry project endpoint: has the estate been deployed (azd provision)?' }
 $workspace = Get-LogAnalyticsWorkspaceId -WorkspaceName $env:AZURE_ESTATE_LOG_ANALYTICS_WORKSPACE -ResourceGroup $resourceGroup
-function Get-FoundryHeaders { @{ Authorization = "Bearer $(Get-AzAccessToken https://ai.azure.com)" } }
-function Get-Graph([string] $Path) { Invoke-AzRest -Method get -Url "https://graph.microsoft.com/v1.0$Path" }
 
 if (-not $Trail) {
     $rows = Invoke-LogAnalyticsQuery -WorkspaceId $workspace "union AppTraces, AppRequests, AppDependencies | where TimeGenerated > ago(1d) | where tostring(Properties.failureCode) == 'UnmappableTrackingMessage' | top 1 by TimeGenerated desc | project tostring(Properties.correlationId)"
@@ -51,7 +49,7 @@ if (-not $Trail) {
 Write-Host "Trail: $Trail"
 
 # 1. The identities and their roles.
-$published = Invoke-RestMethod -Uri "$endpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck
+$published = Invoke-RestMethod -Uri "$endpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck
 $identityPrincipal = $published.instance_identity.principal_id ?? $published.identity.principal_id
 $identityClient = $published.instance_identity.client_id ?? $published.identity.client_id
 if (-not ($identityPrincipal -and $identityClient)) { Write-Fail "the Agent $agent is not published, or has no identity of its own: run infra/deploy-agents.ps1" }
@@ -91,7 +89,7 @@ $body = @{
     max_output_tokens = 1200
     structured_inputs = @{ correlationId = $Trail }
 } | ConvertTo-Json -Depth 10 -Compress
-$response = Invoke-RestMethod -Method Post -Uri "$endpoint/openai/v1/responses" -Headers (Get-FoundryHeaders) -ContentType 'application/json' -Body $body -TimeoutSec 180 -SkipHttpErrorCheck
+$response = Invoke-RestMethod -Method Post -Uri "$endpoint/openai/v1/responses" -Headers (Get-FoundryHeader) -ContentType 'application/json' -Body $body -TimeoutSec 180 -SkipHttpErrorCheck
 if ($response.status -ne 'completed') { Write-Fail "the Agent's response did not complete: $(($response.error ?? @{ status = $response.status }) | ConvertTo-Json -Compress -Depth 5)" }
 $calls = @($response.output | Where-Object type -EQ 'mcp_call')
 $tools = (@($calls.name | Sort-Object -Unique)) -join ','
@@ -120,12 +118,12 @@ foreach ($flow in 'agent-mcp-integration-operations', 'agent-view-integration-op
 }
 
 # 4. Nothing kept.
-$kept = (Invoke-WebRequest -Uri "$endpoint/openai/v1/responses/$($response.id)" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck).StatusCode
+$kept = (Invoke-WebRequest -Uri "$endpoint/openai/v1/responses/$($response.id)" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck).StatusCode
 if ($kept -eq 404) {
     Write-Pass 'the service did not keep the response (store: false is honoured when the Agent calls an MCP tool)'
 }
 else {
-    Invoke-WebRequest -Method Delete -Uri "$endpoint/openai/v1/responses/$($response.id)" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck | Out-Null
+    Invoke-WebRequest -Method Delete -Uri "$endpoint/openai/v1/responses/$($response.id)" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck | Out-Null
     Write-Host "NOTE  the service kept the response (HTTP $kept) although store was false; it was deleted. Record this in docs/operations/foundry.md (spike 3)."
 }
 

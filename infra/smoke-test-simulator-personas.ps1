@@ -43,11 +43,9 @@ if (-not $endpoint) { Write-Fail 'no Foundry project endpoint: has the estate be
 if ("$($env:AZURE_ESTATE_AGENTS_ENABLED)".ToLowerInvariant() -ne 'true') { Write-Fail 'the Agents are off in this estate: deploy it with ESTATE_AGENTS_ENABLED_SETTING=true' }
 
 $workspace = Get-LogAnalyticsWorkspaceId -WorkspaceName $env:AZURE_ESTATE_LOG_ANALYTICS_WORKSPACE -ResourceGroup $resourceGroup
-function Get-Graph([string] $Path) { Invoke-AzRest -Method get -Url "https://graph.microsoft.com/v1.0$Path" }
-function Get-FoundryHeaders { @{ Authorization = "Bearer $(Get-AzAccessToken https://ai.azure.com)" } }
 
 # 1. The Agent's identity holds no role; the project's shared identity holds none either.
-$published = Invoke-RestMethod -Uri "$endpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck
+$published = Invoke-RestMethod -Uri "$endpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck
 $identityPrincipal = $published.instance_identity.principal_id ?? $published.identity.principal_id
 if (-not $identityPrincipal) { Write-Fail "the Agent $agent is not published, or has no identity of its own: run infra/deploy-agents.ps1" }
 $held = @((Get-Graph "/servicePrincipals/$identityPrincipal/appRoleAssignments").value).Count
@@ -70,7 +68,7 @@ $body = @{
     store             = $false
     max_output_tokens = 800
 } | ConvertTo-Json -Depth 10 -Compress
-$response = Invoke-RestMethod -Method Post -Uri "$endpoint/openai/v1/responses" -Headers (Get-FoundryHeaders) -ContentType 'application/json' `
+$response = Invoke-RestMethod -Method Post -Uri "$endpoint/openai/v1/responses" -Headers (Get-FoundryHeader) -ContentType 'application/json' `
     -Body $body -TimeoutSec 60 -SkipHttpErrorCheck
 if ($response.status -ne 'completed') { Write-Fail "the Agent's response did not complete: $($response.error | ConvertTo-Json -Compress -Depth 5)" }
 if (@($response.output | Where-Object { $_.type -in 'mcp_call', 'function_call' }).Count -ne 0) { Write-Fail 'the Agent called a tool, and it has none' }
@@ -81,7 +79,7 @@ if ($texts.Count -lt 3 -or @($texts | Where-Object { $_ -isnot [string] -or $_.L
     Write-Fail 'the answer is not a list of at least three short texts'
 }
 Write-Pass "the real model wrote $($texts.Count) texts"
-$status = (Invoke-WebRequest -Uri "$endpoint/openai/v1/responses/$($response.id)" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck).StatusCode
+$status = (Invoke-WebRequest -Uri "$endpoint/openai/v1/responses/$($response.id)" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck).StatusCode
 if ($status -notin 404, 400) { Write-Fail "the response $($response.id) can be read back (HTTP $status): store: false should keep nothing" }
 Write-Pass 'the response is not kept by the service'
 

@@ -136,7 +136,8 @@ public sealed class PlannerAgentAzureTests
     {
         var script = Script("smoke-test-planner-agent.ps1");
 
-        script.Should().Contain("get_assignment_options").And.Contain("agent-mcp-planner").And.Contain("agent-view-planner");
+        script.Should().Contain("role assignment list").And.Contain("holds no Azure role");
+        script.Should().Contain("agent-mcp-planner").And.Contain("agent-view-planner");
         script.Should().Contain("OverCapacity").And.Contain("compares a Carrier's cost").And.Contain("carrierCost");
         script.Should().Contain("no street address or Consignee field appears in the tool calls").And.Contain("holds $role on the Planner agent view and nothing else");
         script.Should().MatchRegex(@"store\s*=\s*\$false");

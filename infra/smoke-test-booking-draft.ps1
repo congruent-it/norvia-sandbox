@@ -42,8 +42,6 @@ if (-not $intakeEndpoint) { Write-Fail 'no Foundry Intake project endpoint: has 
 if (-not $partnerApi) { Write-Fail 'no Partner API address: has the estate been deployed (azd provision)?' }
 $hostUrl = Get-AppUrl booking-draft-api -ResourceGroup $resourceGroup
 $workspace = Get-LogAnalyticsWorkspaceId -WorkspaceName $env:AZURE_ESTATE_LOG_ANALYTICS_WORKSPACE -ResourceGroup $resourceGroup
-function Get-FoundryHeaders { @{ Authorization = "Bearer $(Get-AzAccessToken https://ai.azure.com)" } }
-function Get-Graph([string] $Path) { Invoke-AzRest -Method get -Url "https://graph.microsoft.com/v1.0$Path" }
 function Get-SubscriptionKey([string] $Name) {
     (Invoke-Az rest --method post --url "$arm/Microsoft.ApiManagement/service/$($env:AZURE_ESTATE_API_MANAGEMENT)/subscriptions/$Name/listSecrets?api-version=2024-05-01" `
             --query primaryKey --output tsv | Out-String).Trim()
@@ -179,7 +177,7 @@ foreach ($sentinel in $reference, $consignee) {
 Write-Pass 'no text of the email is in AppTraces, AppRequests, AppDependencies, AppEvents or AppExceptions (two sentinels searched)'
 
 # 7. The identities and their roles.
-$published = Invoke-RestMethod -Uri "$intakeEndpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck
+$published = Invoke-RestMethod -Uri "$intakeEndpoint/agents/${agent}?api-version=v1" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck
 $agentPrincipal = $published.instance_identity.principal_id ?? $published.identity.principal_id
 if (-not $agentPrincipal) { Write-Fail "the Agent $agent is not published in the Intake project, or has no identity of its own: run infra/deploy-agents.ps1" }
 if (@((Get-Graph "/servicePrincipals/$agentPrincipal/appRoleAssignments").value).Count -ne 0) { Write-Fail "the Agent's identity holds an app role" }
@@ -203,7 +201,7 @@ if (-not ($held.Count -eq 1 -and $held[0].definition -like "*$foundryUserRoleId"
 Write-Pass "the host's identity holds Foundry User on the Intake project and nothing else"
 
 # 8. Nothing kept. The host asks with store: false and deletes before it returns; the sweeper is the safety net, so a leftover is a NOTE and not a failure.
-$list = Invoke-WebRequest -Uri "$intakeEndpoint/openai/v1/responses?limit=20&order=desc" -Headers (Get-FoundryHeaders) -TimeoutSec 60 -SkipHttpErrorCheck
+$list = Invoke-WebRequest -Uri "$intakeEndpoint/openai/v1/responses?limit=20&order=desc" -Headers (Get-FoundryHeader) -TimeoutSec 60 -SkipHttpErrorCheck
 if ($list.StatusCode -eq 200) {
     $kept = @(($list.Content | ConvertFrom-Json).data | Where-Object { $_.created_at -ge [DateTimeOffset]::new($started).ToUnixTimeSeconds() })
     if ($kept.Count -eq 0) {
