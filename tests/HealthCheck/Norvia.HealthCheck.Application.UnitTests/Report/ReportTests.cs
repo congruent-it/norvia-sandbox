@@ -1,8 +1,8 @@
 using Norvia.Agents;
-using Evidence = Norvia.HealthCheck.Application.Checks.Evidence;
 using Norvia.HealthCheck.Application.Checks;
 using Norvia.HealthCheck.Application.Report;
 using Norvia.HealthCheck.Application.Run;
+using Evidence = Norvia.HealthCheck.Application.Checks.Evidence;
 
 namespace Norvia.HealthCheck.Application.UnitTests.Report;
 

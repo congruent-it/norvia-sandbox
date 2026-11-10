@@ -345,7 +345,10 @@ public sealed class AgentMcpServerTests
     {
         var tools = ToBicep(new JsonArray(Tools.Select(name => (JsonNode)new JsonObject
         {
-            ["name"] = name, ["description"] = $"Reads {name}.", ["method"] = "GET", ["path"] = $"/{name.Replace('_', '-')}",
+            ["name"] = name,
+            ["description"] = $"Reads {name}.",
+            ["method"] = "GET",
+            ["path"] = $"/{name.Replace('_', '-')}",
         }).ToArray()));
         var defaults = Defaults(tools).Where(line => !parameters.Any(given => given.Split(' ')[1] == line.Split(' ')[1]));
 

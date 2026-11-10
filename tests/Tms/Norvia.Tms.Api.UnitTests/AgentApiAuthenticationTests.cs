@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
-using Asp.Versioning;
 using Ardalis.Result;
+using Asp.Versioning;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

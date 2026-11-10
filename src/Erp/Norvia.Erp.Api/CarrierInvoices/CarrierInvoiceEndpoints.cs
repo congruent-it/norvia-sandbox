@@ -1,7 +1,7 @@
 using Mediator;
-using Norvia.Agents;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Agents;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.CarrierInvoices;
