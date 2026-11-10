@@ -3,6 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Nodes;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Fonts.Standard14Fonts;
+using UglyToad.PdfPig.Writer;
 using static Norvia.Integration.BookingDraft.Api.IntegrationTests.FakeResponses;
 
 namespace Norvia.Integration.BookingDraft.Api.IntegrationTests;
@@ -38,6 +42,35 @@ public sealed class GatewayCallTests
 
         return request;
     }
+
+    private static HttpRequestMessage Upload(string token, byte[] body, string contentType)
+    {
+        var request = Request(token);
+        request.Content = new ByteArrayContent(body);
+        request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
+        return request;
+    }
+
+    /// <summary>A PDF with a page per text; an empty text makes a page with nothing to read, as a scan has.</summary>
+    private static byte[] Pdf(params string[] pages)
+    {
+        var builder = new PdfDocumentBuilder();
+        var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+        foreach (var text in pages)
+        {
+            var page = builder.AddPage(PageSize.A4);
+            if (text.Length > 0)
+            {
+                page.AddText(text, 12, new PdfPoint(25, 700), font);
+            }
+        }
+
+        return builder.Build();
+    }
+
+    /// <summary>Everything the host logged, messages, keys and exceptions, as one string.</summary>
+    private static string Trail(AzureHost host) =>
+        string.Concat(host.Logs.GetSnapshot().Select(record => record.Message + string.Join(',', Keys(record).Values) + record.Exception));
 
     private static Dictionary<string, object?> Keys(Microsoft.Extensions.Logging.Testing.FakeLogRecord record) =>
         record.Scopes.SelectMany(scope => (IEnumerable<KeyValuePair<string, object?>>)scope!).GroupBy(pair => pair.Key).ToDictionary(group => group.Key, group => group.Last().Value);
@@ -324,5 +357,127 @@ public sealed class GatewayCallTests
 
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         (await response.Content.ReadAsStringAsync(Ct)).Should().NotContain("sorry");
+    }
+
+    // A PDF in place of the text
+
+    [Fact]
+    public async Task APdfWithText_GivesTheSameDraft_AsItsTextPasted()
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(Message(Draft));
+
+        using var pasted = await host.Client.SendAsync(Request(host.Token()), Ct);
+        using var uploaded = await host.Client.SendAsync(Upload(host.Token(), Pdf(Text), "application/pdf"), Ct);
+
+        uploaded.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await uploaded.Content.ReadAsStringAsync(Ct)).Should().Be(await pasted.Content.ReadAsStringAsync(Ct));
+        var asked = host.Responses.Requests.Where(request => request.Method == HttpMethod.Post).Select(request => JsonNode.Parse(request.Body)!["input"]!.ToJsonString()).ToList();
+        asked.Should().HaveCount(2).And.OnlyContain(input => input.Contains(Text, StringComparison.Ordinal));
+        asked[1].Should().Be(asked[0], "the PDF's text goes through the same extraction as the pasted text");
+    }
+
+    [Fact]
+    public async Task AScannedPdf_IsRefused422NoTextInPdf_AndReachesNoAgent()
+    {
+        await using var host = new AzureHost();
+
+        using var response = await host.Client.SendAsync(Upload(host.Token(), Pdf("", ""), "application/pdf"), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await response.Content.ReadFromJsonAsync<JsonObject>(Ct))!["failureCode"]!.GetValue<string>().Should().Be("NoTextInPdf");
+        host.Responses.Requests.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("image/png")]
+    [InlineData("application/msword")]
+    public async Task AFileThatIsNotAPdf_IsRefused415UnsupportedFormat_AndReachesNoAgent(string contentType)
+    {
+        await using var host = new AzureHost();
+
+        using var response = await host.Client.SendAsync(Upload(host.Token(), Encoding.UTF8.GetBytes(Text), contentType), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
+        var body = await response.Content.ReadAsStringAsync(Ct);
+        JsonNode.Parse(body)!["failureCode"]!.GetValue<string>().Should().Be("UnsupportedFormat");
+        body.Should().NotContain(Text);
+        host.Responses.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task APdfThatCannotBeOpened_IsRefused415UnsupportedFormat_AndReachesNoAgent()
+    {
+        await using var host = new AzureHost();
+
+        using var response = await host.Client.SendAsync(Upload(host.Token(), Encoding.UTF8.GetBytes("%PDF-nonsense"), "application/pdf"), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
+        host.Responses.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task APdfOverTheSizeLimit_IsRefused413InputTooLarge_AndReachesNoAgent()
+    {
+        var pdf = Pdf(Text);
+        await using var host = new AzureHost(maxPdfBytes: 1_024);
+        byte[] oversize = [.. pdf, .. new byte[1_025]];
+
+        using var response = await host.Client.SendAsync(Upload(host.Token(), oversize, "application/pdf"), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        (await response.Content.ReadFromJsonAsync<JsonObject>(Ct))!["failureCode"]!.GetValue<string>().Should().Be("InputTooLarge");
+        host.Responses.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task APdfWithMoreTextThanTheLimit_IsRefused413InputTooLarge_AndReachesNoAgent()
+    {
+        await using var host = new AzureHost(maxCharacters: 100);
+
+        using var response = await host.Client.SendAsync(Upload(host.Token(), Pdf(new string('x', 101)), "application/pdf"), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        host.Responses.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TheTrail_NeverHoldsAPdfOrItsText_InALogOrOnASpan()
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(Message(Draft));
+        var token = host.Token();
+        var pdf = Pdf(Text);
+
+        using var _ = await host.Client.SendAsync(Upload(token, pdf, "application/pdf"), Ct);
+
+        var everything = Trail(host);
+        everything.Should().NotBeEmpty().And.NotContain(Text).And.NotContain(token).And.NotContain("%PDF");
+        var tags = host.Spans.SelectMany(span => span.TagObjects).Select(tag => $"{tag.Value}").ToList();
+        host.Spans.Should().NotBeEmpty();
+        tags.Should().NotContain(value => value.Contains(Text, StringComparison.Ordinal) || value.Contains("%PDF", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("scanned")]
+    [InlineData("unsupported")]
+    [InlineData("oversize")]
+    public async Task TheTrail_NeverHoldsTheUploadOfARefusedRequest(string kind)
+    {
+        await using var host = new AzureHost(maxPdfBytes: 1_024);
+        var token = host.Token();
+        using var request = kind switch
+        {
+            "scanned" => Upload(token, Pdf("", ""), "application/pdf"),
+            "unsupported" => Upload(token, Encoding.UTF8.GetBytes(Text), "image/png"),
+            _ => Upload(token, [.. Pdf(Text), .. new byte[1_100]], "application/pdf"),
+        };
+
+        using var _ = await host.Client.SendAsync(request, Ct);
+
+        var everything = Trail(host);
+        everything.Should().NotBeEmpty().And.NotContain(Text).And.NotContain(token).And.NotContain("%PDF");
+        // A refusal never reaches the agent, so it may leave no span at all; any it leaves must hold neither.
+        host.Spans.SelectMany(span => span.TagObjects).Select(tag => $"{tag.Value}").Should().NotContain(value => value.Contains(Text, StringComparison.Ordinal) || value.Contains("%PDF", StringComparison.Ordinal));
     }
 }
