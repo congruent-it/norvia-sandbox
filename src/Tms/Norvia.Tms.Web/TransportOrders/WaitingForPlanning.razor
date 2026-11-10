@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Shipments
+@using Norvia.Agents
 @using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Application.TransportOrders.ToPlan
 @implements IAsyncDisposable
@@ -101,7 +102,9 @@
         @* Shown beside the order, never as a filter: a Planner plans an order whatever its rating result. *@
         <PropertyColumn Title="Rating result" Property="@(transportOrder => RatingText.Of(transportOrder.RatingResult))" />
         <TemplateColumn Title="Suggest">
-            <SuggestAssignment TransportOrderNumber="@context.TransportOrderNumber" ForPlanner="RoleKey == NorviaRole.Planner.Key" />
+            <SuggestAssignment TransportOrderNumber="@context.TransportOrderNumber" ForPlanner="RoleKey == NorviaRole.Planner.Key"
+                               Stale="_stale.Contains(context.TransportOrderNumber)"
+                               OnSuggested="suggestion => Preselect(context.TransportOrderNumber, suggestion)" />
         </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
@@ -117,6 +120,9 @@
     private IReadOnlyList<CarrierView>? _carriers;
     private bool _carriersFailed;
     private string? _assignee = string.Empty;
+    // One per order the assistant has been asked about: a second Suggest never drops the first order's.
+    private readonly Dictionary<string, SuggestedAssignment> _suggested = [];
+    private readonly HashSet<string> _stale = [];
     private bool _assigning;
 
     // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
@@ -149,6 +155,23 @@
             Logger.LogWarning(exception, "Reading the active Carriers failed");
             _carriersFailed = true;
         }
+    }
+
+    // A Suggestion only pre-selects: the order and who carries it, as if the Planner had picked them. The Carrier must be one the picker
+    // offers (an inactive Carrier is never offered). Nothing is assigned until the Planner presses Assign, and they can change either choice.
+    private void Preselect(string number, Suggestion suggestion)
+    {
+        _stale.Remove(number);
+        _suggested.Remove(number);
+        if (SuggestedAssignment.From(number, suggestion) is not { } suggested
+            || (suggested.CarrierId is { } carrierId && _carriers?.Any(carrier => carrier.Id == carrierId) != true))
+        {
+            return;
+        }
+
+        _suggested[number] = suggested;
+        _assignee = suggested.CarrierId ?? OwnFleetOption;
+        _selected.Add(number);
     }
 
     private void Select(string number, bool selected)
@@ -189,12 +212,18 @@
         try
         {
             var assignments = new TransportOrderAssignments(Commands, Logger);
-            await foreach (var (number, answer) in assignments.AssignEachAsync(SelectedIn(transportOrders), carrierId, _closed.Token))
+            await foreach (var (number, answer) in assignments.AssignEachAsync(SelectedIn(transportOrders), carrierId, _suggested.Values, _closed.Token))
             {
                 // A Planned order leaves the selection; one that wasn't assigned stays selected, to try again.
                 if (answer is AssignAnswer.Planned)
                 {
                     _selected.Remove(number);
+                }
+
+                // The TMS refused it (a Carrier went inactive, the order was planned meanwhile): the Suggestion about it is stale.
+                if (answer is AssignAnswer.Refused && _suggested.Remove(number))
+                {
+                    _stale.Add(number);
                 }
 
                 _outcomes.Add(new AssignmentOutcome(number, assignee, answer));

@@ -31,11 +31,17 @@ public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(IL
         ArgumentNullException.ThrowIfNull(next);
 
         var (correlationId, numberKey, number) = TrailOf(message);
-        using var trail = Logger.Track(new()
+        var keys = new Dictionary<string, object?>
         {
             [TrackingKeys.CorrelationId] = correlationId,
             [numberKey] = number,
-        });
+        };
+        foreach (var (key, value) in ExtraKeysOf(message))
+        {
+            keys[key] = value;
+        }
+
+        using var trail = Logger.Track(keys);
         var result = await next(message, cancellationToken);
         if (result.IsSuccess)
         {
@@ -54,6 +60,9 @@ public abstract partial class TrackPlanningInLoggingScope<TCommand, TOutcome>(IL
     /// when the action is refused.
     /// </summary>
     protected abstract (string CorrelationId, string NumberKey, string Number) TrailOf(TCommand message);
+
+    /// <summary>More keys for the whole call's scope, such as the Agent whose Suggestion the Planner acted on; none by default.</summary>
+    protected virtual Dictionary<string, object?> ExtraKeysOf(TCommand message) => [];
 
     /// <summary>Logs what the action did, for an outcome that isn't a repeat.</summary>
     protected abstract void LogDone(TOutcome outcome);

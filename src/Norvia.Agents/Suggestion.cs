@@ -7,18 +7,20 @@ namespace Norvia.Agents;
 /// <param name="SuggestedAction">What to do, in plain text. Acting on it is the person's own command, under their own role.</param>
 /// <param name="Action">The kind of action it suggests. Resubmit, Discard and Release let the host pre-select the message or order; nothing executes.</param>
 /// <param name="Run">The Agent run that produced it, set by the client that ran it, for the audit when the person acts on it.</param>
+/// <param name="CarrierId">The Carrier a <see cref="SuggestedActionKind.AssignCarrier"/> Suggestion names, so the host can pre-select it; null otherwise.</param>
 public sealed record Suggestion(
     string Cause,
     IReadOnlyList<Evidence> Evidence,
     string SuggestedAction,
     Confidence Confidence,
     SuggestedActionKind Action = SuggestedActionKind.NeedsAPerson,
-    AgentRun? Run = null);
+    AgentRun? Run = null,
+    string? CarrierId = null);
 
 /// <summary>The Agent and the run ID that produced a <see cref="Suggestion"/>.</summary>
 public sealed record AgentRun(string AgentName, string RunId);
 
-/// <summary>What a <see cref="Suggestion"/> suggests. Its wire names are <c>resubmit</c>, <c>discard</c>, <c>fix-the-cause-first</c>, <c>release</c>, <c>wait</c>, <c>accept</c>, <c>accept-adjusted</c>, <c>reject</c> and <c>needs-a-person</c>.</summary>
+/// <summary>What a <see cref="Suggestion"/> suggests. Its wire names are <c>resubmit</c>, <c>discard</c>, <c>fix-the-cause-first</c>, <c>release</c>, <c>wait</c>, <c>accept</c>, <c>accept-adjusted</c>, <c>reject</c>, <c>assign-own-fleet</c>, <c>assign-carrier</c> and <c>needs-a-person</c>.</summary>
 public enum SuggestedActionKind
 {
     Resubmit,
@@ -40,6 +42,12 @@ public enum SuggestedActionKind
 
     /// <summary>Reject a Carrier invoice line (E2). Finance writes the reason.</summary>
     Reject,
+
+    /// <summary>Assign a Transport Order to Own fleet (P3). The host only pre-selects it: the Planner confirms.</summary>
+    AssignOwnFleet,
+
+    /// <summary>Assign a Transport Order to the Carrier the Suggestion names (P3). The host only pre-selects it: the Planner confirms.</summary>
+    AssignCarrier,
 }
 
 /// <summary>One claim and the tool result it came from.</summary>

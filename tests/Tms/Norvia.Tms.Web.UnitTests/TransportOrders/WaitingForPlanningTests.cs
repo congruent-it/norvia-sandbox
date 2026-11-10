@@ -1,5 +1,6 @@
 using AngleSharp.Dom;
 using Microsoft.FluentUI.AspNetCore.Components;
+using Norvia.Agents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders.ToPlan;
 using Norvia.Tms.Domain.TransportOrders;
@@ -228,8 +229,8 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     public void Assign_ToACarrier_AssignsEachSelectedOrderToItAndSaysWhichShipmentPlansIt()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"), Samples.ToPlan("TO-0000043"), Samples.ToPlan("TO-0000044"));
-        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
-        Commands.AssignAsync("TO-0000044", "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000013"));
+        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
+        Commands.AssignAsync("TO-0000044", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000013"));
         Select(page, "TO-0000042");
         Select(page, "TO-0000044");
         Choose(page, Samples.Kessler.Id);
@@ -241,14 +242,14 @@ public sealed class WaitingForPlanningTests : TmsWebContext
             "Transport Order TO-0000042 is planned as Shipment SH-0000012, carried by Kessler Spedition.",
             "Transport Order TO-0000044 is planned as Shipment SH-0000013, carried by Kessler Spedition."));
         page.Find("a[href='/shipments/SH-0000012']");
-        Commands.DidNotReceive().AssignAsync("TO-0000043", Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        Commands.DidNotReceive().AssignAsync("TO-0000043", Arg.Any<string?>(), Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void Assign_ToOwnFleet_AssignsWithoutACarrier()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"));
-        Commands.AssignAsync("TO-0000042", null, Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
+        Commands.AssignAsync("TO-0000042", null, Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
         Select(page, "TO-0000042");
         Choose(page, "own-fleet");
 
@@ -262,7 +263,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     public void Assign_ToOwnFleetOnADayOverCapacity_ShowsTheLoadWarningBesideThePlannedMessage()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"));
-        Commands.AssignAsync("TO-0000042", null, Arg.Any<CancellationToken>())
+        Commands.AssignAsync("TO-0000042", null, Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns(new AssignAnswer.Planned("SH-0000012", "Thu 1 Oct: Over capacity, 34 of 30 pallet places after this assignment"));
         Select(page, "TO-0000042");
         Choose(page, "own-fleet");
@@ -278,7 +279,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     public void Assign_AnOrderWhoseRatingFailed_AssignsIt()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042", ratingResult: RatingResult.RatingFailed));
-        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
+        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
         Select(page, "TO-0000042");
         Choose(page, Samples.Kessler.Id);
 
@@ -291,10 +292,10 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     public void Assign_WhenTheTmsRefusesOne_SaysWhyAndStillAssignsTheOthers()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"), Samples.ToPlan("TO-0000043"), Samples.ToPlan("TO-0000044"));
-        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
-        Commands.AssignAsync("TO-0000043", "CAR-0002", Arg.Any<CancellationToken>())
+        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000012"));
+        Commands.AssignAsync("TO-0000043", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns(new AssignAnswer.Refused("Transport Order TO-0000043 is Planned already."));
-        Commands.AssignAsync("TO-0000044", "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000013"));
+        Commands.AssignAsync("TO-0000044", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000013"));
         SelectAll(page, "TO-0000042", "TO-0000043", "TO-0000044");
         Choose(page, Samples.Kessler.Id);
 
@@ -311,9 +312,9 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     public void Assign_WhenTheTmsCantBeReachedForOne_ShowsAnErrorToTryAgainAndStillAssignsTheOthers()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"), Samples.ToPlan("TO-0000043"));
-        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<CancellationToken>())
+        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>())
             .Returns<AssignAnswer>(_ => throw new HttpRequestException("The TMS API didn't answer."));
-        Commands.AssignAsync("TO-0000043", "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000013"));
+        Commands.AssignAsync("TO-0000043", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Planned("SH-0000013"));
         SelectAll(page, "TO-0000042", "TO-0000043");
         Choose(page, Samples.Kessler.Id);
 
@@ -331,7 +332,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"));
         var answer = new TaskCompletionSource<AssignAnswer>();
-        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<CancellationToken>()).Returns(answer.Task);
+        Commands.AssignAsync("TO-0000042", "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(answer.Task);
         Select(page, "TO-0000042");
         Choose(page, Samples.Kessler.Id);
 
@@ -346,7 +347,7 @@ public sealed class WaitingForPlanningTests : TmsWebContext
     public void Assign_AgainAfterwards_ShowsOnlyTheNewOutcomes()
     {
         var page = RenderWith(Samples.ToPlan("TO-0000042"), Samples.ToPlan("TO-0000043"));
-        Commands.AssignAsync(Arg.Any<string>(), "CAR-0002", Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Refused("Carrier CAR-0002 is not active."));
+        Commands.AssignAsync(Arg.Any<string>(), "CAR-0002", Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new AssignAnswer.Refused("Carrier CAR-0002 is not active."));
         Select(page, "TO-0000042");
         Choose(page, Samples.Kessler.Id);
         AssignButton(page).Click();

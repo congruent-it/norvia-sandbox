@@ -23,7 +23,8 @@ public interface ITransportOrderCommands
     /// each Transport Order with a call of its own, so each succeeds or is refused on its own.
     /// </summary>
     /// <param name="carrierId">The Carrier to carry it; null for Own fleet.</param>
-    Task<AssignAnswer> AssignAsync(string transportOrderNumber, string? carrierId, CancellationToken cancellationToken);
+    /// <param name="actingOn">The Agent run whose Suggestion the Planner acted on, which the assignment's trace then names; null when they acted on their own.</param>
+    Task<AssignAnswer> AssignAsync(string transportOrderNumber, string? carrierId, AgentRun? actingOn, CancellationToken cancellationToken);
 
     /// <summary>Reassigns a Planned Shipment to Own fleet or another Carrier, to fix a mistake before release.</summary>
     /// <param name="carrierId">The Carrier to carry it; null for Own fleet.</param>

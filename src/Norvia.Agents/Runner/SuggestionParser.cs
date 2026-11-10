@@ -35,8 +35,10 @@ public static class SuggestionParser
             "accept" => SuggestedActionKind.Accept,
             "accept-adjusted" => SuggestedActionKind.AcceptAdjusted,
             "reject" => SuggestedActionKind.Reject,
+            "assign-own-fleet" => SuggestedActionKind.AssignOwnFleet,
+            "assign-carrier" => SuggestedActionKind.AssignCarrier,
             "needs-a-person" => SuggestedActionKind.NeedsAPerson,
-            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first, release, wait, accept, accept-adjusted, reject or needs-a-person."),
+            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first, release, wait, accept, accept-adjusted, reject, assign-own-fleet, assign-carrier or needs-a-person."),
         };
         if (!Enum.TryParse<Confidence>(Text(root, "confidence"), ignoreCase: true, out var confidence))
         {
@@ -60,7 +62,9 @@ public static class SuggestionParser
             evidence.Add(new Evidence(Text(item, "claim"), resultId, toolName));
         }
 
-        return new Suggestion(cause, evidence, action, confidence, kind);
+        // Only an assign-carrier reply names a Carrier, and it must.
+        var carrierId = kind == SuggestedActionKind.AssignCarrier ? Text(root, "carrierId") : null;
+        return new Suggestion(cause, evidence, action, confidence, kind, CarrierId: carrierId);
     }
 
     private static string Text(JsonElement element, string property) =>

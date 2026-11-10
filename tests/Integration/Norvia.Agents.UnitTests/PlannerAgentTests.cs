@@ -68,7 +68,8 @@ public sealed class PlannerAgentTests
         result.ToolCalls.Should().Equal(new ToolCallRecord("r1", "get_assignment_options"));
         result.Suggestion.SuggestedAction.Should().StartWith("Assign to Own fleet.").And.Contain("Van Dijk").And.Contain("112.90 EUR");
         result.Suggestion.Evidence.Should().OnlyContain(evidence => evidence.ResultId == "r1" && evidence.ToolName == "get_assignment_options");
-        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson, "nothing is pre-selected (#442)");
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.AssignOwnFleet, "the host pre-selects it, and the Planner confirms (#442)");
+        result.Suggestion.CarrierId.Should().BeNull();
         result.Suggestion.Confidence.Should().Be(Confidence.High);
         tools.Opened.Should().Be(new ToolContext("corr-1", "X-Correlation-ID"));
     }
@@ -80,6 +81,8 @@ public sealed class PlannerAgentTests
 
         result.Suggestion.SuggestedAction.Should().StartWith("Assign to Carrier Kessler at 90.14 EUR.").And.Contain("Over capacity, 34 of 30 pallet places");
         result.Suggestion.Cause.Should().Contain("Kessler");
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.AssignCarrier);
+        result.Suggestion.CarrierId.Should().Be("CAR-Kessler");
     }
 
     [Fact]
@@ -88,6 +91,7 @@ public sealed class PlannerAgentTests
         var (result, _) = await RunAsync(Options(OverCapacity, Carrier("Van Dijk", null, notPriced: "NoMatchingLane")));
 
         result.Suggestion.SuggestedAction.Should().StartWith("Assign to Own fleet, accepting this warning:").And.Contain("Over capacity, 34 of 30 pallet places");
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.AssignOwnFleet);
     }
 
     [Fact]
@@ -96,6 +100,7 @@ public sealed class PlannerAgentTests
         var (result, _) = await RunAsync(Options(NoDriver, Carrier("Van Dijk", 112.90m)));
 
         result.Suggestion.SuggestedAction.Should().StartWith("Assign to Carrier Van Dijk").And.NotContain("Assign to Own fleet");
+        result.Suggestion.CarrierId.Should().Be("CAR-Van Dijk");
     }
 
     [Fact]
@@ -114,6 +119,7 @@ public sealed class PlannerAgentTests
         var (result, _) = await RunAsync(Options(refused, Carrier("Van Dijk", null, meets: false)));
 
         result.Suggestion.SuggestedAction.Should().NotContain("Assign to").And.Contain("TransportOrderAlreadyPlanned");
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
         result.Suggestion.Confidence.Should().Be(Confidence.Low);
     }
 

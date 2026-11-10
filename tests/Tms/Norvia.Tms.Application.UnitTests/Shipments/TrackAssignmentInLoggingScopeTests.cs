@@ -48,6 +48,36 @@ public sealed class TrackAssignmentInLoggingScopeTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_AssignmentMadeFromASuggestion_NamesTheAgentAndItsRun()
+    {
+        await _behaviour.Handle(Assign with { ActingOn = new Norvia.Agents.AgentRun("planner", "run-7") }, Answering(Planned), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["agentId"] = "planner",
+            ["agentRunId"] = "run-7",
+        });
+    }
+
+    [Fact]
+    public async Task Handle_AssignmentMadeOnThePlannersOwn_NamesNoAgent()
+    {
+        await _behaviour.Handle(Assign, Answering(Planned), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Keys.Should().NotContain(["agentId", "agentRunId"]);
+    }
+
+    [Fact]
+    public async Task Handle_RefusedAssignmentMadeFromASuggestion_NamesTheAgentAndItsRun()
+    {
+        var refused = AssignmentRefused.Because<AssignTransportOrderResult>(AssignmentRules.TransportOrderNotFound("TO-0000007"));
+
+        await _behaviour.Handle(Assign with { ActingOn = new Norvia.Agents.AgentRun("planner", "run-7") }, Answering(refused), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain("agentRunId", "run-7").And.Contain("outcome", "Refused");
+    }
+
+    [Fact]
     public async Task Handle_PlannedOnOwnFleet_SaysOwnFleet()
     {
         var ownFleet = Planned with { CarriedBy = new CarriedByView(AssignedTo.OwnFleet, null) };

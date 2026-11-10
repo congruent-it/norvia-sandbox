@@ -18,6 +18,15 @@ public sealed partial class TrackAssignmentInLoggingScope(ILogger<TrackAssignmen
         return (message.CorrelationId, TrackingKeys.TransportOrderNumber, message.TransportOrderNumber);
     }
 
+    // Only an assignment the Planner made from a Suggestion names the Agent and its run (ADR 0040).
+    protected override Dictionary<string, object?> ExtraKeysOf(AssignTransportOrderCommand message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        return message.ActingOn is { } run
+            ? new() { [TrackingKeys.AgentId] = run.AgentName, [TrackingKeys.AgentRunId] = run.RunId }
+            : [];
+    }
+
     protected override void LogDone(AssignTransportOrderResult outcome)
     {
         ArgumentNullException.ThrowIfNull(outcome);
