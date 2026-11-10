@@ -108,6 +108,7 @@
     <Project Path="tests/Integration/Norvia.Integration.LocalAgentMcp.UnitTests/Norvia.Integration.LocalAgentMcp.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalPartnerApi.UnitTests/Norvia.Integration.LocalPartnerApi.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.TransportOrderIntake.UnitTests/Norvia.Integration.TransportOrderIntake.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.BookingDraft.Api.IntegrationTests/Norvia.Integration.BookingDraft.Api.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.BookingDraft.Api.UnitTests/Norvia.Integration.BookingDraft.Api.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.BookingDraft.UnitTests/Norvia.Integration.BookingDraft.UnitTests.csproj" />
   </Folder>
