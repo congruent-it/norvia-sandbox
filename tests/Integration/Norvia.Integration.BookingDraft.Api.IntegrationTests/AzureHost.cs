@@ -29,7 +29,7 @@ internal sealed class AzureHost : IAsyncDisposable
     private readonly ActivityListener _listener;
     private readonly List<Activity> _spans = [];
 
-    public AzureHost(bool enabled = true, int timeoutSeconds = 5, int maxCharacters = 8_000)
+    public AzureHost(bool enabled = true, int timeoutSeconds = 5, int maxCharacters = 8_000, int maxPdfBytes = 1_000_000)
     {
         Random.Shared.NextBytes(_key);
         var key = _key;
@@ -41,6 +41,7 @@ internal sealed class AzureHost : IAsyncDisposable
             builder.UseSetting("Agents:Enabled", enabled.ToString());
             builder.UseSetting("Agents:TimeoutSeconds", timeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
             builder.UseSetting("Agents:MaxInputCharacters", maxCharacters.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            builder.UseSetting("Agents:MaxPdfBytes", maxPdfBytes.ToString(System.Globalization.CultureInfo.InvariantCulture));
             builder.UseSetting("Agents:Foundry:ProjectEndpoint", ProjectEndpoint);
             builder.UseSetting("Agents:Api:Issuer", Issuer);
             builder.UseSetting("Agents:Api:Audience", Audience);
