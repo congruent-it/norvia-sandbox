@@ -117,8 +117,8 @@ jobs:
           if-no-files-found: ignore
 
   # One leg per application, each on a runner of its own with its own Docker daemon, so the AppHosts of the legs
-  # can't clash. The TMS has fourteen legs: its unit and architecture tests, one leg for each of its integration test projects
-  # (one per large component, one for its faults, and one for the small components together, coding guidelines §10) and four UI test projects. There are no path filters: every gate runs on every PR. The AppHost references every application, so
+  # can't clash. The TMS has fifteen legs: its unit and architecture tests, one leg for each of its integration test projects
+  # (one per large component, one for its faults, and one for the small components together, coding guidelines §10) and five UI test projects. There are no path filters: every gate runs on every PR. The AppHost references every application, so
   # each leg builds the whole solution.
   integration:
     name: Tests (${{ matrix.application }})
@@ -161,6 +161,9 @@ jobs:
           - application: TMS (UI, Customer service agent)
             directory: Tms
             kinds: UiTests.CustomerServiceAgent
+          - application: TMS (UI, Planner agent)
+            directory: Tms
+            kinds: UiTests.PlannerAgent
           - application: TMS (UI, Faults)
             directory: Tms
             kinds: UiTests.Faults

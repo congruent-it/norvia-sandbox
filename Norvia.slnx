@@ -202,6 +202,7 @@
     <Project Path="tests/Tms/Norvia.Tms.TestSupport/Norvia.Tms.TestSupport.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.CustomerServiceAgent/Norvia.Tms.Web.UiTests.CustomerServiceAgent.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.Faults/Norvia.Tms.Web.UiTests.Faults.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.PlannerAgent/Norvia.Tms.Web.UiTests.PlannerAgent.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.Remaining/Norvia.Tms.Web.UiTests.Remaining.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.Shipments/Norvia.Tms.Web.UiTests.Shipments.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Web.UiTests.TransportOrders/Norvia.Tms.Web.UiTests.TransportOrders.csproj" />
