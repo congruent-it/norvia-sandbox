@@ -1,5 +1,7 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Norvia.Tms.Api.Agents;
 using Norvia.Tms.TestSupport.Capacity;
 
 namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
@@ -12,15 +14,8 @@ namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
 /// </summary>
 public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
 {
-    // Every property the agent view may carry (PlannerAgentMapping.cs); the answer's JSON names no other.
-    private static readonly HashSet<string> Allowed =
-    [
-        "transportOrderNumber", "status", "shipper", "ratingResult", "asOf", "collection", "delivery", "collectionWindow", "deliveryWindow", "goods", "ownFleet", "carriers",
-        "city", "postcodeArea", "country", "earliest", "latest", "totalWeightKg", "palletPlaces",
-        "meetsAssignmentRules", "ruleBroken", "fit", "collectionDay", "warning", "load", "availableVehicles", "availableDrivers", "driversWithDrivingHoursLeft", "mostDrivingHoursLeft",
-        "capacityKg", "capacityPalletPlaces", "demandKg", "demandPalletPlaces", "over",
-        "carrierId", "name", "carrierCost", "notPriced",
-    ];
+    // Every property the agent view may carry, read from the view's own types (PlannerAgentMapping.cs), so a field added to the view is a field this test sees.
+    private static readonly HashSet<string> Allowed = [.. PropertyNamesOf(typeof(PlannerAgentAssignmentOptionsView))];
 
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
@@ -32,7 +27,7 @@ public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
         var options = await client.OptionsOfAsync(number, _cancellationToken);
-        var (_, assigned) = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToOwnFleet(), _cancellationToken);
+        var assigned = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToOwnFleet(), _cancellationToken);
 
         // P3: the Assignment rules let it through, and P10: the load check of the collection day with the order counted gives no warning.
         var own = options["ownFleet"]!;
@@ -57,13 +52,14 @@ public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
         var day = PlannerAgentCalls.Weekday(1);
         var before = (await LoadOfAsync(day))!;
         var spare = before["capacityKg"]!.GetValue<decimal>() - before["demandKg"]!.GetValue<decimal>();
+        spare.Should().BeGreaterThan(2_000m, "the day must have room for a filler and then an order that tips it over, so the seed has not filled it");
         var filler = await PlannerAgentCalls.AcceptedAsync(fixture, PlannerAgentCalls.BookingOn(day).Weighing(spare - 500m), _cancellationToken);
         await PlannerAgentCalls.PlannedAsync(fixture, filler, PlanningCalls.ToOwnFleet(), _cancellationToken);
         var number = await PlannerAgentCalls.AcceptedAsync(fixture, PlannerAgentCalls.BookingOn(day).Weighing(1_500m), _cancellationToken);
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
         var options = await client.OptionsOfAsync(number, _cancellationToken);
-        var (_, assigned) = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToOwnFleet(), _cancellationToken);
+        var assigned = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToOwnFleet(), _cancellationToken);
 
         var own = options["ownFleet"]!;
         own["fit"]!.GetValue<string>().Should().Be("OverCapacity");
@@ -84,7 +80,7 @@ public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
         var options = await client.OptionsOfAsync(number, _cancellationToken);
-        var (_, assigned) = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToOwnFleet(), _cancellationToken);
+        var assigned = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToOwnFleet(), _cancellationToken);
 
         var own = options["ownFleet"]!;
         own["fit"]!.GetValue<string>().Should().Be("OutsideHorizon");
@@ -104,9 +100,9 @@ public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
 
         var options = await client.OptionsOfAsync(number, _cancellationToken);
         var otherOptions = await client.OptionsOfAsync(other, _cancellationToken);
-        var (shipmentNumber, _) = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToCarrier(), _cancellationToken);
+        var shipmentNumber = (await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToCarrier(), _cancellationToken))["shipmentNumber"]!.GetValue<string>();
         var released = await fixture.ReleasedAsync(shipmentNumber, _cancellationToken);
-        var (otherShipment, _) = await PlannerAgentCalls.PlannedAsync(fixture, other, PlanningCalls.ToCarrier(PlanningCalls.OtherCarrierId), _cancellationToken);
+        var otherShipment = (await PlannerAgentCalls.PlannedAsync(fixture, other, PlanningCalls.ToCarrier(PlanningCalls.OtherCarrierId), _cancellationToken))["shipmentNumber"]!.GetValue<string>();
         var refusal = await fixture.ReleaseRefusedAsync(otherShipment, HttpStatusCode.UnprocessableEntity, _cancellationToken);
 
         // P9: 910.5 kg ÷ 100 × 9.50 = 86.4975, so 86.50, which the release freezes on the Carrier booking and publishes.
@@ -129,7 +125,7 @@ public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
         var options = await client.OptionsOfAsync(number, _cancellationToken);
-        var (shipmentNumber, _) = await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToCarrier(), _cancellationToken);
+        var shipmentNumber = (await PlannerAgentCalls.PlannedAsync(fixture, number, PlanningCalls.ToCarrier(), _cancellationToken))["shipmentNumber"]!.GetValue<string>();
         var refusal = await fixture.ReleaseRefusedAsync(shipmentNumber, HttpStatusCode.UnprocessableEntity, _cancellationToken);
 
         var carrier = options.CarrierOf(PlanningCalls.CarrierId);
@@ -200,6 +196,17 @@ public sealed class AssignmentOptionsTests(PlannerAgentFixture fixture)
     /// <summary>The day's load as P10 shows it to the Planner, from the open days.</summary>
     private async Task<JsonNode?> LoadOfAsync(DateOnly day) =>
         (await fixture.ListOpenDaysAsync(_cancellationToken)).Single(open => CapacityCalls.DateOf(open) == day)["load"];
+
+    private static IEnumerable<string> PropertyNamesOf(Type type)
+    {
+        var element = type.IsGenericType ? type.GetGenericArguments()[0] : type;
+        if (element.Namespace?.StartsWith("Norvia.Tms.Api", StringComparison.Ordinal) != true)
+        {
+            return [];
+        }
+
+        return element.GetProperties().SelectMany(property => PropertyNamesOf(property.PropertyType).Prepend(JsonNamingPolicy.CamelCase.ConvertName(property.Name)));
+    }
 
     private static IEnumerable<string> PropertyNames(JsonNode? node) => node switch
     {

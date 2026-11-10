@@ -56,21 +56,36 @@ internal static class PlannerAgentCalls
         return number;
     }
 
-    /// <summary>The Planner assigns the order, which the TMS must plan, and its ShipmentPlanned is out. Returns the Shipment number.</summary>
-    public static async Task<(string ShipmentNumber, JsonNode Answer)> PlannedAsync(
+    /// <summary>The Planner assigns the order, which the TMS must plan, and its ShipmentPlanned is out. Returns the TMS's answer: the Shipment number, the correlation ID and any load warning.</summary>
+    public static async Task<JsonNode> PlannedAsync(
         PlannerAgentFixture fixture, string number, JsonObject assignment, CancellationToken cancellationToken)
     {
         var assigned = await fixture.AssignPlannedAsync(number, assignment, cancellationToken);
         await fixture.PublishedAsync(assigned["correlationId"]!.GetValue<string>(), "ShipmentPlanned", cancellationToken);
-        return (assigned["shipmentNumber"]!.GetValue<string>(), assigned);
+        return assigned;
     }
 
     /// <summary>A JSON-RPC call of the MCP protocol.</summary>
-    public static Task<HttpResponseMessage> CallAsync(this HttpClient client, string method, CancellationToken cancellationToken, JsonObject? parameters = null) =>
-        client.PostAsJsonAsync(
-            new Uri(PlannerAgentFixture.McpPath, UriKind.Relative),
-            new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = parameters ?? new JsonObject() },
-            cancellationToken);
+    public static Task<HttpResponseMessage> CallAsync(this HttpClient client, string method, CancellationToken cancellationToken) =>
+        client.SendAsync(Request(method, new JsonObject(), correlationId: null), cancellationToken);
+
+    private static HttpRequestMessage Request(string method, JsonObject parameters, string? correlationId)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, new Uri(PlannerAgentFixture.McpPath, UriKind.Relative))
+        {
+            Content = JsonContent.Create(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = parameters }),
+        };
+        if (correlationId is not null)
+        {
+            request.Headers.Add("X-Correlation-ID", correlationId);
+        }
+
+        return request;
+    }
+
+    /// <summary>A <c>tools/call</c> of the MCP protocol, whatever the stand-in answers.</summary>
+    public static Task<HttpResponseMessage> CallToolRawAsync(this HttpClient client, string tool, JsonObject arguments, CancellationToken cancellationToken) =>
+        client.SendAsync(Request("tools/call", new JsonObject { ["name"] = tool, ["arguments"] = arguments }, Guid.NewGuid().ToString()), cancellationToken);
 
     /// <summary>Calls <c>get_assignment_options</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
     public static Task<(bool IsError, string Text)> GetAssignmentOptionsAsync(this HttpClient client, string transportOrderNumber, CancellationToken cancellationToken) =>
@@ -92,17 +107,7 @@ internal static class PlannerAgentCalls
     public static async Task<(bool IsError, string Text)> CallToolAsync(
         this HttpClient client, string tool, JsonObject arguments, string correlationId, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(PlannerAgentFixture.McpPath, UriKind.Relative))
-        {
-            Content = JsonContent.Create(new JsonObject
-            {
-                ["jsonrpc"] = "2.0",
-                ["id"] = 1,
-                ["method"] = "tools/call",
-                ["params"] = new JsonObject { ["name"] = tool, ["arguments"] = arguments },
-            }),
-        };
-        request.Headers.Add("X-Correlation-ID", correlationId);
+        using var request = Request("tools/call", new JsonObject { ["name"] = tool, ["arguments"] = arguments }, correlationId);
         using var response = await client.SendAsync(request, cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = (await response.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["result"]!;

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 
 namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
 
@@ -59,7 +60,7 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
         using var response = await client.CallAsync("tools/list", _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var tools = (await response.Content.ReadFromJsonAsync<System.Text.Json.Nodes.JsonObject>(_cancellationToken))!["result"]!["tools"]!.AsArray();
+        var tools = (await response.Content.ReadFromJsonAsync<JsonObject>(_cancellationToken))!["result"]!["tools"]!.AsArray();
         tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal([PlannerAgentCalls.Tool], "the Planner agent reads and writes nothing else");
     }
 
@@ -76,6 +77,18 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
     }
 
     [Fact]
+    public async Task AToolCallOverTheRateLimit_IsRefused429Too()
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken());
+        await UseUpTheLimitAsync(client);
+
+        using var response = await client.CallToolRawAsync(PlannerAgentCalls.Tool, new JsonObject { ["transportOrderNumber"] = "TO-9999999" }, _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        response.Headers.RetryAfter.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task TheChecksAreMadeInOrder_ARateLimitedAgentIsStillAskedForItsTokenAndItsRoleFirst()
     {
         var agentId = PlannerAgentFixture.NewAgentId();
@@ -84,13 +97,13 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
         using var noToken = fixture.CreateMcpClient(token: null);
         using var noRole = fixture.CreateMcpClient(fixture.AgentToken(agentId, roles: []));
 
-        using var first = await noToken.CallAsync("tools/list", _cancellationToken);
-        using var second = await noRole.CallAsync("tools/list", _cancellationToken);
-        using var third = await agent.CallAsync("tools/list", _cancellationToken);
+        using var unauthenticated = await noToken.CallAsync("tools/list", _cancellationToken);
+        using var unauthorised = await noRole.CallAsync("tools/list", _cancellationToken);
+        using var limited = await agent.CallAsync("tools/list", _cancellationToken);
 
-        first.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        second.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        third.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        unauthenticated.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        unauthorised.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        limited.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
     }
 
     private async Task UseUpTheLimitAsync(HttpClient client)
