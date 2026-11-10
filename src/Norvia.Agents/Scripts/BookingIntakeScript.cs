@@ -92,7 +92,7 @@ public static class BookingIntakeScript
             Missing("pickupUntil", "The text gives no pickup time."),
             Missing("receiverName", "The text does not name the receiver."),
             Missing("receiverStreet", "The text gives no delivery street."),
-            Missing("items.0.weight", "\"ongeveer een ton\" is ambiguous: a ton is not a weight in a unit the booking can hold.")),
+            Missing("items.0.weight", "\"ongeveer een ton\" is ambiguous: a ton is not a weight in a unit the booking can hold.", ambiguous: true)),
         ["ignored"] = new JsonArray("Groet,\nJan"),
     };
 
@@ -103,5 +103,14 @@ public static class BookingIntakeScript
         ["missing"] = new JsonArray(Missing("booking", "The text does not describe a booking the assistant can read.")),
     };
 
-    private static JsonObject Missing(string field, string reason) => new() { ["field"] = field, ["reason"] = reason };
+    private static JsonObject Missing(string field, string reason, bool ambiguous = false)
+    {
+        var json = new JsonObject { ["field"] = field, ["reason"] = reason };
+        if (ambiguous)
+        {
+            json["kind"] = "ambiguous";
+        }
+
+        return json;
+    }
 }

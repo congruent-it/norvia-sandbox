@@ -56,9 +56,9 @@ public sealed class DraftReviewScreenTests : PortalWebContext
     }
 
     [Fact]
-    public void Render_AFieldWithAValueTheAssistantWasUnsureOf_IsFlaggedCheckThis()
+    public void Render_AFieldTheAgentWasUnsureOf_IsFlaggedCheckThis()
     {
-        var page = RenderDraft(new FlaggedField("items.0.weight", "The email gives 850 kg and 900 kg."));
+        var page = RenderDraft(new FlaggedField("items.0.weight", "The email gives 850 kg and 900 kg.", CheckThis: true));
 
         page.Find("[data-draft-field='items.0.weight']").TextContent.Should().Contain("Check this: The email gives 850 kg and 900 kg.");
     }
@@ -72,6 +72,19 @@ public sealed class DraftReviewScreenTests : PortalWebContext
 
         NotSent();
         page.Find("[data-testid=draft-not-confirmed]").TextContent.Should().Contain("Email").And.Contain("The email gives no address.");
+    }
+
+    [Fact]
+    public void Submit_WithAnInvalidBookingAndAnUnhandledFlag_ShowsBothAtOnce()
+    {
+        var page = RenderDraft(new FlaggedField("remarks", "The email gives no instructions."));
+        Field(Group(page, "Delivery"), "Email").Change("not an email");
+
+        page.Find("form").Submit();
+
+        NotSent();
+        page.Find("[data-testid=draft-not-confirmed]").Should().NotBeNull();
+        page.Markup.Should().Contain("validation-message");
     }
 
     [Fact]

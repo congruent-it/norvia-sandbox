@@ -33,11 +33,11 @@ public sealed class DraftReviewTests
     }
 
     [Fact]
-    public void Flags_AFieldTheTextDidNotGive_IsMissing_AndOneWithAValue_IsToCheck()
+    public void Flags_AFieldTheTextDidNotGive_IsMissing_AndOneTheAgentWasUnsureOf_IsToCheck()
     {
         var review = new DraftReview(Draft(
             Booking(),
-            [new FlaggedField("bookingRef", "The text gives no reference."), new FlaggedField("pickupCity", "Two cities are named.")]));
+            [new FlaggedField("bookingRef", "The text gives no reference."), new FlaggedField("pickupCity", "Two cities are named.", CheckThis: true)]));
 
         review.Flags.Should().Equal(
             new DraftFlag("bookingRef", "The text gives no reference.", DraftFlagKind.Missing),
@@ -86,9 +86,22 @@ public sealed class DraftReviewTests
     }
 
     [Fact]
-    public void Observe_AFlaggedFieldThatWasEdited_IsHandled_AndStaysHandledWhenEditedBack()
+    public void Observe_AFlaggedFieldThatWasEdited_IsHandled_UntilItIsEditedBack()
     {
-        var review = new DraftReview(Draft(Booking(), [new FlaggedField("pickupCity", "Two cities.")]));
+        var review = new DraftReview(Draft(Booking(), [new FlaggedField("pickupCity", "Two cities.", CheckThis: true)]));
+
+        review.Observe(Booking() with { CollectionAddress = new BookingAddress(City: "Amersfoort") });
+        review.CanSubmit.Should().BeTrue();
+
+        review.Observe(Booking());
+        review.CanSubmit.Should().BeFalse("the value is the draft's again and nobody confirmed it");
+    }
+
+    [Fact]
+    public void Observe_AConfirmedField_StaysHandledWhateverTheFormHolds()
+    {
+        var review = new DraftReview(Draft(Booking(), [new FlaggedField("pickupCity", "Two cities.", CheckThis: true)]));
+        review.Confirm("pickupCity");
 
         review.Observe(Booking() with { CollectionAddress = new BookingAddress(City: "Amersfoort") });
         review.Observe(Booking());

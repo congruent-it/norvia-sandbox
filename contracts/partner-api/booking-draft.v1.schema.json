@@ -25,7 +25,11 @@
         "required": ["field", "reason"],
         "properties": {
           "field": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 300 }
+          "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "kind": {
+            "description": "Optional. `missing`: the text does not give the field. `ambiguous`: the text gives it in a way the agent could not settle, such as two weights; the Shipper is asked to check it. Absent means `missing`.",
+            "enum": ["missing", "ambiguous"]
+          }
         }
       }
     },

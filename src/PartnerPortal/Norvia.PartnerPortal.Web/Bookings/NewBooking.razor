@@ -46,14 +46,14 @@ else
     {
         <div role="status" class="mb-6 max-w-3xl" data-testid="draft-review">
             <FluentMessageBar Intent="@(_review.CanSubmit ? MessageIntent.Success : MessageIntent.Warning)" AllowDismiss="false">
-                The assistant filled in what the email gives, and under each value shows the words it came from. A field the email did not give is
+                The Intake agent filled in what the email gives, and under each value shows the words it came from. A field the email did not give is
                 empty. You can send the booking once you have confirmed or edited each field below that is flagged.
                 @if (_review.Unhandled.Count > 0)
                 {
                     <ul class="list-disc pl-6" data-testid="draft-flags">
                         @foreach (var flag in _review.Unhandled)
                         {
-                            <li><strong>@DraftFieldLabels.Of(flag.Field)</strong> (@(flag.Kind == DraftFlagKind.Missing ? "missing" : "check this")): @flag.Reason</li>
+                            <li><strong>@DraftFieldLabels.Of(flag.Field)</strong> (@flag.Title.ToLowerInvariant()): @flag.Reason</li>
                         }
                     </ul>
                 }
@@ -66,7 +66,7 @@ else
         @if (_review.Ignored.Count > 0)
         {
             <section class="mb-6 max-w-3xl" aria-labelledby="draft-ignored-heading" data-testid="draft-ignored">
-                <h2 id="draft-ignored-heading" class="lux-label">Text the assistant did not use</h2>
+                <h2 id="draft-ignored-heading" class="lux-label">Text the Intake agent did not use</h2>
                 <ul class="list-disc pl-6 text-sm">
                     @foreach (var text in _review.Ignored)
                     {
@@ -82,7 +82,7 @@ else
 
     <CascadingValue Value="_review">
     <div @onfocusout="ObserveForm">
-    <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="booking">
+    <EditForm Model="_form" OnSubmit="HandleSubmitAsync" FormName="booking">
         <BookingFormValidator />
 
         <fieldset class="lux-fieldset">
@@ -274,16 +274,22 @@ else
 
     // After any answer the form keeps what was entered, so after a rejection only what was wrong needs changing, and
     // sending it again after an acceptance shows that Norvia doesn't book it twice.
-    private async Task SubmitAsync()
+    private async Task HandleSubmitAsync(EditContext context)
     {
-        // The validator has decided the booking is valid; a flagged field nobody confirmed or edited still holds it back.
+        // Both checks show at once: a flagged field nobody confirmed or edited holds the booking back, and the validator decides what is valid.
         _review?.Observe(_form!.ToRequest());
         _notConfirmed = _review?.Unhandled ?? [];
-        if (_notConfirmed.Count > 0)
+        var valid = context.Validate();
+        if (_notConfirmed.Count > 0 || !valid)
         {
             return;
         }
 
+        await SubmitAsync();
+    }
+
+    private async Task SubmitAsync()
+    {
         _sending = true;
         _answer = null;
         _submitFailed = false;

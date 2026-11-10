@@ -43,6 +43,10 @@ public sealed class BookingDraftExtractorTests
         draft.Booking["items"]!.AsArray()[0]!.AsObject().ContainsKey("weight").Should().BeFalse();
         draft.Missing.Select(m => m.Field).Should().Contain(["bookingRef", "pickupFrom", "items.0.weight"]);
         draft.Missing.Single(m => m.Field == "items.0.weight").Reason.Should().Contain("ambiguous");
+        draft.Missing.Single(m => m.Field == "items.0.weight").Ambiguous.Should().BeTrue();
+        draft.Missing.Single(m => m.Field == "bookingRef").Ambiguous.Should().BeFalse();
+        BookingDraftSchema.Errors(draft.ToJson()).Should().BeEmpty();
+        draft.ToJson()["missing"]!.AsArray().Single(m => m!["field"]!.GetValue<string>() == "items.0.weight")!["kind"]!.GetValue<string>().Should().Be("ambiguous");
     }
 
     [Fact]

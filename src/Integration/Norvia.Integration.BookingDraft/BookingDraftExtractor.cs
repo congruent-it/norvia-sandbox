@@ -68,7 +68,7 @@ public sealed class BookingDraftExtractor(IAgentClient agent)
         var haystack = Normalize(text);
         var quotes = reply["quotes"]!.AsObject().ToDictionary(quote => quote.Key, quote => quote.Value!.GetValue<string>(), StringComparer.Ordinal);
         var missing = reply["missing"]!.AsArray()
-            .Select(field => new MissingField(field!["field"]!.GetValue<string>(), field["reason"]!.GetValue<string>()))
+            .Select(field => new MissingField(field!["field"]!.GetValue<string>(), field["reason"]!.GetValue<string>(), field["kind"]?.GetValue<string>() == "ambiguous"))
             .ToList();
         var kept = new Dictionary<string, string>(StringComparer.Ordinal);
         var booking = new JsonObject();

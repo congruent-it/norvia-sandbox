@@ -8,12 +8,23 @@ namespace Norvia.Integration.BookingDraft;
 /// </summary>
 public sealed record BookingDraft(JsonObject Booking, IReadOnlyDictionary<string, string> Quotes, IReadOnlyList<MissingField> Missing, IReadOnlyList<string> Ignored)
 {
+    private static JsonObject ToJson(MissingField field)
+    {
+        var json = new JsonObject { ["field"] = field.Field, ["reason"] = field.Reason };
+        if (field.Ambiguous)
+        {
+            json["kind"] = "ambiguous";
+        }
+
+        return json;
+    }
+
     /// <summary>The draft as the Partner API's <c>booking-draft</c> document.</summary>
     public JsonObject ToJson() => new()
     {
         ["booking"] = Booking.DeepClone(),
         ["quotes"] = new JsonObject(Quotes.Select(quote => KeyValuePair.Create(quote.Key, (JsonNode?)JsonValue.Create(quote.Value)))),
-        ["missing"] = new JsonArray([.. Missing.Select(field => (JsonNode)new JsonObject { ["field"] = field.Field, ["reason"] = field.Reason })]),
+        ["missing"] = new JsonArray([.. Missing.Select(field => ToJson(field))]),
         ["ignored"] = new JsonArray([.. Ignored.Select(text => (JsonNode)JsonValue.Create(text)!)]),
     };
 }

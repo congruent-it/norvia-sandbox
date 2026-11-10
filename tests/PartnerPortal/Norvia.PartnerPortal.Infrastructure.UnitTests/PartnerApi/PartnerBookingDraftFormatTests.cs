@@ -56,6 +56,33 @@ public sealed class PartnerBookingDraftFormatTests
     }
 
     [Fact]
+    public void Read_AnAmbiguousField_IsFlaggedToCheck_AndAMissingOneIsNot()
+    {
+        var answer = PartnerBookingDraftFormat.Read(
+            200,
+            """
+            {"booking": {}, "quotes": {}, "missing": [
+              {"field": "items.0.weight", "reason": "850 kg and 900 kg.", "kind": "ambiguous"},
+              {"field": "receiverEmail", "reason": "No email.", "kind": "missing"},
+              {"field": "bookingRef", "reason": "No reference."}]}
+            """,
+            null);
+
+        answer.Flags.Should().Equal(
+            new FlaggedField("items.0.weight", "850 kg and 900 kg.", CheckThis: true),
+            new FlaggedField("receiverEmail", "No email."),
+            new FlaggedField("bookingRef", "No reference."));
+    }
+
+    [Fact]
+    public void Read_AValueTheFormCannotRead_IsFlaggedToCheck()
+    {
+        var answer = PartnerBookingDraftFormat.Read(200, """{"booking": {"items": [{"weight": "heavy"}]}, "quotes": {}, "missing": []}""", null);
+
+        answer.Flags.Should().Equal(new FlaggedField("items.0.weight", "The weight 'heavy' could not be read.", CheckThis: true));
+    }
+
+    [Fact]
     public void Read_ADraftWithoutQuotesOrIgnored_HasNone()
     {
         var answer = PartnerBookingDraftFormat.Read(200, """{"booking": {}, "missing": []}""", null);

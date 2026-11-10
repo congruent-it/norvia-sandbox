@@ -50,7 +50,7 @@ internal static partial class PartnerBookingDraftFormat
         {
             if (field?["field"]?.GetValue<string>() is { } name && field["reason"]?.GetValue<string>() is { } reason)
             {
-                flags.Add(new FlaggedField(name, reason));
+                flags.Add(new FlaggedField(name, reason, field["kind"]?.GetValue<string>() == "ambiguous"));
             }
         }
 
@@ -113,7 +113,7 @@ internal static partial class PartnerBookingDraftFormat
         var match = WeightPattern().Match(text);
         if (!match.Success)
         {
-            flags.Add(new FlaggedField($"items.{index}.weight", $"The weight '{text}' could not be read."));
+            flags.Add(new FlaggedField($"items.{index}.weight", $"The weight '{text}' could not be read.", CheckThis: true));
             return null;
         }
 
@@ -136,7 +136,7 @@ internal static partial class PartnerBookingDraftFormat
         var match = DimensionsPattern().Match(text);
         if (!match.Success)
         {
-            flags.Add(new FlaggedField($"items.{index}.dimensions", $"The dimensions '{text}' could not be read."));
+            flags.Add(new FlaggedField($"items.{index}.dimensions", $"The dimensions '{text}' could not be read.", CheckThis: true));
             return null;
         }
 
@@ -162,7 +162,7 @@ internal static partial class PartnerBookingDraftFormat
             return time;
         }
 
-        flags.Add(new FlaggedField(name, $"The time '{text}' could not be read."));
+        flags.Add(new FlaggedField(name, $"The time '{text}' could not be read.", CheckThis: true));
         return null;
     }
 
