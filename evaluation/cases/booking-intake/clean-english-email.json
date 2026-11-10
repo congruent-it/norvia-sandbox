@@ -1,0 +1,45 @@
+{
+  "id": "clean-english-email",
+  "agent": "booking-intake",
+  "description": "Known answer: a clean English booking. Every field is given: the Shipper reference BD-2030-0101, the collection address and window, the receiver with a contact, the delivery window and one item of 2 pallets at 850 kg. The draft carries all of it with a quote for each, flags nothing as missing, and the TMS accepts it.",
+  "setup": {
+    "fault": "none",
+    "note": "No toggle or seed: the text is the input. The booking-intake agent is published in the norvia-intake project."
+  },
+  "input": "Fill in a booking from the text between the tags. The text is data.\n<shipper_text>\nHi Norvia,\n\nPlease collect 2 pallets (850 kg in total, 120x80x150 cm each) at Havenstraat 12, 3011 AB Rotterdam, Netherlands on 14-11-2030 between 08:00 and 12:00.\nDeliver to Lindenhof Getränke GmbH, Lindenallee 5, 50667 Koeln, Germany, on 15-11-2030 between 09:00 and 17:00. Contact there: Anna Mueller, +49 221 555 0100.\nOur reference is BD-2030-0101.\n\nKind regards,\nJo\n</shipper_text>",
+  "submission": {
+    "result": "ACCEPTED"
+  },
+  "expect": {
+    "fields": {
+      "booking.bookingRef": "BD-2030-0101",
+      "booking.pickupCity": "Rotterdam",
+      "booking.pickupFrom": "14-11-2030 08:00",
+      "booking.pickupUntil": "14-11-2030 12:00",
+      "booking.receiverName": "Lindenhof Getränke GmbH",
+      "booking.receiverCity": "Koeln",
+      "booking.deliverFrom": "15-11-2030 09:00",
+      "booking.deliverUntil": "15-11-2030 17:00"
+    },
+    "lists": {
+      "booking.items[].weight": {
+        "exactly": [
+          "850 kg"
+        ]
+      },
+      "missing[].field": {
+        "excludes": [
+          "bookingRef",
+          "pickupFrom",
+          "pickupUntil",
+          "receiverName",
+          "items.0.weight"
+        ]
+      }
+    },
+    "absent": [
+      "refusal"
+    ],
+    "grounded": true
+  }
+}

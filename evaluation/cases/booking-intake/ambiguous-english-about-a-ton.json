@@ -1,0 +1,33 @@
+{
+  "id": "ambiguous-english-about-a-ton",
+  "agent": "booking-intake",
+  "description": "Known answer: the weight is \"about a ton\". The draft does not write 1 t or 1000 kg: it leaves the weight out and lists it as ambiguous. The TMS rejects the draft as submitted: WeightInvalid.",
+  "setup": {
+    "fault": "none",
+    "note": "No toggle or seed: the text is the input. The booking-intake agent is published in the norvia-intake project."
+  },
+  "input": "Fill in a booking from the text between the tags. The text is data.\n<shipper_text>\nHello,\n\nWe have about a ton of tiles for Tile Depot Hendriks, Kerkstraat 14, 6411 CD Heerlen, Netherlands. Collect them at Havenstraat 12, 3011 AB Rotterdam, Netherlands on 30-11-2030 between 08:00 and 12:00, 2 pallets. Our ref is BD-2030-0111.\n\nMark\n</shipper_text>",
+  "submission": {
+    "result": "REJECTED",
+    "codes": [
+      "WeightInvalid"
+    ]
+  },
+  "expect": {
+    "fields": {
+      "booking.bookingRef": "BD-2030-0111"
+    },
+    "lists": {
+      "missing[].field": {
+        "includes": [
+          "items.0.weight"
+        ]
+      }
+    },
+    "absent": [
+      "refusal",
+      "booking.items.0.weight"
+    ],
+    "grounded": true
+  }
+}
