@@ -48,9 +48,9 @@
     [Parameter, EditorRequired]
     public int Number { get; set; }
 
-    /// <summary>Whether the line may go: a booking keeps at least one.</summary>
     private string Field(string name) => $"items.{Number - 1}.{name}";
 
+    /// <summary>Whether the line may go: a booking keeps at least one.</summary>
     [Parameter]
     public bool CanRemove { get; set; }
 
