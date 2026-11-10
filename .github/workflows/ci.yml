@@ -176,6 +176,9 @@ jobs:
           - application: Partner portal (Carrier and Shipper faults)
             directory: PartnerPortal
             kinds: IntegrationTests.Faults
+          - application: Partner portal (UI, Intake agent)
+            directory: PartnerPortal
+            kinds: UiTests.IntakeAgent
           - application: ERP
             directory: Erp
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
