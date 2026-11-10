@@ -68,6 +68,10 @@ public sealed class GatewayCallTests
         return builder.Build();
     }
 
+    /// <summary>Everything the host logged, messages, keys and exceptions, as one string.</summary>
+    private static string Trail(AzureHost host) =>
+        string.Concat(host.Logs.GetSnapshot().Select(record => record.Message + string.Join(',', Keys(record).Values) + record.Exception));
+
     private static Dictionary<string, object?> Keys(Microsoft.Extensions.Logging.Testing.FakeLogRecord record) =>
         record.Scopes.SelectMany(scope => (IEnumerable<KeyValuePair<string, object?>>)scope!).GroupBy(pair => pair.Key).ToDictionary(group => group.Key, group => group.Last().Value);
 
@@ -417,8 +421,7 @@ public sealed class GatewayCallTests
     {
         var pdf = Pdf(Text);
         await using var host = new AzureHost(maxPdfBytes: 1_024);
-        var oversize = new byte[1_025];
-        pdf.CopyTo(oversize, 0);
+        byte[] oversize = [.. pdf, .. new byte[1_025]];
 
         using var response = await host.Client.SendAsync(Upload(host.Token(), oversize, "application/pdf"), Ct);
 
@@ -448,7 +451,7 @@ public sealed class GatewayCallTests
 
         using var _ = await host.Client.SendAsync(Upload(token, pdf, "application/pdf"), Ct);
 
-        var everything = string.Concat(host.Logs.GetSnapshot().Select(record => record.Message + string.Join(',', Keys(record).Values) + record.Exception));
+        var everything = Trail(host);
         everything.Should().NotBeEmpty().And.NotContain(Text).And.NotContain(token).And.NotContain("%PDF");
         var tags = host.Spans.SelectMany(span => span.TagObjects).Select(tag => $"{tag.Value}").ToList();
         host.Spans.Should().NotBeEmpty();
@@ -472,8 +475,9 @@ public sealed class GatewayCallTests
 
         using var _ = await host.Client.SendAsync(request, Ct);
 
-        var everything = string.Concat(host.Logs.GetSnapshot().Select(record => record.Message + string.Join(',', Keys(record).Values) + record.Exception));
+        var everything = Trail(host);
         everything.Should().NotBeEmpty().And.NotContain(Text).And.NotContain(token).And.NotContain("%PDF");
-        host.Spans.SelectMany(span => span.TagObjects).Select(tag => $"{tag.Value}").Should().NotContain(value => value.Contains(Text, StringComparison.Ordinal));
+        // A refusal never reaches the agent, so it may leave no span at all; any it leaves must hold neither.
+        host.Spans.SelectMany(span => span.TagObjects).Select(tag => $"{tag.Value}").Should().NotContain(value => value.Contains(Text, StringComparison.Ordinal) || value.Contains("%PDF", StringComparison.Ordinal));
     }
 }
