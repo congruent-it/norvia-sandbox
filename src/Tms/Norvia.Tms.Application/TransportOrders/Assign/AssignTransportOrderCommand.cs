@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Mediator;
+using Norvia.Agents;
 
 namespace Norvia.Tms.Application.TransportOrders.Assign;
 
@@ -14,5 +15,6 @@ namespace Norvia.Tms.Application.TransportOrders.Assign;
 /// The new Message trail the TMS starts for this assignment, as it starts in the TMS UI, not at API Management. A repeat
 /// answers with the trail of the assignment it repeats.
 /// </param>
-public sealed record AssignTransportOrderCommand(string TransportOrderNumber, string? CarrierId, string AssignmentKey, string CorrelationId)
+/// <param name="ActingOn">The Agent run whose Suggestion the Planner acted on, which the trace then names. Null when they acted on their own.</param>
+public sealed record AssignTransportOrderCommand(string TransportOrderNumber, string? CarrierId, string AssignmentKey, string CorrelationId, AgentRun? ActingOn = null)
     : ICommand<Result<AssignTransportOrderResult>>;

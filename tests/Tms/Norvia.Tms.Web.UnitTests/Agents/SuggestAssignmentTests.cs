@@ -53,6 +53,35 @@ public sealed class SuggestAssignmentTests : TmsWebContext
     }
 
     [Fact]
+    public void Suggest_TellsThePageWhatItSuggested_SoItCanPreselect()
+    {
+        AgentSettings.Enabled = true;
+        var suggestion = Answer();
+        Explain.SuggestAsync(new SuggestAssignmentQuery(Number), Arg.Any<CancellationToken>()).Returns(suggestion);
+        Suggestion? given = null;
+        var page = Render<SuggestAssignment>(parameters => parameters
+            .Add(page => page.TransportOrderNumber, Number).Add(page => page.ForPlanner, true)
+            .Add(page => page.OnSuggested, (Suggestion value) => given = value));
+
+        page.Find("fluent-button").Click();
+
+        page.WaitForAssertion(() => given.Should().Be(suggestion));
+    }
+
+    [Fact]
+    public void Render_AStaleSuggestion_SaysTheTmsRefusedTheAssignment()
+    {
+        AgentSettings.Enabled = true;
+        Explain.SuggestAsync(new SuggestAssignmentQuery(Number), Arg.Any<CancellationToken>()).Returns(Answer());
+        var page = Render<SuggestAssignment>(parameters => parameters
+            .Add(page => page.TransportOrderNumber, Number).Add(page => page.ForPlanner, true).Add(page => page.Stale, true));
+
+        page.Find("fluent-button").Click();
+
+        page.WaitForAssertion(() => page.Find("[data-testid=suggestion]").TextContent.Should().Contain("out of date"));
+    }
+
+    [Fact]
     public void Suggest_TheAssistantsTextIsEncoded_NeverRenderedAsMarkup()
     {
         AgentSettings.Enabled = true;

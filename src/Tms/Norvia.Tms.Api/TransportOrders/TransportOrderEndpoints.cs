@@ -12,6 +12,7 @@ using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
+using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Application.TransportOrders.Assign;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
@@ -213,6 +214,7 @@ public static class TransportOrderEndpoints
         CancellationToken cancellationToken)
     {
         var errors = AssignmentCalls.Check(PlanningAction.Assignment, idempotencyKey, assignment.AssignedTo, assignment.CarrierId);
+        ActingOnCalls.Check(errors, nameof(AssignTransportOrderRequest.AgentRunId), assignment.AgentName, assignment.AgentRunId);
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
@@ -220,7 +222,8 @@ public static class TransportOrderEndpoints
 
         var carrierId = assignment.AssignedTo == AssignedTo.Carrier ? assignment.CarrierId : null;
         // The action starts in the TMS UI, not at API Management, so the TMS starts its Message trail.
-        var command = new AssignTransportOrderCommand(transportOrderNumber, carrierId, idempotencyKey!, CorrelationId.New().Value);
+        var command = new AssignTransportOrderCommand(
+            transportOrderNumber, carrierId, idempotencyKey!, CorrelationId.New().Value, ActingOnCalls.Of(assignment.AgentName, assignment.AgentRunId));
         var result = await mediator.Send(command, cancellationToken);
         if (result.IsSuccess)
         {
@@ -286,21 +289,14 @@ public static class TransportOrderEndpoints
         }
 
         // The Agent's name and run come together or not at all, and are short: they are only for the trace.
-        if (string.IsNullOrWhiteSpace(request.AgentName) != string.IsNullOrWhiteSpace(request.AgentRunId))
-        {
-            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.AgentRunId)] = ["The Agent and its run ID come together."];
-        }
-        else if (request.AgentName?.Length > 100 || request.AgentRunId?.Length > 200)
-        {
-            errors[nameof(ReleaseWithoutProofOfDeliveryRequest.AgentRunId)] = ["The Agent's name is at most 100 characters and its run ID 200."];
-        }
+        ActingOnCalls.Check(errors, nameof(ReleaseWithoutProofOfDeliveryRequest.AgentRunId), request.AgentName, request.AgentRunId);
 
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var actingOn = string.IsNullOrWhiteSpace(request.AgentName) ? null : new AgentRun(request.AgentName.Trim(), request.AgentRunId!.Trim());
+        var actingOn = ActingOnCalls.Of(request.AgentName, request.AgentRunId);
         var command = new ReleaseWithoutProofOfDeliveryCommand(transportOrderNumber, request.Remark!, request.ReleasedBy!, CorrelationId.New().Value, actingOn);
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess

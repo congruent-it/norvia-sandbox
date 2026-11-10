@@ -147,6 +147,16 @@ public sealed class TmsApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task AssignAsync_ActingOnASuggestion_NamesTheAgentAndItsRun()
+    {
+        _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
+
+        await _client.AssignAsync("TO-0000042", "CAR-0002", new Norvia.Agents.AgentRun("planner", "run-7"), Xunit.TestContext.Current.CancellationToken);
+
+        JsonNode.Parse(_tmsApi.RequestBody!)!.ToJsonString().Should().Be("""{"assignedTo":"Carrier","carrierId":"CAR-0002","agentName":"planner","agentRunId":"run-7"}""");
+    }
+
+    [Fact]
     public async Task AssignAsync_ToOwnFleet_PostsOwnFleetWithoutACarrier()
     {
         _tmsApi.Answer(HttpStatusCode.Created, Assigned("SH-0000012"));
@@ -805,7 +815,7 @@ public sealed class TmsApiClientTests : IDisposable
         record.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).ToDictionary();
 
     private Task<AssignAnswer> AssignAsync(string number, string? carrierId) =>
-        _client.AssignAsync(number, carrierId, Xunit.TestContext.Current.CancellationToken);
+        _client.AssignAsync(number, carrierId, null, Xunit.TestContext.Current.CancellationToken);
 
     // As the TMS API answers an assignment: AssignTransportOrderResult, with its enums as strings.
     private static string Assigned(string shipmentNumber) =>

@@ -10,7 +10,7 @@
 
 @* One fixed question about one row of the Planner's waiting-for-planning list: who should carry this Transport Order? The TMS computes the
    options and the assistant chooses among them; it recommends one option the Assignment rules allow, with the trade-off and any warning it
-   accepts. The answer is shown only: nothing is pre-selected or assigned. Off unless Agents:Enabled, and only in the Planner role view. An
+   accepts. The page pre-selects the recommended option in its assign flow; nothing is assigned until the Planner confirms. Off unless Agents:Enabled, and only in the Planner role view. An
    Agent is never on a critical path (ADR 0040). *@
 @if (Agents.Value.Enabled && ForPlanner)
 {
@@ -36,6 +36,12 @@
         {
             @* Text only: what the assistant wrote is data, so it is encoded, never rendered as markup. *@
             <div class="mt-3" data-testid="suggestion">
+                @if (Stale)
+                {
+                    <div role="alert">
+                        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">This suggestion is out of date: the TMS refused the assignment. Ask again.</FluentMessageBar>
+                    </div>
+                }
                 <h2 class="text-lg">Suggestion</h2>
                 <p data-testid="suggested-action">@suggestion.SuggestedAction</p>
                 <h2 class="text-lg">Why</h2>
@@ -66,6 +72,14 @@
     [Parameter]
     public bool ForPlanner { get; set; }
 
+    /// <summary>Whether the TMS has refused an assignment of this order since the Suggestion was made, so the Suggestion no longer holds.</summary>
+    [Parameter]
+    public bool Stale { get; set; }
+
+    /// <summary>Raised with each Suggestion the assistant gives, so the page can pre-select the recommended option. Nothing executes.</summary>
+    [Parameter]
+    public EventCallback<Suggestion> OnSuggested { get; set; }
+
     private async Task SuggestAsync()
     {
         _asking = true;
@@ -77,6 +91,7 @@
             if (result.IsSuccess)
             {
                 _suggestion = result.Value;
+                await OnSuggested.InvokeAsync(result.Value);
             }
             else
             {

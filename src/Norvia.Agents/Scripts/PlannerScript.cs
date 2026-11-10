@@ -9,7 +9,7 @@ namespace Norvia.Agents.Scripts;
 /// The scripted model of the Planner agent. It reads the assignment options of the Transport Order the question names with its one tool,
 /// <c>get_assignment_options</c>, and recommends exactly one option the Assignment rules allow: Own fleet when it fits, otherwise the
 /// cheapest Carrier the Carrier Rate Card prices, or Own fleet with its warning named when no Carrier can be priced. It never recommends
-/// an option that breaks an Assignment rule, never states a figure the result did not give, and suggests no action beyond text.
+/// an option that breaks an Assignment rule, never states a figure the result did not give, and suggests no action beyond a pre-selection: the Planner confirms.
 /// </summary>
 public static class PlannerScript
 {
@@ -62,7 +62,7 @@ public static class PlannerScript
                 evidence,
                 $"Assign to Own fleet.{against}",
                 "high",
-                "needs-a-person");
+                "assign-own-fleet");
         }
 
         if (own.MeetsRules && warned && cheapest is null)
@@ -75,7 +75,7 @@ public static class PlannerScript
                 evidence,
                 $"Assign to Own fleet, accepting this warning: {warning}.",
                 "medium",
-                "needs-a-person");
+                "assign-own-fleet");
         }
 
         if (cheapest is not null)
@@ -90,7 +90,8 @@ public static class PlannerScript
                 evidence,
                 $"Assign to Carrier {cheapest.Name} at {Money(cheapest.Cost!.Value)}.{against}",
                 "medium",
-                "needs-a-person");
+                cheapest.Id.Length == 0 ? "needs-a-person" : "assign-carrier",
+                cheapest.Id.Length == 0 ? null : cheapest.Id);
         }
 
         var broken = options.Carriers.Select(carrier => carrier.RuleBroken).Prepend(own.RuleBroken).FirstOrDefault(rule => rule is not null);
@@ -132,6 +133,7 @@ public static class PlannerScript
     }
 
     private static Carrier CarrierOf(JsonElement entry) => new(
+        IntegrationOperationsScript.Text(entry, "carrierId") ?? string.Empty,
         IntegrationOperationsScript.Text(entry, "name") ?? "an unnamed Carrier",
         Meets(entry),
         entry.TryGetProperty("carrierCost", out var cost) && cost.ValueKind == JsonValueKind.Number && cost.TryGetDecimal(out var amount) ? amount : null,
@@ -144,5 +146,5 @@ public static class PlannerScript
 
     private sealed record OwnFleet(bool MeetsRules, string Fit, string? Warning, string? RuleBroken);
 
-    private sealed record Carrier(string Name, bool MeetsRules, decimal? Cost, string? RuleBroken);
+    private sealed record Carrier(string Id, string Name, bool MeetsRules, decimal? Cost, string? RuleBroken);
 }

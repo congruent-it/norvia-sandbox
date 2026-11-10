@@ -191,6 +191,7 @@ public sealed class AgentRunnerTests
     [InlineData("accept", SuggestedActionKind.Accept)]
     [InlineData("accept-adjusted", SuggestedActionKind.AcceptAdjusted)]
     [InlineData("reject", SuggestedActionKind.Reject)]
+    [InlineData("assign-own-fleet", SuggestedActionKind.AssignOwnFleet)]
     public async Task RunAsync_TheActionOfTheReply_IsTheSuggestionsKind(string wire, SuggestedActionKind expected)
     {
         var reply = GoodReply.Replace("needs-a-person", wire, StringComparison.Ordinal);
@@ -198,6 +199,28 @@ public sealed class AgentRunnerTests
         var result = await Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
 
         result.Suggestion.Action.Should().Be(expected);
+    }
+
+    [Fact]
+    public async Task RunAsync_AnAssignCarrierReply_CarriesTheCarrierItNames()
+    {
+        var reply = GoodReply.Replace("\"needs-a-person\"", "\"assign-carrier\",\"carrierId\":\"CAR-0002\"", StringComparison.Ordinal);
+
+        var result = await Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.AssignCarrier);
+        result.Suggestion.CarrierId.Should().Be("CAR-0002");
+    }
+
+    [Fact]
+    public async Task RunAsync_AnAssignCarrierReplyNamingNoCarrier_ReadsAsNeedsAPerson()
+    {
+        var reply = GoodReply.Replace("needs-a-person", "assign-carrier", StringComparison.Ordinal);
+
+        var result = await Runner(Says(Calls("get_message_trail"), Answers(reply)), Tools(TrailSamples.AllWell)).RunAsync(Definition, Question, CancellationToken.None);
+
+        result.Suggestion.Action.Should().Be(SuggestedActionKind.NeedsAPerson);
+        result.Suggestion.CarrierId.Should().BeNull();
     }
 
     [Fact]

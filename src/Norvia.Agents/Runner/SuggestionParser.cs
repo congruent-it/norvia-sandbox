@@ -35,8 +35,10 @@ public static class SuggestionParser
             "accept" => SuggestedActionKind.Accept,
             "accept-adjusted" => SuggestedActionKind.AcceptAdjusted,
             "reject" => SuggestedActionKind.Reject,
+            "assign-own-fleet" => SuggestedActionKind.AssignOwnFleet,
+            "assign-carrier" => SuggestedActionKind.AssignCarrier,
             "needs-a-person" => SuggestedActionKind.NeedsAPerson,
-            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first, release, wait, accept, accept-adjusted, reject or needs-a-person."),
+            _ => throw new AgentRunException("The reply's action is not resubmit, discard, fix-the-cause-first, release, wait, accept, accept-adjusted, reject, assign-own-fleet, assign-carrier or needs-a-person."),
         };
         if (!Enum.TryParse<Confidence>(Text(root, "confidence"), ignoreCase: true, out var confidence))
         {
@@ -60,7 +62,19 @@ public static class SuggestionParser
             evidence.Add(new Evidence(Text(item, "claim"), resultId, toolName));
         }
 
-        return new Suggestion(cause, evidence, action, confidence, kind);
+        // Only an assign-carrier reply names a Carrier. One that names none is still advice worth showing, but it
+        // pre-selects nothing, so it reads as needs-a-person.
+        string? carrierId = null;
+        if (kind == SuggestedActionKind.AssignCarrier)
+        {
+            carrierId = root.TryGetProperty("carrierId", out _) ? Text(root, "carrierId") : null;
+            if (carrierId is null)
+            {
+                kind = SuggestedActionKind.NeedsAPerson;
+            }
+        }
+
+        return new Suggestion(cause, evidence, action, confidence, kind, CarrierId: carrierId);
     }
 
     private static string Text(JsonElement element, string property) =>

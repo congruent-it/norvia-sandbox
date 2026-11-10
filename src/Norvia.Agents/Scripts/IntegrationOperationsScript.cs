@@ -97,7 +97,7 @@ public static class IntegrationOperationsScript
                 "fix-the-cause-first");
     }
 
-    internal static string Json(string cause, IEnumerable<(string Claim, string Citation)> evidence, string action, string confidence, string kind) =>
+    internal static string Json(string cause, IEnumerable<(string Claim, string Citation)> evidence, string action, string confidence, string kind, string? carrierId = null) =>
         JsonSerializer.Serialize(new
         {
             cause,
@@ -105,7 +105,10 @@ public static class IntegrationOperationsScript
             action = kind,
             suggestedAction = action,
             confidence,
-        });
+            carrierId,
+        }, WithoutNulls);
+
+    private static readonly JsonSerializerOptions WithoutNulls = new() { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
 
     // The first hop that failed, as the agent view tells it.
     private static FailedHop? FirstFailedHop(string trail)

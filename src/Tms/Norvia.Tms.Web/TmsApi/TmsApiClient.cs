@@ -72,11 +72,11 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
         }
     }
 
-    public async Task<AssignAnswer> AssignAsync(string transportOrderNumber, string? carrierId, CancellationToken cancellationToken)
+    public async Task<AssignAnswer> AssignAsync(string transportOrderNumber, string? carrierId, AgentRun? actingOn, CancellationToken cancellationToken)
     {
         using var span = activities.Source.StartActivity("Assign Transport Order", ActivityKind.Internal);
         using var request = await CommandAsync($"/v1/transport-orders/{Uri.EscapeDataString(transportOrderNumber)}/assign", cancellationToken);
-        request.Content = JsonContent.Create(new Assignment(carrierId is null ? AssignedTo.OwnFleet : AssignedTo.Carrier, carrierId), options: Json);
+        request.Content = JsonContent.Create(new Assignment(carrierId is null ? AssignedTo.OwnFleet : AssignedTo.Carrier, carrierId, actingOn?.AgentName, actingOn?.RunId), options: Json);
 
         using var response = await http.SendAsync(request, cancellationToken);
         switch (response.StatusCode)
@@ -356,7 +356,7 @@ internal sealed partial class TmsApiClient(HttpClient http, ITmsApiTokens tokens
     private sealed record Refusal(string? Detail, string? Code, string? CorrelationId);
 
     // What the TMS UI asks the TMS API to assign a Transport Order to.
-    private sealed record Assignment(AssignedTo AssignedTo, string? CarrierId);
+    private sealed record Assignment(AssignedTo AssignedTo, string? CarrierId, string? AgentName, string? AgentRunId);
 
     // What the TMS API answers an assignment, as far as the TMS UI reads it.
     private sealed record Assigned(string ShipmentNumber, string? CorrelationId, string? ShipperId, LoadWarning? LoadWarning = null);
