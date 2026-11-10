@@ -985,6 +985,12 @@ else
             .WithEnvironment("AgentMcp__CustomerServiceReply__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/customer-service-reply"))
             .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__CustomerServiceReply__ApiTokens__Audience", LocalTokens.TmsAudience)
+            // The Planner agent's server, at /mcp/planner. Its own audience, role and agent view on the TMS API.
+            .WithEnvironment("AgentMcp__Planner__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__Planner__Tokens__Audience", LocalTokens.PlannerAgentAudience)
+            .WithEnvironment("AgentMcp__Planner__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/planner"))
+            .WithEnvironment("AgentMcp__Planner__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__Planner__ApiTokens__Audience", LocalTokens.TmsAudience)
             // The fifth server: the Carrier invoice matching agent's, at /mcp/finance-matching. It calls the ERP API's Finance agent view as the
             // Agent's identity, with a token for the ERP API's audience.
             .WithEnvironment("AgentMcp__FinanceMatching__Tokens__Issuer", LocalTokens.Issuer)
