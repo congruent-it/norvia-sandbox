@@ -314,6 +314,22 @@ if (builder.ExecutionContext.IsPublishMode)
         .PublishAsAzureContainerApp((infrastructure, app) =>
             infrastructure.Add(EntraSignIn.For(infrastructure, app, estate.HealthCheckClientId, estate.EntraIssuer, ["/agent/v1/*"])));
 
+    // The Intake agent's Booking draft in Azure (ADR 0040, #459): API Management routes POST /partner/v1/booking-drafts to this host, which asks the Agent
+    // published in the Intake project as its own identity (Foundry User on norvia-intake only). It runs outside Easy Auth's gate, as it is no browser's:
+    // it takes the Entra token API Management sends for its own app registration, whose one role only API Management's identity holds. Locally the
+    // Partner API stand-in plays the same operation in process, so the host is declared in Azure only.
+    var bookingDraftIdentity = builder.AddAzureUserAssignedIdentity("booking-draft-identity")
+        .PublishAsExisting(estate.BookingDraftIdentity, null);
+    builder.AddProject<Projects.Norvia_Integration_BookingDraft_Api>("booking-draft-api")
+        .WithReference(insights)
+        .WithExternalHttpEndpoints()
+        .WithAzureUserAssignedIdentity(bookingDraftIdentity)
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryIntakeProjectEndpoint)
+        .WithEnvironment("Agents__Api__Issuer", estate.EntraIssuer)
+        .WithEnvironment("Agents__Api__Audience", estate.BookingDraftApiClientId)
+        .WithEnvironment("Agents__Api__GatewayClientId", estate.ApiManagementClientId);
+
     // In Azure the Partner portal books through API Management as each Persona: it runs as the identity every Persona's
     // client app trusts, so it gets their tokens without a secret (ADR 0005), and reads their subscription keys from
     // the estate's Key Vault.

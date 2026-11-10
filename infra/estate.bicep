@@ -66,6 +66,10 @@ param healthCheckRedirectUris string = ''
 the Estate health-check agent's API Management backend keeps it when the estate is deployed again.''')
 param healthCheckBaseUrl string = ''
 
+@description('''The Booking draft host's address, empty before the host is first deployed. infra/deploy-agents.ps1 stores it, so the Booking draft
+backend keeps it when the estate is deployed again.''')
+param bookingDraftBaseUrl string = ''
+
 @description('''Easy Auth's sign-in callback on the Driver app, empty before the Driver app is first deployed. azd's postdeploy
 hook stores it, so the Driver app's app registration keeps it when the estate is deployed again.''')
 param driverAppRedirectUris string = ''
@@ -215,6 +219,8 @@ module foundry 'estate/foundry.bicep' = {
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
     // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check, the TMS UI (Explain on a Rejected booking), the ERP UI (Explain on a Carrier invoice line) and the Simulator (its plans' pools of Carrier texts).
     applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, tmsUiIdentity.properties.principalId, erpIdentity.properties.principalId, identities.outputs.simulatorPrincipalId]
+    // The Booking draft host asks the Intake agent as its own identity, in the Intake project only.
+    intakeApplicationPrincipalIds: [bookingDraft.outputs.principalId]
   }
 }
 
@@ -756,6 +762,24 @@ module financeRejectionReasonMcp 'estate/finance-rejection-reason-mcp.bicep' = {
     erpAgentApiAppId: financeMatchingMcp.outputs.erpAgentApiAppId
     erpBaseUrl: erpBaseUrl
   }
+}
+
+// The Intake agent's Booking draft in Azure (#459): the `booking-drafts` operation of the Partner API, the host's identity and API app registration, and
+// the host as a backend. Like the other agent modules it has no outputs of the template bar the identity's principal; the scripts and the AppHost find
+// the app registration and the identity by their names. It writes to API Management after the MCP servers, one after another.
+module bookingDraft 'estate/booking-draft.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    location: location
+    tags: tags
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementPrincipalId: identities.outputs.apiManagementPrincipalId
+    bookingDraftBaseUrl: bookingDraftBaseUrl
+  }
+  dependsOn: [
+    financeRejectionReasonMcp
+  ]
 }
 
 // The hook stores each output as AZURE_<NAME>, which is where azd looks up the AppHost's Estate parameters.

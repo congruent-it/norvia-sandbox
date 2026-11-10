@@ -21,7 +21,7 @@ The AppHost references what the Bicep owns (Service Bus, Application Insights, L
 
 | Piece | Kind | Notes |
 |---|---|---|
-| Container Apps environment `apps` | Container Apps | Holds the TMS API and UI, the ERP API and UI, the Driver app API and UI, the Partner portal, the Simulator and the Integration console. They run as managed-identity callers and are built from the same code locally |
+| Container Apps environment `apps` | Container Apps | Holds the TMS API and UI, the ERP API and UI, the Driver app API and UI, the Partner portal, the Simulator, the Integration console and, for the Intake agent, the Booking draft host (`booking-draft-api`, which only API Management may call). They run as managed-identity callers and are built from the same code locally |
 | Migration jobs | Container Apps jobs | One per database: the TMS's, the Partner portal's, the Driver app's, the Simulator's and the ERP's. azd's postdeploy hook runs each and fails the deployment if one fails |
 | Azure SQL | Serverless, one server | Five databases: `tms`, `erp`, `driver-app`, `partner-portal` and `simulator`. The Integration console has none |
 | Storage account | Blob | The TMS's Proof of delivery files, with a lifecycle rule to cool them after 30 days |

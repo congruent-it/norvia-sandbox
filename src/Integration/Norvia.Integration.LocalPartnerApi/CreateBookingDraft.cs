@@ -14,9 +14,9 @@ namespace Norvia.Integration.LocalPartnerApi;
 /// </summary>
 internal static partial class CreateBookingDraft
 {
-    public const string AgentsDisabled = "AgentsDisabled";
-    public const string InputTooLarge = "InputTooLarge";
-    public const string TextRequired = "TextRequired";
+    public const string AgentsDisabled = BookingDraftOperation.AgentsDisabled;
+    public const string InputTooLarge = BookingDraftOperation.InputTooLarge;
+    public const string TextRequired = BookingDraftOperation.TextRequired;
 
     public static IEndpointRouteBuilder MapCreateBookingDraft(this IEndpointRouteBuilder endpoints)
     {
@@ -62,7 +62,7 @@ internal static partial class CreateBookingDraft
         var agents = options.Value;
         if (!agents.Enabled)
         {
-            return Refuse(logger, correlationId, StatusCodes.Status503ServiceUnavailable, AgentsDisabled, "The assistant is unavailable.");
+            return Refuse(logger, BookingDraftOperation.Refuse(correlationId, StatusCodes.Status503ServiceUnavailable, AgentsDisabled, "The assistant is unavailable."));
         }
 
         // One counter per subscription, after the checks, so a refusal is not counted.
@@ -70,66 +70,40 @@ internal static partial class CreateBookingDraft
         {
             var seconds = (int)Math.Ceiling(retryAfter.TotalSeconds);
             context.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            return Refuse(logger, correlationId, StatusCodes.Status429TooManyRequests, "RateLimitExceeded", $"Rate limit is exceeded. Try again in {seconds} seconds.");
+            return Refuse(logger, BookingDraftOperation.Refuse(correlationId, StatusCodes.Status429TooManyRequests, "RateLimitExceeded", $"Rate limit is exceeded. Try again in {seconds} seconds."));
         }
 
-        var text = await ReadTextAsync(context, agents.MaxInputCharacters);
-        if (text.Code is { } code)
+        var answer = await BookingDraftOperation.DraftAsync(extractor, context.Request.Body, agents.MaxInputCharacters, correlationId, context.RequestAborted);
+        return answer.Outcome switch
         {
-            return Refuse(logger, correlationId, code == InputTooLarge ? StatusCodes.Status413PayloadTooLarge : StatusCodes.Status400BadRequest, code,
-                code == InputTooLarge ? $"The text is longer than {agents.MaxInputCharacters} characters." : "The request needs a text.");
-        }
+            BookingDraftOperation.Succeeded => Succeed(logger, answer),
+            BookingDraftOperation.Refused => Refuse(logger, answer),
+            _ => Fail(logger, answer),
+        };
+    }
 
-        var outcome = await extractor.ExtractAsync(text.Value!, correlationId, context.RequestAborted);
-        if (outcome.Draft is not { } draft)
-        {
-            return outcome.FailureCode == BookingDraftFailureCodes.MultipleBookingsInText
-                ? Refuse(logger, correlationId, StatusCodes.Status422UnprocessableEntity, outcome.FailureCode, "The text describes more than one booking. Paste one at a time.")
-                : Fail(logger, correlationId, outcome.FailureCode ?? BookingDraftFailureCodes.AgentUnavailable);
-        }
-
+    private static ContentHttpResult Succeed(ILogger logger, BookingDraftAnswer answer)
+    {
         using var succeeded = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Succeeded));
         LogDrafted(logger);
-        return Answer(StatusCodes.Status200OK, draft.ToJson());
+        return Answer(answer);
     }
 
-    // The text is read once, and never kept past the call.
-    private static async Task<(string? Value, string? Code)> ReadTextAsync(HttpContext context, int maxCharacters)
+    private static ContentHttpResult Refuse(ILogger logger, BookingDraftAnswer answer)
     {
-        JsonNode? body;
-        try
-        {
-            body = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted);
-        }
-        catch (JsonException)
-        {
-            return (null, TextRequired);
-        }
-
-        if (body is not JsonObject { } request || request["text"] is not JsonValue value || !value.TryGetValue<string>(out var text) || string.IsNullOrWhiteSpace(text))
-        {
-            return (null, TextRequired);
-        }
-
-        return text.Length > maxCharacters ? (null, InputTooLarge) : (text, null);
+        using var refused = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Refused, answer.FailureCode));
+        LogRefused(logger, answer.StatusCode, answer.FailureCode);
+        return Answer(answer);
     }
 
-    private static ContentHttpResult Refuse(ILogger logger, string correlationId, int statusCode, string failureCode, string text)
+    private static ContentHttpResult Fail(ILogger logger, BookingDraftAnswer answer)
     {
-        using var refused = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Refused, failureCode));
-        LogRefused(logger, statusCode, failureCode);
-        return Answer(statusCode, ErrorBody(correlationId, failureCode, text));
+        using var failed = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, answer.FailureCode));
+        LogFailed(logger, answer.FailureCode);
+        return Answer(answer);
     }
 
-    private static ContentHttpResult Fail(ILogger logger, string correlationId, string failureCode)
-    {
-        using var failed = logger.BeginScope(TrackingKeys.OutcomeOf(TrackingKeys.Failed, failureCode));
-        LogFailed(logger, failureCode);
-        return Answer(StatusCodes.Status503ServiceUnavailable, ErrorBody(correlationId, failureCode, "The assistant is unavailable."));
-    }
-
-    private static JsonObject ErrorBody(string correlationId, string failureCode, string text) =>
-        new() { ["messageId"] = correlationId, ["failureCode"] = failureCode, ["text"] = text };
+    private static ContentHttpResult Answer(BookingDraftAnswer answer) => Answer(answer.StatusCode, answer.Body);
 
     private static ContentHttpResult Answer(int statusCode, JsonObject body) =>
         TypedResults.Content(body.ToJsonString(), "application/json", statusCode: statusCode);
@@ -138,7 +112,7 @@ internal static partial class CreateBookingDraft
     private static partial void LogRefused(ILogger logger, int statusCode, string? failureCode);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The assistant failed ({FailureCode})")]
-    private static partial void LogFailed(ILogger logger, string failureCode);
+    private static partial void LogFailed(ILogger logger, string? failureCode);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Answered the Shipper with a Booking draft")]
     private static partial void LogDrafted(ILogger logger);

@@ -343,7 +343,7 @@ The checks are those of the other operations, in the same order: the subscriptio
 |---|---|---|
 | 200 | | A draft |
 | 400 | `TextRequired` | No text |
-| 413 | `InputTooLarge` | More than `Agents:MaxInputCharacters` characters (8000) |
+| 413 | `InputTooLarge` | More than `Agents:MaxInputCharacters` characters (8000), or, in Azure, a request over 40 KB, which API Management refuses before it reaches the host |
 | 422 | `MultipleBookingsInText` | The text describes more than one booking: paste one at a time |
 | 503 | `AgentsDisabled` | `Agents:Enabled` is off (the default) |
 | 503 | `AgentUnavailable` | The model failed, was too slow, or its reply did not match the draft schema |

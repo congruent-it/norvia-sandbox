@@ -36,6 +36,10 @@ param foundryUserPrincipalIds array
 is theirs only when its own slice says so, because its prompts are a Shipper\'s booking text.''')
 param applicationPrincipalIds array = []
 
+@description('''Identities of the applications that ask the Intake agent, such as the Booking draft host's: Foundry User on the `norvia-intake` project only. The `norvia`
+project is theirs never.''')
+param intakeApplicationPrincipalIds array = []
+
 var intakeProjectName = 'norvia-intake'
 
 var resourceToken = uniqueString(resourceGroup().id)
@@ -176,6 +180,16 @@ resource usersUseTheIntakeProject 'Microsoft.Authorization/roleAssignments@2022-
   scope: intakeProject
   properties: {
     principalId: principalId
+    roleDefinitionId: foundryUser
+  }
+}]
+
+resource applicationsUseTheIntakeProject 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for principalId in intakeApplicationPrincipalIds: {
+  name: guid(intakeProject.id, principalId, foundryUser)
+  scope: intakeProject
+  properties: {
+    principalId: principalId
+    principalType: 'ServicePrincipal'
     roleDefinitionId: foundryUser
   }
 }]

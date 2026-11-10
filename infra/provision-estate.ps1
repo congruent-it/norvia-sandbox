@@ -293,6 +293,8 @@ Set-AzdValue AZURE_ESTATE_FOUNDRY_PROJECT_ENDPOINT $foundryProjectEndpoint
 Set-AzdParameter estate_foundry_project_endpoint $foundryProjectEndpoint
 Set-AzdValue FOUNDRY_PROJECT_ENDPOINT $foundryProjectEndpoint
 Set-AzdValue FOUNDRY_INTAKE_PROJECT_ENDPOINT $foundryIntakeProjectEndpoint
+Set-AzdValue AZURE_ESTATE_FOUNDRY_INTAKE_PROJECT_ENDPOINT $foundryIntakeProjectEndpoint
+Set-AzdParameter estate_foundry_intake_project_endpoint $foundryIntakeProjectEndpoint
 
 # The Integration console's agent API: the app registration API Management's identity calls it as, and that identity.
 # The estate is at its 64 outputs, so they are found by name (infra/estate/integration-operations-mcp.bicep).
@@ -337,6 +339,18 @@ Set-AzdValue AZURE_ESTATE_HEALTH_CHECK_AGENT_API_CLIENT_ID $healthCheckAgentApiC
 Set-AzdParameter estate_health_check_agent_api_client_id $healthCheckAgentApiClientId
 Set-AzdValue AZURE_ESTATE_HEALTH_CHECK_IDENTITY_NAME $healthCheckIdentityName
 Set-AzdParameter estate_health_check_identity_name $healthCheckIdentityName
+
+# The Booking draft host: its API app registration (the audience of the tokens API Management sends it) and its identity (Foundry User on the
+# Intake project only). The estate is at its 64 outputs, so they are found by name (infra/estate/booking-draft.bicep).
+$bookingDraftApiClientId = [string](Get-AzTsvLines ad app list --filter "displayName eq 'Norvia booking draft API ($envName)'" --query '[0].appId')
+if (-not $bookingDraftApiClientId) { Write-Fail 'The estate has no Booking draft API app registration' }
+$bookingDraftIdentityName = [string](Get-AzTsvLines identity list --subscription $subscription --resource-group $resourceGroup `
+        --query "[?starts_with(name, 'id-booking-draft-')].name | [0]")
+if (-not $bookingDraftIdentityName) { Write-Fail 'The estate has no Booking draft identity' }
+Set-AzdValue AZURE_ESTATE_BOOKING_DRAFT_API_CLIENT_ID $bookingDraftApiClientId
+Set-AzdParameter estate_booking_draft_api_client_id $bookingDraftApiClientId
+Set-AzdValue AZURE_ESTATE_BOOKING_DRAFT_IDENTITY_NAME $bookingDraftIdentityName
+Set-AzdParameter estate_booking_draft_identity_name $bookingDraftIdentityName
 
 # The seeded Drivers' Entra test users, whose domain and password the apps take as the Estate parameters azd asks for.
 $driverAppRegistrationClientId = Get-EstateOutput 'ESTATE_DRIVER_APP_REGISTRATION_CLIENT_ID'

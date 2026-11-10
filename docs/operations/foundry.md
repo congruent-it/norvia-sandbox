@@ -2,7 +2,7 @@
 
 The Foundry account and projects the Agents run on ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)), what the estate deploys of it, and the answers to the two spikes of #497. For engineers and coding agents working on the estate. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-Two Agents are published, both into `norvia`: the Integration operations agent and the Estate health-check agent ([Publishing the Agents](#publishing-the-agents)).
+Agents are published into `norvia` (the Integration operations agent, the Estate health-check agent and the others that read the estate through narrow views) and, since #459, the Intake agent into `norvia-intake` ([Publishing the Agents](#publishing-the-agents)).
 
 ## What the estate deploys
 
@@ -26,7 +26,7 @@ Every Foundry resource carries the cost tags `workload=foundry-agents` and `cost
 | Intake | `norvia-intake` | No |
 | Every other Agent | `norvia` | Yes |
 
-An Agent that reads a Shipper's text goes in `norvia-intake`; one that reads only the estate's own data through narrow views goes in `norvia`. The Intake agent's slice publishes into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`).
+An Agent that reads a Shipper's text goes in `norvia-intake`; one that reads only the estate's own data through narrow views goes in `norvia`. The Intake agent publishes into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`), and its host, the Booking draft host, holds Foundry User on that project only.
 
 ## Settings
 
@@ -144,8 +144,10 @@ What it does not do: it does not turn the stateful Agent Service into a stateles
 1. points the API Management backend of the Agent's server at the application (`integration-console-agent-api` at the console's `/agent/v1`, `health-check-agent-api` at the Estate health check's) and stores `ESTATE_INTEGRATION_CONSOLE_BASE_URL` or `ESTATE_HEALTH_CHECK_BASE_URL`, so deploying the estate again keeps it;
 2. makes the project's `<server>-mcp` connection with the agent-identity authentication type ([create-agent-connection.ps1](../../infra/create-agent-connection.ps1));
 3. creates the Agent's next version with `POST /agents/<name>/versions?api-version=v1` as a **prompt agent**: the model deployment (the definition's, or the estate's own when that one is not in the project), the instructions, the temperature, and one MCP tool with `require_approval: never`, the server's address, the connection, `allowed_tools` from the definition, and the header `X-Correlation-ID: {{correlationId}}`, with `correlationId` declared as a structured input. The caller supplies it on each response, so the Agent's tool calls join the trail it was asked about. Foundry can send a per-call header to an MCP tool, so there is no fallback to the conversation ID;
-4. reads the Agent's identity from `GET /agents/<name>` (`instance_identity`) and writes `.azure/<env>/published-agents.json`;
+4. reads the Agent's identity from `GET /agents/<name>` (`instance_identity`) and writes `.azure/<env>/published-agents.json`. An Agent without a tool (the Intake agent) has no server, no connection and no role, so this step and the next skip it;
 5. runs [assign-agent-roles.ps1](../../infra/assign-agent-roles.ps1) with that file, which gives each identity its one read role.
+
+The Intake agent (`booking-intake`) is the exception to the project: the script publishes it into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`), as a prompt agent with no tool, and points the API Management backend `booking-draft-host` at the Booking draft host (`ESTATE_BOOKING_DRAFT_BASE_URL`). Its smoke run is [infra/smoke-test-booking-draft.ps1](../../infra/smoke-test-booking-draft.ps1) ([p1-transport-order-intake.md](../processes/tms/p1-transport-order-intake.md#booking-draft-from-pasted-text)). The host's identity (`id-booking-draft-<token>`) holds Foundry User on `norvia-intake` and nothing else; the Intake agent's own identity holds no role.
 
 Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke runs are [infra/smoke-test-integration-operations-agent.ps1](../../infra/smoke-test-integration-operations-agent.ps1) ([integration-console.md](integration-console.md#explain-and-the-agent-api)) and [infra/smoke-test-estate-health-check.ps1](../../infra/smoke-test-estate-health-check.ps1) ([estate-health-check.md](estate-health-check.md#smoke-run)).
 
@@ -153,13 +155,13 @@ Publishing the same file again is a new version of the same Agent. The response 
 
 ## Open points of #500
 
-The estate half of #500 is built (the sweeper, its toggle, the smoke run, the spike). The Integration console's Foundry client (#380) does points 2 and 4 for itself: every call sets `store: false` and creates no conversation, the response is deleted afterwards, best effort, and a failed delete is `ConversationNotDeleted` on the run's span (the client is `FoundryAgentClient`, in the console's Infrastructure project; there is no Foundry SDK reference). A shared `IConversationCleanup` in `Norvia.Agents` is not extracted, because a second host does not exist yet: whoever builds #458 picks it up, and #500 stays open until then.
+The estate half of #500 is built (the sweeper, its toggle, the smoke run, the spike). The Integration console's Foundry client (#380) does points 2 and 4 for itself: every call sets `store: false` and creates no conversation, the response is deleted afterwards, best effort, and a failed delete is `ConversationNotDeleted` on the run's span (the client is `FoundryAgentClient`, in the console's Infrastructure project; there is no Foundry SDK reference). A shared `IConversationCleanup` in `Norvia.Agents` is not extracted: the Booking draft host (#459) is the second host and does the same delete in its own client, in its own project, so the two copies are the case for extracting it, and #500 stays open until then.
 
 | # | Open point | Where | Needs |
 |---|---|---|---|
 | 1 | `IConversationCleanup` in `Norvia.Agents`: deletes the run's conversation and its responses as soon as the host has the answer. Best effort: a failure is logged as `ConversationNotDeleted` on the run's span and never thrown. Unit tests with the Foundry client faked (the call, the code on failure, no exception to the caller); at least 80% line coverage | `Norvia.Agents`, shared by every host | #379 |
-| 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3. **Done for the Integration console** (`FoundryAgentClient`, unit tested) | Each host's Foundry client | #458 for the Intake agent |
-| 3 | The Intake operation (`booking-drafts`) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished), and the sweeper retries it. Unit test: delete fails, draft returned, code on the span | The Intake operation of #458 | #379, #458 |
+| 2 | Every Foundry call sets `store: false` and creates no conversation unless an Agent needs history (none does). This is the answer of spike 3. **Done for the Integration console** (`FoundryAgentClient`, unit tested) **and for the Booking draft host** (its own `FoundryAgentClient`, unit tested, #459) | Each host's Foundry client | None |
+| 3 | The Intake operation (`booking-drafts`) deletes first and only then returns the draft. A failed delete is `ConversationNotDeleted`, the draft is still returned (the Shipper is not punished), and the sweeper retries it. **Done in the Booking draft host's `FoundryAgentClient`** (#459): the response is deleted before the reply is returned, and the unit test has the delete fail, the draft returned and the code on the span | The Intake operation | None |
 | 4 | Only Infrastructure projects reference the Foundry SDK, so the cleanup port is in the host's Application layer or in `Norvia.Agents` and the call is in Infrastructure (the architecture test of #379 covers it) | `Norvia.Agents` and each host | #379 |
 | 5 | Verify in a tenant: run `infra/smoke-test-conversation-sweeper.ps1` (Foundry User may list and delete, the list response shape). The Integration operations agent's smoke run reads the response back after a run and says `NOTE` when the service kept it although `store` was false; record both here, in "The sweeper" and spike 3 | A deployed estate | The first `azd up` with the Agents on |
 | 6 | Docs that say "planned" for the host side: [failure-behaviour.md](../architecture/failure-behaviour.md) (the row for `IConversationCleanup`), [local-vs-azure.md](../architecture/local-vs-azure.md) (locally there is no Foundry conversation), the Intake agent's P1 doc. Drop "planned" when 1 to 3 are built | Docs | 1 to 3 |
@@ -168,7 +170,7 @@ Acceptance criteria of #500 still open: *a normal Agent run leaves no conversati
 
 ## Open point of #721
 
-The conversation sweeper (#500) lists and deletes conversations in the `norvia` project only, and the Intake agent's conversations are in `norvia-intake`. Before the Intake agent publishes, the sweeper needs the Intake endpoint as well and its identity needs Foundry User on the Intake project.
+The conversation sweeper (#500) lists and deletes conversations in the `norvia` project only, and the Intake agent's responses are in `norvia-intake`. The Intake agent is published now (#459), and the sweeper still does not reach its project: it needs the Intake endpoint as well, and its identity needs Foundry User on the Intake project. **Not done in #459.** Until then the only protection for a Shipper's text in Foundry is the host's own `store: false` and the delete before it returns the draft; a response that delete misses is not swept.
 
 ## Not here
 
