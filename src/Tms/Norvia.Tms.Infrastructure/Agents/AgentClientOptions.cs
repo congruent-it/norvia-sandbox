@@ -20,6 +20,9 @@ public sealed class AgentClientOptions
     /// <summary>The MCP stand-in's endpoint for the customer-service-reply server, <c>/mcp/customer-service-reply</c>. Empty, the reply agent is not served.</summary>
     public Uri? ReplyMcpAddress { get; set; }
 
+    /// <summary>The MCP stand-in's endpoint for the planner server, <c>/mcp/planner</c>. Empty, the Planner agent is not served.</summary>
+    public Uri? PlannerMcpAddress { get; set; }
+
     /// <summary>A short timeout and no retry: an Agent is never on a critical path (ADR 0040).</summary>
     [Range(1, 300)]
     public int TimeoutSeconds { get; set; } = 20;
@@ -28,6 +31,9 @@ public sealed class AgentClientOptions
 
     /// <summary>The Customer service reply agent's own local identity: another client ID, another audience and another role than <see cref="Tokens"/>.</summary>
     public AgentTokenOptions ReplyTokens { get; set; } = new();
+
+    /// <summary>The Planner agent's own local identity: another client ID, another audience and another role than <see cref="Tokens"/>.</summary>
+    public AgentTokenOptions PlannerTokens { get; set; } = new();
 
     public AgentModelOptions Model { get; set; } = new();
 

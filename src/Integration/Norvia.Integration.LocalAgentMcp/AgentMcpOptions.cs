@@ -38,6 +38,12 @@ public sealed class AgentMcpOptions
     public HealthCheckServerOptions? CustomerServiceReply { get; set; }
 
     /// <summary>
+    /// The Planner agent's MCP server (<c>planner</c>), served at <c>/mcp/planner</c>. Its own audience and role, so no other Agent's token
+    /// opens it. Not configured, the stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? Planner { get; set; }
+
+    /// <summary>
     /// The Carrier invoice matching agent's MCP server (<c>finance-matching</c>), served at <c>/mcp/finance-matching</c>. It calls the ERP
     /// API's Finance agent view. Not configured, the stand-in does not serve it.
     /// </summary>

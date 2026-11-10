@@ -734,6 +734,19 @@ module customerServiceReplyMcp 'estate/customer-service-reply-mcp.bicep' = {
   }
 }
 
+// The Planner agent's MCP server (one tool, the assignment options) and the agent view app registration of its own. Its role on the
+// TMS agent API is the third role of the registration customerServiceMcp makes.
+module plannerMcp 'estate/planner-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    tmsAgentApiAppId: customerServiceMcp.outputs.tmsAgentApiAppId
+    tmsBaseUrl: tmsBaseUrl
+  }
+}
+
 // The Carrier invoice matching agent's API Management front over the ERP API's Finance agent view, with its MCP server and the two app
 // registrations that keep it narrow (infra/smoke-test-finance-agent.ps1). Like the others, it has no outputs.
 module financeMatchingMcp 'estate/finance-matching-mcp.bicep' = {

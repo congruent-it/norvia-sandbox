@@ -38,7 +38,7 @@ public sealed class CustomerServiceAgentRulesTests
     {
         Contract().Role.Should().Be(AgentRoles.CustomerServiceRead);
         typeof(AgentRoles).GetFields().Select(field => field.Name).Should().Equal(
-            [nameof(AgentRoles.CustomerServiceRead), nameof(AgentRoles.CustomerServiceReplyRead)], "each of the two Agents holds one role of its own on the TMS API");
+            [nameof(AgentRoles.CustomerServiceRead), nameof(AgentRoles.CustomerServiceReplyRead), nameof(AgentRoles.PlannerRead)], "each of the three Agents holds one role of its own on the TMS API");
         CustomerServiceAgentEndpoints.Flow.Should().StartWith("agent-view-");
         Contract().Tools.Should().OnlyContain(tool => tool.Path.StartsWith("/rejected-bookings/", StringComparison.Ordinal) || tool.Path.StartsWith("/transport-orders/", StringComparison.Ordinal) || tool.Path.StartsWith("/shipments/", StringComparison.Ordinal));
     }

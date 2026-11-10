@@ -33,6 +33,7 @@ public static class AgentsInfrastructure
             .Validate(options => options.UsesFoundry || options.McpAddress is { IsAbsoluteUri: true }, "Agents:McpAddress must be the MCP server's absolute address.")
             .Validate(options => options.UsesFoundry || options.Tokens.IsComplete, "Agents:Tokens needs an Issuer, an Audience, a ClientId, a Role and a SigningKey.")
             .Validate(options => options.UsesFoundry || options.ReplyMcpAddress is null || (options.ReplyMcpAddress.IsAbsoluteUri && options.ReplyTokens.IsComplete), "Agents:ReplyMcpAddress needs an absolute address and Agents:ReplyTokens an Issuer, an Audience, a ClientId, a Role and a SigningKey.")
+            .Validate(options => options.UsesFoundry || options.PlannerMcpAddress is null || (options.PlannerMcpAddress.IsAbsoluteUri && options.PlannerTokens.IsComplete), "Agents:PlannerMcpAddress needs an absolute address and Agents:PlannerTokens an Issuer, an Audience, a ClientId, a Role and a SigningKey.")
             .ValidateOnStart();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IRunIds, GuidRunIds>();

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Shipments
+@using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Application.TransportOrders.ToPlan
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
@@ -83,7 +84,7 @@
 
     @* The earliest collection first, as the query gives them: what is collected first is planned first. *@
     <FluentDataGrid Items="transportOrders.AsQueryable()" TGridItem="TransportOrderToPlanSummary" Class="flatly-table" aria-label="Transport Orders waiting for planning"
-                    GridTemplateColumns="auto 1.2fr 1.2fr 1.2fr 1fr 1fr 1.6fr 1fr" MultiLine="true">
+                    GridTemplateColumns="auto 1.2fr 1.2fr 1.2fr 1fr 1fr 1.6fr 1fr 1.4fr" MultiLine="true">
         <TemplateColumn Title="Select">
             <FluentCheckbox Value="_selected.Contains(context.TransportOrderNumber)"
                             ValueChanged="@((bool selected) => Select(context.TransportOrderNumber, selected))"
@@ -99,6 +100,9 @@
         <PropertyColumn Title="Collection window" Property="@(transportOrder => NorviaTime.FormatWindow(transportOrder.CollectionEarliest, transportOrder.CollectionLatest))" />
         @* Shown beside the order, never as a filter: a Planner plans an order whatever its rating result. *@
         <PropertyColumn Title="Rating result" Property="@(transportOrder => RatingText.Of(transportOrder.RatingResult))" />
+        <TemplateColumn Title="Suggest">
+            <SuggestAssignment TransportOrderNumber="@context.TransportOrderNumber" ForPlanner="RoleKey == NorviaRole.Planner.Key" />
+        </TemplateColumn>
     </FluentDataGrid>
 </LiveListStates>
 
@@ -115,8 +119,17 @@
     private string? _assignee = string.Empty;
     private bool _assigning;
 
+    // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
+    // circuit; a page that couldn't read it shows no Suggest button.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [PersistentState]
+    public string? RoleKey { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
+        RoleKey ??= HttpContext is null ? null : NorviaRole.Current(HttpContext.Request).Key;
         _list = new LiveTransportOrderList<TransportOrderToPlanSummary>(
             Queries.ListWaitingForPlanningAsync, "the Transport Orders waiting for planning", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);

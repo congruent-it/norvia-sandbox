@@ -28,6 +28,8 @@ internal sealed partial class LocalAgentClient(
 
     private const string ReplyAgentName = "customer-service-reply";
 
+    private const string PlannerAgentName = "planner";
+
     public async Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -43,20 +45,23 @@ internal sealed partial class LocalAgentClient(
         try
         {
             var definition = AgentDefinitions.Load(request.AgentName);
-            // The reply agent is its own identity: its own server, its own role, so it holds none of the Customer service agent's.
-            var reply = request.AgentName == ReplyAgentName;
-            if (reply)
+            // The reply and Planner agents are identities of their own: each its own server and its own role, so none holds another's.
+            var (address, tokens, name) = request.AgentName switch
+            {
+                ReplyAgentName => (settings.ReplyMcpAddress, settings.ReplyTokens, "Agents:Reply"),
+                PlannerAgentName => (settings.PlannerMcpAddress, settings.PlannerTokens, "Agents:Planner"),
+                _ => (settings.McpAddress, null, "Agents:"),
+            };
+            if (tokens is not null)
             {
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
                     "Bearer",
-                    settings.ReplyTokens.IsComplete ? AgentToken.Create(settings.ReplyTokens, time) : throw new InvalidOperationException("Agents:ReplyTokens is not set."));
+                    tokens.IsComplete ? AgentToken.Create(tokens, time) : throw new InvalidOperationException($"{name}Tokens is not set."));
             }
 
             var runner = new AgentRunner(
                 AgentModels.For(definition, settings.Model),
-                new McpToolSource(
-                    http,
-                    (reply ? settings.ReplyMcpAddress : settings.McpAddress) ?? throw new InvalidOperationException(reply ? "Agents:ReplyMcpAddress is not set." : "Agents:McpAddress is not set.")),
+                new McpToolSource(http, address ?? throw new InvalidOperationException($"{name}McpAddress is not set.")),
                 new AgentRunnerOptions(TimeSpan.FromSeconds(settings.TimeoutSeconds)));
             var result = await runner.RunAsync(definition, new AgentQuestion(request.Question, request.CorrelationId, runId), cancellationToken);
 

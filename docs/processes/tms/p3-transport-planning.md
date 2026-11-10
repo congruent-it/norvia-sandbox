@@ -63,6 +63,12 @@ The Planner's second list, of Shipments to release, shows Planned Shipments with
 
 When a Carrier booking ends Rejected, Not delivered or Withdrawn, P4 moves the Shipment back to Planned. So does a Carrier booking that [P7](p7-exception-handling.md) Cancels before collection. It comes back to the Planner's list of Shipments to release, showing its last Carrier booking's outcome and reason. The Planner reassigns it (to another Carrier or to Own fleet) or releases it again to the same Carrier. It keeps the same Shipment and Shipment number. So the ordinary rules for a Planned Shipment apply, with no special status. A rejection is ordinary planning work, not an Exception for P7.
 
+## Suggest an assignment
+
+With `Agents:Enabled` on, a Planner sees a **Suggest** button on each Transport Order in the waiting-for-planning list (the Planner view only). It puts one fixed question to the Planner agent and shows a Suggestion: one recommended option, Own fleet or an active Carrier, with the reasoning, the trade-off against the other options (cost against capacity warnings), cited evidence and a confidence. It names any warning it is accepting, such as an Over capacity day, and it never recommends an option the Assignment rules refuse. The Planner decides: the button assigns nothing and pre-selects nothing (that comes with #442).
+
+The TMS computes the options and the agent chooses among them (`get_assignment_options`, [GetAssignmentOptionsHandler.cs](../../../src/Tms/Norvia.Tms.Application/Agents/Planner/GetAssignmentOptionsHandler.cs)). It reuses the code P3, P9 and P10 already run: [AssignmentRules.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/AssignmentRules.cs) (`Check` and `PriceCarrierBooking`), the load check with the order counted ([LoadCheckWarnings.cs](../../../src/Tms/Norvia.Tms.Application/Fleet/Planning/LoadCheckWarnings.cs) `IfAssignedAsync`) and the Driving-hour budget. Own fleet is `Fits`, `OverCapacity` or `OutsideHorizon` (warnings that never block an assignment), `DayNotOpen`, `NoDriverWithDrivingHoursLeft` or `NoCollectionDay`; a Carrier is priced from its Carrier Rate Card or carries the code that says why not, such as `NoMatchingLane`. The agent's view leaves out the street address, the Consignee and every file. If the agent is unavailable the page says "Assistant unavailable" and planning carries on as before. See [the Planner agent](../../../agents/README.md) and the [identity matrix](../../architecture/identity-and-access.md#agents).
+
 ## Assignment rules
 
 | Rule | Failure codes |
@@ -183,7 +189,7 @@ Designed in this document and not built yet:
 | Releasing with a Spot price, and the Planner's list showing why a release couldn't be priced | Designed in [P9](p9-freight-settlement.md#when-the-carrier-rate-card-cant-price-the-shipment). A Carrier Shipment is priced from its Carrier Rate Card at release ([AssignmentRules.cs](../../../src/Tms/Norvia.Tms.Domain/Shipments/AssignmentRules.cs) `PriceCarrierBooking`) and a release it can't price is refused with `NoRateCard`, `NoValidRateCardVersion`, `NoMatchingLane` or `WeightAboveHighestBreak` (422). There is no Spot price, and the TMS UI doesn't show the refusal's code yet |
 | Handing an Own fleet Shipment over to a Trip, and P10's load check as a warning when assigning to Own fleet | Own fleet capacity and Trips are P10 and P11. A Released Own fleet Shipment waits |
 | The ERP and the Carrier master-data sync | Carriers come from the seed file ([Carriers in the TMS](#carriers-in-the-tms)) |
-| Suggested or automatic assignment, coverage rules, groupage, un-planning, a dispatcher role | Left out on purpose ([Deferred](#deferred)) |
+| Automatic assignment, coverage rules, groupage, un-planning, a dispatcher role | Left out on purpose ([Deferred](#deferred)). A *suggested* assignment is built as the [Suggest button](#suggest-an-assignment), which only shows its answer |
 | As-found toggles and presenter-panel faults for P3 | None added. No Bicep parameter switches anything broken in planning, for example a `ShipmentReleased` subscription with no alert on its dead-letter queue. [Failure behaviour](../../architecture/failure-behaviour.md#p3-transport-planning) lists the row each would worsen |
 | Alerts on P3 | None built: there is no alert on the `carrier-booking` dead-letter queue ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
 | Planning in the Integration console's failed runs and dead-letter panels | Nothing to show for planning itself: it has no Logic App run. Finding its Hops by the Transport Order number is built |
@@ -192,7 +198,7 @@ Designed in this document and not built yet:
 
 These were left out on purpose while designing P3, each with its reason.
 
-- **Suggested or automatic assignment, and coverage rules** such as "Own fleet only within the Benelux". Planning is manual for now, so the demo has a visible human step and needs no rules or lane-to-Carrier data.
+- **Automatic assignment, and coverage rules** such as "Own fleet only within the Benelux". Planning is manual for now, so the demo has a visible human step and needs no rules or lane-to-Carrier data.
 - **Choosing on Carrier cost.** Carrier Rate Cards exist since [P9](p9-freight-settlement.md#carrier-cost), but planning stays manual.
 - **Groupage, and splitting a Transport Order over several Shipments.** The one-Shipment-per-Transport-Order rule stands (ADR 0007).
 - **Un-planning, and changes after release.** Reassigning covers mistakes before release. After release, changes go through P4 (withdrawing) and P7 (cancelling from an Exception). Cancelling a Transport Order is already deferred in P1.

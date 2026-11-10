@@ -40,10 +40,32 @@ public sealed partial class LoadCheckWarnings(
         }
     }
 
+    /// <summary>
+    /// The load check for the collection day of a Transport Order that is not planned yet, with the order counted as if it were
+    /// assigned to Own fleet now (P10). Null when the order has no collection day, or the day is within the horizon but not open.
+    /// Unlike <see cref="ForAsync"/>, a failure to work it out is not swallowed: nothing is saved that it could be late for.
+    /// </summary>
+    public async Task<LoadCheckWarning?> IfAssignedAsync(TransportOrder order, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return await LoadCheckAsync(order, countOrder: true, cancellationToken);
+    }
+
     private async Task<LoadCheckWarning?> WarningForAsync(Shipment shipment, CancellationToken cancellationToken)
     {
         var orders = await transportOrders.ListAsync(new TransportOrdersByIdsSpec([shipment.TransportOrderId]), cancellationToken);
-        if (orders.FirstOrDefault() is not { } order || CollectionDate.Of(order.Details) is not { } date)
+        if (orders.FirstOrDefault() is not { } order)
+        {
+            return null;
+        }
+
+        var check = await LoadCheckAsync(order, countOrder: false, cancellationToken);
+        return check is { OutsideHorizon: true } or { Load.Over: true } ? check : null;
+    }
+
+    private async Task<LoadCheckWarning?> LoadCheckAsync(TransportOrder order, bool countOrder, CancellationToken cancellationToken)
+    {
+        if (CollectionDate.Of(order.Details) is not { } date)
         {
             return null;
         }
@@ -58,8 +80,16 @@ public sealed partial class LoadCheckWarnings(
             return null;
         }
 
-        var load = loads.Of(day, await loads.DemandByDayAsync(cancellationToken));
-        return load.Over ? new LoadCheckWarning(date, OutsideHorizon: false, load) : null;
+        var demand = await loads.DemandByDayAsync(cancellationToken);
+        if (countOrder)
+        {
+            demand = new Dictionary<DateOnly, FleetLoad>(demand)
+            {
+                [date] = LoadCheck.Sum([demand.GetValueOrDefault(date, FleetLoad.None), LoadCheck.DemandOf(order.Details)]),
+            };
+        }
+
+        return new LoadCheckWarning(date, OutsideHorizon: false, loads.Of(day, demand));
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The load check warning for Shipment {ShipmentNumber} couldn't be worked out")]

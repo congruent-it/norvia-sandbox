@@ -496,6 +496,9 @@ _Avoid_: bot, copilot, AI, assistant
 One question put to an Agent, with its tool calls and its answer, identified by a run ID. It is a span in the host application, and its tool calls are hops on a Message trail tagged with the Agent's identity and the tool name.
 _Avoid_: chat, session, conversation (that is Foundry's own record of a run)
 
+**Assignment options**:
+Where a Transport Order waiting for planning can go, as the TMS works it out for the Planner agent's one tool: whether Own fleet fits the collection day (the load check with the order counted, the Vehicles and Drivers available, the Driving-hour budget), any Over capacity or out-of-horizon warning, each active Carrier's Carrier cost from its Carrier Rate Card or the code that says it cannot be priced (such as `NoMatchingLane`), and which Assignment rules each option meets. The TMS computes it and the Planner agent chooses among the options; it never recommends one the rules refuse. The Planner's **Suggest** button on a Transport Order waiting for planning shows the result as a Suggestion and assigns nothing.
+
 **Agent view**:
 An application's narrower, read-only endpoint group for the Agents: statuses, codes, times, numbers and business names, from an allowlist of fields, with no message body. The Integration console's is its agent API (`/agent/v1`), and so is the Estate health check's; the ERP API's is `/v1/agent/finance`, the Carrier invoice matching agent's view of a Carrier invoice line, which leaves out the Planner's remark of a Spot price (the cost's source is a label) and every Shipper and Consignee detail; the TMS API's is `/v1/agent/customer-service`, the Customer service agent's view of a Rejected booking, which leaves out the Consignee's name, address and contacts and every file's contents; an MCP server exposes each operation as a tool (ADR 0040).
 _Avoid_: agent endpoint, agent database
