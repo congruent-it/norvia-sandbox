@@ -52,7 +52,7 @@ internal static partial class BookingDraftEndpoint
 
         var settings = options.Value;
         var answer = settings.Enabled
-            ? await BookingDraftOperation.DraftAsync(extractor, context.Request.Body, settings.MaxInputCharacters, correlationId, context.RequestAborted)
+            ? await BookingDraftOperation.DraftAsync(extractor, context.Request.Body, context.Request.ContentType, settings.Limits, correlationId, context.RequestAborted)
             : BookingDraftOperation.Refuse(correlationId, StatusCodes.Status503ServiceUnavailable, BookingDraftOperation.AgentsDisabled, "The assistant is unavailable.");
 
         var outcome = new Dictionary<string, object?> { ["outcome"] = answer.Outcome };

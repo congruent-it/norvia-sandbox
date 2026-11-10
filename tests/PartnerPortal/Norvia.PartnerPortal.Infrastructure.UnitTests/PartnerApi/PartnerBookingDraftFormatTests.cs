@@ -133,6 +133,8 @@ public sealed class PartnerBookingDraftFormatTests
     [Theory]
     [InlineData(422, """{"failureCode": "MultipleBookingsInText", "messageId": "m-1"}""", BookingDraftOutcome.MultipleBookings)]
     [InlineData(413, """{"failureCode": "InputTooLarge"}""", BookingDraftOutcome.TooLarge)]
+    [InlineData(422, """{"failureCode": "NoTextInPdf"}""", BookingDraftOutcome.NoTextInPdf)]
+    [InlineData(415, """{"failureCode": "UnsupportedFormat"}""", BookingDraftOutcome.UnsupportedFormat)]
     [InlineData(503, """{"failureCode": "AgentsDisabled"}""", BookingDraftOutcome.Unavailable)]
     [InlineData(503, """{"failureCode": "AgentUnavailable"}""", BookingDraftOutcome.Unavailable)]
     [InlineData(403, """{"text": "no"}""", BookingDraftOutcome.Unavailable)]

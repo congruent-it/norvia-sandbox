@@ -329,7 +329,13 @@ Countries are ISO 3166-1 alpha-2 codes. The map knows the countries of Europe, e
 
 ## Booking draft
 
-`POST /partner/v1/booking-drafts` with `{"text": "..."}` answers a [booking-draft.v1](booking-draft.v1.schema.json) for the Shipper Persona's pasted text, usually an email in English or Dutch:
+`POST /partner/v1/booking-drafts` answers a [booking-draft.v1](booking-draft.v1.schema.json) for the Shipper Persona's text, usually an email in English or Dutch. The body is one of:
+
+- `application/json` with `{"text": "..."}` (pasted text);
+- `text/plain`, the text itself;
+- `application/pdf`, a PDF with a text layer. The text is extracted in .NET before the model sees it, and goes through the same extraction, rules and schema validation as pasted text. There is no OCR: a scanned or image-only PDF is refused with `NoTextInPdf`. The PDF and its text are neither stored nor logged.
+
+The answer holds:
 
 - `booking`: the booking's fields as [booking.v1](booking.v1.schema.json) has them (the draft schema references it, so the two stay in step). Every field is optional, and a value the text does not give is left out.
 - `quotes`: for each filled field, the words of the text it came from. A value without a quote that is in the text is thrown away and listed as missing: the Intake agent cannot invent a Shipper reference, a date, a weight or a quantity.
@@ -344,7 +350,9 @@ The checks are those of the other operations, in the same order: the subscriptio
 |---|---|---|
 | 200 | | A draft |
 | 400 | `TextRequired` | No text |
-| 413 | `InputTooLarge` | More than `Agents:MaxInputCharacters` characters (8000), or, in Azure, a request over 40 KB, which API Management refuses before it reaches the host |
+| 413 | `InputTooLarge` | More than `Agents:MaxInputCharacters` characters (8000) of text, or of text read from a PDF; a PDF over `Agents:MaxPdfBytes` (1,000,000) or `Agents:MaxPdfPages` (10); or, in Azure, a request over 40 KB (1 MB for a PDF), which API Management refuses before it reaches the host |
+| 415 | `UnsupportedFormat` | A body that is not `application/json`, `text/plain` or a PDF that can be opened |
+| 422 | `NoTextInPdf` | The PDF has no text to read (a scan or an image): paste the text instead |
 | 422 | `MultipleBookingsInText` | The text describes more than one booking: paste one at a time |
 | 503 | `AgentsDisabled` | `Agents:Enabled` is off (the default) |
 | 503 | `AgentUnavailable` | The model failed, was too slow, or its reply did not match the draft schema |

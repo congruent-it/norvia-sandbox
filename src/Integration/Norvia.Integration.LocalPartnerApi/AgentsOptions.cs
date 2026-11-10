@@ -1,18 +1,15 @@
 using System.ComponentModel.DataAnnotations;
+using Norvia.Integration.BookingDraft;
 
 namespace Norvia.Integration.LocalPartnerApi;
 
 /// <summary>The Intake agent's guards (ADR 0040): off by default, a maximum input size, a stricter rate limit than bookings, and no retry.</summary>
-public sealed class AgentsOptions
+public sealed class AgentsOptions : BookingDraftInputOptions
 {
     public const string SectionName = "Agents";
 
     /// <summary>Whether the Booking draft operation does anything. The estate decides, as for the other Agents.</summary>
     public bool Enabled { get; set; }
-
-    /// <summary>The most characters of pasted text the operation accepts.</summary>
-    [Range(100, 100_000)]
-    public int MaxInputCharacters { get; set; } = 8_000;
 
     /// <summary>The most Booking drafts one subscription may ask for in a minute. A model call costs money, so it is far fewer than bookings.</summary>
     [Range(1, 600)]

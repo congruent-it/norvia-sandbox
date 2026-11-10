@@ -73,7 +73,7 @@ internal static partial class CreateBookingDraft
             return Refuse(logger, BookingDraftOperation.Refuse(correlationId, StatusCodes.Status429TooManyRequests, "RateLimitExceeded", $"Rate limit is exceeded. Try again in {seconds} seconds."));
         }
 
-        var answer = await BookingDraftOperation.DraftAsync(extractor, context.Request.Body, agents.MaxInputCharacters, correlationId, context.RequestAborted);
+        var answer = await BookingDraftOperation.DraftAsync(extractor, context.Request.Body, context.Request.ContentType, agents.Limits, correlationId, context.RequestAborted);
         return answer.Outcome switch
         {
             BookingDraftOperation.Succeeded => Succeed(logger, answer),

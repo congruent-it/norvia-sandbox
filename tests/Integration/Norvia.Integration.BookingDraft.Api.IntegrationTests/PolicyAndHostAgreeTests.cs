@@ -62,13 +62,15 @@ public sealed class PolicyAndHostAgreeTests
     }
 
     [Fact]
-    public void ThePolicysSizeCap_HoldsEveryCharacterTheHostAccepts()
+    public void ThePolicysSizeCaps_HoldEveryCharacterAndEveryPdfByteTheHostAccepts()
     {
-        // The policy caps bytes before the host caps characters; at 4 bytes a character plus the JSON around the text, the host's default must fit under the cap.
-        var caps = System.Text.RegularExpressions.Regex.Matches(Inbound.ToString(), @"(?:>|&gt;) (\d+)").Select(match => int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)).Distinct();
-        var cap = caps.Should().ContainSingle().Subject;
+        // The policy caps bytes before the host caps characters or a PDF's bytes; at 4 bytes a character plus the JSON around the text, and a PDF as it is, the host's defaults must fit.
+        var caps = System.Text.RegularExpressions.Regex.Matches(Inbound.ToString(), @"long cap = pdf \? (\d+) : (\d+);").Single();
+        var pdfCap = int.Parse(caps.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        var textCap = int.Parse(caps.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
         var defaults = new BookingDraftHostOptions();
 
-        (defaults.MaxInputCharacters * 4 + 1_024).Should().BeLessThanOrEqualTo(cap);
+        (defaults.MaxInputCharacters * 4 + 1_024).Should().BeLessThanOrEqualTo(textCap);
+        defaults.MaxPdfBytes.Should().BeLessThanOrEqualTo(pdfCap);
     }
 }

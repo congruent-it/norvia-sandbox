@@ -53,6 +53,43 @@ public sealed class NorviaPartnerApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task DraftBookingFromPdfAsync_PostsThePdfAsApplicationPdf_AsThePersona()
+    {
+        _partnerApi.Answer(HttpStatusCode.UnprocessableEntity, """{"failureCode": "NoTextInPdf", "messageId": "m-1"}""");
+
+        var answer = await _client.DraftBookingFromPdfAsync(Samples.BrouwerDranken, "%PDF-1.4 test"u8.ToArray(), TestContext.Current.CancellationToken);
+
+        _partnerApi.Request!.RequestUri.Should().Be(new Uri("https://apim.example/partner/v1/booking-drafts"));
+        _partnerApi.Request.Content!.Headers.ContentType!.MediaType.Should().Be("application/pdf");
+        _partnerApi.Request.Headers.GetValues("Ocp-Apim-Subscription-Key").Should().Equal("brouwer-key");
+        _partnerApi.RequestBody.Should().Be("%PDF-1.4 test");
+        answer.Outcome.Should().Be(Norvia.PartnerPortal.Application.Bookings.DraftFromText.BookingDraftOutcome.NoTextInPdf);
+    }
+
+    [Fact]
+    public async Task DraftBookingFromPdfAsync_WhenNorviaCannotBeReached_IsUnavailable_AndNeverLogsTheContent()
+    {
+        _partnerApi.Fail(new HttpRequestException("down"));
+
+        var answer = await _client.DraftBookingFromPdfAsync(Samples.BrouwerDranken, "SECRET-PDF-CONTENT"u8.ToArray(), TestContext.Current.CancellationToken);
+
+        answer.Outcome.Should().Be(Norvia.PartnerPortal.Application.Bookings.DraftFromText.BookingDraftOutcome.Unavailable);
+        string.Join('\n', _logger.Collector.GetSnapshot().Select(log => log.Message)).Should().NotContain("SECRET-PDF-CONTENT");
+    }
+
+    [Fact]
+    public async Task DraftBookingFromTextAsync_PostsTheTextAsJson_AsThePersona()
+    {
+        _partnerApi.Answer(HttpStatusCode.UnprocessableEntity, """{"failureCode": "MultipleBookingsInText"}""");
+
+        var answer = await _client.DraftBookingFromTextAsync(Samples.BrouwerDranken, "the email", TestContext.Current.CancellationToken);
+
+        _partnerApi.Request!.Content!.Headers.ContentType!.MediaType.Should().Be("application/json");
+        JsonNode.Parse(_partnerApi.RequestBody!)!["text"]!.GetValue<string>().Should().Be("the email");
+        answer.Outcome.Should().Be(Norvia.PartnerPortal.Application.Bookings.DraftFromText.BookingDraftOutcome.MultipleBookings);
+    }
+
+    [Fact]
     public async Task SubmitAsync_PostsTheBookingToTransportOrders_AsThePersona()
     {
         _partnerApi.Answer(HttpStatusCode.Created, Contracts.Read("PartnerApi/samples/responses/accepted.json"));

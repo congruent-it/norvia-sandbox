@@ -190,6 +190,84 @@ public sealed class CreateBookingDraftTests : IAsyncLifetime
         keys["correlationId"].Should().Be(response.Headers.GetValues("X-Correlation-ID").Single());
     }
 
+    [Fact]
+    public async Task Draft_ATextPdf_GivesTheSameDraftAsItsTextPasted()
+    {
+        using var pasted = await DraftAsync(BookingIntakeSamples.Good);
+        using var uploaded = await DraftBytesAsync(Pdf(BookingIntakeSamples.Good), "application/pdf");
+
+        uploaded.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await BodyAsync(uploaded)).ToJsonString().Should().Be((await BodyAsync(pasted)).ToJsonString());
+    }
+
+    [Fact]
+    public async Task Draft_AScannedPdf_IsRefused422_AsNoTextInPdf()
+    {
+        using var response = await DraftBytesAsync(Pdf(""), "application/pdf");
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await BodyAsync(response))["failureCode"]!.GetValue<string>().Should().Be("NoTextInPdf");
+    }
+
+    [Fact]
+    public async Task Draft_AnImage_IsRefused415_AsUnsupportedFormat()
+    {
+        using var response = await DraftBytesAsync([1, 2, 3], "image/png");
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
+        (await BodyAsync(response))["failureCode"]!.GetValue<string>().Should().Be("UnsupportedFormat");
+    }
+
+    [Fact]
+    public async Task Draft_APdfOverThePageCap_IsRefused413_AsInputTooLarge()
+    {
+        using var response = await DraftBytesAsync(Pdf(Enumerable.Repeat("a page", 11).ToArray()), "application/pdf");
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        (await BodyAsync(response))["failureCode"]!.GetValue<string>().Should().Be("InputTooLarge");
+    }
+
+    [Fact]
+    public async Task Draft_ThePdfAndItsTextAreNotLogged()
+    {
+        using var response = await DraftBytesAsync(Pdf(BookingIntakeSamples.Good), "application/pdf");
+        _ = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        var logged = string.Join('\n', _factory.Logs.GetSnapshot().Select(log => log.Message + string.Join(' ', log.Scopes.Select(scope => scope?.ToString()))));
+        logged.Should().NotContain("Mueller").And.NotContain("Havenstraat").And.NotContain("SH-2030-0142");
+    }
+
+    private static byte[] Pdf(params string[] pages)
+    {
+        var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
+        var font = builder.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica);
+        foreach (var text in pages)
+        {
+            var page = builder.AddPage(UglyToad.PdfPig.Content.PageSize.A4);
+            var y = 800.0;
+            foreach (var line in text.Split('\n'))
+            {
+                if (line.Length > 0)
+                {
+                    page.AddText(line, 10, new UglyToad.PdfPig.Core.PdfPoint(20, y), font);
+                }
+
+                y -= 12;
+            }
+        }
+
+        return builder.Build();
+    }
+
+    private async Task<HttpResponseMessage> DraftBytesAsync(byte[] body, string contentType)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/partner/v1/booking-drafts") { Content = new ByteArrayContent(body) };
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        request.Headers.Add("Ocp-Apim-Subscription-Key", LocalPartnerApiFactory.BrouwerKey);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _factory.PersonaToken(roles: DraftRole));
+        return await _partnerApi.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
     private Task<HttpResponseMessage> DraftAsync(
         string text, string? subscriptionKey = LocalPartnerApiFactory.BrouwerKey, string token = "") =>
         DraftAsync(_partnerApi, _factory, text, subscriptionKey, token);

@@ -68,6 +68,10 @@
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.15.1" />
     <PackageVersion Include="Microsoft.Azure.Workflows.WebJobs.Sdk" Version="1.2.0" />
   </ItemGroup>
+  <ItemGroup Label="Intake agent">
+    <!-- Reads the text of an uploaded PDF in .NET before the model sees it (no OCR). -->
+    <PackageVersion Include="PdfPig" Version="0.1.16" />
+  </ItemGroup>
   <ItemGroup Label="Web">
     <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.14.4" />
   </ItemGroup>
