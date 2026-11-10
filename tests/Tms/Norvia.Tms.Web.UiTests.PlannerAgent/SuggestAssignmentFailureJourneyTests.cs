@@ -4,7 +4,7 @@ using static Microsoft.Playwright.Assertions;
 namespace Norvia.Tms.Web.UiTests.PlannerAgent;
 
 /// <summary>
-/// An Agent that fails costs the list nothing but the suggestion. It stops the MCP stand-in, which Aspire cannot stop once it has served calls, so <see cref="StopsTheAgentFirst"/> runs
+/// An Agent that fails costs the list nothing but the suggestion. It stops the MCP stand-in, which Aspire cannot stop once it has served calls, so <see cref="FailureJourneyFirstOrderer"/> runs
 /// this class before the others.
 /// </summary>
 public sealed class SuggestAssignmentFailureJourneyTests(PlannerAgentUiFixture agent) : WaitingForPlanningPage(agent)

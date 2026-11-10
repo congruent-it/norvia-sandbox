@@ -15,6 +15,9 @@ public abstract class WaitingForPlanningPage(PlannerAgentUiFixture fixture) : Br
     // The assistant reads the options through the MCP stand-in and the model before it answers; the first call on a cold host takes longer than a page does.
     protected const float AgentTimeout = 30_000;
 
+    // The order weighs 910.5 kg; the margin keeps it clear of a day that is nearly full.
+    private const decimal SpareKgForTheOrder = 2_000m;
+
     private static readonly TimeZoneInfo Amsterdam = TimeZoneInfo.FindSystemTimeZoneById("Europe/Amsterdam");
 
     protected PlannerAgentUiFixture Agent { get; } = fixture;
@@ -41,26 +44,38 @@ public abstract class WaitingForPlanningPage(PlannerAgentUiFixture fixture) : Br
     }
 
     /// <summary>The first weekday with room for the order and no warning: not Over capacity, and with spare weight for it and a margin.</summary>
-    protected async Task<DateOnly> DayThatFitsAsync()
+    protected async Task<DateOnly> DayThatFitsAsync(CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Amsterdam).DateTime);
-        var days = await OpenDaysAsync();
-        return days
-            .Where(day => day.Date > today && day.Date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
-            .Where(day => day.Load is { } load && !load["over"]!.GetValue<bool>() && load["capacityKg"]!.GetValue<decimal>() - load["demandKg"]!.GetValue<decimal>() > 2_000m)
-            .Select(day => day.Date)
-            .First();
+        var days = await OpenDaysAsync(cancellationToken);
+        var fitting = days.FirstOrDefault(day => day.Date > today && day.Date.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && day.HasRoomFor(SpareKgForTheOrder));
+        return fitting?.Date ?? throw new InvalidOperationException($"No open weekday after {today} has {SpareKgForTheOrder} kg to spare and is not Over capacity.");
     }
 
     /// <summary>The day the demo seed leaves Over capacity, which the Planner sees flagged on the Capacity view.</summary>
-    protected async Task<DateOnly> OverCapacityDayAsync() =>
-        (await OpenDaysAsync()).First(day => day.Load is { } load && load["over"]!.GetValue<bool>()).Date;
+    protected async Task<DateOnly> OverCapacityDayAsync(CancellationToken cancellationToken) =>
+        (await OpenDaysAsync(cancellationToken)).FirstOrDefault(day => day.Over)?.Date
+        ?? throw new InvalidOperationException("The demo seed left no open day Over capacity.");
 
-    private async Task<IReadOnlyList<(DateOnly Date, JsonNode? Load)>> OpenDaysAsync()
+    private async Task<IReadOnlyList<CapacityDay>> OpenDaysAsync(CancellationToken cancellationToken)
     {
-        using var response = await Agent.Manage.GetAsync(new Uri("/v1/capacity/days", UriKind.Relative), TestContext.Current.CancellationToken);
+        using var response = await Agent.Manage.GetAsync(new Uri("/v1/capacity/days", UriKind.Relative), cancellationToken);
         response.EnsureSuccessStatusCode();
-        var days = await response.Content.ReadFromJsonAsync<JsonArray>(TestContext.Current.CancellationToken);
-        return [.. days!.Select(day => (DateOnly.Parse(day!["date"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture), day["load"]))];
+        var days = await response.Content.ReadFromJsonAsync<JsonArray>(cancellationToken);
+        return [.. days!.Select(day => CapacityDay.Of(day!))];
+    }
+
+    /// <summary>One open day of the Planning horizon and its load check, as the Capacity view reads it.</summary>
+    private sealed record CapacityDay(DateOnly Date, bool Over, decimal SpareKg, bool HasLoad)
+    {
+        public bool HasRoomFor(decimal kg) => HasLoad && !Over && SpareKg > kg;
+
+        public static CapacityDay Of(JsonNode day)
+        {
+            var date = DateOnly.Parse(day["date"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture);
+            return day["load"] is { } load
+                ? new CapacityDay(date, load["over"]!.GetValue<bool>(), load["capacityKg"]!.GetValue<decimal>() - load["demandKg"]!.GetValue<decimal>(), true)
+                : new CapacityDay(date, false, 0, false);
+        }
     }
 }
