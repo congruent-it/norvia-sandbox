@@ -6,7 +6,7 @@
     On demand and before a release, as the presenter (or the manual workflow .github/workflows/evaluate-agent.yml). It never
     runs in CI and never gates a merge: a failed case is a finding (docs/operations/agent-evaluation.md).
 
-      infra/run-agent-evaluation.ps1 <agent> [-Case <id>] [-Runs <n>] [-Out <file>]
+      infra/run-agent-evaluation.ps1 <agent> [-Case <id>] [-Runs <n>] [-Submit] [-Out <file>]
 
     Reads evaluation/cases/<agent>/*.json (format: evaluation/README.md), puts each case's input to the published agent through
     the project's Responses API (store: false, no conversation: docs/operations/foundry.md spike 3), checks the answer with
@@ -24,6 +24,9 @@
 .PARAMETER Agent The agent whose cases to run: a directory of evaluation/cases.
 .PARAMETER Case Runs only the case with this id.
 .PARAMETER Runs How many times each case runs. Defaults to 1.
+.PARAMETER Submit For the Intake agent (#462): sends the draft of each case that has a "submission" through the booking path, as the Partner portal
+    sends a reviewed draft, and records the TMS's answer next to the case's known one (infra/evaluation/submit-drafts.ps1). A draft the TMS answers
+    otherwise than the case says is printed as a FINDING. It never changes a case's verdict. It makes real Transport Orders in the estate.
 .PARAMETER Out The result file.
 #>
 [CmdletBinding()]
@@ -31,6 +34,7 @@ param(
     [Parameter(Mandatory, Position = 0)][string] $Agent,
     [string] $Case,
     [ValidateRange(1, 1000)][int] $Runs = 1,
+    [switch] $Submit,
     [string] $Out
 )
 $ErrorActionPreference = 'Stop'
@@ -53,6 +57,11 @@ if (-not $env:FOUNDRY_PROJECT_ENDPOINT -and (Get-Command azd -ErrorAction Silent
     if (-not $env:FOUNDRY_PROJECT_ENDPOINT) { $env:FOUNDRY_PROJECT_ENDPOINT = $env:AZURE_ESTATE_FOUNDRY_PROJECT_ENDPOINT }
 }
 $endpoint = $env:FOUNDRY_PROJECT_ENDPOINT
+# The Intake agent is published in its own project, with no tracing (docs/operations/foundry.md), so its cases run against that project.
+if ($Agent -ceq 'booking-intake') {
+    $endpoint = $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT ? $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT : $env:AZURE_ESTATE_FOUNDRY_INTAKE_PROJECT_ENDPOINT
+    if (-not $endpoint) { Write-Abort 'no Foundry Intake project endpoint: set FOUNDRY_INTAKE_PROJECT_ENDPOINT, or deploy the estate (azd provision)' }
+}
 if (-not $endpoint) { Write-Abort 'no Foundry project endpoint: set FOUNDRY_PROJECT_ENDPOINT, or deploy the estate (azd provision)' }
 
 $casesDirectory = Join-Path $repo "evaluation/cases/$Agent"
@@ -88,6 +97,8 @@ if (-not $env:EVALUATION_SUBJECT) {
         }
     }
 }
+
+if ($Submit -and @($selected | Where-Object { $null -ne $_.Data.submission }).Count -eq 0) { Write-Abort '-Submit: none of the selected cases has a "submission" (the known answer of the booking path)' }
 
 $accessToken = Get-AzAccessToken https://ai.azure.com
 
@@ -171,6 +182,7 @@ function Invoke-Run($Item) {
 }
 
 $results = [Collections.Generic.List[object]]::new()
+$drafts = [ordered]@{}
 $total = 0
 $passed = 0
 foreach ($item in $selected) {
@@ -183,6 +195,7 @@ foreach ($item in $selected) {
         if ($last.pass) { $casePassed++ }
         if ($Runs -ne 1) { Write-Host "  run ${n}/${Runs}: $($last.pass ? 'pass' : 'fail')" }
     }
+    if ($null -ne $item.Data.submission -and $null -ne $last.answer.booking -and $last.answer.booking.PSObject.Properties.Count -gt 0) { $drafts[$item.Id] = $last.answer.booking }
     Write-Host "  tools: $($last.toolCalls.Count -eq 0 ? 'none' : ($last.toolCalls -join ', '))"
     foreach ($check in $last.checks) { Write-Host "  $($check.pass ? 'PASS' : 'FAIL')  $($check.check): $($check.reason)" }
     $checksPassed = @($last.checks | Where-Object pass).Count
@@ -196,11 +209,43 @@ foreach ($item in $selected) {
         })
 }
 
+# The end to end: the draft of each case goes through the booking path, and the TMS's answer is recorded next to the known one. A draft the
+# TMS answers otherwise is a finding about the agent (or about the known answer); it does not change the case's verdict.
+$submissions = [ordered]@{}
+if ($Submit -and $drafts.Count -gt 0) {
+    $draftsFile = Join-Path ([IO.Path]::GetTempPath()) "intake-drafts-$([guid]::NewGuid()).json"
+    $answersFile = Join-Path ([IO.Path]::GetTempPath()) "intake-answers-$([guid]::NewGuid()).json"
+    try {
+        $drafts | ConvertTo-Json -Depth 20 | Set-Content -Path $draftsFile -Encoding utf8NoBOM
+        & (Join-Path $PSScriptRoot 'evaluation/submit-drafts.ps1') -DraftsFile $draftsFile -ResultFile $answersFile
+        $answers = Get-Content -Raw $answersFile | ConvertFrom-Json -AsHashtable
+    }
+    finally {
+        Remove-Item -Path $draftsFile, $answersFile -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($item in $selected | Where-Object { $null -ne $_.Data.submission }) {
+        $known = $item.Data.submission
+        $actual = $answers[$item.Id]
+        $knownCodes = @($known.codes | Sort-Object -CaseSensitive)
+        if ($null -eq $actual) {
+            $finding = $true
+            $line = "no draft was submitted: the agent gave no booking"
+        }
+        else {
+            $actualCodes = @($actual.codes | Sort-Object -CaseSensitive)
+            $finding = $actual.result -cne $known.result -or ($actualCodes -join ',') -cne ($knownCodes -join ',')
+            $line = "TMS said $($actual.result)$($actualCodes.Count -gt 0 ? " ($($actualCodes -join ', '))" : '')"
+        }
+        Write-Host "$($finding ? 'FINDING' : 'MATCH  ') $($item.Id): expected $($known.result)$($knownCodes.Count -gt 0 ? " ($($knownCodes -join ', '))" : ''); $line"
+        $submissions[$item.Id] = [ordered]@{ expected = $known; actual = $actual; finding = $finding }
+    }
+}
+
 if (-not $Out) {
     $environmentName = $env:AZURE_ENV_NAME ? $env:AZURE_ENV_NAME : 'local'
     $Out = Join-Path $repo ".azure/$environmentName/evaluation/$Agent-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')).json"
 }
 New-Item -ItemType Directory -Path (Split-Path -Parent ([IO.Path]::GetFullPath($Out))) -Force | Out-Null
-[ordered]@{ agent = $Agent; at = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'); cases = @($results) } |
+[ordered]@{ agent = $Agent; at = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'); cases = @($results); submissions = $submissions } |
     ConvertTo-Json -Depth 20 | Set-Content -Path $Out -Encoding utf8NoBOM
 Write-Host "RESULT $passed/$total cases passed. Written to $Out. A failed case is a finding, not a failed build."

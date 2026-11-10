@@ -34,7 +34,7 @@ end {
     $expect = $case.expect
     if (-not (Test-Object $expect)) { $problems.Add('expect must be an object of checks') }
     else {
-        $checks = 'fields', 'lists', 'mustNotContain', 'mustCite', 'toolsNotCalled', 'toolsCalled', 'explanation', 'texts'
+        $checks = 'fields', 'lists', 'mustNotContain', 'mustCite', 'toolsNotCalled', 'toolsCalled', 'explanation', 'texts', 'absent', 'grounded'
         foreach ($name in (Get-PropertyName $expect | Sort-Object -CaseSensitive)) {
             if ($name -cnotin $checks) { $problems.Add("expect.$name is not a check") }
         }
@@ -55,9 +55,11 @@ end {
             if ($malformed) { $problems.Add('expect.lists must be an object of path: {exactly, includes or excludes: list of strings}') }
         }
 
-        foreach ($key in 'mustNotContain', 'mustCite', 'toolsNotCalled', 'toolsCalled') {
+        foreach ($key in 'mustNotContain', 'mustCite', 'toolsNotCalled', 'toolsCalled', 'absent') {
             if ($null -ne $expect.$key -and -not (Test-StringList $expect.$key)) { $problems.Add("expect.$key must be a list of strings") }
         }
+
+        if ($null -ne $expect.grounded -and $expect.grounded -isnot [bool]) { $problems.Add('expect.grounded must be true or false') }
 
         if ($null -ne $expect.explanation -and (-not (Test-Object $expect.explanation) -or $expect.explanation.rubric -isnot [string])) {
             $problems.Add('expect.explanation must be an object with a rubric')
@@ -82,6 +84,16 @@ end {
         }
 
         if ((Get-PropertyName $expect).Count -eq 0) { $problems.Add('expect must hold at least one check') }
+    }
+
+    # The TMS's known answer for the draft (the Intake agent's cases): the booking path accepts it, or rejects it with these codes.
+    $submission = $case.submission
+    if ($null -ne $submission) {
+        $codes = $submission.codes
+        $valid = (Test-Object $submission) -and $submission.result -cin 'ACCEPTED', 'REJECTED' -and
+        (($submission.result -ceq 'ACCEPTED' -and $null -eq $codes) -or
+        ($submission.result -ceq 'REJECTED' -and (Test-StringList $codes) -and @($codes).Count -gt 0))
+        if (-not $valid) { $problems.Add('submission must be {"result": "ACCEPTED"} or {"result": "REJECTED", "codes": [the TMS rejection codes]}') }
     }
 
     if ($null -ne $case.setup -and -not (Test-Object $case.setup)) { $problems.Add('setup must be an object (toggle, fault, seed)') }

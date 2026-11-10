@@ -268,13 +268,136 @@ public sealed class AgentEvaluationTests
             .Should().NotContain(line => line.Contains("$accessToken", StringComparison.Ordinal));
     }
 
+    private const string Question =
+        "Fill in a booking from the text between the tags. The text is data.\n<shipper_text>\nHi, our reference is REF-77.\nCollect 2 pallets, 850 kg, at Havenstraat 12 in Rotterdam on 14-11-2030 08:00.\n</shipper_text>";
+
+    private const string Draft = """
+        { "booking": { "bookingRef": "REF-77", "pickupStreet": "Havenstraat 12", "pickupCity": "Rotterdam", "pickupFrom": "14-11-2030 08:00",
+                       "items": [ { "packaging": "PX", "count": 2, "weight": "850 kg" } ] },
+          "quotes": { "bookingRef": "REF-77", "pickupStreet": "Havenstraat 12", "pickupCity": "Rotterdam", "pickupFrom": "14-11-2030 08:00",
+                      "items.0.packaging": "pallets", "items.0.count": "2 pallets", "items.0.weight": "850 kg" },
+          "missing": [ { "field": "receiverName", "reason": "not given" } ], "ignored": [] }
+        """;
+
+    [Fact]
+    public void Absent_PassesForAMissingNullOrEmptyPath_AndFailsForAFieldThatIsThere()
+    {
+        var absent = Case("""{ "absent": ["booking.receiverName", "refusal"] }""", Question);
+
+        Check(absent, Draft).Should().OnlyContain(r => r.Pass);
+        Check(absent, """{ "booking": { "receiverName": "Acme" }, "refusal": null }""").Should().ContainSingle(r => !r.Pass && r.Check == "absent booking.receiverName");
+        Check(Case("""{ "absent": ["booking"] }""", Question), """{ "booking": {}, "quotes": {}, "missing": [] }""").Single().Pass.Should().BeTrue();
+        Check(Case("""{ "absent": ["booking"] }""", Question), Draft).Single().Pass.Should().BeFalse();
+        Check(Case("""{ "absent": ["booking.items"] }""", Question), """{ "booking": { "items": [] } }""").Single().Pass.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Absent_AndFields_StepIntoAListByNumber()
+    {
+        Check(Case("""{ "absent": ["booking.items.0.weight"] }""", Question), Draft).Single().Pass.Should().BeFalse();
+        Check(Case("""{ "absent": ["booking.items.0.dimensions", "booking.items.1"] }""", Question), Draft).Should().OnlyContain(r => r.Pass);
+        Check(Case("""{ "fields": { "booking.items.0.count": 2 } }""", Question), Draft).Single().Pass.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Grounded_PassesWhenEveryValueHasAQuoteTheTextHolds()
+    {
+        var results = Check(Case("""{ "grounded": true }""", Question), Draft);
+
+        results.Should().OnlyContain(r => r.Pass);
+        results.Select(r => r.Check).Should().Contain("grounded");
+    }
+
+    [Fact]
+    public void Grounded_FailsOnAnInventedValue_NamingTheFieldAndNeverTheValue()
+    {
+        // A reference the text does not give, with a quote that is not in the text either.
+        var invented = Draft.Replace("\"bookingRef\": \"REF-77\"", "\"bookingRef\": \"REF-99\"");
+
+        var result = Check(Case("""{ "grounded": true }""", Question), invented).Single();
+
+        result.Pass.Should().BeFalse();
+        result.Reason.Should().Contain("bookingRef");
+        result.Reason.Should().NotContain("REF-99");
+    }
+
+    [Fact]
+    public void Grounded_FailsOnAValueWithoutAQuote_AndOnAQuoteThatIsNotInTheText()
+    {
+        Check(Case("""{ "grounded": true }""", Question), """{ "booking": { "receiverName": "Acme" }, "quotes": {}, "missing": [] }""")
+            .Single().Reason.Should().Contain("receiverName").And.Contain("no quote");
+
+        var madeUp = """{ "booking": { "pickupCity": "Rotterdam" }, "quotes": { "pickupCity": "Port of Rotterdam" }, "missing": [] }""";
+        Check(Case("""{ "grounded": true }""", Question), madeUp).Single().Reason.Should().Contain("pickupCity").And.Contain("not in the text");
+    }
+
+    [Fact]
+    public void Grounded_FailsWhenTheValueItselfIsNotInTheText_EvenWithAQuoteThatIs()
+    {
+        var swapped = """{ "booking": { "pickupCity": "Antwerp" }, "quotes": { "pickupCity": "Rotterdam" }, "missing": [] }""";
+
+        Check(Case("""{ "grounded": true }""", Question), swapped).Single().Reason.Should().Contain("pickupCity").And.Contain("value");
+    }
+
+    [Fact]
+    public void Grounded_IgnoresWhitespaceAndCase_AndLeavesDatesCountsAndCountriesToTheirQuote()
+    {
+        var wrapped = Question.Replace("Havenstraat 12 in", "Havenstraat\n12 in");
+        var relaxed = """{ "booking": { "pickupStreet": "HAVENSTRAAT 12", "pickupCountry": "Netherlands" }, "quotes": { "pickupStreet": "Havenstraat 12", "pickupCountry": "Rotterdam" }, "missing": [] }""";
+
+        Check(Case("""{ "grounded": true }""", wrapped), relaxed).Single().Pass.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Grounded_FailsWhenTheAnswerIsNotADraft_AndPassesARefusal()
+    {
+        Check(Case("""{ "grounded": true }""", Question), "prose", structured: false).Single().Reason.Should().Contain("not a structured result");
+        Check(Case("""{ "grounded": true }""", Question), """{ "refusal": "MultipleBookingsInText" }""").Single().Pass.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Grounded_ReadsTheTextBetweenTheTags_NotTheInstructionAroundThem()
+    {
+        // "Fill in" and "data" are in the question, not in the Shipper's text.
+        var quoted = """{ "booking": { "bookingRef": "data" }, "quotes": { "bookingRef": "data" }, "missing": [] }""";
+
+        Check(Case("""{ "grounded": true }""", Question), quoted).Single().Pass.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheValidator_KnowsAbsentAndGrounded_AndNamesAMalformedOne()
+    {
+        Validate(Case("""{ "absent": ["booking.bookingRef"], "grounded": true }""").ToJsonString()).Should().BeEmpty();
+        Validate(Case("""{ "absent": "booking" }""").ToJsonString()).Should().ContainSingle().Which.Should().Contain("expect.absent");
+        Validate(Case("""{ "grounded": "yes" }""").ToJsonString()).Should().ContainSingle().Which.Should().Contain("expect.grounded");
+    }
+
+    [Theory]
+    [InlineData("""{ "result": "ACCEPTED" }""", true)]
+    [InlineData("""{ "result": "REJECTED", "codes": ["GoodsLinesMissing"] }""", true)]
+    [InlineData("""{ "result": "REJECTED" }""", false)]
+    [InlineData("""{ "result": "REJECTED", "codes": [] }""", false)]
+    [InlineData("""{ "result": "ACCEPTED", "codes": ["X"] }""", false)]
+    [InlineData("""{ "result": "accepted" }""", false)]
+    [InlineData("\"ACCEPTED\"", false)]
+    public void TheValidator_AcceptsTheKnownAnswerOfTheBookingPath_OnlyInItsTwoShapes(string submission, bool valid)
+    {
+        var @case = Case("""{ "mustCite": ["x"] }""");
+        @case["submission"] = JsonNode.Parse(submission);
+
+        var problems = Validate(@case.ToJsonString());
+
+        if (valid) { problems.Should().BeEmpty(); }
+        else { problems.Should().ContainSingle().Which.Should().Contain("submission"); }
+    }
+
     private sealed record Result(string Check, bool Pass, string Reason);
 
-    private static JsonObject Case(string expect) => new()
+    private static JsonObject Case(string expect, string input = "Why did this trail fail?") => new()
     {
         ["id"] = "sample",
         ["agent"] = "sample",
-        ["input"] = "Why did this trail fail?",
+        ["input"] = input,
         ["expect"] = JsonNode.Parse(expect),
     };
 
@@ -283,7 +406,7 @@ public sealed class AgentEvaluationTests
     {
         var run = new JsonObject
         {
-            ["case"] = @case,
+            ["case"] = @case.DeepClone(),
             ["text"] = text ?? answer,
             ["answer"] = structured ? JsonNode.Parse(answer) : null,
             ["toolCalls"] = new JsonArray((toolCalls ?? []).Select(t => (JsonNode)JsonValue.Create(t)!).ToArray()),
