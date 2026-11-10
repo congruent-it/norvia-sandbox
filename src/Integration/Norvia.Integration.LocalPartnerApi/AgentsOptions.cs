@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Norvia.Integration.BookingDraft;
 
 namespace Norvia.Integration.LocalPartnerApi;
 
@@ -13,6 +14,17 @@ public sealed class AgentsOptions
     /// <summary>The most characters of pasted text the operation accepts.</summary>
     [Range(100, 100_000)]
     public int MaxInputCharacters { get; set; } = 8_000;
+
+    /// <summary>The most bytes of an uploaded PDF the operation accepts. The PDF is read for its text and never kept.</summary>
+    [Range(1_024, 10_000_000)]
+    public int MaxPdfBytes { get; set; } = 1_000_000;
+
+    /// <summary>The most pages of an uploaded PDF the operation reads.</summary>
+    [Range(1, 50)]
+    public int MaxPdfPages { get; set; } = 10;
+
+    /// <summary>The limits the operation checks a request against.</summary>
+    public BookingDraftLimits Limits => new(MaxInputCharacters, MaxPdfBytes, MaxPdfPages);
 
     /// <summary>The most Booking drafts one subscription may ask for in a minute. A model call costs money, so it is far fewer than bookings.</summary>
     [Range(1, 600)]

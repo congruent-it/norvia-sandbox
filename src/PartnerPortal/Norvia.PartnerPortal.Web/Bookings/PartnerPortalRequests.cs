@@ -64,6 +64,9 @@ internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPart
     public async Task<BookingDraftAnswer?> DraftBookingFromTextAsync(PersonaId personaId, string text, CancellationToken cancellationToken) =>
         FoundOrNull(await SendAsync(new DraftBookingFromTextQuery(personaId, text), cancellationToken));
 
+    public async Task<BookingDraftAnswer?> DraftBookingFromPdfAsync(PersonaId personaId, byte[] pdf, CancellationToken cancellationToken) =>
+        FoundOrNull(await SendAsync(new DraftBookingFromPdfQuery(personaId, pdf), cancellationToken));
+
     public async Task<BookingView?> SubmitBookingAsync(PersonaId personaId, BookingRequest booking, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();

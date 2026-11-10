@@ -38,6 +38,8 @@ internal static partial class PartnerBookingDraftFormat
         {
             (422, "MultipleBookingsInText") => BookingDraftOutcome.MultipleBookings,
             (413, _) => BookingDraftOutcome.TooLarge,
+            (422, "NoTextInPdf") => BookingDraftOutcome.NoTextInPdf,
+            (415, _) => BookingDraftOutcome.UnsupportedFormat,
             _ => BookingDraftOutcome.Unavailable,
         };
         return BookingDraftAnswer.Refused(outcome, messageId ?? json?["messageId"]?.GetValue<string>());

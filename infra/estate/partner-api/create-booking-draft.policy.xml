@@ -71,18 +71,20 @@
     </choose>
     <!-- A stricter limit than a booking's, one counter per subscription of its own: a model call costs money. After the checks, so a refusal is not counted. Over the limit API Management answers 429 itself, with Retry-After. -->
     <rate-limit-by-key calls="10" renewal-period="60" counter-key="@(context.Subscription.Id + &quot;:booking-drafts&quot;)" />
-    <!-- At most 40 KB (8,000 characters of any script, with the JSON around them): the Content-Length when the Shipper sent one, otherwise the body's own length. Nothing reaches the host over it. -->
+    <!-- At most 40 KB for a text (8,000 characters of any script, with the JSON around them) and 1 MB for a PDF (the host's page and byte caps are the exact limits): the Content-Length when the Shipper sent one, otherwise the body's own length. Nothing reaches the host over it. -->
     <choose>
       <when condition="@{
+        var pdf = context.Request.Headers.GetValueOrDefault(&quot;Content-Type&quot;, &quot;&quot;).StartsWith(&quot;application/pdf&quot;, StringComparison.OrdinalIgnoreCase);
+        long cap = pdf ? 1048576 : 40960;
         long declared;
         if (long.TryParse(context.Request.Headers.GetValueOrDefault(&quot;Content-Length&quot;, &quot;&quot;), out declared))
         {
-          return declared &gt; 40960;
+          return declared &gt; cap;
         }
-        return context.Request.Body.As&lt;byte[]&gt;(preserveContent: true).Length &gt; 40960;
+        return context.Request.Body.As&lt;byte[]&gt;(preserveContent: true).Length &gt; cap;
       }">
         <trace source="norvia-partner-api" severity="information">
-          <message>The request is over 40 KB.</message>
+          <message>The request is over 40 KB (1 MB for a PDF).</message>
           <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
           <metadata name="flow" value="booking-draft" />
           <metadata name="outcome" value="Refused" />
@@ -99,7 +101,7 @@
           <set-body>@(new JObject(
             new JProperty("messageId", (string)context.Variables["correlationId"]),
             new JProperty("failureCode", "InputTooLarge"),
-            new JProperty("text", "The text is too long.")).ToString())</set-body>
+            new JProperty("text", "The text is too long, or the PDF is too large.")).ToString())</set-body>
         </return-response>
       </when>
     </choose>

@@ -32,6 +32,8 @@ internal sealed class RecordingPartnerApi : INorviaPartnerApi
 
     public Task<BookingDraftAnswer> DraftBookingFromTextAsync(Persona persona, string text, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+    public Task<BookingDraftAnswer> DraftBookingFromPdfAsync(Persona persona, byte[] pdf, CancellationToken cancellationToken) => throw new NotSupportedException();
+
     public Task<NorviaAnswer> SubmitAsync(Persona persona, BookingRequest booking, CancellationToken cancellationToken) => throw new NotSupportedException();
 
     public Task<NorviaReply> AnswerAsync(Persona persona, string carrierBookingNumber, string shipmentNumber, CarrierAnswer answer, CancellationToken cancellationToken) =>

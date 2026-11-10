@@ -69,18 +69,31 @@ internal sealed partial class NorviaPartnerApiClient(
         return answer;
     }
 
-    public async Task<BookingDraftAnswer> DraftBookingFromTextAsync(Persona persona, string text, CancellationToken cancellationToken)
+    public Task<BookingDraftAnswer> DraftBookingFromTextAsync(Persona persona, string text, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(persona);
         ArgumentNullException.ThrowIfNull(text);
 
-        using var span = activities.Source.StartActivity("Draft booking from text", ActivityKind.Internal);
+        return DraftBookingAsync(persona, "Draft booking from text", () => JsonContent.Create(new { text }), cancellationToken);
+    }
+
+    public Task<BookingDraftAnswer> DraftBookingFromPdfAsync(Persona persona, byte[] pdf, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pdf);
+
+        return DraftBookingAsync(persona, "Draft booking from PDF", () => new ByteArrayContent(pdf) { Headers = { ContentType = new MediaTypeHeaderValue("application/pdf") } }, cancellationToken);
+    }
+
+    private async Task<BookingDraftAnswer> DraftBookingAsync(Persona persona, string spanName, Func<HttpContent> content, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(persona);
+
+        using var span = activities.Source.StartActivity(spanName, ActivityKind.Internal);
         BookingDraftAnswer answer;
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("booking-drafts", UriKind.Relative))
             {
-                Content = JsonContent.Create(new { text }),
+                Content = content(),
             };
             request.Headers.Add("Ocp-Apim-Subscription-Key", options.Value.SubscriptionKeyOf(persona.Id));
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(persona.Id, cancellationToken));
@@ -91,7 +104,7 @@ internal sealed partial class NorviaPartnerApiClient(
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // Unreachable, too slow, or no token to call with. Only the exception's type is logged: never the text.
+            // Unreachable, too slow, or no token to call with. Only the exception's type is logged: never the text or the PDF.
             LogDraftNotAsked(persona.Id.Value, exception.GetType().Name);
             answer = BookingDraftAnswer.Refused(BookingDraftOutcome.Unavailable, messageId: null);
         }

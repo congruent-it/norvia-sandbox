@@ -9,6 +9,7 @@
 @inject BookingDraftHandoff Handoff
 @inject NavigationManager Navigation
 @inject ILogger<FillFromEmail> Logger
+@using Microsoft.AspNetCore.Components.Forms
 
 <PageTitle>Partner portal · @(_persona?.DisplayName ?? PersonaId) · Fill from an email</PageTitle>
 
@@ -34,13 +35,21 @@ else
     <p class="mb-8 max-w-3xl">
         As <strong>@_persona.DisplayName</strong>, paste the email that asks for a transport, in English or Dutch. Norvia's assistant fills in a
         booking from it and flags what the email does not give. You review the booking and send it yourself; nothing is booked until you do.
-        Paste one booking at a time.
+        Paste one booking at a time. Or upload the email as a PDF with text in it: a scan or a photo has no text to read.
     </p>
 
     <fieldset class="lux-fieldset">
         <legend>Email</legend>
         <div class="max-w-3xl">
             <FluentTextArea Label="The email's text" @bind-Value="_text" Rows="12" Style="width: 100%;" />
+        </div>
+    </fieldset>
+
+    <fieldset class="lux-fieldset">
+        <legend>PDF</legend>
+        <div class="max-w-3xl">
+            <label for="email-pdf">The email as a PDF</label>
+            <InputFile id="email-pdf" accept="application/pdf,.pdf" OnChange="UploadAsync" disabled="@_asking" />
         </div>
     </fieldset>
 
@@ -91,13 +100,38 @@ else
         }
     }
 
-    private async Task AskAsync()
+    /// <summary>The most bytes of a PDF the page reads: the assistant's own default (Agents:MaxPdfBytes), so a PDF it would refuse is not uploaded.</summary>
+    private const long MaxPdfBytes = 1_000_000;
+
+    private Task AskAsync() => DraftAsync(cancellationToken => Portal.DraftBookingFromTextAsync(new PersonaId(PersonaId), _text!, cancellationToken));
+
+    private async Task UploadAsync(InputFileChangeEventArgs files)
+    {
+        var file = files.File;
+        await DraftAsync(async cancellationToken =>
+        {
+            if (file.Size > MaxPdfBytes)
+            {
+                return BookingDraftAnswer.Refused(BookingDraftOutcome.TooLarge, null);
+            }
+
+            using var buffer = new MemoryStream();
+            await using (var content = file.OpenReadStream(MaxPdfBytes, cancellationToken))
+            {
+                await content.CopyToAsync(buffer, cancellationToken);
+            }
+
+            return await Portal.DraftBookingFromPdfAsync(new PersonaId(PersonaId), buffer.ToArray(), cancellationToken);
+        });
+    }
+
+    private async Task DraftAsync(Func<CancellationToken, Task<BookingDraftAnswer?>> ask)
     {
         _asking = true;
         _message = null;
         try
         {
-            var answer = await Portal.DraftBookingFromTextAsync(new PersonaId(PersonaId), _text!, CancellationToken.None);
+            var answer = await ask(CancellationToken.None);
             switch (answer?.Outcome)
             {
                 case BookingDraftOutcome.Drafted:
@@ -108,7 +142,13 @@ else
                     _message = "The text describes more than one booking. Paste one at a time.";
                     break;
                 case BookingDraftOutcome.TooLarge:
-                    _message = "The text is too long. Paste only the part that describes the booking.";
+                    _message = "That is too large for the assistant. Paste only the part that describes the booking.";
+                    break;
+                case BookingDraftOutcome.NoTextInPdf:
+                    _message = "This PDF has no text to read; paste the text instead.";
+                    break;
+                case BookingDraftOutcome.UnsupportedFormat:
+                    _message = "The assistant can't read that file. Upload a PDF with text in it, or paste the text.";
                     break;
                 default:
                     _message = "Assistant unavailable. Fill in the booking form yourself.";

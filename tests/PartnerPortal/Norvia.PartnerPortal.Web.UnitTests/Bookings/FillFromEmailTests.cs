@@ -45,7 +45,7 @@ public sealed class FillFromEmailTests : PortalWebContext
     [Theory]
     [InlineData(BookingDraftOutcome.Unavailable, "Assistant unavailable")]
     [InlineData(BookingDraftOutcome.MultipleBookings, "more than one booking")]
-    [InlineData(BookingDraftOutcome.TooLarge, "too long")]
+    [InlineData(BookingDraftOutcome.TooLarge, "too large")]
     public void Fill_WhenNoDraftComesBack_SaysWhy_AndStaysOnThePage(BookingDraftOutcome outcome, string expected)
     {
         Portal.DraftBookingFromTextAsync(Brouwer, "the email", Arg.Any<CancellationToken>()).Returns(BookingDraftAnswer.Refused(outcome, null));
@@ -67,5 +67,35 @@ public sealed class FillFromEmailTests : PortalWebContext
         page.FindAll("fluent-button").Single(button => button.TextContent.Trim() == "Fill the booking").Click();
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Assistant unavailable"));
+    }
+
+    private static readonly byte[] PdfBytes = "%PDF-1.4 test"u8.ToArray();
+
+    [Fact]
+    public void Upload_APdf_SendsItToTheAssistant_AndOpensTheBookingFormWithTheDraft()
+    {
+        var draft = new BookingDraftAnswer(BookingDraftOutcome.Drafted, new BookingRequest { ShipperReference = "SH-2030-0142" }, [], "corr-1", new Dictionary<string, string>(), []);
+        Portal.DraftBookingFromPdfAsync(Brouwer, Arg.Is<byte[]>(bytes => bytes.SequenceEqual(PdfBytes)), Arg.Any<CancellationToken>()).Returns(draft);
+        var navigation = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        var page = Render<FillFromEmail>(parameters => parameters.Add(p => p.PersonaId, "brouwer-dranken"));
+
+        page.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>().UploadFiles(Bunit.InputFileContent.CreateFromBinary(PdfBytes, "email.pdf", contentType: "application/pdf"));
+
+        page.WaitForAssertion(() => navigation.Uri.Should().EndWith("/personas/brouwer-dranken/bookings/new"));
+    }
+
+    [Theory]
+    [InlineData(BookingDraftOutcome.NoTextInPdf, "This PDF has no text to read; paste the text instead")]
+    [InlineData(BookingDraftOutcome.UnsupportedFormat, "can't read that file")]
+    [InlineData(BookingDraftOutcome.TooLarge, "too large")]
+    [InlineData(BookingDraftOutcome.Unavailable, "Assistant unavailable")]
+    public void Upload_WhenNoDraftComesBack_SaysWhy_AndStaysOnThePage(BookingDraftOutcome outcome, string expected)
+    {
+        Portal.DraftBookingFromPdfAsync(Brouwer, Arg.Any<byte[]>(), Arg.Any<CancellationToken>()).Returns(BookingDraftAnswer.Refused(outcome, null));
+        var page = Render<FillFromEmail>(parameters => parameters.Add(p => p.PersonaId, "brouwer-dranken"));
+
+        page.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>().UploadFiles(Bunit.InputFileContent.CreateFromBinary(PdfBytes, "email.pdf", contentType: "application/pdf"));
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain(expected));
     }
 }

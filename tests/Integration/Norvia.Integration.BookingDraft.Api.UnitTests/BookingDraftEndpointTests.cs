@@ -50,6 +50,37 @@ public sealed class BookingDraftEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_PDF_is_read_for_its_text_and_the_agent_is_asked_with_it()
+    {
+        var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
+        builder.AddPage(UglyToad.PdfPig.Content.PageSize.A4).AddText(Text, 12, new UglyToad.PdfPig.Core.PdfPoint(25, 700),
+            builder.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica));
+        using var request = Request(_host.Token());
+        request.Content = new ByteArrayContent(builder.Build());
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+
+        var response = await _host.Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        _host.Agent.Asked.Should().ContainSingle().Which.Text.Should().Contain(Text);
+        _host.Logs.GetSnapshot().Select(log => log.Message).Should().NotContain(message => message.Contains(Text, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_format_that_is_not_text_or_PDF_is_415_and_reaches_no_agent()
+    {
+        using var request = Request(_host.Token());
+        request.Content = new ByteArrayContent([1, 2, 3]);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+
+        var response = await _host.Client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
+        (await response.Content.ReadFromJsonAsync<JsonObject>(TestContext.Current.CancellationToken))!["failureCode"]!.GetValue<string>().Should().Be("UnsupportedFormat");
+        _host.Agent.Asked.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task A_call_without_a_token_is_401_and_reaches_no_agent()
     {
         var response = await _host.Client.SendAsync(Request(token: null), TestContext.Current.CancellationToken);

@@ -37,6 +37,12 @@ public interface IPartnerPortal
     /// </summary>
     Task<BookingDraftAnswer?> DraftBookingFromTextAsync(PersonaId personaId, string text, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Asks Norvia's Intake agent for a Booking draft from a PDF the Persona uploaded; null when there is no such Persona. Answers as
+    /// <see cref="DraftBookingFromTextAsync"/>, with <see cref="BookingDraftOutcome.NoTextInPdf"/> for a PDF with no text. The PDF is not kept.
+    /// </summary>
+    Task<BookingDraftAnswer?> DraftBookingFromPdfAsync(PersonaId personaId, byte[] pdf, CancellationToken cancellationToken);
+
     /// <summary>Sends the booking to Norvia as the Persona and returns Norvia's answer; null when there is no such Persona.</summary>
     Task<BookingView?> SubmitBookingAsync(PersonaId personaId, BookingRequest booking, CancellationToken cancellationToken);
 
