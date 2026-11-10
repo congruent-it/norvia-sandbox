@@ -14,8 +14,8 @@ namespace Norvia.PartnerPortal.Web.UiTests.IntakeAgent.Bookings;
 /// </summary>
 public sealed class FillFromPdfJourneyTests(IntakeAgentUiFixture norvia) : BrowserPage(norvia)
 {
-    // The page reads at most 1,000,000 bytes (Agents:MaxPdfBytes); one more is too large.
-    private const int PageLimit = 1_000_000;
+    // The page reads at most this many bytes (FillFromEmail.razor, the same as Agents:MaxPdfBytes); one more is too large.
+    private const int MaxPdfBytes = 1_000_000;
 
     [Fact]
     public async Task ATextPdf_PrefillsTheBookingForm_AsItsTextPasted()
@@ -48,7 +48,7 @@ public sealed class FillFromPdfJourneyTests(IntakeAgentUiFixture norvia) : Brows
     {
         await OpenFillFromEmailAsync();
 
-        await UploadAsync("photo.pdf", "application/pdf", "%PDF-nonsense"u8.ToArray());
+        await UploadAsync("notes.txt", "text/plain", "Collect 2 pallets in Rotterdam."u8.ToArray());
 
         await ExpectRefusedAsync("The assistant can't read that file. Upload a PDF with text in it, or paste the text.");
     }
@@ -57,7 +57,7 @@ public sealed class FillFromPdfJourneyTests(IntakeAgentUiFixture norvia) : Brows
     public async Task APdfOverTheSizeLimit_ShowsThatItIsTooLarge()
     {
         await OpenFillFromEmailAsync();
-        var oversize = new byte[PageLimit + 1];
+        var oversize = new byte[MaxPdfBytes + 1];
         TextPdf(BookingIntakeSamples.Good).CopyTo(oversize, 0);
 
         await UploadAsync("big.pdf", "application/pdf", oversize);
