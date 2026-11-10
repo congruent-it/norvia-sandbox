@@ -1,6 +1,6 @@
 namespace Norvia.Agents.Runner;
 
-internal static class JsonReplies
+public static class JsonReplies
 {
     // Models often wrap JSON in a code fence.
     public static string WithoutFence(string reply)

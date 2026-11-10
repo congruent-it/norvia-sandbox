@@ -1,0 +1,191 @@
+<policies>
+  <!--
+    The Intake agent's Booking draft (ADR 0040): POST /partner/v1/booking-drafts. The policy only checks and routes; the business rules (what a
+    draft is, what the text may say, what is missing) are the host's and the agent's, not policy's (ADR 0011). Nothing of the request or the
+    answer is logged: the Shipper's text holds a Consignee's personal data, so no trace here carries a body, and the service's diagnostics log none.
+  -->
+  <inbound>
+    <base />
+    <set-variable name="correlationId" value="@(Guid.NewGuid().ToString())" />
+    <validate-azure-ad-token tenant-id="{{entra-tenant-id}}" output-token-variable-name="partnerToken">
+      <audiences>
+        <audience>{{partner-api-client-id}}</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <choose>
+      <when condition="@(!((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;roles&quot;, &quot;&quot;).Split(',').Contains(&quot;TransportOrders.Draft&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>This client may not draft bookings from text.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="booking-draft" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NotAllowedToDraft" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("failureCode", "NotAllowedToDraft"),
+            new JProperty("text", "This client may not draft bookings from text.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-variable name="shipperId" value="@{
+      var clientId = ((Jwt)context.Variables[&quot;partnerToken&quot;]).Claims.GetValueOrDefault(&quot;azp&quot;, &quot;&quot;);
+      foreach (var entry in &quot;{{shippers-by-client-id}}&quot;.Split(';'))
+      {
+        var pair = entry.Split('=');
+        if (pair.Length == 2 &amp;&amp; pair[0] == clientId) { return pair[1]; }
+      }
+      return &quot;&quot;;
+    }" />
+    <choose>
+      <when condition="@(string.IsNullOrEmpty((string)context.Variables[&quot;shipperId&quot;]))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>No Shipper is registered for this client.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="booking-draft" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="NoShipperForClient" />
+        </trace>
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("failureCode", "NoShipperForClient"),
+            new JProperty("text", "No Shipper is registered for this client.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <!-- A stricter limit than a booking's, one counter per subscription of its own: a model call costs money. After the checks, so a refusal is not counted. Over the limit API Management answers 429 itself, with Retry-After. -->
+    <rate-limit-by-key calls="10" renewal-period="60" counter-key="@(context.Subscription.Id + &quot;:booking-drafts&quot;)" />
+    <!-- At most 40 KB (8,000 characters of any script, with the JSON around them): the Content-Length when the Shipper sent one, otherwise the body's own length. Nothing reaches the host over it. -->
+    <choose>
+      <when condition="@{
+        long declared;
+        if (long.TryParse(context.Request.Headers.GetValueOrDefault(&quot;Content-Length&quot;, &quot;&quot;), out declared))
+        {
+          return declared &gt; 40960;
+        }
+        return context.Request.Body.As&lt;byte[]&gt;(preserveContent: true).Length &gt; 40960;
+      }">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The request is over 40 KB.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="booking-draft" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="InputTooLarge" />
+        </trace>
+        <return-response>
+          <set-status code="413" reason="Request Entity Too Large" />
+          <set-header name="X-Correlation-ID" exists-action="override">
+            <value>@((string)context.Variables["correlationId"])</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("failureCode", "InputTooLarge"),
+            new JProperty("text", "The text is too long.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-header name="X-Shipper-ID" exists-action="override">
+      <value>@((string)context.Variables["shipperId"])</value>
+    </set-header>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+    <trace source="norvia-partner-api" severity="information">
+      <message>Passed to the Booking draft host</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="booking-draft" />
+      <metadata name="partyId" value="@((string)context.Variables[&quot;shipperId&quot;])" />
+    </trace>
+    <!-- Only API Management's identity may call the host (ADR 0020): the token is for the host's own app registration, whose one role it alone holds. -->
+    <set-backend-service backend-id="booking-draft-host" />
+    <rewrite-uri template="/draft/v1/booking-drafts" copy-unmatched-params="false" />
+    <authentication-managed-identity resource="{{booking-draft-api-client-id}}" client-id="{{api-management-identity-client-id}}" />
+  </inbound>
+  <backend>
+    <!-- A little over the host's own deadline for the model, and no retry: the Agent is never on a critical path. -->
+    <forward-request timeout="40" follow-redirects="false" />
+  </backend>
+  <outbound>
+    <base />
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+    <!-- The outcome of the answer the Shipper got, as API Management's hop. The code is the host's own, read from the answer and never logged with it. -->
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: Booking draft</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="booking-draft" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+      <when condition="@(context.Response.StatusCode &gt;= 400 &amp;&amp; context.Response.StatusCode &lt; 500)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: refused</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="booking-draft" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="@{ try { return context.Response.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;failureCode&quot;].ToString(); } catch { return &quot;BookingDraftRefused&quot;; } }" />
+        </trace>
+      </when>
+      <otherwise>
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered: assistant unavailable</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="booking-draft" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="@{ try { return context.Response.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;failureCode&quot;].ToString(); } catch { return &quot;AgentUnavailable&quot;; } }" />
+        </trace>
+      </otherwise>
+    </choose>
+  </outbound>
+  <on-error>
+    <base />
+    <!-- API Management checks the subscription key before the inbound section runs. -->
+    <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
+    <trace source="norvia-partner-api" severity="information">
+      <message>@(context.LastError.Message)</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="booking-draft" />
+      <metadata name="outcome" value="@(context.Response.StatusCode &gt;= 400 &amp;&amp; context.Response.StatusCode &lt; 500 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+    </trace>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables["correlationId"])</value>
+    </set-header>
+    <!-- The host could not be reached or took too long: the Shipper is told the assistant is unavailable, as the host would, and fills the form in by hand. -->
+    <choose>
+      <when condition="@(context.Response.StatusCode &gt;= 500)">
+        <set-status code="503" reason="Service Unavailable" />
+        <set-header name="Content-Type" exists-action="override">
+          <value>application/json</value>
+        </set-header>
+        <set-body>@(new JObject(
+          new JProperty("messageId", (string)context.Variables["correlationId"]),
+          new JProperty("failureCode", "AgentUnavailable"),
+          new JProperty("text", "The assistant is unavailable.")).ToString())</set-body>
+      </when>
+    </choose>
+  </on-error>
+</policies>

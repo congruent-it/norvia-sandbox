@@ -19,6 +19,7 @@ An app role belongs to the app registration of the API it guards. Each registrat
 | **Norvia TMS API** | `api://<tenant>/norvia-tms-<env>` | Only principals granted one of its roles (`appRoleAssignmentRequired`) | The [TMS API roles](#tms-api-roles) |
 | **Norvia ERP API** | `api://<tenant>/norvia-erp-api-<env>` | Only principals granted its role (`appRoleAssignmentRequired`) | `BillableLines.Record`, which the [Billing Logic App](../processes/erp/e1-invoicing.md#erp-api) holds, `ShipperInvoices.Report`, which the Shipper invoice Logic App holds, `ShipperInvoices.Manage` and `CarrierInvoices.Manage`, which the Simulator holds, `CarrierCosts.Record`, which the Carrier cost Logic App holds, `CarrierInvoices.Receive`, which the Carrier invoice Logic App holds, and `CarrierInvoices.Report`, which the Carrier invoice outcome Logic App holds |
 | **Norvia Partner API** | `api://<tenant>/norvia-partner-api-<env>` | Any Persona, holding a role or not, so a Carrier Persona calling a Shipper operation gets 403 from API Management, which the demo shows | The [Partner API roles](#partner-api-roles) |
+| **Norvia booking draft API** | `api://<tenant>/norvia-booking-draft-api-<env>` | Only API Management (`appRoleAssignmentRequired`) | `BookingDrafts.Create`, which only API Management's identity holds. The Booking draft host takes this token and nothing else, and checks the token's `azp` is API Management's too |
 | **Norvia intake Logic App trigger** | `api://<tenant>/norvia-intake-trigger-<env>` | Only API Management | `TransportOrderIntake.Trigger` |
 | **Norvia Carrier-answer Logic App trigger** | `api://<tenant>/norvia-answer-trigger-<env>` | Only API Management | `CarrierAnswer.Trigger` |
 | **Norvia Carrier invoice Logic App trigger** | `api://<tenant>/norvia-carrier-invoice-trigger-<env>` | Only API Management | `CarrierInvoice.Trigger` |
@@ -101,7 +102,7 @@ API Management validates the Persona's token for each operation, takes the Shipp
 | Role | Held by | Guards (Norvia Partner API) | Process |
 |---|---|---|---|
 | `TransportOrders.Submit` | Shipper Personas | Book a Transport Order | [P1](../processes/tms/p1-transport-order-intake.md) |
-| `TransportOrders.Draft` | Shipper Personas | Ask the Intake agent for a Booking draft from pasted text. Built in the local Partner API stand-in; the Azure slice adds the app role and the API Management policy | [P1](../processes/tms/p1-transport-order-intake.md#booking-draft-from-pasted-text) |
+| `TransportOrders.Draft` | Shipper Personas | Ask the Intake agent for a Booking draft from pasted text. Locally the AppHost grants it to the Shipper Personas and the Partner API stand-in checks it; in Azure it is an app role of `Norvia Partner API (<env>)` (`identities.bicep`), granted to the Shipper Personas only, and the `booking-drafts` policy checks it | [P1](../processes/tms/p1-transport-order-intake.md#booking-draft-from-pasted-text) |
 | `Tracking.Read` | Shipper Personas | Read a Shipper's Transport Orders with their Tracking status, and Proof of delivery files | [P8](../processes/tms/p8-shipper-visibility.md) |
 | `CarrierBookings.Respond` | Carrier Personas | Confirm or reject a Carrier booking | [P4](../processes/tms/p4-carrier-booking.md) |
 | `Tracking.Submit` | Carrier Personas | Report a Tracking event | [P5](../processes/tms/p5-shipment-tracking.md) |
@@ -237,7 +238,7 @@ Each Agent ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management
 | Intake agent | Nothing: it has no tools, and its identity holds no roles. The Shipper Persona's `TransportOrders.Draft` guards the operation that runs it | None |
 | Simulator personas agent | Nothing: it has no tools | None |
 
-People get roles for the Agents' screens too: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check (locally the AppHost signs in a local operator holding both; in Azure they are app roles of `Norvia Estate health check (<env>)`, for users only, and the presenter holds both), and `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's Booking drafts (granted locally by the AppHost; the Azure app role is the Azure slice's). Every runtime Fault switch needs `Demo.Fault`, on the application that owns the Fault.
+People get roles for the Agents' screens too: `HealthCheck.Run` and `HealthCheck.Read` for the Estate health check (locally the AppHost signs in a local operator holding both; in Azure they are app roles of `Norvia Estate health check (<env>)`, for users only, and the presenter holds both), and `TransportOrders.Draft` on the Norvia Partner API for Shipper Personas that use the Intake agent's Booking drafts (granted locally by the AppHost and in Azure by `identities.bicep`). Every runtime Fault switch needs `Demo.Fault`, on the application that owns the Fault.
 
 ## The Logic App switch role
 

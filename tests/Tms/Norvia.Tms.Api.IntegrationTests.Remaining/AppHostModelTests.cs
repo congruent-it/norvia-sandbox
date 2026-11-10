@@ -99,7 +99,8 @@ public sealed class AppHostModelTests
             portal.Should().Contain($"PartnerApi__LocalTokens__Roles__{carrier}__0", "CarrierBookings.Respond", "a Carrier Persona answers its booking requests");
         }
 
-        portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__LocalTokens__Roles__brouwer-dranken__2", StringComparison.Ordinal), "a Shipper Persona holds no respond role");
+        portal.Should().Contain("PartnerApi__LocalTokens__Roles__brouwer-dranken__2", "TransportOrders.Draft", "a Shipper Persona may ask the Intake agent for a Booking draft");
+        portal.Keys.Should().NotContain(key => key.StartsWith("PartnerApi__LocalTokens__Roles__brouwer-dranken__3", StringComparison.Ordinal), "a Shipper Persona holds no respond role");
         portal.Where(entry => entry.Key.Contains("LocalTokens__Roles__van-dijk-transport", StringComparison.Ordinal) || entry.Key.Contains("LocalTokens__Roles__kessler-spedition", StringComparison.Ordinal)
                 || entry.Key.Contains("LocalTokens__Roles__pakketpunt-express", StringComparison.Ordinal))
             .Should().NotContain(entry => entry.Value == "Tracking.Read", "a Carrier Persona is refused tracking with 403");
@@ -688,6 +689,35 @@ public sealed class AppHostModelTests
             .And.NotContainKey("LocalOperator__Name", "Easy Auth signs operators in in Azure");
         Resource(builder, "health-check-web").Annotations.OfType<AppIdentityAnnotation>()
             .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("health-check-identity");
+    }
+
+    [Fact]
+    public async Task InAzure_TheBookingDraftHost_AsksTheIntakeProjectAsItsOwnIdentity_AndTakesApiManagementsEntraTokenForItsOwnApi()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var host = await EnvironmentOfAsync(builder, "booking-draft-api");
+
+        host.Should().Contain("Agents__Enabled", "{estate-agents-enabled.value}")
+            .And.Contain("Agents__Foundry__ProjectEndpoint", "{estate-foundry-intake-project-endpoint.value}", "the Intake agent is published in the project without tracing")
+            .And.Contain("Agents__Api__Audience", "{estate-booking-draft-api-client-id.value}")
+            .And.Contain("Agents__Api__GatewayClientId", "{estate-api-management-client-id.value}")
+            .And.ContainKey("Agents__Api__Issuer")
+            .And.NotContainKey("Agents__Api__SigningKey", "in Azure the tokens are Entra's, with no local key");
+        host.Should().NotContain("Agents__Foundry__ProjectEndpoint", "{estate-foundry-project-endpoint.value}");
+        Resource(builder, "booking-draft-api").Annotations.OfType<AppIdentityAnnotation>()
+            .Should().ContainSingle().Which.IdentityResource.Should().BeOfType<AzureUserAssignedIdentityResource>().Which.Name.Should().Be("booking-draft-identity");
+        IsReachableFromOutsideTheContainerAppsEnvironment(builder, "booking-draft-api").Should().BeTrue("API Management reaches it from outside the Container Apps environment");
+        ContainerAppBicepOf(builder, "booking-draft-api").Should().NotContain("authConfigs", "it is no browser's: it checks API Management's token and role itself");
+    }
+
+    [Fact]
+    public async Task Locally_ThereIsNoBookingDraftHost_TheLocalPartnerApiPlaysTheOperation()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
+
+        builder.Resources.Should().NotContain(resource => resource.Name == "booking-draft-api");
+        builder.Resources.Should().Contain(resource => resource.Name == "partner-api");
     }
 
     [Fact]

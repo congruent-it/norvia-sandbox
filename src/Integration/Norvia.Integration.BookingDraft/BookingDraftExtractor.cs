@@ -12,49 +12,52 @@ namespace Norvia.Integration.BookingDraft;
 /// the draft schema before it is returned, and a value without a quote that is in the text is thrown away and flagged as missing, so the agent
 /// cannot invent a Shipper reference, a date, a weight or a quantity. The text and the reply are never logged here.
 /// </summary>
-public sealed class BookingDraftExtractor(IChatClient model, TimeSpan timeout)
+public sealed class BookingDraftExtractor(IAgentClient agent)
 {
     private const string NotInText = "The text does not give it.";
 
-    private readonly AgentRunner _runner = new(model, NoTools.Source, new AgentRunnerOptions(timeout));
-    private readonly Lazy<Norvia.Agents.Definitions.AgentDefinition> _definition = new(BookingIntakeDefinition.Load);
+    /// <summary>The extractor over the in-process runner, which is how it runs locally and in the tests.</summary>
+    public BookingDraftExtractor(IChatClient model, TimeSpan timeout)
+        : this(new InProcessAgentClient(model, timeout))
+    {
+    }
 
     public async Task<BookingDraftOutcome> ExtractAsync(string text, string correlationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         var runId = Guid.NewGuid().ToString("N");
-        ReplyRunResult run;
+        string reply;
         try
         {
-            run = await _runner.RunReplyAsync(_definition.Value, new AgentQuestion(BookingIntakeQuestions.Ask(text), correlationId, runId), cancellationToken);
+            reply = JsonReplies.WithoutFence(await agent.AskAsync(new AgentQuestion(BookingIntakeQuestions.Ask(text), correlationId, runId), cancellationToken));
         }
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             return Failed(runId, BookingDraftFailureCodes.AgentUnavailable);
         }
 
-        JsonNode? reply;
+        JsonNode? parsed;
         try
         {
-            reply = JsonNode.Parse(run.Reply);
+            parsed = JsonNode.Parse(reply);
         }
         catch (JsonException)
         {
             return Failed(runId, BookingDraftFailureCodes.AgentUnavailable);
         }
 
-        if (reply is JsonObject { Count: 1 } refusal && refusal["refusal"]?.GetValue<string>() == BookingDraftFailureCodes.MultipleBookingsInText)
+        if (parsed is JsonObject { Count: 1 } refusal && refusal["refusal"]?.GetValue<string>() == BookingDraftFailureCodes.MultipleBookingsInText)
         {
             return Failed(runId, BookingDraftFailureCodes.MultipleBookingsInText);
         }
 
-        if (BookingDraftSchema.Errors(reply).Count > 0)
+        if (BookingDraftSchema.Errors(parsed).Count > 0)
         {
             return Failed(runId, BookingDraftFailureCodes.AgentUnavailable);
         }
 
-        return new BookingDraftOutcome(runId, Grounded(reply!.AsObject(), text), null);
+        return new BookingDraftOutcome(runId, Grounded(parsed!.AsObject(), text), null);
     }
 
     private static BookingDraftOutcome Failed(string runId, string code) => new(runId, null, code);

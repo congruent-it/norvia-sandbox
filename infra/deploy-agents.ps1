@@ -20,6 +20,10 @@
       4. reads the Agent's identity (Foundry gives each Agent its own) and writes .azure/<env>/published-agents.json;
       5. gives each identity its one read role (infra/assign-agent-roles.ps1), which a new identity needs after every
          publish.
+    The Intake agent (booking-intake) has no tool, so it has no server, connection or role: it is published into its own
+    Foundry project, norvia-intake (FOUNDRY_INTAKE_PROJECT_ENDPOINT), which has no Application Insights connection, and the
+    API Management backend of the Booking draft host (booking-draft-host) is pointed at the host's address
+    (ESTATE_BOOKING_DRAFT_BASE_URL) so the Partner API's booking-drafts operation reaches it.
     It prints names, versions and counts only: never a token. Publishing the same file again is a new version of the same
     Agent. The definition files are YAML, which PowerShell does not read: `yq` turns each into JSON.
 .PARAMETER Name
@@ -40,6 +44,10 @@ $endpoint = $env:FOUNDRY_PROJECT_ENDPOINT ? $env:FOUNDRY_PROJECT_ENDPOINT : $env
 $published = Join-Path $repo '.azure' $env:AZURE_ENV_NAME 'published-agents.json'
 $gateway = $env:AZURE_ESTATE_PARTNER_API_URL -replace '/partner/v1$', ''
 $apiVersion = 'v1'
+# The Agents that read a Shipper's text are published into the Intake project, which has no Application Insights connection
+# (docs/operations/foundry.md). Every other Agent is published into the norvia project.
+$intakeAgents = @('booking-intake')
+$intakeEndpoint = $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT ? $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT : $env:AZURE_ESTATE_FOUNDRY_INTAKE_PROJECT_ENDPOINT
 
 if (-not (Get-Command yq -ErrorAction SilentlyContinue)) { Write-Fail 'yq is not installed' }
 if (-not $endpoint) { Write-Fail 'no Foundry project endpoint: has the estate been deployed (azd provision)?' }
@@ -50,14 +58,14 @@ $files = $Name.Count -gt 0 ? @($Name | ForEach-Object { Join-Path $repo 'agents'
 
 function Invoke-Foundry {
     # Returns the response body; on an error stops with the status and Foundry's error code.
-    param([Parameter(Mandatory)][string] $Method, [Parameter(Mandatory)][string] $Path, $Body)
+    param([Parameter(Mandatory)][string] $Method, [Parameter(Mandatory)][string] $Path, $Body, [string] $ProjectEndpoint = $endpoint)
     # A new project's Agent service can answer 404 ResourceNotFound ("Subdomain does not map to a resource") for a while
     # after the project is made, and then work. Nothing here asks for something that may be absent, so a 404 is tried again.
     for ($attempt = 1; $attempt -le 6; $attempt++) {
         $token = (Invoke-Az account get-access-token --resource https://ai.azure.com --query accessToken --output tsv | Out-String).Trim()
         $request = @{
             Method             = $Method
-            Uri                = "$endpoint$Path"
+            Uri                = "$ProjectEndpoint$Path"
             Headers            = @{ Authorization = "Bearer $token" }
             TimeoutSec         = 120
             SkipHttpErrorCheck = $true
@@ -113,6 +121,11 @@ foreach ($server in $servers) {
         'customer-service-reply' { Set-BackendAddress $server tms-api tms-reply-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service-reply' }
         default { }
     }
+}
+
+# The Booking draft host is the Intake agent's door, not an MCP server: the Partner API's booking-drafts operation calls it.
+if ($files | Where-Object { (Split-Path -Leaf $_) -replace '\.agent\.yaml$' -in $intakeAgents }) {
+    Set-BackendAddress 'booking-draft' booking-draft-api booking-draft-host ESTATE_BOOKING_DRAFT_BASE_URL -Route ''
 }
 
 # 2. The connections. An Agent without tools needs none.
@@ -182,7 +195,9 @@ foreach ($file in $files) {
             }
         }
     }
-    $version = (Invoke-Foundry -Method POST -Path "/agents/$agentName/versions?api-version=$apiVersion" -Body $body).version
+    $projectEndpoint = $agentName -in $intakeAgents ? $intakeEndpoint : $endpoint
+    if (-not $projectEndpoint) { Write-Fail "${agentName}: no Foundry project endpoint for it (FOUNDRY_INTAKE_PROJECT_ENDPOINT is the Intake project's)" }
+    $version = (Invoke-Foundry -Method POST -Path "/agents/$agentName/versions?api-version=$apiVersion" -Body $body -ProjectEndpoint $projectEndpoint).version
     if (-not $version) { Write-Fail "${agentName}: Foundry made no version" }
     Write-Pass "${agentName}: version $version (definition version $($definition.version)) is published"
 
@@ -190,7 +205,7 @@ foreach ($file in $files) {
     if (-not $server) { continue }
 
     # Foundry gives the Agent its own identity (the project's shared identity holds no role, so an Agent without one can call nothing).
-    $agent = Invoke-Foundry -Method GET -Path "/agents/${agentName}?api-version=$apiVersion"
+    $agent = Invoke-Foundry -Method GET -Path "/agents/${agentName}?api-version=$apiVersion" -ProjectEndpoint $projectEndpoint
     $identity = $agent.instance_identity.principal_id ?? $agent.identity.principal_id
     if (-not $identity) { Write-Fail "${agentName}: Foundry gave the Agent no identity of its own" }
     $results += [ordered]@{ agent = $agentName; server = $server; agentIdentityId = $identity }

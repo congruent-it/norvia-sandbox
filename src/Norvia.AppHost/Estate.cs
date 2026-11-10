@@ -166,4 +166,13 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
 
     /// <summary>The Estate health check's agent API app registration, which is the audience of the tokens its agent API accepts. API Management's identity holds <c>HealthCheck.Agent.Read</c> on it.</summary>
     public IResourceBuilder<ParameterResource> HealthCheckAgentApiClientId { get; } = builder.AddParameter("estate-health-check-agent-api-client-id");
+
+    /// <summary>The Intake agent's Foundry project endpoint (<c>norvia-intake</c>, no Application Insights connection), which the Booking draft host calls.</summary>
+    public IResourceBuilder<ParameterResource> FoundryIntakeProjectEndpoint { get; } = builder.AddParameter("estate-foundry-intake-project-endpoint");
+
+    /// <summary>The Booking draft host's managed identity, which asks the Intake agent as (Foundry User on the Intake project only).</summary>
+    public IResourceBuilder<ParameterResource> BookingDraftIdentity { get; } = builder.AddParameter("estate-booking-draft-identity-name");
+
+    /// <summary>The Booking draft host's API app registration, which is the audience of the tokens it accepts. API Management's identity alone holds <c>BookingDrafts.Create</c> on it.</summary>
+    public IResourceBuilder<ParameterResource> BookingDraftApiClientId { get; } = builder.AddParameter("estate-booking-draft-api-client-id");
 }

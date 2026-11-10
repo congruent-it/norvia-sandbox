@@ -65,6 +65,8 @@ var trackingReadRole = 'Tracking.Read'
 var trackingReadRoleId = guid('norvia-partner-api', environmentName, trackingReadRole)
 var submitRole = 'TransportOrders.Submit'
 var submitRoleId = guid('norvia-partner-api', environmentName, submitRole)
+var draftRole = 'TransportOrders.Draft'
+var draftRoleId = guid('norvia-partner-api', environmentName, draftRole)
 var triggerRole = 'TransportOrderIntake.Trigger'
 var triggerRoleId = guid('norvia-intake-trigger', environmentName, triggerRole)
 var answerTriggerRole = 'CarrierAnswer.Trigger'
@@ -567,6 +569,16 @@ resource partnerApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: draftRoleId
+      value: draftRole
+      displayName: 'Draft bookings from text'
+      description: 'Ask the Intake agent for a Booking draft from pasted text (the booking-drafts operation, ADR 0040). Only Shipper Personas hold it, so a Carrier Persona gets 403.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: trackingReadRoleId
       value: trackingReadRole
       displayName: 'Read Shipper tracking'
@@ -657,6 +669,15 @@ resource submitRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
   for (persona, i) in personas: if (persona.party.type == 'Shipper') {
     resourceId: partnerApiPrincipal.id
     appRoleId: submitRoleId
+    principalId: personaPrincipals[i].id
+  }
+]
+
+// Shipper Personas may ask for a Booking draft too; the Carrier Personas may not, and API Management refuses them with 403.
+resource draftRoleGrants 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [
+  for (persona, i) in personas: if (persona.party.type == 'Shipper') {
+    resourceId: partnerApiPrincipal.id
+    appRoleId: draftRoleId
     principalId: personaPrincipals[i].id
   }
 ]

@@ -37,6 +37,9 @@ param healthCheckBaseUrl = readEnvironmentVariable('ESTATE_HEALTH_CHECK_BASE_URL
 // The postdeploy hook stores the Estate health check's sign-in callback once Aspire has deployed it.
 param healthCheckRedirectUris = readEnvironmentVariable('ESTATE_HEALTH_CHECK_REDIRECT_URIS', '')
 
+// The postdeploy hook stores the Booking draft host's address once Aspire has deployed it, for the Partner API's booking-drafts operation.
+param bookingDraftBaseUrl = readEnvironmentVariable('ESTATE_BOOKING_DRAFT_BASE_URL', '')
+
 // The postdeploy hook stores the Driver app's sign-in callback once Aspire has deployed it.
 param driverAppRedirectUris = readEnvironmentVariable('ESTATE_DRIVER_APP_REDIRECT_URIS', '')
 
