@@ -334,6 +334,17 @@ function Get-AzAccessToken {
     (Invoke-Az account get-access-token --resource $Resource --query accessToken --output tsv | Out-String).Trim()
 }
 
+function Get-FoundryHeader {
+    <# .SYNOPSIS The Authorization header for the Foundry project's API, as the signed-in Azure CLI identity. It is never printed. #>
+    @{ Authorization = "Bearer $(Get-AzAccessToken https://ai.azure.com)" }
+}
+
+function Get-Graph {
+    <# .SYNOPSIS A Microsoft Graph v1.0 read, as the signed-in Azure CLI identity. #>
+    param([Parameter(Mandatory, Position = 0)][string] $Path)
+    Invoke-AzRest -Method get -Url "https://graph.microsoft.com/v1.0$Path"
+}
+
 function Get-ThrowawayJobDefinition {
     <#
     .SYNOPSIS The definition of a Container Apps job that runs shell commands as a user-assigned identity in the estate's environment.
@@ -707,6 +718,6 @@ $($keyColumns -join [Environment]::NewLine)
 Export-ModuleMember -Function Write-Pass, Write-Fail, Invoke-Az, Import-AzdEnvironment, Get-ResourceGroupName,
 Get-AppFqdn, Get-AppUrl, Wait-Until, Get-LogAnalyticsWorkspaceId, Invoke-LogAnalyticsQuery,
 New-ThrowawayJob, Get-ThrowawayJobName, Start-ThrowawayJob, Remove-ThrowawayJob, Get-RequiredEnvironmentVariable,
-Set-AzdEnvironmentValue, Invoke-AzRest, Publish-LogicApp, Get-AzAccessToken, Get-ThrowawayJobDefinition,
+Set-AzdEnvironmentValue, Invoke-AzRest, Publish-LogicApp, Get-AzAccessToken, Get-FoundryHeader, Get-Graph, Get-ThrowawayJobDefinition,
 Get-ThrowawayJobResult, Get-RandomSuffix, Test-SameValues, Get-TrailSummary, Invoke-ThrowawayJobForResult, Get-DeadLetters, Get-DeadLetterReason, Assert-InApplicationInsights, Get-PersonaClientId, Wait-ForPresenter, Get-ActionIdsReaching, Get-PublishedEvent, Read-Confirmation, Get-DocumentHops, Wait-DocumentHop, Read-DocumentNumber, Invoke-AsFound,
 Get-MetricAlertValue, Get-QueueDeadLetterCount

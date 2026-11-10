@@ -283,6 +283,50 @@ public sealed class FoundryAgentClientTests : IDisposable
         _foundry.Requests.Should().BeEmpty();
     }
 
+    private static readonly AgentRequest PlannerRequest = new("planner", PlannerQuestions.SuggestAssignment("TO-0000042"), CorrelationId);
+
+    private static readonly string PlannerAnswer = """
+        {"cause":"Own fleet is Over capacity that day, 34 of 30 pallet places; Kessler Spedition costs 412.50.","evidence":[{"claim":"Own fleet is OverCapacity on the collection day.","citation":"r1"},{"claim":"Kessler Spedition's Carrier cost is 412.50.","citation":"r1"}],"action":"needs-a-person","suggestedAction":"Assign to Carrier Kessler Spedition, accepting no warning.","confidence":"medium"}
+        """;
+
+    [Fact]
+    public async Task AskAsync_ThePlannerAgent_IsAskedByName_WithItsOwnCap_AndCitesTheOneAssignmentOptionsRead()
+    {
+        _foundry.Answer(Response(McpCall("get_assignment_options"), Message(PlannerAnswer)));
+
+        var result = await Client().AskAsync(PlannerRequest, TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Evidence.Should().HaveCount(2).And.OnlyContain(evidence => evidence.ResultId == "r1" && evidence.ToolName == "get_assignment_options");
+        result.Value.Run.Should().Be(new AgentRun("planner", "run-42"));
+        var body = JsonNode.Parse(_foundry.Requests.Single(request => request.Method == HttpMethod.Post).Body)!;
+        body["agent_reference"]!["name"]!.GetValue<string>().Should().Be("planner");
+        body["max_tool_calls"]!.GetValue<int>().Should().Be(1, because: "the TMS computes the options in one read");
+        body["structured_inputs"]!["correlationId"]!.GetValue<string>().Should().Be(CorrelationId);
+        body["store"]!.GetValue<bool>().Should().BeFalse();
+        body["input"]!.ToJsonString().Should().Contain("TO-0000042");
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenThePlannerAgentCallsAnotherAgentsTool_IsAgentToolRefused()
+    {
+        _foundry.Answer(Response(McpCall("get_rejected_booking"), Message(PlannerAnswer)));
+
+        var result = await Client().AskAsync(PlannerRequest, TestContext.Current.CancellationToken);
+
+        result.Errors.Should().Equal(AgentFailureCodes.AgentToolRefused);
+    }
+
+    [Fact]
+    public async Task AskAsync_WhenThePlannerAgentReadsTwice_IsAgentToolRefused()
+    {
+        _foundry.Answer(Response(McpCall("get_assignment_options"), McpCall("get_assignment_options"), Message(PlannerAnswer)));
+
+        var result = await Client().AskAsync(PlannerRequest, TestContext.Current.CancellationToken);
+
+        result.Errors.Should().Equal(AgentFailureCodes.AgentToolRefused);
+    }
+
     private static object? Scope(Microsoft.Extensions.Logging.Testing.FakeLogRecord log, string key) =>
         log.Scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>().SelectMany(keys => keys).Where(pair => pair.Key == key).Select(pair => pair.Value).FirstOrDefault();
 
