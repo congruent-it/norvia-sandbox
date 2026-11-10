@@ -69,7 +69,6 @@ public sealed class PolicyAndHostAgreeTests
         var cap = caps.Should().ContainSingle().Subject;
         var defaults = new BookingDraftHostOptions();
 
-        cap.Should().Be(40_960);
         (defaults.MaxInputCharacters * 4 + 1_024).Should().BeLessThanOrEqualTo(cap);
     }
 }

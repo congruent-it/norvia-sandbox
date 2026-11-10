@@ -1,7 +1,4 @@
 using System.Diagnostics;
-using System.Net;
-using System.Text;
-using System.Text.Json.Nodes;
 using Azure.Core;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -23,8 +20,8 @@ internal sealed class AzureHost : IAsyncDisposable
 {
     public const string Issuer = "https://login.test/tenant/v2.0";
     public const string Audience = "api://norvia-booking-draft-api";
-    public const string Gateway = "00000000-0000-0000-0000-00000000a9a1";
-    public const string Project = "https://ais-norvia.services.ai.azure.com/api/projects/norvia-intake";
+    public const string GatewayClientId = "00000000-0000-0000-0000-00000000a9a1";
+    public const string ProjectEndpoint = "https://ais-norvia.services.ai.azure.com/api/projects/norvia-intake";
     public const string Route = "/draft/v1/booking-drafts";
 
     private readonly WebApplicationFactory<Program> _factory;
@@ -44,10 +41,10 @@ internal sealed class AzureHost : IAsyncDisposable
             builder.UseSetting("Agents:Enabled", enabled.ToString());
             builder.UseSetting("Agents:TimeoutSeconds", timeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
             builder.UseSetting("Agents:MaxInputCharacters", maxCharacters.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            builder.UseSetting("Agents:Foundry:ProjectEndpoint", Project);
+            builder.UseSetting("Agents:Foundry:ProjectEndpoint", ProjectEndpoint);
             builder.UseSetting("Agents:Api:Issuer", Issuer);
             builder.UseSetting("Agents:Api:Audience", Audience);
-            builder.UseSetting("Agents:Api:GatewayClientId", Gateway);
+            builder.UseSetting("Agents:Api:GatewayClientId", GatewayClientId);
             builder.ConfigureLogging(logging =>
             {
                 logging.ClearProviders();
@@ -100,7 +97,7 @@ internal sealed class AzureHost : IAsyncDisposable
     }
 
     /// <summary>A token as Entra would issue it to API Management's identity for the host's API: the gateway as <c>azp</c>, the host's one role.</summary>
-    public string Token(string azp = Gateway, string[]? roles = null, string audience = Audience, byte[]? signingKey = null) =>
+    public string Token(string azp = GatewayClientId, string[]? roles = null, string audience = Audience, byte[]? signingKey = null) =>
         new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = Issuer,
@@ -123,77 +120,5 @@ internal sealed class AzureHost : IAsyncDisposable
         public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken) => new("foundry-token", DateTimeOffset.MaxValue);
 
         public override ValueTask<AccessToken> GetTokenAsync(TokenRequestContext requestContext, CancellationToken cancellationToken) => new(GetToken(requestContext, cancellationToken));
-    }
-}
-
-internal sealed record RecordedRequest(HttpMethod Method, string Uri, string? Authorization, string Body);
-
-/// <summary>The project's Responses endpoint: a POST is answered as the test says, a DELETE with the status the test sets.</summary>
-internal sealed class FakeResponses : HttpMessageHandler
-{
-    private readonly List<RecordedRequest> _requests = [];
-    private JsonObject[] _output = [];
-    private string _status = "completed";
-    private HttpStatusCode? _failure;
-
-    public IReadOnlyList<RecordedRequest> Requests
-    {
-        get
-        {
-            lock (_requests)
-            {
-                return [.. _requests];
-            }
-        }
-    }
-
-    public HttpStatusCode DeleteStatus { get; set; } = HttpStatusCode.OK;
-
-    public bool Hang { get; set; }
-
-    public void Answer(params JsonObject[] output) => _output = output;
-
-    public void Answer(string status, params JsonObject[] output) => (_status, _output) = (status, output);
-
-    public void Fail(HttpStatusCode status) => _failure = status;
-
-    public static JsonObject Message(string text) => new()
-    {
-        ["type"] = "message",
-        ["role"] = "assistant",
-        ["content"] = new JsonArray(new JsonObject { ["type"] = "output_text", ["text"] = text }),
-    };
-
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
-        lock (_requests)
-        {
-            _requests.Add(new RecordedRequest(request.Method, request.RequestUri!.AbsoluteUri, request.Headers.Authorization?.ToString(), body));
-        }
-
-        if (request.Method == HttpMethod.Delete)
-        {
-            return new HttpResponseMessage(DeleteStatus);
-        }
-
-        if (Hang)
-        {
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-        }
-
-        if (_failure is { } failure)
-        {
-            return new HttpResponseMessage(failure);
-        }
-
-        var response = new JsonObject
-        {
-            ["id"] = "resp-1",
-            ["object"] = "response",
-            ["status"] = _status,
-            ["output"] = new JsonArray(_output.Select(item => (JsonNode?)item.DeepClone()).ToArray()),
-        };
-        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(response.ToJsonString(), Encoding.UTF8, "application/json") };
     }
 }

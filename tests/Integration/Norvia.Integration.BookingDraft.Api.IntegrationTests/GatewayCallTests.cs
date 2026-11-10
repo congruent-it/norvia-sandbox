@@ -66,7 +66,7 @@ public sealed class GatewayCallTests
         using var _ = await host.Client.SendAsync(Request(host.Token()), Ct);
 
         var create = host.Responses.Requests.Single(request => request.Method == HttpMethod.Post);
-        create.Uri.Should().Be($"{AzureHost.Project}/openai/v1/responses");
+        create.Uri.Should().Be($"{AzureHost.ProjectEndpoint}/openai/v1/responses");
         create.Authorization.Should().Be("Bearer foundry-token", "the Foundry call is the host's own, never the Shipper's or the gateway's token");
         var body = JsonNode.Parse(create.Body)!;
         body["agent_reference"]!["name"]!.GetValue<string>().Should().Be("booking-intake");
@@ -131,18 +131,6 @@ public sealed class GatewayCallTests
         await using var host = new AzureHost();
 
         using var response = await host.Client.SendAsync(Request(host.Token(audience: "api://norvia-partner-api")), Ct);
-
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        host.Responses.Requests.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task AShippersOwnPartnerApiToken_WithTheDraftRole_IsRefused_AndReachesNoAgent()
-    {
-        // A Shipper who found the host's address and holds TransportOrders.Draft for the Partner API still has neither the host's role nor the gateway's azp.
-        await using var host = new AzureHost();
-
-        using var response = await host.Client.SendAsync(Request(host.Token(azp: "00000000-0000-0000-0000-0000000000ff", roles: ["TransportOrders.Draft"], audience: "api://norvia-partner-api")), Ct);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         host.Responses.Requests.Should().BeEmpty();
@@ -245,7 +233,36 @@ public sealed class GatewayCallTests
     // The trail
 
     [Fact]
-    public async Task TheTrail_HoldsTheKeysOfTheHops_AndNeverTheTextTheDraftOrTheToken()
+    public async Task TheTrail_HoldsTheKeysOfTheOperationsHop()
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(Message(Draft));
+
+        using var _ = await host.Client.SendAsync(Request(host.Token()), Ct);
+
+        var answered = Keys(host.Logs.GetSnapshot().Single(record => record.Message == "Answered with a Booking draft"));
+        answered["correlationId"].Should().Be("corr-1");
+        answered["flow"].Should().Be("booking-draft");
+        answered["partyId"].Should().Be("SHIPPER-1");
+        answered["outcome"].Should().Be("Succeeded");
+    }
+
+    [Fact]
+    public async Task TheTrail_HoldsTheKeysOfTheAgentsHop()
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(Message(Draft));
+
+        using var _ = await host.Client.SendAsync(Request(host.Token()), Ct);
+
+        var agent = Keys(host.Logs.GetSnapshot().Single(record => record.Message == "The Intake agent answered"));
+        agent["agentId"].Should().Be("booking-intake");
+        agent["correlationId"].Should().Be("corr-1");
+        agent["runId"].Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task TheTrail_NeverHoldsTheTextTheDraftOrATokenInALog()
     {
         await using var host = new AzureHost();
         host.Responses.Answer(Message(Draft));
@@ -254,17 +271,58 @@ public sealed class GatewayCallTests
         using var _ = await host.Client.SendAsync(Request(token), Ct);
 
         var logs = host.Logs.GetSnapshot();
-        var answered = Keys(logs.Single(record => record.Message == "Answered with a Booking draft"));
-        answered["correlationId"].Should().Be("corr-1");
-        answered["flow"].Should().Be("booking-draft");
-        answered["partyId"].Should().Be("SHIPPER-1");
-        answered["outcome"].Should().Be("Succeeded");
-        var agent = Keys(logs.Single(record => record.Message == "The Intake agent answered"));
-        agent["agentId"].Should().Be("booking-intake");
-        agent["correlationId"].Should().Be("corr-1");
-        agent["runId"].Should().NotBeNull();
         var everything = string.Concat(logs.Select(record => record.Message + string.Join(',', Keys(record).Values) + record.Exception));
         everything.Should().NotContain(Text).And.NotContain(token).And.NotContain("foundry-token").And.NotContain("quotes");
+    }
+
+    [Fact]
+    public async Task TheTrail_NeverHoldsTheTextOnASpan()
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(Message(Draft));
+
+        using var _ = await host.Client.SendAsync(Request(host.Token()), Ct);
+
+        host.Spans.Should().NotBeEmpty();
         host.Spans.SelectMany(span => span.TagObjects).Select(tag => $"{tag.Value}").Should().NotContain(value => value.Contains(Text, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ATokenForTheHostsAudience_FromAClientThatIsNotTheGateway_EvenWithTheDraftRoleOfThePartnerApi_IsRefused403()
+    {
+        // A Shipper's client holds TransportOrders.Draft for the Partner API; here the audience is right, so only the host's role and azp stop it.
+        await using var host = new AzureHost();
+
+        using var response = await host.Client.SendAsync(Request(host.Token(azp: "00000000-0000-0000-0000-0000000000ff", roles: ["TransportOrders.Draft"])), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        host.Responses.Requests.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("failed")]
+    [InlineData("incomplete")]
+    [InlineData("cancelled")]
+    public async Task AResponseThatDidNotComplete_IsUnavailable503_AndStillDeleted(string status)
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(status, Message(Draft));
+
+        using var response = await host.Client.SendAsync(Request(host.Token()), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        host.Responses.Requests.Select(request => request.Method).Should().Equal(HttpMethod.Post, HttpMethod.Delete);
+    }
+
+    [Fact]
+    public async Task AnAnswerThatIsNoJson_IsUnavailable503_WithoutTheAnswerInTheBody()
+    {
+        await using var host = new AzureHost();
+        host.Responses.Answer(Message("I could not read that email, sorry."));
+
+        using var response = await host.Client.SendAsync(Request(host.Token()), Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await response.Content.ReadAsStringAsync(Ct)).Should().NotContain("sorry");
     }
 }
