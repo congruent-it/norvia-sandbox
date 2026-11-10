@@ -65,6 +65,14 @@ internal static class PlannerAgentCalls
         return assigned;
     }
 
+    /// <summary>The assignment as the TMS UI sends it when the Planner acts on the Agent's Suggestion: it names the Agent and its run.</summary>
+    public static JsonObject ActingOn(this JsonObject assignment, string agentName, string agentRunId)
+    {
+        assignment["agentName"] = agentName;
+        assignment["agentRunId"] = agentRunId;
+        return assignment;
+    }
+
     /// <summary>A JSON-RPC call of the MCP protocol.</summary>
     public static Task<HttpResponseMessage> CallAsync(this HttpClient client, string method, CancellationToken cancellationToken) =>
         client.SendAsync(Request(method, new JsonObject(), correlationId: null), cancellationToken);
