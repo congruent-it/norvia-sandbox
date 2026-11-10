@@ -67,6 +67,7 @@ public static class BookingIntakeScript
             ["items.0.dimensions"] = "120x80x150 cm",
         },
         ["missing"] = new JsonArray(),
+        ["ignored"] = new JsonArray("Thanks,\nJo"),
     };
 
     private static JsonObject Partial() => new()
@@ -92,6 +93,7 @@ public static class BookingIntakeScript
             Missing("receiverName", "The text does not name the receiver."),
             Missing("receiverStreet", "The text gives no delivery street."),
             Missing("items.0.weight", "\"ongeveer een ton\" is ambiguous: a ton is not a weight in a unit the booking can hold.")),
+        ["ignored"] = new JsonArray("Groet,\nJan"),
     };
 
     private static JsonObject Nothing() => new()

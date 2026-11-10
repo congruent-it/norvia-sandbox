@@ -334,6 +334,7 @@ Countries are ISO 3166-1 alpha-2 codes. The map knows the countries of Europe, e
 - `booking`: the booking's fields as [booking.v1](booking.v1.schema.json) has them (the draft schema references it, so the two stay in step). Every field is optional, and a value the text does not give is left out.
 - `quotes`: for each filled field, the words of the text it came from. A value without a quote that is in the text is thrown away and listed as missing: the Intake agent cannot invent a Shipper reference, a date, a weight or a quantity.
 - `missing`: the fields the text does not give or gives ambiguously, each with a reason. A field of an item is named `items.<index>.<name>`.
+- `ignored` (optional): short pieces of the text the agent did not use, verbatim, such as a signature or a disclaimer, so the Shipper sees that nothing disappeared silently. The library keeps only a piece that is in the text.
 
 It is not a Booking: the Shipper reviews the draft in the booking form and submits it through the ordinary `POST /partner/v1/transport-orders`. The draft is stateless and stored nowhere.
 

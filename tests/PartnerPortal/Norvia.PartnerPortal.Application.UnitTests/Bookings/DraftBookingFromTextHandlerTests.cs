@@ -21,7 +21,7 @@ public sealed class DraftBookingFromTextHandlerTests
     [Fact]
     public async Task Handle_AsAKnownPersona_AsksNorviaForTheDraftAsThatPersona()
     {
-        var answer = new BookingDraftAnswer(BookingDraftOutcome.Drafted, new BookingRequest { ShipperReference = "SH-1" }, [], "corr-1");
+        var answer = new BookingDraftAnswer(BookingDraftOutcome.Drafted, new BookingRequest { ShipperReference = "SH-1" }, [], "corr-1", new Dictionary<string, string>(), []);
         _partnerApi.DraftBookingFromTextAsync(Samples.BrouwerDranken, "the email", Arg.Any<CancellationToken>()).Returns(answer);
 
         var result = await _handler.Handle(new DraftBookingFromTextQuery(Samples.BrouwerDranken.Id, "the email"), CancellationToken.None);

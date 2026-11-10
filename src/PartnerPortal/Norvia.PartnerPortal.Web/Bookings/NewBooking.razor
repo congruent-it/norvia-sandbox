@@ -10,6 +10,7 @@
 @inject BookingDraftHandoff Handoff
 @inject NavigationManager Navigation
 @inject ILogger<NewBooking> Logger
+@implements IDisposable
 
 <PageTitle>Partner portal · @(_persona?.DisplayName ?? PersonaId) · Book a transport</PageTitle>
 
@@ -41,21 +42,46 @@ else
         <FluentAnchor Href="@PersonaChoice.FillFromEmailPath(PersonaId)" Appearance="Appearance.Lightweight">Fill from an email</FluentAnchor>
     </p>
 
-    @if (_flags.Count > 0)
+    @if (_review is not null)
     {
-        <div role="status" class="mb-6 max-w-3xl">
-            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                The assistant filled in what the email gives. Check these before you send the booking:
-                <ul class="list-disc pl-6" data-testid="draft-flags">
-                    @foreach (var flag in _flags)
-                    {
-                        <li><strong>@DraftFieldLabels.Of(flag.Field)</strong>: @flag.Reason</li>
-                    }
-                </ul>
+        <div role="status" class="mb-6 max-w-3xl" data-testid="draft-review">
+            <FluentMessageBar Intent="@(_review.CanSubmit ? MessageIntent.Success : MessageIntent.Warning)" AllowDismiss="false">
+                The assistant filled in what the email gives, and under each value shows the words it came from. A field the email did not give is
+                empty. You can send the booking once you have confirmed or edited each field below that is flagged.
+                @if (_review.Unhandled.Count > 0)
+                {
+                    <ul class="list-disc pl-6" data-testid="draft-flags">
+                        @foreach (var flag in _review.Unhandled)
+                        {
+                            <li><strong>@DraftFieldLabels.Of(flag.Field)</strong> (@(flag.Kind == DraftFlagKind.Missing ? "missing" : "check this")): @flag.Reason</li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <span class="block">Every flagged field is handled.</span>
+                }
             </FluentMessageBar>
         </div>
+        @if (_review.Ignored.Count > 0)
+        {
+            <section class="mb-6 max-w-3xl" aria-labelledby="draft-ignored-heading" data-testid="draft-ignored">
+                <h2 id="draft-ignored-heading" class="lux-label">Text the assistant did not use</h2>
+                <ul class="list-disc pl-6 text-sm">
+                    @foreach (var text in _review.Ignored)
+                    {
+                        <li class="whitespace-pre-line">@text</li>
+                    }
+                </ul>
+            </section>
+        }
+        <p class="mb-6">
+            <FluentAnchor Href="@PersonaChoice.FillFromEmailPath(PersonaId)" Appearance="Appearance.Outline">Start again with other text</FluentAnchor>
+        </p>
     }
 
+    <CascadingValue Value="_review">
+    <div @onfocusout="ObserveForm">
     <EditForm Model="_form" OnValidSubmit="SubmitAsync" FormName="booking">
         <BookingFormValidator />
 
@@ -64,14 +90,15 @@ else
             <div class="max-w-md">
                 <FluentTextField Label="Shipper reference" @bind-Value="_form.ShipperReference" />
                 <FluentValidationMessage For="() => _form.ShipperReference" />
+                <DraftNote Field="bookingRef" />
             </div>
         </fieldset>
 
         <fieldset class="lux-fieldset">
             <legend>Collection</legend>
             <div class="grid gap-4">
-                <AddressFields Address="_form.Collection" />
-                <LocalTimeFields Id="collection" FromLabel="Collect from" UntilLabel="Collect until"
+                <AddressFields Address="_form.Collection" Prefix="pickup" />
+                <LocalTimeFields Id="collection" FromField="pickupFrom" UntilField="pickupUntil" FromLabel="Collect from" UntilLabel="Collect until"
                                  @bind-From="_form.CollectFrom" @bind-Until="_form.CollectUntil" />
             </div>
         </fieldset>
@@ -80,16 +107,26 @@ else
             <legend>Delivery</legend>
             <div class="grid gap-4">
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <FluentTextField Label="Consignee" @bind-Value="_form.Consignee.Name" />
-                    <FluentTextField Label="Contact name" @bind-Value="_form.Consignee.ContactName" />
-                    <FluentTextField Label="Phone" TextFieldType="TextFieldType.Tel" @bind-Value="_form.Consignee.Phone" />
+                    <div>
+                        <FluentTextField Label="Consignee" @bind-Value="_form.Consignee.Name" />
+                        <DraftNote Field="receiverName" />
+                    </div>
+                    <div>
+                        <FluentTextField Label="Contact name" @bind-Value="_form.Consignee.ContactName" />
+                        <DraftNote Field="receiverContact" />
+                    </div>
+                    <div>
+                        <FluentTextField Label="Phone" TextFieldType="TextFieldType.Tel" @bind-Value="_form.Consignee.Phone" />
+                        <DraftNote Field="receiverPhone" />
+                    </div>
                     <div>
                         <FluentTextField Label="Email" TextFieldType="TextFieldType.Email" @bind-Value="_form.Consignee.Email" />
                         <FluentValidationMessage For="() => _form.Consignee.Email" />
+                        <DraftNote Field="receiverEmail" />
                     </div>
                 </div>
-                <AddressFields Address="_form.Delivery" />
-                <LocalTimeFields Id="delivery" FromLabel="Deliver from (optional)" UntilLabel="Deliver until (optional)"
+                <AddressFields Address="_form.Delivery" Prefix="receiver" />
+                <LocalTimeFields Id="delivery" FromField="deliverFrom" UntilField="deliverUntil" FromLabel="Deliver from (optional)" UntilLabel="Deliver until (optional)"
                                  @bind-From="_form.DeliverFrom" @bind-Until="_form.DeliverUntil" />
             </div>
         </fieldset>
@@ -109,8 +146,24 @@ else
             <legend>Instructions</legend>
             <div class="max-w-3xl">
                 <FluentTextArea Label="Instructions for Norvia (optional)" @bind-Value="_form.Instructions" Rows="3" />
+                <DraftNote Field="remarks" />
             </div>
         </fieldset>
+
+        @if (_notConfirmed.Count > 0)
+        {
+            <div role="alert" class="mb-6" data-testid="draft-not-confirmed">
+                <FluentMessageBar Intent="MessageIntent.Error" AllowDismiss="false">
+                    The booking is not sent yet. Confirm or edit these fields first:
+                    <ul class="list-disc pl-6">
+                        @foreach (var flag in _notConfirmed)
+                        {
+                            <li><strong>@DraftFieldLabels.Of(flag.Field)</strong>: @flag.Reason</li>
+                        }
+                    </ul>
+                </FluentMessageBar>
+            </div>
+        }
 
         @if (_answer is not null)
         {
@@ -141,6 +194,8 @@ else
             }
         </div>
     </EditForm>
+    </div>
+    </CascadingValue>
 }
 
 @code {
@@ -151,7 +206,8 @@ else
     private bool _sending;
     private bool _submitFailed;
     private string? _traceId;
-    private IReadOnlyList<FlaggedField> _flags = [];
+    private DraftReview? _review;
+    private IReadOnlyList<DraftFlag> _notConfirmed = [];
 
     [Parameter]
     public string PersonaId { get; set; } = string.Empty;
@@ -184,23 +240,50 @@ else
         if (Handoff.Take() is { Booking: { } fromEmail } emailDraft)
         {
             _form = BookingForm.From(fromEmail);
-            _flags = emailDraft.Flags;
+            SetReview(new DraftReview(emailDraft));
         }
         else
         {
             var draft = await Portal.DraftBookingAsync(new PersonaId(PersonaId), CancellationToken.None);
             _form = draft is null ? null : BookingForm.From(draft);
-            _flags = [];
+            SetReview(null);
         }
 
         _answer = null;
         _submitFailed = false;
+        _notConfirmed = [];
     }
+
+    private void SetReview(DraftReview? review)
+    {
+        _review?.Changed -= OnReviewChanged;
+        _review = review;
+        _review?.Changed += OnReviewChanged;
+    }
+
+    private void OnReviewChanged() => _ = InvokeAsync(() =>
+    {
+        _notConfirmed = [];
+        StateHasChanged();
+    });
+
+    // A field edited since the draft counts as handled; the screen follows when the Shipper leaves the field.
+    private void ObserveForm() => _review?.Observe(_form!.ToRequest());
+
+    public void Dispose() => SetReview(null);
 
     // After any answer the form keeps what was entered, so after a rejection only what was wrong needs changing, and
     // sending it again after an acceptance shows that Norvia doesn't book it twice.
     private async Task SubmitAsync()
     {
+        // The validator has decided the booking is valid; a flagged field nobody confirmed or edited still holds it back.
+        _review?.Observe(_form!.ToRequest());
+        _notConfirmed = _review?.Unhandled ?? [];
+        if (_notConfirmed.Count > 0)
+        {
+            return;
+        }
+
         _sending = true;
         _answer = null;
         _submitFailed = false;

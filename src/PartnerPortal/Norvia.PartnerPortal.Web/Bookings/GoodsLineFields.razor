@@ -2,16 +2,24 @@
 <fieldset class="mb-4 border border-border p-4">
     <legend class="lux-label px-1">Goods line @Number</legend>
     <div class="grid items-start gap-4 sm:grid-cols-3 lg:grid-cols-7">
-        <FluentSelect TOption="string" Label="Package type" Items="PackageTypeNames" @bind-Value="Line.PackageType"
-                      OptionText="@(name => name[..1].ToUpperInvariant() + name[1..])" />
-        <FluentNumberField TValue="int?" Label="Quantity" @bind-Value="Line.Quantity" />
+        <div>
+            <FluentSelect TOption="string" Label="Package type" Items="PackageTypeNames" @bind-Value="Line.PackageType"
+                          OptionText="@(name => name[..1].ToUpperInvariant() + name[1..])" />
+            <DraftNote Field="@Field("packaging")" />
+        </div>
+        <div>
+            <FluentNumberField TValue="int?" Label="Quantity" @bind-Value="Line.Quantity" />
+            <DraftNote Field="@Field("count")" />
+        </div>
         <div>
             <FluentNumberField TValue="decimal?" Label="Weight (kg)" @bind-Value="Line.WeightKg" />
             <FluentValidationMessage For="() => Line.WeightKg" />
+            <DraftNote Field="@Field("weight")" />
         </div>
         <div>
             <FluentNumberField TValue="decimal?" Label="Length (cm)" @bind-Value="Line.LengthCm" />
             <FluentValidationMessage For="() => Line.LengthCm" />
+            <DraftNote Field="@Field("dimensions")" />
         </div>
         <div>
             <FluentNumberField TValue="decimal?" Label="Width (cm)" @bind-Value="Line.WidthCm" />
@@ -41,6 +49,8 @@
     public int Number { get; set; }
 
     /// <summary>Whether the line may go: a booking keeps at least one.</summary>
+    private string Field(string name) => $"items.{Number - 1}.{name}";
+
     [Parameter]
     public bool CanRemove { get; set; }
 

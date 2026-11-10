@@ -22,7 +22,9 @@ public sealed class FillFromEmailTests : PortalWebContext
             BookingDraftOutcome.Drafted,
             new BookingRequest { ShipperReference = "SH-2030-0142" },
             [new FlaggedField("pickupFrom", "\"morgen\" is not a date.")],
-            "corr-1");
+            "corr-1",
+            new Dictionary<string, string> { ["bookingRef"] = "Our reference is SH-2030-0142" },
+            ["Groet, Jan"]);
         Portal.DraftBookingFromTextAsync(Brouwer, "the email", Arg.Any<CancellationToken>()).Returns(draft);
         var navigation = Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
         var page = Render<FillFromEmail>(parameters => parameters.Add(p => p.PersonaId, "brouwer-dranken"));

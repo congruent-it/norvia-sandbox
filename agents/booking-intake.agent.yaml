@@ -3,7 +3,7 @@
 # the agent runs in the Foundry project without tracing (norvia-intake) and nothing it is given is logged. The in-process runner reads this
 # file locally; infra/deploy-agents.ps1 publishes it as a Foundry prompt agent without a tool. Raise `version` on any change.
 name: booking-intake
-version: 1
+version: 2
 description: Fills in a booking draft from a Shipper's pasted email in English or Dutch, with the quote each value came from and a list of what is missing or ambiguous. It never invents a value.
 model:
   deployment: gpt-5.4-mini
@@ -23,7 +23,8 @@ instructions: |
   {
     "booking": { ... },
     "quotes": { "<field>": "<words from the text>" },
-    "missing": [ { "field": "<field>", "reason": "<why>" } ]
+    "missing": [ { "field": "<field>", "reason": "<why>" } ],
+    "ignored": [ "<words from the text>" ]
   }
 
   "booking" has only these fields, all optional, and only the ones the text gives:
@@ -47,6 +48,10 @@ instructions: |
     from the text. For a field of an item the key is items.<index>.<name>, such as items.0.weight. A field without a quote is thrown away.
   - In "missing" name the field the same way: bookingRef, pickupFrom, items.0.weight. List at least the Shipper reference, the collection
     address and window, the receiver's name and address and the goods when the text does not give them.
+  - "ignored" lists the short pieces of the text you did not use for the booking, such as a signature, a greeting or a disclaimer, copied
+    exactly from the text, so the Shipper sees that nothing disappeared silently. It may be empty. Never put text you used in it.
+  - When two values in the text compete for one field (two weights, two dates), leave the field out and list it in "missing" with a
+    reason that names both, such as "the email gives 850 kg and 900 kg".
   - Make no check of the Lane, the price or whether Norvia can carry the goods: Rating decides that after the booking is accepted.
   - If the text describes more than one booking (more than one pickup or more than one delivery, as separate bookings), answer only
     {"refusal": "MultipleBookingsInText"}. A booking with several kinds of package is one booking.

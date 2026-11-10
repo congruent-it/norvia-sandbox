@@ -28,6 +28,12 @@
           "reason": { "type": "string", "minLength": 1, "maxLength": 300 }
         }
       }
+    },
+    "ignored": {
+      "description": "Short pieces of the text the agent did not use, each verbatim, such as a signature or a disclaimer, so nothing disappears silently. Optional.",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
     }
   }
 }

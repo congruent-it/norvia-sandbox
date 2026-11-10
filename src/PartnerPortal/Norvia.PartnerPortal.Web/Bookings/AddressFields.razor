@@ -2,13 +2,27 @@
 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <div class="sm:col-span-2">
         <FluentTextField Label="Street" @bind-Value="Address.Street" />
+        <DraftNote Field="@($"{Prefix}Street")" />
     </div>
-    <FluentTextField Label="Postcode" @bind-Value="Address.Postcode" />
-    <FluentTextField Label="City" @bind-Value="Address.City" />
-    <FluentTextField Label="Country" @bind-Value="Address.Country" Placeholder="NL or Netherlands" />
+    <div>
+        <FluentTextField Label="Postcode" @bind-Value="Address.Postcode" />
+        <DraftNote Field="@($"{Prefix}PostalCode")" />
+    </div>
+    <div>
+        <FluentTextField Label="City" @bind-Value="Address.City" />
+        <DraftNote Field="@($"{Prefix}City")" />
+    </div>
+    <div>
+        <FluentTextField Label="Country" @bind-Value="Address.Country" Placeholder="NL or Netherlands" />
+        <DraftNote Field="@($"{Prefix}Country")" />
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired]
     public AddressForm Address { get; set; } = null!;
+
+    /// <summary>The Booking draft's name for the address: <c>pickup</c> or <c>receiver</c>.</summary>
+    [Parameter, EditorRequired]
+    public string Prefix { get; set; } = string.Empty;
 }
