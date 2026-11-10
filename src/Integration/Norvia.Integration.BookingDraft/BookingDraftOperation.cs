@@ -14,7 +14,9 @@ public static class BookingDraftOperation
     public const string AgentsDisabled = "AgentsDisabled";
     public const string InputTooLarge = "InputTooLarge";
     public const string TextRequired = "TextRequired";
+    // Refusals that share the public code InputTooLarge but need their own text; they never leave this class.
     private const string PdfTooLarge = "PdfTooLarge";
+    private const string PdfTextTooLong = "PdfTextTooLong";
     public const string UnsupportedFormat = "UnsupportedFormat";
     public const string NoTextInPdf = "NoTextInPdf";
 
@@ -37,6 +39,7 @@ public static class BookingDraftOperation
             {
                 InputTooLarge => Refuse(correlationId, 413, code, $"The text is longer than {limits.MaxInputCharacters} characters."),
                 PdfTooLarge => Refuse(correlationId, 413, InputTooLarge, $"The PDF is over {limits.MaxPdfPages} pages or {limits.MaxPdfBytes / 1024} KB."),
+                PdfTextTooLong => Refuse(correlationId, 413, InputTooLarge, $"The text in the PDF is longer than {limits.MaxInputCharacters} characters."),
                 UnsupportedFormat => Refuse(correlationId, 415, code, "Send the text or a PDF."),
                 NoTextInPdf => Refuse(correlationId, 422, code, "This PDF has no text to read; paste the text instead."),
                 _ => Refuse(correlationId, 400, code, "The request needs a text."),
@@ -74,7 +77,7 @@ public static class BookingDraftOperation
             case "application/json":
                 return await ReadTextAsync(body, limits.MaxInputCharacters, cancellationToken);
             case "text/plain":
-                using (var reader = new StreamReader(body, Encoding.UTF8, leaveOpen: true))
+                using (var reader = new StreamReader(body, CharsetOf(contentType), leaveOpen: true))
                 {
                     var plain = await reader.ReadToEndAsync(cancellationToken);
                     return string.IsNullOrWhiteSpace(plain) ? (null, TextRequired)
@@ -104,14 +107,29 @@ public static class BookingDraftOperation
         }
 
         var read = PdfText.Read(buffer.ToArray(), limits.MaxPdfPages);
-        return read switch
+        return read.Status switch
         {
-            { Unreadable: true } => (null, UnsupportedFormat),
-            { TooManyPages: true } => (null, PdfTooLarge),
-            { Text: var text } when string.IsNullOrWhiteSpace(text) => (null, NoTextInPdf),
-            { Text: var text } when text.Length > limits.MaxInputCharacters => (null, InputTooLarge),
+            PdfReadStatus.Unreadable => (null, UnsupportedFormat),
+            PdfReadStatus.TooManyPages => (null, PdfTooLarge),
+            _ when string.IsNullOrWhiteSpace(read.Text) => (null, NoTextInPdf),
+            _ when read.Text.Length > limits.MaxInputCharacters => (null, PdfTextTooLong),
             _ => (read.Text, null),
         };
+    }
+
+    /// <summary>The charset a <c>text/plain</c> content type names, UTF-8 when it names none or one that is not known.</summary>
+    private static Encoding CharsetOf(string? contentType)
+    {
+        var charset = contentType?.Split(';').Skip(1).Select(parameter => parameter.Split('=', 2))
+            .FirstOrDefault(pair => pair.Length == 2 && pair[0].Trim().Equals("charset", StringComparison.OrdinalIgnoreCase))?[1].Trim().Trim('"');
+        try
+        {
+            return charset is { Length: > 0 } ? Encoding.GetEncoding(charset) : Encoding.UTF8;
+        }
+        catch (ArgumentException)
+        {
+            return Encoding.UTF8;
+        }
     }
 
     private static async Task<(string? Value, string? Code)> ReadTextAsync(Stream body, int maxCharacters, CancellationToken cancellationToken)

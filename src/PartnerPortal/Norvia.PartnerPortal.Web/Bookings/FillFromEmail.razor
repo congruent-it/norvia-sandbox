@@ -4,12 +4,12 @@
     personal data by nature, so this page never logs or keeps it: it goes to Norvia's Intake agent and the draft goes to the booking form.
 *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Components.Forms
 @using Norvia.PartnerPortal.Application.Bookings.DraftFromText
 @inject IPartnerPortal Portal
 @inject BookingDraftHandoff Handoff
 @inject NavigationManager Navigation
 @inject ILogger<FillFromEmail> Logger
-@using Microsoft.AspNetCore.Components.Forms
 
 <PageTitle>Partner portal · @(_persona?.DisplayName ?? PersonaId) · Fill from an email</PageTitle>
 

@@ -69,7 +69,7 @@ What a Shipper sends Norvia through the Norvia Partner API to ask for a transpor
 _Avoid_: order, Transport Order (that is Norvia's, once accepted), Carrier booking (that is Norvia's request to a Carrier)
 
 **Booking draft**:
-A Booking the Intake agent filled in from a Shipper's pasted text, with the quote each value came from and the fields that are missing or ambiguous. It is not a Booking until the Shipper reviews it and submits it through the existing path. It is stateless and stored nowhere, and a Booking holds no link back to it.
+A Booking the Intake agent filled in from a Shipper's pasted text, or from the text of a PDF they uploaded (read in .NET, never OCR: a scan has no text and is refused), with the quote each value came from and the fields that are missing or ambiguous. It is not a Booking until the Shipper reviews it and submits it through the existing path. It is stateless and stored nowhere, and a Booking holds no link back to it.
 _Avoid_: pre-booking, parsed booking
 
 **Shipper reference**:

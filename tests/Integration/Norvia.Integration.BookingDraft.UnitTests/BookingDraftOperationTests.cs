@@ -96,6 +96,17 @@ public sealed class BookingDraftOperationTests
     }
 
     [Fact]
+    public async Task Plain_text_is_read_in_the_charset_it_names()
+    {
+        var questions = new List<string>();
+
+        var answer = await DraftAsync(Encoding.Latin1.GetBytes("Getränke Schmitz"), "text/plain; charset=iso-8859-1", questions: questions);
+
+        answer.StatusCode.Should().Be(200);
+        questions.Should().ContainSingle().Which.Should().Contain("Getränke Schmitz");
+    }
+
+    [Fact]
     public async Task A_file_that_is_not_a_readable_PDF_is_415_UnsupportedFormat()
     {
         var answer = await DraftAsync(Encoding.UTF8.GetBytes("%PDF-nonsense"), "application/pdf");
@@ -135,6 +146,7 @@ public sealed class BookingDraftOperationTests
 
         answer.StatusCode.Should().Be(413);
         answer.FailureCode.Should().Be(BookingDraftOperation.InputTooLarge);
+        answer.Body["text"]!.GetValue<string>().Should().Be("The text in the PDF is longer than 100 characters.");
     }
 
     [Fact]
