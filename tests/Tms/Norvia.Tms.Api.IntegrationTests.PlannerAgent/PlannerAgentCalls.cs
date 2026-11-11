@@ -111,24 +111,22 @@ internal static class PlannerAgentCalls
         client.CallToolAsync(AssignmentOptionsTool, new JsonObject { ["transportOrderNumber"] = transportOrderNumber }, Guid.NewGuid().ToString(), cancellationToken);
 
     /// <summary>The assignment options of the order, as the Agent reads them, which must be a success.</summary>
-    public static async Task<JsonNode> OptionsOfAsync(this HttpClient client, string transportOrderNumber, CancellationToken cancellationToken)
-    {
-        var (isError, text) = await client.GetAssignmentOptionsAsync(transportOrderNumber, cancellationToken);
-        isError.Should().BeFalse(text);
-        return JsonNode.Parse(text)!;
-    }
+    public static async Task<JsonNode> OptionsOfAsync(this HttpClient client, string transportOrderNumber, CancellationToken cancellationToken) =>
+        SucceededWith(await client.GetAssignmentOptionsAsync(transportOrderNumber, cancellationToken));
 
     /// <summary>The assignment options of the order with the what-if tally of a plan (#445): the orders already suggested for Own fleet, which the TMS counts. Must be a success.</summary>
     public static async Task<JsonNode> OptionsAssumingAsync(
-        this HttpClient client, string transportOrderNumber, string alreadyAssumed, CancellationToken cancellationToken)
-    {
-        var (isError, text) = await client.CallToolAsync(
+        this HttpClient client, string transportOrderNumber, string alreadyAssumed, CancellationToken cancellationToken) =>
+        SucceededWith(await client.CallToolAsync(
             AssignmentOptionsAssumingTool,
             new JsonObject { ["transportOrderNumber"] = transportOrderNumber, ["alreadyAssumed"] = alreadyAssumed },
             Guid.NewGuid().ToString(),
-            cancellationToken);
-        isError.Should().BeFalse(text);
-        return JsonNode.Parse(text)!;
+            cancellationToken));
+
+    private static JsonNode SucceededWith((bool IsError, string Text) result)
+    {
+        result.IsError.Should().BeFalse(result.Text);
+        return JsonNode.Parse(result.Text)!;
     }
 
     /// <summary>The Carrier's option among the options' carriers.</summary>
