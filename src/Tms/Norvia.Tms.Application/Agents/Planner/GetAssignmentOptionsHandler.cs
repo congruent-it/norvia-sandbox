@@ -60,14 +60,31 @@ public sealed class GetAssignmentOptionsHandler(
             details.Delivery?.Window?.Latest,
             demand.WeightKg,
             demand.PalletPlaces,
-            await OwnFleetAsync(order, cancellationToken),
+            await OwnFleetAsync(order, await AssumedAsync(order, query.AlreadyAssumed, cancellationToken), cancellationToken),
             CarriersFor(order));
     }
 
-    private async Task<OwnFleetOption> OwnFleetAsync(TransportOrder order, CancellationToken cancellationToken)
+    // The what-if tally lives here, in the query, not in the model's arithmetic: only orders still waiting for planning count, as a planned one is in the demand already.
+    private async Task<IReadOnlyList<TransportOrder>> AssumedAsync(TransportOrder order, IReadOnlyList<string>? numbers, CancellationToken cancellationToken)
+    {
+        var assumed = new List<TransportOrder>();
+        foreach (var text in numbers?.Distinct(StringComparer.Ordinal) ?? [])
+        {
+            if (TransportOrderNumber.TryParse(text, out var number)
+                && number != order.Number
+                && await transportOrders.FirstOrDefaultAsync(new TransportOrderByNumberSpec(number), cancellationToken) is { Status: TransportOrderStatus.Accepted } other)
+            {
+                assumed.Add(other);
+            }
+        }
+
+        return assumed;
+    }
+
+    private async Task<OwnFleetOption> OwnFleetAsync(TransportOrder order, IReadOnlyList<TransportOrder> assumed, CancellationToken cancellationToken)
     {
         var refusal = AssignmentRules.Check(order, carrierId: null, carrier: null);
-        var check = await loadChecks.IfAssignedAsync(order, cancellationToken);
+        var check = await loadChecks.IfAssignedAsync(order, assumed, cancellationToken);
         var day = CollectionDate.Of(order.Details);
         if (day is null)
         {

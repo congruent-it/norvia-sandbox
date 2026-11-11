@@ -46,9 +46,9 @@ internal static class McpTools
     }
 
     // Business keys, correlation IDs and run IDs are identifiers; nothing else reaches a URL. A queue or subscription's name
-    // (entity) may also hold the '/' of topic/subscription, and then only between two names.
+    // (entity) may also hold the '/' of topic/subscription, and then only between two names. The what-if tally (alreadyAssumed) is a comma-separated list of order numbers.
     private static bool Plain(string parameter, string text) =>
         text.Length is > 0 and <= 200
-        && text.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':' || (character == '/' && parameter == "entity"))
+        && text.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' or ':' || (character == '/' && parameter == "entity") || (character == ',' && parameter == "alreadyAssumed"))
         && !text.Split('/').Any(name => name.Length == 0 || name.All(character => character == '.'));
 }

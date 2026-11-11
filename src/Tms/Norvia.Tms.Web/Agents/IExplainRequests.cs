@@ -30,4 +30,7 @@ public interface IExplainRequests
 
     /// <summary>A draft Notify Shipper message on an open Exception, as the Suggestion's cause. Nothing is sent: the Planner edits it and sends it through Notify Shipper.</summary>
     Task<Result<Suggestion>> DraftNotificationAsync(DraftShipperNotificationQuery query, CancellationToken cancellationToken);
+
+    /// <summary>A Suggestion per order of the waiting list, made in the list's order with the what-if tally (#445). Nothing is pre-selected, assigned or stored.</summary>
+    Task<Result<PlannedList>> PlanAsync(PlanTheListQuery query, CancellationToken cancellationToken);
 }

@@ -1,7 +1,7 @@
 # The Planner agent (ADR 0040). The in-process runner reads this file locally; infra/deploy-agents.ps1 publishes it as a Foundry prompt
 # agent. Plain YAML, so a script can read it with yq. Raise `version` on any change.
 name: planner
-version: 2
+version: 3
 description: Suggests to a Planner who should carry a Transport Order waiting for planning, Own fleet or one of the active Carriers, with the reasoning, the trade-off between cost and capacity warnings, and any warning it is accepting.
 model:
   # The model deployment in the Foundry project: the estate's one shared deployment, named after its model (foundryModelName in
@@ -9,13 +9,14 @@ model:
   deployment: gpt-5.4-mini
   temperature: 0.2
   maxOutputTokens: 1200
-  # The cap on tool calls per question (ADR 0040). The TMS computes the options in one read, so the agent reads once.
+  # The cap on tool calls per question (ADR 0040). The TMS computes the options in one read, so the agent reads once, per order. A plan of the waiting list asks one question per order, so the plan's own cap on orders caps its tool calls too.
   maxToolCalls: 1
 tools:
   # contracts/agent-mcp/<server>.tools.json lists what the server serves; names picks the ones this Agent may call.
   server: planner
   names:
     - get_assignment_options
+    - get_assignment_options_assuming
 inputs:
   # The correlation ID of the Transport Order's Message trail, supplied per run and sent as this header on each tool call, so the tool
   # calls join its trail.
@@ -23,7 +24,9 @@ inputs:
 instructions: |
   You are the Planner agent of Norvia, a transport company. A Planner has opened a Transport Order that is waiting for planning and asks
   you who should carry it: Own fleet, or one of the active Carriers. Read the assignment options with get_assignment_options, using the
-  Transport Order's number. The TMS has already computed everything: you choose among the options it lists, you never compute a
+  Transport Order's number. When the question lists "Transport Orders already assumed on Own fleet in this plan", you are working through
+  a list of orders: read with get_assignment_options_assuming instead, giving the same number and those orders' numbers, separated by
+  commas, as alreadyAssumed. The TMS counts them against Own fleet's day; you never add them up yourself. The TMS has already computed everything: you choose among the options it lists, you never compute a
   capacity, a cost or a rule yourself.
 
   How to choose:

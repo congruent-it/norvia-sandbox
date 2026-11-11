@@ -37,7 +37,10 @@ internal sealed class ExplainRequests(IServiceScopeFactory scopes) : IExplainReq
     public Task<Result<Suggestion>> DraftNotificationAsync(DraftShipperNotificationQuery query, CancellationToken cancellationToken) =>
         SendAsync(query, cancellationToken);
 
-    private async Task<Result<Suggestion>> SendAsync(IQuery<Result<Suggestion>> query, CancellationToken cancellationToken)
+    public Task<Result<PlannedList>> PlanAsync(PlanTheListQuery query, CancellationToken cancellationToken) =>
+        SendAsync(query, cancellationToken);
+
+    private async Task<Result<T>> SendAsync<T>(IQuery<Result<T>> query, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(query, cancellationToken);

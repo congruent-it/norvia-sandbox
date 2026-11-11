@@ -33,6 +33,12 @@ internal static partial class AgentPageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Suggesting an assignment for Transport Order {TransportOrderNumber} failed")]
     public static partial void SuggestCrashed(ILogger logger, Exception exception, string transportOrderNumber);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Planning the waiting list failed with {FailureCode}")]
+    public static partial void PlanFailed(ILogger logger, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Planning the waiting list failed")]
+    public static partial void PlanCrashed(ILogger logger, Exception exception);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "Drafting a Shipper notification for Exception {ExceptionNumber} failed with {FailureCode}")]
     public static partial void NotificationDraftFailed(ILogger logger, string exceptionNumber, string failureCode);
 

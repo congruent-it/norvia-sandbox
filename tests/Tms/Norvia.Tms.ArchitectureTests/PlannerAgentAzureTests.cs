@@ -48,7 +48,7 @@ public sealed class PlannerAgentAzureTests
             .Should().OnlyContain(method => method == "GET");
         Of(resources, "Microsoft.ApiManagement/service/apis/operations").Select(operation => operation["properties"]!["urlTemplate"]!.GetValue<string>())
             .Should().Equal(ContractFile["tools"]!.AsArray().Select(tool => tool!["path"]!.GetValue<string>()));
-        tools.Select(tool => tool["properties"]!["displayName"]!.GetValue<string>()).Should().Equal("get_assignment_options", "get_exception_timeline");
+        tools.Select(tool => tool["properties"]!["displayName"]!.GetValue<string>()).Should().Equal("get_assignment_options", "get_assignment_options_assuming", "get_exception_timeline");
     }
 
     [Fact]

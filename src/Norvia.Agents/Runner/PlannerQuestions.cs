@@ -26,8 +26,44 @@ public static class PlannerQuestions
         }
 
         var number = question[Prefix.Length..^Suffix.Length];
-        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+        return IsKey(number) ? number : null;
     }
+
+    private const string TallyMiddle = " The Transport Orders already assumed on Own fleet in this plan: ";
+    private const string TallyEnd = ".";
+
+    /// <summary>
+    /// The question for one order of a plan of the waiting list (#445): the same, with the orders the plan has already suggested for Own fleet.
+    /// With none, it is the plain <see cref="SuggestAssignment(string)"/> question.
+    /// </summary>
+    public static string SuggestAssignment(string transportOrderNumber, IReadOnlyList<string> alreadyAssumed)
+    {
+        ArgumentNullException.ThrowIfNull(alreadyAssumed);
+        return alreadyAssumed.Count == 0
+            ? SuggestAssignment(transportOrderNumber)
+            : SuggestAssignment(transportOrderNumber) + TallyMiddle + string.Join(", ", alreadyAssumed) + TallyEnd;
+    }
+
+    /// <summary>The Transport Order number and the orders already assumed of a Suggest question (with or without a tally), or null when the text is another question.</summary>
+    public static (string Number, IReadOnlyList<string> AlreadyAssumed)? ParseSuggestAssignmentWithTally(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        if (ParseSuggestAssignment(question) is { } plain)
+        {
+            return (plain, []);
+        }
+
+        var at = question.IndexOf(TallyMiddle, StringComparison.Ordinal);
+        if (at < 0 || !question.EndsWith(TallyEnd, StringComparison.Ordinal) || ParseSuggestAssignment(question[..at]) is not { } number)
+        {
+            return null;
+        }
+
+        var assumed = question[(at + TallyMiddle.Length)..^TallyEnd.Length].Split(", ");
+        return assumed.All(IsKey) ? (number, assumed) : null;
+    }
+
+    private static bool IsKey(string text) => text.Length > 0 && text.All(character => char.IsAsciiLetterOrDigit(character) || character == '-');
 
     private const string NotePrefix = "Draft a short internal note on the Exception ";
     private const string NoteSuffix = ", of what has happened and what is outstanding.";
@@ -49,7 +85,7 @@ public static class PlannerQuestions
         }
 
         var number = question[NotePrefix.Length..^NoteSuffix.Length];
-        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+        return IsKey(number) ? number : null;
     }
 
     private const string NotifyPrefix = "Draft the Notify Shipper message for the Exception ";
@@ -73,7 +109,7 @@ public static class PlannerQuestions
         }
 
         var parts = question[NotifyPrefix.Length..^NotifySuffix.Length].Split(NotifyMiddle);
-        return parts.Length == 2 && parts.All(part => part.Length > 0 && part.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'))
+        return parts.Length == 2 && parts.All(IsKey)
             ? (parts[0], parts[1])
             : null;
     }

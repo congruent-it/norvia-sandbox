@@ -3157,6 +3157,45 @@
         }
       }
     },
+    "/v1/agent/planner/transport-orders/{transportOrderNumber}/assignment-options/assuming/{alreadyAssumed}": {
+      "get": {
+        "tags": [
+          "PlannerAgent"
+        ],
+        "summary": "As the assignment options, with the what-if tally of a plan of the waiting list: alreadyAssumed is the comma-separated numbers of the Transport Orders already suggested for Own fleet, which Own fleet's load check counts too. Nothing is assigned.",
+        "operationId": "AgentGetAssignmentOptionsAssuming",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "alreadyAssumed",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerAgentAssignmentOptionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/agent/planner/exceptions/{exceptionNumber}/timeline": {
       "get": {
         "tags": [

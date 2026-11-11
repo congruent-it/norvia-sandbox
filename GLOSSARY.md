@@ -518,6 +518,14 @@ _Avoid_: test, rule (that is one part of a Check), audit point, scan
 What a Check found wrong in the estate: the Check's ID, severity, rule, as-found toggle and fix, and the evidence, which names the resources concerned and never a secret's value (a secret is reported by where it is). A Check that passes gives no Finding. The Agent cites a Finding by its ID and never adds one.
 _Avoid_: issue, problem, alert (that is an Azure Monitor rule, and what a Check looks for), defect
 
+**Plan the list**:
+The Planner's button on the waiting-for-planning list (TMS UI, Planner view, `Agents:Enabled` on). The Planner agent works through the Transport Orders in the list's order, one question and one tool call per order, and returns a Suggestion per order. Each Suggestion is accepted or ignored on its own; accepting one selects that order only. A run is capped (`Agents:MaxPlanOrders`) and, if it hits its cap or the assistant fails part way, stops with the Suggestions so far and says so.
+_Avoid_: batch, auto-plan
+
+**What-if tally**:
+The orders a Plan the list run has already suggested for Own fleet, passed to the assignment options query as `alreadyAssumed` so Own fleet's load check for the collection day counts them too. The TMS counts, not the model. Nothing is assigned; only orders still waiting for planning that collect on the same day add to the demand.
+_Avoid_: running total, reservation
+
 **Suggestion**:
 What an Agent proposes a person do, shown in the host application's UI: a cause or reasoning, the evidence it cites, a suggested action and a confidence. It is not stored, and acting on it is the person's own command, whose trace names the Agent and the run ID. The suggested action depends on the host: in the Integration console it is one of Resubmit, Discard, Fix the cause first or Needs a person. In the Integration console a Suggestion of Resubmit or Discard on a dead-lettered message pre-selects that message in the resubmit and discard flow and executes nothing: the operator confirms, a discard still asks for its reason, and the audit of what they then do names the Agent and the run ID. In the TMS UI a Suggestion of the Planner agent to assign a Transport Order to Own fleet or a Carrier pre-selects that order and assignee in the assign flow and executes nothing; the trace of the assignment names the Agent and the run ID only when the Planner then assigns the order as suggested. In the ERP UI a Suggestion on a Carrier invoice line that is To decide is Accept as invoiced, Accept adjusted, Reject, Wait (an Unknown booking line) or Needs a person, and only one the ERP allows for the line: it pre-selects that action on the line's decision form and executes nothing, Finance writes the remark or reason and confirms, and the decision's trace names the Agent and the run ID only when Finance did what was suggested. A Suggestion that is ignored is not recorded.
 _Avoid_: recommendation, proposal, agent action

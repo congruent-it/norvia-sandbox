@@ -9,6 +9,12 @@
       "path": "/transport-orders/{transportOrderNumber}/assignment-options"
     },
     {
+      "name": "get_assignment_options_assuming",
+      "description": "As get_assignment_options, with the what-if tally of a plan of the waiting list: alreadyAssumed is the comma-separated numbers of the Transport Orders the plan has already suggested for Own fleet, so Own fleet's load check counts them too (nothing is assigned). The TMS does the counting, never the model. Same narrowed fields, never a street address, a Consignee, an instruction or a file.",
+      "method": "GET",
+      "path": "/transport-orders/{transportOrderNumber}/assignment-options/assuming/{alreadyAssumed}"
+    },
+    {
       "name": "get_exception_timeline",
       "description": "Returns an Exception's timeline by its number, to draft an internal note: its type and causes, status, the Shipment's status and who carries it, the Shipment's Tracking events with their sources and the remarks reporters typed, the Carrier bookings and their state, the actions already taken (Shipper notifications and whether they were sent, Carrier booking cancellations, agreed delivery windows) and the notes so far. Staff-side facts. Never a postcode or street address, a Consignee's personal data or a file.",
       "method": "GET",
