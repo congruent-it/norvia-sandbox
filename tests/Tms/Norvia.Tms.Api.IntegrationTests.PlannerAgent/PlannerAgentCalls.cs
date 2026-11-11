@@ -13,6 +13,7 @@ namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
 internal static class PlannerAgentCalls
 {
     public const string Tool = "get_assignment_options";
+    public const string TimelineTool = "get_exception_timeline";
 
     /// <summary>The flow the TMS API's agent view traces its calls under, and the stand-in's.</summary>
     public const string AgentViewFlow = "agent-view-planner";
@@ -133,6 +134,29 @@ internal static class PlannerAgentCalls
         return await runner.RunAsync(
             definition,
             new AgentQuestion(PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, Guid.NewGuid().ToString("N")),
+            cancellationToken);
+    }
+
+    /// <summary>Calls <c>get_exception_timeline</c> and returns the text the tool answered with, which must be a success.</summary>
+    public static async Task<string> TimelineTextOfAsync(this HttpClient client, string exceptionNumber, CancellationToken cancellationToken)
+    {
+        var (isError, text) = await client.CallToolAsync(TimelineTool, new JsonObject { ["exceptionNumber"] = exceptionNumber }, Guid.NewGuid().ToString(), cancellationToken);
+        isError.Should().BeFalse(text);
+        return text;
+    }
+
+    /// <summary>The Agent's draft of a note on the Exception, as the TMS UI runs it in process: the note definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
+    public static async Task<AgentRunResult> DraftNoteAsync(
+        PlannerAgentFixture fixture, string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken)
+    {
+        var definition = AgentDefinitionLoader.Parse(
+            await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", "planner-exception-note.agent.yaml"), cancellationToken));
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", fixture.AgentToken(agentId));
+        var runner = new AgentRunner(PlannerExceptionNoteScript.Model(), new McpToolSource(http, fixture.McpAddress), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
+        return await runner.RunAsync(
+            definition,
+            new AgentQuestion(PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, Guid.NewGuid().ToString("N")),
             cancellationToken);
     }
 }
