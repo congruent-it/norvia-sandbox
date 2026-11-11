@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Norvia.Agents;
 using Norvia.Agents.Runner;
 using Norvia.Tms.Application.Agents;
+using Norvia.Tms.Application.Agents.Planner;
 
 namespace Norvia.Tms.Infrastructure.Agents;
 
@@ -31,7 +32,7 @@ internal sealed partial class LocalAgentClient(
     private const string PlannerAgentName = "planner";
 
     // The draft note is its own definition on the Planner's server and identity: it holds the Planner's role and no other.
-    private const string PlannerNoteAgentName = "planner-exception-note";
+    private const string PlannerNoteAgentName = DraftExceptionNoteHandler.AgentName;
 
     public async Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken)
     {
