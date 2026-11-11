@@ -53,7 +53,7 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
     }
 
     [Fact]
-    public async Task ACallWithTheReadRole_ListsTheTwoReadTools()
+    public async Task ACallWithTheReadRole_ListsTheThreeReadTools()
     {
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
@@ -61,7 +61,7 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var tools = (await response.Content.ReadFromJsonAsync<JsonObject>(_cancellationToken))!["result"]!["tools"]!.AsArray();
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().BeEquivalentTo([PlannerAgentCalls.AssignmentOptionsTool, PlannerAgentCalls.TimelineTool], "the Planner agent reads and writes nothing else");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().BeEquivalentTo([PlannerAgentCalls.AssignmentOptionsTool, PlannerAgentCalls.AssignmentOptionsAssumingTool, PlannerAgentCalls.TimelineTool], "the Planner agent reads and writes nothing else");
     }
 
     [Fact]
