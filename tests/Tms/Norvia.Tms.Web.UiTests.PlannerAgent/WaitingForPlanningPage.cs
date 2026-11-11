@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Norvia.Tms.TestSupport;
 using static Microsoft.Playwright.Assertions;
@@ -30,6 +31,38 @@ public abstract class WaitingForPlanningPage(PlannerAgentUiFixture fixture) : Br
         await Page.GotoAsync("/transport-orders");
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Transport Orders waiting for planning", Level = 1 })).ToBeVisibleAsync();
         await Expect(RowOf(shipperReference)).ToBeVisibleAsync();
+    }
+
+    protected ILocator AssignGroup => Page.GetByRole(AriaRole.Group, new() { Name = "Assign" });
+
+    protected ILocator Outcomes => Page.GetByRole(AriaRole.List, new() { Name = "Assignment outcomes" });
+
+    /// <summary>Asks the assistant about the row and waits for its Suggestion, which the page has acted on by the time it shows.</summary>
+    protected static async Task<ILocator> SuggestAsync(ILocator row, string number)
+    {
+        await row.GetByRole(AriaRole.Button, new() { Name = $"Suggest for {number}" }).ClickAsync();
+        var suggestion = row.GetByTestId("suggestion");
+        await Expect(suggestion.GetByRole(AriaRole.Heading, new() { Name = "Suggestion" })).ToBeVisibleAsync(new() { Timeout = AgentTimeout });
+        return suggestion;
+    }
+
+    /// <summary>The Carrier a Suggestion names ("Assign to Carrier Kessler Spedition at 120.00 EUR").</summary>
+    protected static async Task<string> SuggestedCarrierAsync(ILocator suggestion)
+    {
+        var action = await suggestion.GetByTestId("suggested-action").InnerTextAsync();
+        return Regex.Match(action, @"Assign to Carrier (?<name>.+?) at \d+\.\d{2} EUR").Groups["name"].Value;
+    }
+
+    /// <summary>Plans the order as another Planner would, behind this page's back, so the page still lists it.</summary>
+    protected async Task AssignBehindThePageAsync(string number, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{number}/assign", UriKind.Relative))
+        {
+            Content = JsonContent.Create(new JsonObject { ["assignedTo"] = "OwnFleet" }),
+        };
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        using var response = await Agent.Manage.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
     }
 
     protected ILocator RowOf(string shipperReference) => Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipperReference });
