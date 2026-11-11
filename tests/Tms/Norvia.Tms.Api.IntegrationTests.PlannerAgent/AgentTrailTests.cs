@@ -20,11 +20,11 @@ public sealed class AgentTrailTests(PlannerAgentFixture fixture)
 
         var run = await fixture.SuggestAsync(agentId, number, correlationId, _cancellationToken);
 
-        run.Suggestion.Evidence.Select(evidence => evidence.ToolName).Should().Contain(PlannerAgentCalls.Tool, "the answer cites what the tool returned");
+        run.Suggestion.Evidence.Select(evidence => evidence.ToolName).Should().Contain(PlannerAgentCalls.AssignmentOptionsTool, "the answer cites what the tool returned");
         var standIn = await fixture.StandInLogAsync(log => IsHop(log, PlannerAgentCalls.StandInFlow, correlationId, agentId, "Succeeded"), _cancellationToken);
         var agentView = await fixture.TmsLogAsync(log => IsHop(log, PlannerAgentCalls.AgentViewFlow, correlationId, agentId, "Succeeded"), _cancellationToken);
-        standIn["toolName"].Should().Be(PlannerAgentCalls.Tool);
-        agentView["toolName"].Should().Be(PlannerAgentCalls.Tool);
+        standIn["toolName"].Should().Be(PlannerAgentCalls.AssignmentOptionsTool);
+        agentView["toolName"].Should().Be(PlannerAgentCalls.AssignmentOptionsTool);
     }
 
     [Fact]
@@ -39,10 +39,10 @@ public sealed class AgentTrailTests(PlannerAgentFixture fixture)
         (await run.Should().ThrowAsync<AgentRunException>()).Which.FailureCode.Should().Be("AgentToolRefused");
         var standIn = await fixture.StandInLogAsync(log => IsHop(log, PlannerAgentCalls.StandInFlow, correlationId, agentId, "Refused"), _cancellationToken);
         standIn["failureCode"].Should().Be("AgentToolRefused");
-        standIn["toolName"].Should().Be(PlannerAgentCalls.Tool);
+        standIn["toolName"].Should().Be(PlannerAgentCalls.AssignmentOptionsTool);
         await fixture.TmsLogAsync(log => IsHop(log, PlannerAgentCalls.AgentViewFlow, correlationId, agentId, "Refused"), _cancellationToken);
     }
 
     private static bool IsHop(TmsLog log, string flow, string correlationId, string agentId, string outcome) =>
-        log["flow"] == flow && log["correlationId"] == correlationId && log["agentId"] == agentId && log["toolName"] == PlannerAgentCalls.Tool && log["outcome"] == outcome;
+        log["flow"] == flow && log["correlationId"] == correlationId && log["agentId"] == agentId && log["toolName"] == PlannerAgentCalls.AssignmentOptionsTool && log["outcome"] == outcome;
 }

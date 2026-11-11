@@ -61,7 +61,7 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var tools = (await response.Content.ReadFromJsonAsync<JsonObject>(_cancellationToken))!["result"]!["tools"]!.AsArray();
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().BeEquivalentTo([PlannerAgentCalls.Tool, PlannerAgentCalls.TimelineTool], "the Planner agent reads and writes nothing else");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().BeEquivalentTo([PlannerAgentCalls.AssignmentOptionsTool, PlannerAgentCalls.TimelineTool], "the Planner agent reads and writes nothing else");
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class AgentMcpAccessTests(PlannerAgentFixture fixture)
         using var client = fixture.CreateMcpClient(fixture.AgentToken());
         await UseUpTheLimitAsync(client);
 
-        using var response = await client.CallToolRawAsync(PlannerAgentCalls.Tool, new JsonObject { ["transportOrderNumber"] = "TO-9999999" }, _cancellationToken);
+        using var response = await client.CallToolRawAsync(PlannerAgentCalls.AssignmentOptionsTool, new JsonObject { ["transportOrderNumber"] = "TO-9999999" }, _cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
         response.Headers.RetryAfter.Should().NotBeNull();

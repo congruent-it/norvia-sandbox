@@ -10,10 +10,13 @@ using Norvia.Tms.TestSupport.Capacity;
 
 namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
 
+/// <summary>The MCP server an Agent run connects to, with the token its identity holds for it.</summary>
+internal sealed record AgentServer(Uri Address, string Token);
+
 /// <summary>What the tests do as the Shipper's booking, the Planner, the Agent and its MCP server.</summary>
 internal static class PlannerAgentCalls
 {
-    public const string Tool = "get_assignment_options";
+    public const string AssignmentOptionsTool = "get_assignment_options";
     public const string TimelineTool = "get_exception_timeline";
 
     /// <summary>The Planner notification agent's two tools, which are all its identity may call.</summary>
@@ -104,7 +107,7 @@ internal static class PlannerAgentCalls
 
     /// <summary>Calls <c>get_assignment_options</c> and returns the MCP result: its <c>isError</c> and the text the tool answered with.</summary>
     public static Task<(bool IsError, string Text)> GetAssignmentOptionsAsync(this HttpClient client, string transportOrderNumber, CancellationToken cancellationToken) =>
-        client.CallToolAsync(Tool, new JsonObject { ["transportOrderNumber"] = transportOrderNumber }, Guid.NewGuid().ToString(), cancellationToken);
+        client.CallToolAsync(AssignmentOptionsTool, new JsonObject { ["transportOrderNumber"] = transportOrderNumber }, Guid.NewGuid().ToString(), cancellationToken);
 
     /// <summary>The assignment options of the order, as the Agent reads them, which must be a success.</summary>
     public static async Task<JsonNode> OptionsOfAsync(this HttpClient client, string transportOrderNumber, CancellationToken cancellationToken)
@@ -144,19 +147,17 @@ internal static class PlannerAgentCalls
     ];
 
     internal static async Task<AgentRunResult> RunAsync(
-        PlannerAgentFixture fixture,
-        string agentId,
+        AgentServer server,
         string definitionFile,
         IChatClient model,
         string question,
         string correlationId,
-        CancellationToken cancellationToken,
-        bool notificationAgent = false)
+        CancellationToken cancellationToken)
     {
         var definition = AgentDefinitionLoader.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", definitionFile), cancellationToken));
         using var http = new HttpClient();
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", notificationAgent ? fixture.NotificationAgentToken(agentId) : fixture.AgentToken(agentId));
-        var runner = new AgentRunner(model, new McpToolSource(http, notificationAgent ? fixture.NotificationMcpAddress : fixture.McpAddress), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", server.Token);
+        var runner = new AgentRunner(model, new McpToolSource(http, server.Address), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
         return await runner.RunAsync(definition, new AgentQuestion(question, correlationId, Guid.NewGuid().ToString("N")), cancellationToken);
     }
 }

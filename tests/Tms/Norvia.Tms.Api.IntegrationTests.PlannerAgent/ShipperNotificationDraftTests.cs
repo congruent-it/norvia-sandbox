@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Norvia.AppHost;
 using Norvia.Tms.TestSupport.Exceptions;
 
 namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
@@ -14,6 +15,7 @@ public sealed class ShipperNotificationDraftTests(PlannerAgentFixture fixture)
 {
     // Written out, not read from the handler's constant, so a changed name shows.
     private const string NotificationAgentName = "planner-notification";
+    private const string PlannerNotificationAgentFlow = "agent-view-planner-notification";
     private const string CarrierName = "Proef Transport";
 
     private static readonly string[] OwnTools = [PlannerAgentCalls.TemplateTool, PlannerAgentCalls.ShipperViewTool];
@@ -70,34 +72,59 @@ public sealed class ShipperNotificationDraftTests(PlannerAgentFixture fixture)
     [Fact]
     public async Task ForAnExceptionWithACarrierAndAnInternalRemark_NeitherToolShowsThem()
     {
-        var (exceptionNumber, transportOrderNumber, hidden) = await ExceptionWithACarrierAndARemarkAsync();
+        var open = await ExceptionWithACarrierAndARemarkAsync();
         using var client = fixture.CreateMcpClient(fixture.NotificationAgentToken());
 
-        var template = await ReadAsync(client, PlannerAgentCalls.TemplateTool, new JsonObject { ["exceptionNumber"] = exceptionNumber });
-        var view = await ReadAsync(client, PlannerAgentCalls.ShipperViewTool, new JsonObject { ["transportOrderNumber"] = transportOrderNumber });
+        var template = await ReadAsync(client, PlannerAgentCalls.TemplateTool, new JsonObject { ["exceptionNumber"] = open.ExceptionNumber });
+        var view = await ReadAsync(client, PlannerAgentCalls.ShipperViewTool, new JsonObject { ["transportOrderNumber"] = open.TransportOrderNumber });
 
-        template.Should().Contain("delivery", "it is the template for the Exception's type").And.NotContainAny(hidden);
-        view.Should().Contain(transportOrderNumber).And.NotContainAny(hidden);
+        template.Should().Contain("delivery", "it is the template for the Exception's type").And.NotContainAny(open.Hidden);
+        view.Should().Contain(open.TransportOrderNumber).And.NotContainAny(open.Hidden);
     }
 
     [Fact]
-    public async Task TheDraft_ReadsOnlyTheTemplateAndTheShipperView_OnTheTrailOfTheExceptionAsTheAgent_AndLeaksNothing()
+    public async Task TheDraft_LeaksNothingOfTheCarrierTheRemarkOrTheException()
     {
-        var (exceptionNumber, transportOrderNumber, hidden) = await ExceptionWithACarrierAndARemarkAsync();
+        var open = await ExceptionWithACarrierAndARemarkAsync();
+
+        var run = await fixture.DraftShipperNotificationAsync(PlannerAgentFixture.NewAgentId(), open.ExceptionNumber, open.TransportOrderNumber, Guid.NewGuid().ToString(), _cancellationToken);
+
+        run.Suggestion.Cause.Should().NotBeNullOrWhiteSpace().And.NotContainAny(open.Hidden);
+    }
+
+    [Fact]
+    public async Task TheDraft_ReadsOnlyTheTemplateAndTheShipperView_OnTheTrailOfTheExceptionAsTheAgent()
+    {
+        var open = await ExceptionWithACarrierAndARemarkAsync();
         var agentId = PlannerAgentFixture.NewAgentId();
         var correlationId = Guid.NewGuid().ToString();
 
-        var run = await fixture.DraftShipperNotificationAsync(agentId, exceptionNumber, transportOrderNumber, correlationId, _cancellationToken);
+        var run = await fixture.DraftShipperNotificationAsync(agentId, open.ExceptionNumber, open.TransportOrderNumber, correlationId, _cancellationToken);
 
-        run.Suggestion.Cause.Should().NotBeNullOrWhiteSpace().And.NotContainAny(hidden);
         run.Suggestion.Evidence.Select(evidence => evidence.ToolName).Distinct().Should().BeEquivalentTo(OwnTools);
         foreach (var tool in OwnTools)
         {
-            var hop = await fixture.TmsLogAsync(
-                log => log["flow"] == "agent-view-planner-notification" && log["correlationId"] == correlationId && log["agentId"] == agentId && log["toolName"] == tool && log["outcome"] == "Succeeded",
+            await fixture.TmsLogAsync(
+                log => log["flow"] == PlannerNotificationAgentFlow && log["correlationId"] == correlationId && log["agentId"] == agentId && log["toolName"] == tool && log["outcome"] == "Succeeded",
                 _cancellationToken);
-            hop["agentId"].Should().Be(agentId);
         }
+    }
+
+    // The notification agent's token is for the TMS API's notification view only: every other agent view refuses it, whoever calls (API Management, or the stand-in).
+    [Theory]
+    [InlineData("/v1/agent/planner/transport-orders/TO-9999999/assignment-options")]
+    [InlineData("/v1/agent/planner/exceptions/EX-9999999/timeline")]
+    [InlineData("/v1/agent/customer-service/transport-orders/TO-9999999")]
+    [InlineData("/v1/agent/customer-service/shipments/SH-9999999/exceptions")]
+    [InlineData("/v1/agent/customer-service-reply/transport-orders/TO-9999999/shipper-view")]
+    public async Task TheNotificationAgentsIdentity_IsRefused403_OnTheOtherAgentViewsOfTheTmsApi(string path)
+    {
+        var token = fixture.IssueToken([LocalTokens.PlannerNotificationAgentReadRole], LocalTokens.TmsAudience, LocalTokens.PlannerNotificationAgentClientId);
+        using var client = fixture.CreateTmsClient(token);
+
+        using var response = await client.GetAsync(new Uri(path, UriKind.Relative), _cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Theory]
@@ -105,13 +132,13 @@ public sealed class ShipperNotificationDraftTests(PlannerAgentFixture fixture)
     [InlineData(true)]
     public async Task AMessageSentFromADraft_NamesTheAgentAndItsRunOnItsTrace_EditedOrNot(bool edited)
     {
-        var (exceptionNumber, transportOrderNumber, _) = await ExceptionWithACarrierAndARemarkAsync();
-        var run = await fixture.DraftShipperNotificationAsync(PlannerAgentFixture.NewAgentId(), exceptionNumber, transportOrderNumber, Guid.NewGuid().ToString(), _cancellationToken);
+        var open = await ExceptionWithACarrierAndARemarkAsync();
+        var run = await fixture.DraftShipperNotificationAsync(PlannerAgentFixture.NewAgentId(), open.ExceptionNumber, open.TransportOrderNumber, Guid.NewGuid().ToString(), _cancellationToken);
         var notification = ShipperNotificationCalls.Notification(edited ? run.Suggestion.Cause + "\n\nPlease call us with questions." : run.Suggestion.Cause);
         notification["agentName"] = NotificationAgentName;
         notification["agentRunId"] = run.RunId;
 
-        var sent = await NotifiedAsync(exceptionNumber, notification);
+        var sent = await NotifiedAsync(open.ExceptionNumber, notification);
 
         var trace = await SucceededTraceAsync(sent["correlationId"]!.GetValue<string>());
         trace["agentId"].Should().Be(NotificationAgentName);
@@ -121,24 +148,26 @@ public sealed class ShipperNotificationDraftTests(PlannerAgentFixture fixture)
     [Fact]
     public async Task AMessageTypedByHand_NamesNoAgentOnItsTrace()
     {
-        var (exceptionNumber, _, _) = await ExceptionWithACarrierAndARemarkAsync();
+        var open = await ExceptionWithACarrierAndARemarkAsync();
 
-        var sent = await NotifiedAsync(exceptionNumber, ShipperNotificationCalls.Notification());
+        var sent = await NotifiedAsync(open.ExceptionNumber, ShipperNotificationCalls.Notification());
 
         var trace = await SucceededTraceAsync(sent["correlationId"]!.GetValue<string>());
         trace["agentId"].Should().BeNull();
         trace["agentRunId"].Should().BeNull();
     }
 
-    // A Booked Carrier Shipment whose delivery failed, with an internal remark on its Exception. Returns what the Shipper must never be told of it.
-    private async Task<(string ExceptionNumber, string TransportOrderNumber, string[] Hidden)> ExceptionWithACarrierAndARemarkAsync()
+    /// <summary>An open Exception of a Carrier Shipment, with an internal remark on it, and what the Shipper must never be told of it.</summary>
+    private sealed record NotifiableException(string ExceptionNumber, string TransportOrderNumber, string[] Hidden);
+
+    private async Task<NotifiableException> ExceptionWithACarrierAndARemarkAsync()
     {
         var (shipmentNumber, carrierBookingNumber, reference, exceptionNumber) = await fixture.BookedWithDeliveryFailedAsync(_cancellationToken);
         var remark = $"Internal remark {Guid.NewGuid():N}";
         using var noted = await fixture.AddNoteAsync(exceptionNumber, ExceptionCalls.Note(remark), _cancellationToken);
         noted.StatusCode.Should().Be(HttpStatusCode.OK);
         var shipment = await fixture.GetShipmentAsync(shipmentNumber, _cancellationToken);
-        return (exceptionNumber, shipment["transportOrderNumber"]!.GetValue<string>(), [PlanningCalls.CarrierId, CarrierName, carrierBookingNumber, reference, remark, exceptionNumber]);
+        return new(exceptionNumber, shipment["transportOrderNumber"]!.GetValue<string>(), [PlanningCalls.CarrierId, CarrierName, carrierBookingNumber, reference, remark, exceptionNumber]);
     }
 
     private async Task<string> ReadAsync(HttpClient client, string tool, JsonObject arguments)

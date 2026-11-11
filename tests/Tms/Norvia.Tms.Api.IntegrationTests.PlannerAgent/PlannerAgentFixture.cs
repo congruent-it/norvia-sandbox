@@ -31,23 +31,21 @@ public sealed class PlannerAgentFixture : AgentMcpFixture
     /// <summary>The Agent's run, as the TMS UI runs it in process: its definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
     public Task<AgentRunResult> SuggestAsync(string agentId, string transportOrderNumber, string correlationId, CancellationToken cancellationToken) =>
         PlannerAgentCalls.RunAsync(
-            this, agentId, "planner.agent.yaml", PlannerScript.Model(), PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, cancellationToken);
+            new AgentServer(McpAddress, AgentToken(agentId)), "planner.agent.yaml", PlannerScript.Model(), PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, cancellationToken);
 
     /// <summary>The Agent's draft of a note on the Exception, run as the TMS UI runs it: the note definition and its scripted model.</summary>
     public Task<AgentRunResult> DraftNoteAsync(string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken) =>
         PlannerAgentCalls.RunAsync(
-            this, agentId, "planner-exception-note.agent.yaml", PlannerExceptionNoteScript.Model(), PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, cancellationToken);
+            new AgentServer(McpAddress, AgentToken(agentId)), "planner-exception-note.agent.yaml", PlannerExceptionNoteScript.Model(), PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, cancellationToken);
 
     /// <summary>The Agent's draft of a Notify Shipper message, run as the TMS UI runs it: the notification definition and its scripted model, with the notification agent's token.</summary>
     public Task<AgentRunResult> DraftShipperNotificationAsync(
         string agentId, string exceptionNumber, string transportOrderNumber, string correlationId, CancellationToken cancellationToken) =>
         PlannerAgentCalls.RunAsync(
-            this,
-            agentId,
+            new AgentServer(NotificationMcpAddress, NotificationAgentToken(agentId)),
             "planner-notification.agent.yaml",
             PlannerNotificationScript.Model(),
             PlannerQuestions.DraftShipperNotification(exceptionNumber, transportOrderNumber),
             correlationId,
-            cancellationToken,
-            notificationAgent: true);
+            cancellationToken);
 }
