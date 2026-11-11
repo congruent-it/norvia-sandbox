@@ -18,7 +18,7 @@ public sealed class ActingOnSuggestionTests(PlannerAgentFixture fixture)
     {
         var number = await AcceptedOrderAsync();
         var agentName = PlannerAgentFixture.NewAgentId();
-        var run = await PlannerAgentCalls.SuggestAsync(fixture, agentName, number, Guid.NewGuid().ToString(), _cancellationToken);
+        var run = await fixture.SuggestAsync(agentName, number, Guid.NewGuid().ToString(), _cancellationToken);
         var key = Guid.NewGuid().ToString();
 
         using var response = await fixture.AssignAsync(number, PlanningCalls.ToCarrier().ActingOn(agentName, run.RunId), _cancellationToken, key);
@@ -56,7 +56,7 @@ public sealed class ActingOnSuggestionTests(PlannerAgentFixture fixture)
         var number = await AcceptedOrderAsync();
         var agentName = PlannerAgentFixture.NewAgentId();
 
-        await PlannerAgentCalls.SuggestAsync(fixture, agentName, number, Guid.NewGuid().ToString(), _cancellationToken);
+        await fixture.SuggestAsync(agentName, number, Guid.NewGuid().ToString(), _cancellationToken);
 
         // The Agent's reading is the only thing on its trail: the order is still unassigned, nothing is planned, and no trace outside the read-only agent view names the Agent.
         await TmsFixture.SettleOutboxAsync(_cancellationToken);
@@ -70,7 +70,7 @@ public sealed class ActingOnSuggestionTests(PlannerAgentFixture fixture)
     {
         var number = await AcceptedOrderAsync();
         var agentName = PlannerAgentFixture.NewAgentId();
-        var run = await PlannerAgentCalls.SuggestAsync(fixture, agentName, number, Guid.NewGuid().ToString(), _cancellationToken);
+        var run = await fixture.SuggestAsync(agentName, number, Guid.NewGuid().ToString(), _cancellationToken);
 
         // The Carrier became inactive since the Agent suggested it.
         var refusal = await fixture.AssignRefusedAsync(

@@ -23,6 +23,7 @@
   <ItemGroup>
     <!-- The Agent's definition, which the tests run the in-process runner with, as the TMS UI does. -->
     <None Include="..\..\..\agents\planner.agent.yaml" Link="agents\planner.agent.yaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\agents\planner-exception-note.agent.yaml" Link="agents\planner-exception-note.agent.yaml" CopyToOutputDirectory="PreserveNewest" />
     <!-- One AppHost for the whole project (SQL Server and the Service Bus emulator in Docker). -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

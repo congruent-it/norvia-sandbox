@@ -1,3 +1,5 @@
+using Norvia.Agents.Runner;
+using Norvia.Agents.Scripts;
 using Norvia.AppHost;
 
 namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
@@ -17,4 +19,14 @@ public sealed class PlannerAgentFixture : AgentMcpFixture
 
     /// <summary>The MCP endpoint a runner connects to.</summary>
     public Uri McpAddress => McpEndpoint(McpPath);
+
+    /// <summary>The Agent's run, as the TMS UI runs it in process: its definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
+    public Task<AgentRunResult> SuggestAsync(string agentId, string transportOrderNumber, string correlationId, CancellationToken cancellationToken) =>
+        PlannerAgentCalls.RunAsync(
+            this, agentId, "planner.agent.yaml", PlannerScript.Model(), PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, cancellationToken);
+
+    /// <summary>The Agent's draft of a note on the Exception, run as the TMS UI runs it: the note definition and its scripted model.</summary>
+    public Task<AgentRunResult> DraftNoteAsync(string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken) =>
+        PlannerAgentCalls.RunAsync(
+            this, agentId, "planner-exception-note.agent.yaml", PlannerExceptionNoteScript.Model(), PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, cancellationToken);
 }

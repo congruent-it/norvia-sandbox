@@ -18,7 +18,7 @@ public sealed class AgentTrailTests(PlannerAgentFixture fixture)
         var correlationId = Guid.NewGuid().ToString();
         var number = await PlannerAgentCalls.AcceptedAsync(fixture, PlannerAgentCalls.BookingOn(PlannerAgentCalls.Weekday(0)), _cancellationToken);
 
-        var run = await PlannerAgentCalls.SuggestAsync(fixture, agentId, number, correlationId, _cancellationToken);
+        var run = await fixture.SuggestAsync(agentId, number, correlationId, _cancellationToken);
 
         run.Suggestion.Evidence.Select(evidence => evidence.ToolName).Should().Contain(PlannerAgentCalls.Tool, "the answer cites what the tool returned");
         var standIn = await fixture.StandInLogAsync(log => IsHop(log, PlannerAgentCalls.StandInFlow, correlationId, agentId, "Succeeded"), _cancellationToken);
@@ -33,7 +33,7 @@ public sealed class AgentTrailTests(PlannerAgentFixture fixture)
         var agentId = PlannerAgentFixture.NewAgentId();
         var correlationId = Guid.NewGuid().ToString();
 
-        var run = () => PlannerAgentCalls.SuggestAsync(fixture, agentId, "TO-9999999", correlationId, _cancellationToken);
+        var run = () => fixture.SuggestAsync(agentId, "TO-9999999", correlationId, _cancellationToken);
 
         // The TMS UI turns this into Result.Unavailable("AgentToolRefused") and shows "Assistant unavailable" (LocalAgentClient).
         (await run.Should().ThrowAsync<AgentRunException>()).Which.FailureCode.Should().Be("AgentToolRefused");
