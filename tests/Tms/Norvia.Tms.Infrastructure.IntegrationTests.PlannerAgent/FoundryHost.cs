@@ -94,7 +94,7 @@ internal sealed class FakeResponses : HttpMessageHandler
 {
     private readonly List<RecordedRequest> _requests = [];
     private JsonObject[] _output = [];
-        private HttpStatusCode? _failure;
+    private HttpStatusCode? _failure;
 
     public IReadOnlyList<RecordedRequest> Requests
     {
