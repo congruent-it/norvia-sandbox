@@ -30,8 +30,18 @@ public sealed class PlannerAgentFixture : AgentMcpFixture
 
     /// <summary>The Agent's run, as the TMS UI runs it in process: its definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
     public Task<AgentRunResult> SuggestAsync(string agentId, string transportOrderNumber, string correlationId, CancellationToken cancellationToken) =>
+        SuggestAsync(agentId, transportOrderNumber, [], correlationId, cancellationToken);
+
+    /// <summary>The Agent's run for one order of a plan of the waiting list (#445): the same question with the orders the plan has already suggested for Own fleet.</summary>
+    public Task<AgentRunResult> SuggestAsync(
+        string agentId, string transportOrderNumber, IReadOnlyList<string> alreadyAssumed, string correlationId, CancellationToken cancellationToken) =>
         PlannerAgentCalls.RunAsync(
-            new AgentServer(McpAddress, AgentToken(agentId)), "planner.agent.yaml", PlannerScript.Model(), PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, cancellationToken);
+            new AgentServer(McpAddress, AgentToken(agentId)),
+            "planner.agent.yaml",
+            PlannerScript.Model(),
+            PlannerQuestions.SuggestAssignment(transportOrderNumber, alreadyAssumed),
+            correlationId,
+            cancellationToken);
 
     /// <summary>The Agent's draft of a note on the Exception, run as the TMS UI runs it: the note definition and its scripted model.</summary>
     public Task<AgentRunResult> DraftNoteAsync(string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken) =>

@@ -17,6 +17,7 @@ internal sealed record AgentServer(Uri Address, string Token);
 internal static class PlannerAgentCalls
 {
     public const string AssignmentOptionsTool = "get_assignment_options";
+    public const string AssignmentOptionsAssumingTool = "get_assignment_options_assuming";
     public const string TimelineTool = "get_exception_timeline";
 
     /// <summary>The Planner notification agent's two tools, which are all its identity may call.</summary>
@@ -113,6 +114,19 @@ internal static class PlannerAgentCalls
     public static async Task<JsonNode> OptionsOfAsync(this HttpClient client, string transportOrderNumber, CancellationToken cancellationToken)
     {
         var (isError, text) = await client.GetAssignmentOptionsAsync(transportOrderNumber, cancellationToken);
+        isError.Should().BeFalse(text);
+        return JsonNode.Parse(text)!;
+    }
+
+    /// <summary>The assignment options of the order with the what-if tally of a plan (#445): the orders already suggested for Own fleet, which the TMS counts. Must be a success.</summary>
+    public static async Task<JsonNode> OptionsAssumingAsync(
+        this HttpClient client, string transportOrderNumber, string alreadyAssumed, CancellationToken cancellationToken)
+    {
+        var (isError, text) = await client.CallToolAsync(
+            AssignmentOptionsAssumingTool,
+            new JsonObject { ["transportOrderNumber"] = transportOrderNumber, ["alreadyAssumed"] = alreadyAssumed },
+            Guid.NewGuid().ToString(),
+            cancellationToken);
         isError.Should().BeFalse(text);
         return JsonNode.Parse(text)!;
     }
