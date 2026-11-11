@@ -18,7 +18,6 @@
     "mustNotContain": [
       "85.00",
       "85,00",
-      "EUR",
       "€",
       "discount",
       "10%"

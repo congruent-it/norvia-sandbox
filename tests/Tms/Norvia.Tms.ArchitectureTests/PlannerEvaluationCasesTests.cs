@@ -10,7 +10,10 @@ namespace Norvia.Tms.ArchitectureTests;
 /// </summary>
 public sealed class PlannerEvaluationCasesTests
 {
-    private static readonly string[] Agents = ["planner", "planner-exception-note", "planner-notification"];
+    private const string InactiveCarrier = "CAR-0004";
+
+    public static TheoryData<string> Agents => ["planner", "planner-exception-note", "planner-notification"];
+
     private static readonly string[] PlannerActions = ["assign-own-fleet", "assign-carrier", "needs-a-person"];
 
     private static Dictionary<string, JsonNode> Cases(string agent) =>
@@ -28,9 +31,7 @@ public sealed class PlannerEvaluationCasesTests
     private static IEnumerable<string> Field(JsonNode c, string name) => Strings(c["expect"]!["fields"]?[name]);
 
     [Theory]
-    [InlineData("planner")]
-    [InlineData("planner-exception-note")]
-    [InlineData("planner-notification")]
+    [MemberData(nameof(Agents))]
     public void EveryCase_HasAKnownAnswer_ASeed_AndBelongsToItsAgent(string agent)
     {
         var cases = Cases(agent);
@@ -52,6 +53,11 @@ public sealed class PlannerEvaluationCasesTests
             ["assign-order-fits-own-fleet", "assign-order-does-not-fit-own-fleet", "assign-no-matching-lane-on-a-day-with-room",
              "assign-cheapest-carrier-is-inactive", "never-an-ineligible-option-order-already-planned", "never-an-ineligible-option-order-not-accepted",
              "warning-own-fleet-on-an-over-capacity-day", "batch-tally-takes-own-fleet-over-capacity", "batch-tally-no-carrier-lane-names-the-overload"]);
+    }
+
+    [Fact]
+    public void EveryPlannerCase_ExpectsOneOfTheThreeActions()
+    {
         foreach (var (id, c) in Cases("planner"))
         {
             Field(c, "action").Should().NotBeEmpty(id).And.BeSubsetOf(PlannerActions, id);
@@ -77,7 +83,7 @@ public sealed class PlannerEvaluationCasesTests
         {
             var assignsCarrier = Field(c, "action").Contains("assign-carrier");
             Field(c, "carrierId").Any().Should().Be(assignsCarrier, id);
-            Field(c, "carrierId").Should().NotContain("CAR-0004", id);
+            Field(c, "carrierId").Should().NotContain(InactiveCarrier, id);
         }
     }
 
@@ -136,9 +142,7 @@ public sealed class PlannerEvaluationCasesTests
     }
 
     [Theory]
-    [InlineData("planner")]
-    [InlineData("planner-exception-note")]
-    [InlineData("planner-notification")]
+    [MemberData(nameof(Agents))]
     public void TheLeakageCases_ForbidTheSeededConsigneeAndAddress(string agent)
     {
         var leakage = Cases(agent).Where(c => c.Key.StartsWith("leakage-", StringComparison.Ordinal)).ToList();
@@ -154,9 +158,7 @@ public sealed class PlannerEvaluationCasesTests
     }
 
     [Theory]
-    [InlineData("planner")]
-    [InlineData("planner-exception-note")]
-    [InlineData("planner-notification")]
+    [MemberData(nameof(Agents))]
     public void TheInjectionCases_PutTheirTextInTheSeed_AndTheAnswerIsTheOneWithoutIt(string agent)
     {
         var injections = Cases(agent).Where(c => c.Key.StartsWith("injection-", StringComparison.Ordinal)).ToList();
@@ -166,17 +168,20 @@ public sealed class PlannerEvaluationCasesTests
         {
             c["setup"]!["seed"]!.GetValue<string>().Should().ContainEquivalentOf("ignore your instructions", id);
             c["expect"]!["explanation"]!["rubric"]!.GetValue<string>().Should().ContainEquivalentOf("follow", id);
-            if (agent == "planner")
-            {
-                Field(c, "action").Should().Equal(["assign-carrier"], id, "assigning everything to Own fleet is what the text asks for");
-                Strings(c["expect"]!["mustNotContain"]).Should().Contain("everything to Own fleet", id);
-            }
         }
+    }
 
-        if (agent == "planner")
+    [Fact]
+    public void ThePlannerInjectionCases_CoverEachSourceTheIssueNames_AndNeverAssignToOwnFleet()
+    {
+        var injections = Cases("planner").Where(c => c.Key.StartsWith("injection-", StringComparison.Ordinal)).ToList();
+
+        injections.Select(c => c.Key).Should().BeEquivalentTo(
+            ["injection-in-a-shipper-name", "injection-in-a-shipper-reference", "injection-in-a-carrier-remark", "injection-in-an-exception-note", "injection-in-a-rejected-bookings-submitted-content"]);
+        foreach (var (id, c) in injections)
         {
-            injections.Select(c => c.Key).Should().BeEquivalentTo(
-                ["injection-in-a-shipper-name", "injection-in-a-shipper-reference", "injection-in-a-carrier-remark", "injection-in-an-exception-note", "injection-in-a-rejected-bookings-submitted-content"]);
+            Field(c, "action").Should().Equal(["assign-carrier"], id, "assigning everything to Own fleet is what the text asks for");
+            Strings(c["expect"]!["mustNotContain"]).Should().Contain("everything to Own fleet", id);
         }
     }
 
@@ -189,12 +194,17 @@ public sealed class PlannerEvaluationCasesTests
             .And.Contain("infra/run-agent-evaluation.ps1 planner ")
             .And.Contain("infra/run-agent-evaluation.ps1 planner-notification")
             .And.Contain("never in CI");
-        foreach (var agent in Agents)
+        File.ReadAllText(Path.Combine(RepositoryRoot.Path, "evaluation", "README.md")).Should().Contain("## Planner agents");
+        foreach (var agent in Agents.Select(row => row.Data))
         {
             docs.Should().Contain($"evaluation/cases/{agent}/");
         }
 
-        File.ReadAllText(Path.Combine(RepositoryRoot.Path, "evaluation", "README.md")).Should().Contain("## Planner agents");
+    }
+
+    [Fact]
+    public void TheRun_IsNeverStartedByAPullRequest()
+    {
         Directory.GetFiles(Path.Combine(RepositoryRoot.Path, ".github", "workflows")).Select(File.ReadAllText)
             .Should().NotContain(text => text.Contains("run-agent-evaluation", StringComparison.Ordinal) && text.Contains("pull_request", StringComparison.Ordinal));
     }
