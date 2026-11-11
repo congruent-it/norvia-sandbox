@@ -28,4 +28,27 @@ public static class PlannerQuestions
         var number = question[Prefix.Length..^Suffix.Length];
         return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
     }
+
+    private const string NotePrefix = "Draft a short internal note on the Exception ";
+    private const string NoteSuffix = ", of what has happened and what is outstanding.";
+
+    public static string DraftExceptionNote(string exceptionNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(exceptionNumber);
+        return NotePrefix + exceptionNumber + NoteSuffix;
+    }
+
+    /// <summary>The Exception number of a Draft note question, or null when the text is another question.</summary>
+    public static string? ParseDraftExceptionNote(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        if (!question.StartsWith(NotePrefix, StringComparison.Ordinal) || !question.EndsWith(NoteSuffix, StringComparison.Ordinal)
+            || question.Length <= NotePrefix.Length + NoteSuffix.Length)
+        {
+            return null;
+        }
+
+        var number = question[NotePrefix.Length..^NoteSuffix.Length];
+        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+    }
 }

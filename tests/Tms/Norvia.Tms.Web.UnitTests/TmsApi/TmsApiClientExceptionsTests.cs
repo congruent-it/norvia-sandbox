@@ -90,11 +90,21 @@ public sealed class TmsApiClientExceptionsTests : IDisposable
     {
         _tmsApi.Answer(HttpStatusCode.OK, Acted);
 
-        var answer = await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", Cancel);
+        var answer = await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", null, Cancel);
 
         answer.Should().Be(new ExceptionAnswer.Done());
         _tmsApi.Request!.RequestUri.Should().Be(new Uri("http://tms-api.example/v1/exceptions/EX-0000005/notes"));
         BodyShouldBe("""{ "text": "Phoned Kessler", "planner": "Anna de Vries" }""");
+    }
+
+    [Fact]
+    public async Task AddNoteAsync_SavedFromADraft_NamesTheAgentAndItsRun()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Acted);
+
+        await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", new Norvia.Agents.AgentRun("planner-exception-note", "run-7"), Cancel);
+
+        BodyShouldBe("""{ "text": "Phoned Kessler", "planner": "Anna de Vries", "agentName": "planner-exception-note", "agentRunId": "run-7" }""");
     }
 
     [Fact]
@@ -114,7 +124,7 @@ public sealed class TmsApiClientExceptionsTests : IDisposable
     {
         _tmsApi.Answer(HttpStatusCode.OK, Acted);
 
-        await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", Cancel);
+        await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", null, Cancel);
 
         _logger.LatestRecord.Message.Should().Be("Note added on Exception EX-0000005");
         ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>
@@ -136,7 +146,7 @@ public sealed class TmsApiClientExceptionsTests : IDisposable
             $$"""{ "status": {{(int)status}}, "title": "The note can't be added.", "detail": "{{reason}}", "code": "{{code}}", "correlationId": "corr-refused" }""",
             "application/problem+json");
 
-        var answer = await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", Cancel);
+        var answer = await _client.AddNoteAsync("EX-0000005", "Phoned Kessler", null, Cancel);
 
         answer.Should().Be(new ExceptionAnswer.Refused(reason));
         ScopeOf(_logger.LatestRecord).Should().Contain(new Dictionary<string, object?>

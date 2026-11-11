@@ -59,7 +59,8 @@ public interface ITransportOrderCommands
     Task<ExceptionAnswer> AgreeDeliveryWindowAsync(string exceptionNumber, DateTimeOffset earliest, DateTimeOffset latest, CancellationToken cancellationToken);
 
     /// <summary>Adds a free-text note to an open Exception (P7).</summary>
-    Task<ExceptionAnswer> AddNoteAsync(string exceptionNumber, string text, CancellationToken cancellationToken);
+    /// <param name="actingOn">The Agent run whose draft the note was saved from, edited or not, which the note's trace then names; null when the Planner wrote it themselves.</param>
+    Task<ExceptionAnswer> AddNoteAsync(string exceptionNumber, string text, AgentRun? actingOn, CancellationToken cancellationToken);
 
     /// <summary>Resolves an open Exception with an outcome and the remark every outcome needs (P7).</summary>
     Task<ExceptionAnswer> ResolveAsync(string exceptionNumber, ExceptionOutcome outcome, string remark, CancellationToken cancellationToken);

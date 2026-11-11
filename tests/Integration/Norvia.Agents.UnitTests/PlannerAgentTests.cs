@@ -39,7 +39,8 @@ public sealed class PlannerAgentTests
         Definition.Tools.Server.Should().Be("planner").And.Be(contract.Server);
         Definition.Tools.Names.Should().Equal("get_assignment_options");
         Definition.Model.MaxToolCalls.Should().Be(1);
-        contract.Tools.Should().ContainSingle().Which.IsRead.Should().BeTrue();
+        contract.Tools.Select(tool => tool.Name).Should().Equal("get_assignment_options", "get_exception_timeline");
+        contract.Tools.Should().OnlyContain(tool => tool.IsRead);
         contract.Unknown(Definition).Should().BeEmpty();
         contract.Role.Should().Be("TransportOrders.PlannerAgent.Read").And.NotBe(customerService.Role);
     }

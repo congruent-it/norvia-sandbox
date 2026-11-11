@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
+using Norvia.Agents;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Web.Exceptions;
@@ -19,8 +20,8 @@ internal sealed partial class TmsApiClient
     public Task<ExceptionAnswer> AgreeDeliveryWindowAsync(string exceptionNumber, DateTimeOffset earliest, DateTimeOffset latest, CancellationToken cancellationToken) =>
         ActAsync("Agree delivery window", exceptionNumber, "delivery-window", new WindowBody(earliest, latest), "Delivery window agreed", cancellationToken);
 
-    public Task<ExceptionAnswer> AddNoteAsync(string exceptionNumber, string text, CancellationToken cancellationToken) =>
-        ActAsync("Add Exception note", exceptionNumber, "notes", new NoteBody(text, PlannerName.Demo), "Note added", cancellationToken);
+    public Task<ExceptionAnswer> AddNoteAsync(string exceptionNumber, string text, AgentRun? actingOn, CancellationToken cancellationToken) =>
+        ActAsync("Add Exception note", exceptionNumber, "notes", new NoteBody(text, PlannerName.Demo, actingOn?.AgentName, actingOn?.RunId), "Note added", cancellationToken);
 
     public Task<ExceptionAnswer> ResolveAsync(string exceptionNumber, ExceptionOutcome outcome, string remark, CancellationToken cancellationToken) =>
         ActAsync("Resolve Exception", exceptionNumber, "resolve", new ResolveBody(outcome, remark), "Exception resolved", cancellationToken);
@@ -74,7 +75,7 @@ internal sealed partial class TmsApiClient
 
     private sealed record WindowBody(DateTimeOffset Earliest, DateTimeOffset Latest);
 
-    private sealed record NoteBody(string Text, string Planner);
+    private sealed record NoteBody(string Text, string Planner, string? AgentName, string? AgentRunId);
 
     private sealed record ResolveBody(ExceptionOutcome Outcome, string Remark);
 

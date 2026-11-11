@@ -56,6 +56,41 @@ public sealed class TrackExceptionNoteInLoggingScopeTests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task Handle_NoteSavedFromADraft_NamesTheAgentAndItsRun()
+    {
+        var added = new AddExceptionNoteResult("EX-0000005", "SH-0000012", 1, "corr-note");
+
+        await _behaviour.Handle(Add with { ActingOn = new Norvia.Agents.AgentRun("planner-exception-note", "run-7") }, (_, _) => ValueTask.FromResult<Result<AddExceptionNoteResult>>(added), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["agentId"] = "planner-exception-note",
+            ["agentRunId"] = "run-7",
+            ["outcome"] = "Succeeded",
+        });
+    }
+
+    [Fact]
+    public async Task Handle_NoteTheyWroteThemselves_NamesNoAgent()
+    {
+        var added = new AddExceptionNoteResult("EX-0000005", "SH-0000012", 1, "corr-note");
+
+        await _behaviour.Handle(Add, (_, _) => ValueTask.FromResult<Result<AddExceptionNoteResult>>(added), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Keys.Should().NotContain(["agentId", "agentRunId"]);
+    }
+
+    [Fact]
+    public async Task Handle_RefusedNoteFromADraft_StillNamesTheAgentAndItsRun()
+    {
+        var refused = ExceptionRefused.Because<AddExceptionNoteResult>(new ExceptionRefusal(ExceptionRefusalCode.ExceptionNotOpen, "Exception EX-0000005 is Resolved, not Open."));
+
+        await _behaviour.Handle(Add with { ActingOn = new Norvia.Agents.AgentRun("planner-exception-note", "run-7") }, (_, _) => ValueTask.FromResult(refused), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain("agentRunId", "run-7").And.Contain("outcome", "Refused");
+    }
+
     public void Dispose()
     {
         _loggerFactory.Dispose();

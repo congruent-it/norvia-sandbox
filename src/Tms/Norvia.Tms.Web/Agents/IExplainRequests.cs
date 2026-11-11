@@ -24,4 +24,7 @@ public interface IExplainRequests
 
     /// <summary>A recommendation of who should carry a Transport Order waiting for planning. Shown only: nothing is pre-selected or assigned.</summary>
     Task<Result<Suggestion>> SuggestAsync(SuggestAssignmentQuery query, CancellationToken cancellationToken);
+
+    /// <summary>A draft internal note on an open Exception, as the Suggestion's cause. Nothing is saved: the Planner edits it and adds the note.</summary>
+    Task<Result<Suggestion>> DraftNoteAsync(DraftExceptionNoteQuery query, CancellationToken cancellationToken);
 }

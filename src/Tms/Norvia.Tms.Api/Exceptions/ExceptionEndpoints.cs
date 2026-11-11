@@ -1,6 +1,7 @@
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
 using Norvia.Tms.Application.Exceptions.AddNote;
@@ -212,12 +213,16 @@ public static class ExceptionEndpoints
             errors[nameof(AddExceptionNoteRequest.Planner)] = [$"A Planner's name is at most {ExceptionNote.MaxPlannerLength} characters."];
         }
 
+        // The Agent's name and run come together or not at all, and are short: they are only for the trace.
+        ActingOnCalls.Check(errors, nameof(AddExceptionNoteRequest.AgentRunId), request.AgentName, request.AgentRunId);
+
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var command = new AddExceptionNoteCommand(exceptionNumber, request.Text!, request.Planner!, CorrelationId.New().Value);
+        var command = new AddExceptionNoteCommand(
+            exceptionNumber, request.Text!, request.Planner!, CorrelationId.New().Value, ActingOnCalls.Of(request.AgentName, request.AgentRunId));
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)

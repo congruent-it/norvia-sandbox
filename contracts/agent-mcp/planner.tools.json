@@ -7,6 +7,12 @@
       "description": "Returns where a Transport Order waiting for planning can go, by its number: the order itself narrowed (places as city, postcode area and country, goods as a total weight and pallet count, the collection and delivery windows, the Shipper's business name and the Rating result), Own fleet (whether it fits on the collection day: Fits, OverCapacity, OutsideHorizon, DayNotOpen or NoDriverWithDrivingHoursLeft; the load check with the order counted; the Over capacity or out-of-horizon warning; the Vehicles and Drivers available; the Driving hours left; whether it meets the Assignment rules), and each active Carrier (its Carrier cost from its Carrier Rate Card, or why it cannot be priced such as NoMatchingLane, and whether it meets the Assignment rules). Never a street address, a Consignee, an instruction or a file.",
       "method": "GET",
       "path": "/transport-orders/{transportOrderNumber}/assignment-options"
+    },
+    {
+      "name": "get_exception_timeline",
+      "description": "Returns an Exception's timeline by its number, to draft an internal note: its type and causes, status, the Shipment's status and who carries it, the Shipment's Tracking events with their sources and the remarks reporters typed, the Carrier bookings and their state, the actions already taken (Shipper notifications and whether they were sent, Carrier booking cancellations, agreed delivery windows) and the notes so far. Staff-side facts. Never a postcode or street address, a Consignee's personal data or a file.",
+      "method": "GET",
+      "path": "/exceptions/{exceptionNumber}/timeline"
     }
   ]
 }

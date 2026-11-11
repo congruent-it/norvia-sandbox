@@ -30,6 +30,9 @@ internal sealed partial class LocalAgentClient(
 
     private const string PlannerAgentName = "planner";
 
+    // The draft note is its own definition on the Planner's server and identity: it holds the Planner's role and no other.
+    private const string PlannerNoteAgentName = "planner-exception-note";
+
     public async Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -49,7 +52,7 @@ internal sealed partial class LocalAgentClient(
             var (address, tokens, name) = request.AgentName switch
             {
                 ReplyAgentName => (settings.ReplyMcpAddress, settings.ReplyTokens, "Agents:Reply"),
-                PlannerAgentName => (settings.PlannerMcpAddress, settings.PlannerTokens, "Agents:Planner"),
+                PlannerAgentName or PlannerNoteAgentName => (settings.PlannerMcpAddress, settings.PlannerTokens, "Agents:Planner"),
                 _ => (settings.McpAddress, null, "Agents:"),
             };
             if (tokens is not null)
