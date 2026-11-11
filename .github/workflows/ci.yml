@@ -164,6 +164,9 @@ jobs:
           - application: TMS (UI, Planner agent)
             directory: Tms
             kinds: UiTests.PlannerAgent
+          - application: TMS (UI, Planner agent, Plan the list)
+            directory: Tms
+            kinds: UiTests.PlannerAgentPlan
           - application: TMS (UI, Faults)
             directory: Tms
             kinds: UiTests.Faults
