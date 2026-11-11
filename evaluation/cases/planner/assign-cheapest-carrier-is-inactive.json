@@ -1,0 +1,27 @@
+{
+  "id": "assign-cheapest-carrier-is-inactive",
+  "agent": "planner",
+  "description": "Assignment: the cheapest Carrier for the Lane is inactive. The TMS lists only active Carriers, so the answer must not name or price it. Known answer: assign-carrier to the cheapest active Carrier, PakketPunt Express (CAR-0003); Havenstad Koeriers (CAR-0004, inactive in the seed) is nowhere in the answer.",
+  "setup": {
+    "fault": "none",
+    "seed": "Give Havenstad Koeriers (inactive) a Carrier Rate Card with a Rotterdam to Utrecht Lane below PakketPunt Express's in the test environment. Book a Transport Order as Brouwer Dranken from Rotterdam to Utrecht (6 pallets, 1800 kg) in the Partner portal and leave it unassigned, collecting on the Over capacity demo day that infra/smoke-test-over-capacity-day.ps1 prints (P10). Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "assign-carrier",
+      "carrierId": "CAR-0003"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "mustNotContain": [
+      "Havenstad",
+      "CAR-0004"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends an active Carrier and compares only the Carriers the result lists. Does not mention an inactive Carrier."
+    }
+  }
+}

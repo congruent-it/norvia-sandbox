@@ -1,0 +1,22 @@
+{
+  "id": "note-without-tracking-events-says-so",
+  "agent": "planner-exception-note",
+  "description": "Exception note: an Exception for a Shipment with no Tracking events (a Late delivery opened by the Planner's check). Known answer: the note says the timeline shows no Tracking events instead of describing what happened.",
+  "setup": {
+    "fault": "none",
+    "seed": "Open a Late delivery Exception for a Shipment that has no Tracking events. Set EVALUATION_SUBJECT to the Exception's number."
+  },
+  "input": "Draft a short internal note on the Exception ${EVALUATION_SUBJECT}, of what has happened and what is outstanding.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_exception_timeline"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says the timeline shows no Tracking events, and does not describe what happened to the Shipment."
+    }
+  }
+}

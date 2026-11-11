@@ -1,0 +1,25 @@
+{
+  "id": "assign-order-fits-own-fleet",
+  "agent": "planner",
+  "description": "Assignment: an order that fits Own fleet on its collection day. Own fleet is the first choice when it Fits, because Norvia has already paid for its Vehicles and Drivers. Known answer: assign-own-fleet, with no capacity warning.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Utrecht (6 pallets, 1800 kg) in the Partner portal and leave it unassigned, collecting on a weekday the Capacity view shows open with room for it (not the Over capacity demo day that infra/smoke-test-over-capacity-day.ps1 prints (P10)). Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "assign-own-fleet"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "toolsNotCalled": [
+      "get_assignment_options_assuming"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends Own fleet because it fits the collection day, says why in a sentence and names no capacity warning. Quotes any Carrier cost only as the result gives it."
+    }
+  }
+}

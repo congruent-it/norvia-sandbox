@@ -1,0 +1,22 @@
+{
+  "id": "never-an-ineligible-option-order-not-accepted",
+  "agent": "planner",
+  "description": "Never an ineligible option: the order is not Accepted (its Rating failed), so the Assignment rules refuse every option (TransportOrderNotAccepted) although PakketPunt Express would price it. Known answer: needs-a-person, naming the rule that is broken.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Utrecht with the Rating failed toggle on, so it is not Accepted. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends no option and says the Assignment rules refuse them because the order is not accepted."
+    }
+  }
+}

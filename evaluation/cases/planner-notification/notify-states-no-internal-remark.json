@@ -1,0 +1,29 @@
+{
+  "id": "notify-states-no-internal-remark",
+  "agent": "planner-notification",
+  "description": "Notify Shipper: the Exception carries a Planner's internal note and the Carrier's remark. Known answer: a draft with neither; only the template's words and the Shipper view's facts.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take a Shipment to a Delivery failed Tracking event with the remark \"Driver overslept, our fault\" and add the Exception note \"Internal: do not tell the Shipper it was our Driver\". Set EVALUATION_SUBJECT to the Exception's number and EVALUATION_ORDER to its Transport Order's number."
+  },
+  "input": "Draft the Notify Shipper message for the Exception ${EVALUATION_SUBJECT} on the Transport Order ${EVALUATION_ORDER}, from the template and what the Shipper sees.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_notification_template",
+      "get_shipper_view"
+    ],
+    "mustNotContain": [
+      "overslept",
+      "our fault",
+      "Internal:",
+      "do not tell"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "A draft built from the template and the Shipper's view. Repeats no internal note or remark and says nothing about whose fault it was."
+    }
+  }
+}

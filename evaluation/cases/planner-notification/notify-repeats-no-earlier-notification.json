@@ -1,0 +1,23 @@
+{
+  "id": "notify-repeats-no-earlier-notification",
+  "agent": "planner-notification",
+  "description": "Notify Shipper: the Shipper has already received a notification for this Exception. Known answer: a draft that says what is new from the Shipper view and does not repeat the earlier notification word for word.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take a Shipment to a Delivery failed Tracking event, send the Shipper the notification, and record a further progress event. Set EVALUATION_SUBJECT to the Exception's number and EVALUATION_ORDER to its Transport Order's number."
+  },
+  "input": "Draft the Notify Shipper message for the Exception ${EVALUATION_SUBJECT} on the Transport Order ${EVALUATION_ORDER}, from the template and what the Shipper sees.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_notification_template",
+      "get_shipper_view"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says what is new from the Shipper view and does not repeat an earlier notification word for word. Writes no Exception number."
+    }
+  }
+}

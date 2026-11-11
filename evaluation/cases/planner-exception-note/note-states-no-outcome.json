@@ -1,0 +1,27 @@
+{
+  "id": "note-states-no-outcome",
+  "agent": "planner-exception-note",
+  "description": "Exception note: the note never resolves the Exception or picks how it should be resolved. Known answer: the note says what is outstanding and nothing of what should be done (no re-plan, no reassignment, no redelivery).",
+  "setup": {
+    "fault": "none",
+    "seed": "Take a Shipment to a Delivery failed Tracking event with the remark \"Consignee closed\". Set EVALUATION_SUBJECT to the Exception's number."
+  },
+  "input": "Draft a short internal note on the Exception ${EVALUATION_SUBJECT}, of what has happened and what is outstanding.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_exception_timeline"
+    ],
+    "mustNotContain": [
+      "should be re-planned",
+      "should be resolved",
+      "we will redeliver"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says what has happened and what is outstanding. Does not say how the Exception should be resolved, and suggests no outcome such as re-planning, redelivery or reassignment."
+    }
+  }
+}
