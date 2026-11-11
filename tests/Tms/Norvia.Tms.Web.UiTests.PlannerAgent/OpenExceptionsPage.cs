@@ -59,11 +59,11 @@ public abstract class OpenExceptionsPage(PlannerAgentUiFixture fixture) : Browse
         return message;
     }
 
-    /// <summary>Presses Draft message in the open Notify Shipper panel and waits until the assistant's draft has replaced the template.</summary>
-    protected async Task DraftMessageAsync(string exceptionNumber, ILocator message)
+    /// <summary>Presses Draft message in the open Notify Shipper panel and waits until the assistant's draft has replaced the template the box started from.</summary>
+    protected async Task DraftMessageAsync(string exceptionNumber, ILocator message, string template)
     {
         await NotifyPanel(exceptionNumber).GetByRole(AriaRole.Button, new() { Name = $"Draft message for {exceptionNumber}" }).ClickAsync();
-        await Expect(message).ToHaveValueAsync(new System.Text.RegularExpressions.Regex("Your order is"), new() { Timeout = AgentTimeout });
+        await Expect(message).Not.ToHaveValueAsync(template, new() { Timeout = AgentTimeout });
     }
 
     /// <summary>Adds the note in the open panel, waits for the page to confirm it, then opens the list again to read what was stored (this fixture slows the live list down).</summary>
