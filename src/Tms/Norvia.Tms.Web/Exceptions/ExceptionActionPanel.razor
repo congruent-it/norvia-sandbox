@@ -6,6 +6,7 @@
 @using Norvia.Tms.Application.Exceptions.ListOpen
 @using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Domain.Exceptions
+@using Norvia.Tms.Domain.ShipperNotifications
 @using Norvia.Tms.Web.TransportOrders
 @implements IDisposable
 @inject ITransportOrderQueries Queries
@@ -38,6 +39,33 @@
             @switch (Kind)
             {
                 case ExceptionActionKind.NotifyShipper:
+                    @* The Planner notification agent can offer an adjusted wording from the template and what the Shipper sees, and nothing else
+                       (ADR 0011). The draft only replaces this box: nothing is sent until the Planner sends it, and it names the Agent run only then.
+                       Off unless Agents:Enabled, and only in the Planner role view (ADR 0040). *@
+                    @if (Agents.Value.Enabled && ForPlanner)
+                    {
+                        <div>
+                            <FluentButton Appearance="Appearance.Outline" Disabled="_drafting || _working" OnClick="DraftNotificationAsync"
+                                          aria-label="@($"Draft message for {OpenException.ExceptionNumber}")">Draft message</FluentButton>
+                        </div>
+                        @if (_drafting)
+                        {
+                            <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+                                <FluentProgressRing />
+                                <span>The assistant is drafting…</span>
+                            </FluentStack>
+                        }
+                        else if (_unavailable)
+                        {
+                            <div role="alert">
+                                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+                            </div>
+                        }
+                        else if (_draftRun is not null)
+                        {
+                            <p class="!mb-0 text-muted">This is a draft written from the template and what the Shipper sees of the order. Edit it, then send the notification yourself: nothing is sent until you do.</p>
+                        }
+                    }
                     <FluentTextArea @bind-Value="_text" Immediate="true" Label="Message to the Shipper" Rows="5" Style="width: 100%;" />
                     break;
                 case ExceptionActionKind.CancelCarrierBooking:
@@ -220,7 +248,7 @@
 
     private Task<ExceptionAnswer> ActAsync(string number) => Kind switch
     {
-        ExceptionActionKind.NotifyShipper => Commands.NotifyShipperAsync(number, _text.Trim(), _closed.Token),
+        ExceptionActionKind.NotifyShipper => Commands.NotifyShipperAsync(number, _text.Trim(), _draftRun, _closed.Token),
         ExceptionActionKind.CancelCarrierBooking => Commands.CancelCarrierBookingAsync(number, _text.Trim(), _closed.Token),
         ExceptionActionKind.AgreeDeliveryWindow => AgreeAsync(number),
         ExceptionActionKind.AddNote => Commands.AddNoteAsync(number, _text.Trim(), _draftRun, _closed.Token),
@@ -288,6 +316,41 @@
         {
             _unavailable = true;
             AgentPageLog.NoteDraftCrashed(Logger, exception, OpenException.ExceptionNumber);
+        }
+        finally
+        {
+            _drafting = false;
+        }
+    }
+
+    // Replaces the message with the assistant's draft. Sending is the Planner's own Notify Shipper, which names the run because it came from the draft.
+    private async Task DraftNotificationAsync()
+    {
+        _drafting = true;
+        _unavailable = false;
+        try
+        {
+            var result = await Requests.DraftNotificationAsync(new DraftShipperNotificationQuery(OpenException.ExceptionNumber), _closed.Token);
+            if (result.IsSuccess)
+            {
+                // A message is at most ShipperNotification.MaxMessageLength characters, so a longer draft is cut rather than refused when the Planner sends it.
+                _text = result.Value.Cause.Length > ShipperNotification.MaxMessageLength ? result.Value.Cause[..ShipperNotification.MaxMessageLength] : result.Value.Cause;
+                _draftRun = result.Value.Run;
+            }
+            else
+            {
+                _unavailable = true;
+                AgentPageLog.NotificationDraftFailed(Logger, OpenException.ExceptionNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _unavailable = true;
+            AgentPageLog.NotificationDraftCrashed(Logger, exception, OpenException.ExceptionNumber);
         }
         finally
         {

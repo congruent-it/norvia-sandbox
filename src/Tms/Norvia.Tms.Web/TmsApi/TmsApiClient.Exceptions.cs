@@ -11,8 +11,8 @@ namespace Norvia.Tms.Web.TmsApi;
 // The Planner's actions on an Exception (P7). Each starts in the TMS UI, so each answer names a Message trail of its own.
 internal sealed partial class TmsApiClient
 {
-    public Task<ExceptionAnswer> NotifyShipperAsync(string exceptionNumber, string message, CancellationToken cancellationToken) =>
-        ActAsync("Notify Shipper", exceptionNumber, "notify-shipper", new NotifyShipperBody(message, PlannerName.Demo), "Shipper notified", cancellationToken);
+    public Task<ExceptionAnswer> NotifyShipperAsync(string exceptionNumber, string message, AgentRun? actingOn, CancellationToken cancellationToken) =>
+        ActAsync("Notify Shipper", exceptionNumber, "notify-shipper", new NotifyShipperBody(message, PlannerName.Demo, actingOn?.AgentName, actingOn?.RunId), "Shipper notified", cancellationToken);
 
     public Task<ExceptionAnswer> CancelCarrierBookingAsync(string exceptionNumber, string reason, CancellationToken cancellationToken) =>
         ActAsync("Cancel Carrier booking", exceptionNumber, "cancel-carrier-booking", new CancelBody(reason), "Carrier booking cancelled", cancellationToken);
@@ -69,7 +69,7 @@ internal sealed partial class TmsApiClient
     private partial void LogExceptionRefused(string action, string exceptionNumber, string reason);
 
     // What the TMS UI asks the TMS API to do on an Exception.
-    private sealed record NotifyShipperBody(string Message, string Planner);
+    private sealed record NotifyShipperBody(string Message, string Planner, string? AgentName, string? AgentRunId);
 
     private sealed record CancelBody(string Reason);
 

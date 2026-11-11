@@ -120,6 +120,15 @@ public static class LocalTokens
     /// <summary>The app role the Planner agent holds on the TMS API's planner agent view.</summary>
     public const string PlannerAgentReadRole = "TransportOrders.PlannerAgent.Read";
 
+    /// <summary>The Planner notification agent's view audience: its own, so no other Agent's token is for it.</summary>
+    public const string PlannerNotificationAgentAudience = "api://norvia-planner-notification-agent";
+
+    /// <summary>The Planner notification agent's local identity, which stands in for its Entra agent identity. It holds only its own read role.</summary>
+    public const string PlannerNotificationAgentClientId = "norvia-local-agent-planner-notification";
+
+    /// <summary>The app role the Planner notification agent holds on the TMS API's planner notification agent view.</summary>
+    public const string PlannerNotificationAgentReadRole = "TransportOrders.PlannerNotificationAgent.Read";
+
     /// <summary>The app role the Estate health-check agent holds on the health-check API.</summary>
     public const string HealthCheckAgentReadRole = "HealthCheck.Agent.Read";
 

@@ -176,6 +176,47 @@ public sealed class LocalAgentClientTests : IDisposable
         _mcp.Authorizations.Should().BeEmpty();
     }
 
+    private static readonly AgentRequest NotificationRequest = new("planner-notification", PlannerQuestions.DraftShipperNotification("EX-0000005", "TO-0000042"), CorrelationId);
+
+    private static AgentClientOptions NotificationOptions() => SignedOptions().With(options =>
+    {
+        options.PlannerNotificationMcpAddress = new Uri("http://mcp.test/mcp/planner-notification");
+        options.PlannerNotificationTokens = new AgentTokenOptions
+        {
+            Issuer = "https://norvia.local/tokens",
+            Audience = "api://norvia-planner-notification-agent",
+            ClientId = "norvia-local-agent-planner-notification",
+            Role = "TransportOrders.PlannerNotificationAgent.Read",
+            SigningKey = Convert.ToBase64String(new byte[64].Select((_, index) => (byte)(index + 1)).ToArray()),
+        };
+    });
+
+    [Fact]
+    public async Task AskAsync_TheNotificationAgent_WithoutItsOwnServerOrTokens_IsAgentUnavailable_AndNeverUsesTheOtherAgentsToken()
+    {
+        var result = await Client(PlannerOptions()).AskAsync(NotificationRequest, TestContext.Current.CancellationToken);
+
+        result.Status.Should().Be(Ardalis.Result.ResultStatus.Unavailable);
+        result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+        _mcp.Authorizations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AskAsync_TheNotificationAgent_CallsItsOwnServer_AsItsOwnIdentity()
+    {
+        var options = Microsoft.Extensions.Options.Options.Create(NotificationOptions());
+        var http = new HttpClient(new BearerTokenHandler(options, TimeProvider.System) { InnerHandler = _mcp });
+        var client = new LocalAgentClient(http, options, new FixedRunIds("run-42"), TimeProvider.System, _activities, new FakeLogger<LocalAgentClient>(_logs));
+
+        await client.AskAsync(NotificationRequest, TestContext.Current.CancellationToken);
+
+        _mcp.Addresses.Should().OnlyContain(address => address == "http://mcp.test/mcp/planner-notification");
+        var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(_mcp.Authorizations.First()["Bearer ".Length..]);
+        token.GetClaim("azp").Value.Should().Be("norvia-local-agent-planner-notification");
+        token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal("TransportOrders.PlannerNotificationAgent.Read");
+        token.Audiences.Should().Equal("api://norvia-planner-notification-agent");
+    }
+
     [Fact]
     public async Task AskAsync_IsASpanOfTheConsole_WithTheRunId_AndTheTrailsCorrelationId()
     {

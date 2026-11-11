@@ -34,6 +34,10 @@ internal static class Embedded
 
     public static string PlannerExceptionNoteDefinition => Read("agents/planner-exception-note.agent.yaml");
 
+    public static string PlannerNotificationDefinition => Read("agents/planner-notification.agent.yaml");
+
+    public static string PlannerNotificationTools => Read("agent-mcp/planner-notification.tools.json");
+
     public static string PlannerTools => Read("agent-mcp/planner.tools.json");
 
     public static string FinanceMatchingDefinition => Read("agents/finance-matching.agent.yaml");

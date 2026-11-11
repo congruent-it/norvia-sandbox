@@ -747,6 +747,19 @@ module plannerMcp 'estate/planner-mcp.bicep' = {
   }
 }
 
+// The Planner notification agent's MCP server (two tools, the Notify Shipper template and the Shipper view) and the agent view app
+// registration of its own. Its role on the TMS agent API is the fourth role of the registration customerServiceMcp makes.
+module plannerNotificationMcp 'estate/planner-notification-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementClientId: identities.outputs.apiManagementClientId
+    tmsAgentApiAppId: customerServiceMcp.outputs.tmsAgentApiAppId
+    tmsBaseUrl: tmsBaseUrl
+  }
+}
+
 // The Carrier invoice matching agent's API Management front over the ERP API's Finance agent view, with its MCP server and the two app
 // registrations that keep it narrow (infra/smoke-test-finance-agent.ps1). Like the others, it has no outputs.
 module financeMatchingMcp 'estate/finance-matching-mcp.bicep' = {

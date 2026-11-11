@@ -127,6 +127,9 @@ public static class ExceptionEndpoints
             : RefusalProblem.Of<ExceptionRefusalCode, ShipperNotificationTemplateResult>(result, "The template can't be given.", CorrelationId.New().Value, StatusCodeOf);
     }
 
+    // The only Agent whose draft leads to a Shipper notification.
+    private static readonly string[] NotificationDraftingAgents = [DraftShipperNotificationHandler.AgentName];
+
     private static async Task<Results<Ok<NotifyShipperResult>, ProblemHttpResult, ValidationProblem>> NotifyShipperAsync(
         string exceptionNumber,
         NotifyShipperRequest request,
@@ -152,12 +155,15 @@ public static class ExceptionEndpoints
             errors[nameof(NotifyShipperRequest.Planner)] = [$"A Planner's name is at most {ShipperNotification.MaxPlannerLength} characters."];
         }
 
+        // The Agent's name and run come together or not at all, and are short: they are only for the trace.
+        ActingOnCalls.Check(errors, nameof(NotifyShipperRequest.AgentRunId), request.AgentName, request.AgentRunId, NotificationDraftingAgents);
+
         if (errors.Count > 0 || request is not { Message: { } message, Planner: { } planner })
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var command = new NotifyShipperCommand(exceptionNumber, message, planner, CorrelationId.New().Value);
+        var command = new NotifyShipperCommand(exceptionNumber, message, planner, CorrelationId.New().Value, ActingOnCalls.Of(request.AgentName, request.AgentRunId));
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)

@@ -17,4 +17,10 @@ public static class AgentRoles
     /// totals, no street address, no Consignee and no file. Held only by the Planner agent's identity (ADR 0040).
     /// </summary>
     public const string PlannerRead = "TransportOrders.PlannerAgent.Read";
+
+    /// <summary>
+    /// Read the Shipper's view of a Transport Order and the template of a Notify Shipper message, and nothing else: the Planner notification
+    /// agent's role (ADR 0011, ADR 0040). A role of its own, so its identity can call no other Agent's tool and no other identity calls its.
+    /// </summary>
+    public const string PlannerNotificationRead = "TransportOrders.PlannerNotificationAgent.Read";
 }

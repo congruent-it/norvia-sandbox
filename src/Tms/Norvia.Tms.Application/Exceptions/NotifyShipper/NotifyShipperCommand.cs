@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Mediator;
+using Norvia.Agents;
 
 namespace Norvia.Tms.Application.Exceptions.NotifyShipper;
 
@@ -8,5 +9,6 @@ namespace Norvia.Tms.Application.Exceptions.NotifyShipper;
 /// the Exception's type (P7). The TMS records a Shipper notification, Requested, and publishes ShipperNotificationRequested. The
 /// action starts in the TMS UI, so its correlation ID is the TMS's own.
 /// </summary>
-public sealed record NotifyShipperCommand(string ExceptionNumber, string Message, string Planner, string CorrelationId)
+/// <param name="ActingOn">The Agent run whose draft the message was sent from, edited or not, which the trace then names. Null when the Planner wrote it themselves.</param>
+public sealed record NotifyShipperCommand(string ExceptionNumber, string Message, string Planner, string CorrelationId, AgentRun? ActingOn = null)
     : ICommand<Result<NotifyShipperResult>>;

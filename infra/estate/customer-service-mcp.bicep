@@ -34,6 +34,11 @@ var apiRoleId = guid('norvia-tms-agent-api', environmentName, role)
 var replyRole = loadJsonContent('../../contracts/agent-mcp/customer-service-reply.tools.json').role
 var replyApiRoleId = guid('norvia-tms-agent-api', environmentName, replyRole)
 
+// The Planner notification agent's role (planner-notification-mcp.bicep) is the fourth role of the TMS agent API, for the same reason: a
+// view of its own at /v1/agent/planner-notification and a role requirement of its own there.
+var plannerNotificationRole = loadJsonContent('../../contracts/agent-mcp/planner-notification.tools.json').role
+var plannerNotificationApiRoleId = guid('norvia-tms-agent-api', environmentName, plannerNotificationRole)
+
 // The Planner agent's role (planner-mcp.bicep) is the third role of the TMS agent API, for the same reason: a view of its own at
 // /v1/agent/planner and a role requirement of its own there.
 var plannerRole = loadJsonContent('../../contracts/agent-mcp/planner.tools.json').role
@@ -115,6 +120,16 @@ resource tmsAgentApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: plannerNotificationApiRoleId
+      value: plannerNotificationRole
+      displayName: 'Read the TMS API\'s Planner notification agent view'
+      description: 'Call /v1/agent/planner-notification of the TMS API, the Notify Shipper template and the Shipper view. API Management\'s identity holds it, on behalf of the Planner notification Agent.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -138,6 +153,12 @@ resource apiManagementReadsTheReplyAgentApi 'Microsoft.Graph/appRoleAssignedTo@v
 resource apiManagementReadsThePlannerAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsAgentApiPrincipal.id
   appRoleId: plannerApiRoleId
+  principalId: apiManagementPrincipalId
+}
+
+resource apiManagementReadsThePlannerNotificationAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsAgentApiPrincipal.id
+  appRoleId: plannerNotificationApiRoleId
   principalId: apiManagementPrincipalId
 }
 

@@ -27,4 +27,7 @@ public interface IExplainRequests
 
     /// <summary>A draft internal note on an open Exception, as the Suggestion's cause. Nothing is saved: the Planner edits it and adds the note.</summary>
     Task<Result<Suggestion>> DraftNoteAsync(DraftExceptionNoteQuery query, CancellationToken cancellationToken);
+
+    /// <summary>A draft Notify Shipper message on an open Exception, as the Suggestion's cause. Nothing is sent: the Planner edits it and sends it through Notify Shipper.</summary>
+    Task<Result<Suggestion>> DraftNotificationAsync(DraftShipperNotificationQuery query, CancellationToken cancellationToken);
 }

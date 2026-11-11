@@ -92,6 +92,33 @@ public sealed class TrackShipperNotificationInLoggingScopeTests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task Notify_SentFromADraft_NamesTheAgentAndItsRun_EditedOrNot()
+    {
+        var behaviour = new TrackShipperNotificationInLoggingScope(_loggerFactory.CreateLogger<TrackShipperNotificationInLoggingScope>());
+        var requested = new NotifyShipperResult("n-1", "EX-0000005", "SH-0000012", ShipperNotificationStatus.Requested, "corr-notify");
+
+        await behaviour.Handle(Notify with { ActingOn = new Norvia.Agents.AgentRun("planner-notification", "run-9") }, (_, _) => ValueTask.FromResult<Result<NotifyShipperResult>>(requested), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Should().Contain(new Dictionary<string, object?>
+        {
+            ["agentId"] = "planner-notification",
+            ["agentRunId"] = "run-9",
+            ["outcome"] = "Succeeded",
+        });
+    }
+
+    [Fact]
+    public async Task Notify_WrittenByThePlannerThemselves_NamesNoAgent()
+    {
+        var behaviour = new TrackShipperNotificationInLoggingScope(_loggerFactory.CreateLogger<TrackShipperNotificationInLoggingScope>());
+        var requested = new NotifyShipperResult("n-1", "EX-0000005", "SH-0000012", ShipperNotificationStatus.Requested, "corr-notify");
+
+        await behaviour.Handle(Notify, (_, _) => ValueTask.FromResult<Result<NotifyShipperResult>>(requested), CancellationToken.None);
+
+        ScopeKeysOf(_logs.Collector.GetSnapshot().Should().ContainSingle().Subject).Keys.Should().NotContain(["agentId", "agentRunId"]);
+    }
+
     public void Dispose()
     {
         _loggerFactory.Dispose();

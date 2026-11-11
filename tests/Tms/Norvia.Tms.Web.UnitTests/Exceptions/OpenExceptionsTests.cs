@@ -17,7 +17,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
     {
         Queries.FindShipperNotificationTemplateAsync("EX-0000005", Arg.Any<CancellationToken>()).Returns("Your delivery of SHIP-REF-1 failed.");
 
-        Commands.NotifyShipperAsync(default!, default!, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
+        Commands.NotifyShipperAsync(default!, default!, default, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
         Commands.CancelCarrierBookingAsync(default!, default!, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
         Commands.AgreeDeliveryWindowAsync(default!, default, default, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
         Commands.AddNoteAsync(default!, default!, default, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
@@ -164,7 +164,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
         message.Input("Your delivery failed. We will call you.");
         Click(Panel(page, "Notify Shipper of EX-0000005"), "Send notification");
 
-        page.WaitForAssertion(() => Commands.Received(1).NotifyShipperAsync("EX-0000005", "Your delivery failed. We will call you.", Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Commands.Received(1).NotifyShipperAsync("EX-0000005", "Your delivery failed. We will call you.", null, Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("The Shipper is being notified of EX-0000005."));
         page.FindAll("section[aria-label^='Notify Shipper']").Should().BeEmpty();
     }
@@ -179,7 +179,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
         Click(Panel(page, "Notify Shipper of EX-0000005"), "Send notification");
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Write the message to the Shipper."));
-        Commands.DidNotReceive().NotifyShipperAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Commands.DidNotReceive().NotifyShipperAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Norvia.Agents.AgentRun?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

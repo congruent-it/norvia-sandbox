@@ -23,6 +23,9 @@ public sealed class AgentClientOptions
     /// <summary>The MCP stand-in's endpoint for the planner server, <c>/mcp/planner</c>. Empty, the Planner agent is not served.</summary>
     public Uri? PlannerMcpAddress { get; set; }
 
+    /// <summary>The MCP stand-in's endpoint for the planner-notification server, <c>/mcp/planner-notification</c>. Empty, the notification agent is not served.</summary>
+    public Uri? PlannerNotificationMcpAddress { get; set; }
+
     /// <summary>A short timeout and no retry: an Agent is never on a critical path (ADR 0040).</summary>
     [Range(1, 300)]
     public int TimeoutSeconds { get; set; } = 20;
@@ -34,6 +37,9 @@ public sealed class AgentClientOptions
 
     /// <summary>The Planner agent's own local identity: another client ID, another audience and another role than <see cref="Tokens"/>.</summary>
     public AgentTokenOptions PlannerTokens { get; set; } = new();
+
+    /// <summary>The Planner notification agent's own local identity: another client ID, another audience and another role than <see cref="PlannerTokens"/>.</summary>
+    public AgentTokenOptions PlannerNotificationTokens { get; set; } = new();
 
     public AgentModelOptions Model { get; set; } = new();
 

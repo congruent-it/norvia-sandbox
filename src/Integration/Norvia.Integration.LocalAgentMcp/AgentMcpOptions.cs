@@ -44,6 +44,12 @@ public sealed class AgentMcpOptions
     public HealthCheckServerOptions? Planner { get; set; }
 
     /// <summary>
+    /// The Planner notification agent's MCP server (<c>planner-notification</c>), served at <c>/mcp/planner-notification</c>. Its own audience
+    /// and role, so no other Agent's token opens it. Not configured, the stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? PlannerNotification { get; set; }
+
+    /// <summary>
     /// The Carrier invoice matching agent's MCP server (<c>finance-matching</c>), served at <c>/mcp/finance-matching</c>. It calls the ERP
     /// API's Finance agent view. Not configured, the stand-in does not serve it.
     /// </summary>

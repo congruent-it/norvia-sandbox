@@ -33,5 +33,7 @@
     <EmbeddedResource Include="..\..\..\agents\customer-service-reply.agent.yaml" LogicalName="customer-service-reply.agent.yaml" />
     <EmbeddedResource Include="..\..\..\contracts\agent-mcp\planner.tools.json" LogicalName="planner.tools.json" />
     <EmbeddedResource Include="..\..\..\agents\planner.agent.yaml" LogicalName="planner.agent.yaml" />
+    <EmbeddedResource Include="..\..\..\contracts\agent-mcp\planner-notification.tools.json" LogicalName="planner-notification.tools.json" />
+    <EmbeddedResource Include="..\..\..\agents\planner-notification.agent.yaml" LogicalName="planner-notification.agent.yaml" />
   </ItemGroup>
 </Project>

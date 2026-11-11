@@ -31,6 +31,9 @@ builder.Services.AddOptions<AgentMcpOptions>().BindConfiguration(AgentMcpOptions
     .Validate(
         options => options.Planner is null || (options.Planner.Api is { IsAbsoluteUri: true } && options.Planner.Tokens.IsComplete && options.Planner.ApiTokens.IsComplete),
         "AgentMcp:Planner needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
+    .Validate(
+        options => options.PlannerNotification is null || (options.PlannerNotification.Api is { IsAbsoluteUri: true } && options.PlannerNotification.Tokens.IsComplete && options.PlannerNotification.ApiTokens.IsComplete),
+        "AgentMcp:PlannerNotification needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<AgentRateLimit>();
@@ -40,6 +43,7 @@ builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("health-c
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service-reply.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("planner.tools.json")));
+builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("planner-notification.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("finance-matching.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("finance-rejection-reason.tools.json")));
 builder.Services.AddSingleton<AgentServers>();

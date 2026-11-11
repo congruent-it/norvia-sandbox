@@ -16,6 +16,7 @@ internal static class AgentModels
             : definition.Name == "customer-service" ? CustomerServiceScript.Model()
             : definition.Name == "customer-service-reply" ? CustomerServiceReplyScript.Model()
             : definition.Name == "planner" ? PlannerScript.Model()
+            : definition.Name == DraftShipperNotificationHandler.AgentName ? PlannerNotificationScript.Model()
             : definition.Name == DraftExceptionNoteHandler.AgentName ? PlannerExceptionNoteScript.Model()
             : throw new InvalidOperationException($"There is no scripted model for the Agent '{definition.Name}'.");
 }
