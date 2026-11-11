@@ -13,8 +13,7 @@ namespace Norvia.Tms.Web.UiTests.PlannerAgent;
 /// </summary>
 public abstract class WaitingForPlanningPage(PlannerAgentUiFixture fixture) : BrowserPage(fixture)
 {
-    // The assistant reads the options through the MCP stand-in and the model before it answers; the first call on a cold host takes longer than a page does.
-    protected const float AgentTimeout = 30_000;
+    protected const float AgentTimeout = PlannerAgentTimeouts.Answer;
 
     // The order weighs 910.5 kg; the margin keeps it clear of a day that is nearly full.
     private const decimal SpareKgForTheOrder = 2_000m;
