@@ -41,7 +41,7 @@
                 {
                     <div role="alert" data-testid="plan-stopped">
                         <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">
-                            @StoppedText(plan, stopped)
+                            @PlanStopText.Of(plan, stopped)
                         </FluentMessageBar>
                     </div>
                 }
@@ -97,13 +97,6 @@
     /// <summary>Raised when the Planner accepts one Suggestion: only that order, so the page can pre-select it. Nothing executes.</summary>
     [Parameter]
     public EventCallback<ListedSuggestion> OnAccepted { get; set; }
-
-    private static string StoppedText(PlannedList plan, PlanStop stop) => stop.Reason switch
-    {
-        PlanStopReason.CapReached =>
-            $"The run stopped at its cap after {plan.Suggestions.Count} order(s): {stop.OrdersLeft} order(s), from {stop.NextOrder} on, have no suggestion. Plan the list again once these are dealt with.",
-        _ => $"The assistant became unavailable after {plan.Suggestions.Count} order(s): {stop.OrdersLeft} order(s), from {stop.NextOrder} on, have no suggestion.",
-    };
 
     // A Suggestion that names no option to assign (needs a person) has nothing to accept.
     private bool CanAccept(ListedSuggestion listed) => SuggestedAssignment.From(listed.TransportOrderNumber, listed.Suggestion) is not null;

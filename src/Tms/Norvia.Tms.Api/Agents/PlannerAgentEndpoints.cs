@@ -17,6 +17,9 @@ public static class PlannerAgentEndpoints
     /// <summary>The <c>flow</c> of a call on the agent view, as the MCP stand-in names the server's.</summary>
     public const string Flow = "agent-view-planner";
 
+    /// <summary>The most orders a what-if tally may name (#445).</summary>
+    public const int MaxAssumed = 50;
+
     public static IEndpointRouteBuilder MapPlannerAgent(this IEndpointRouteBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -56,8 +59,15 @@ public static class PlannerAgentEndpoints
         ReadOptionsAsync(transportOrderNumber, null, mediator, time, cancellationToken);
 
     private static Task<Results<Ok<PlannerAgentAssignmentOptionsView>, ProblemHttpResult>> GetAssignmentOptionsAssumingAsync(
-        string transportOrderNumber, string alreadyAssumed, IMediator mediator, TimeProvider time, CancellationToken cancellationToken) =>
-        ReadOptionsAsync(transportOrderNumber, alreadyAssumed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), mediator, time, cancellationToken);
+        string transportOrderNumber, string alreadyAssumed, IMediator mediator, TimeProvider time, CancellationToken cancellationToken)
+    {
+        var assumed = alreadyAssumed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        // A plan assumes fewer orders than its cap, so a longer tally is not one the agent made.
+        return assumed.Length > MaxAssumed
+            ? Task.FromResult<Results<Ok<PlannerAgentAssignmentOptionsView>, ProblemHttpResult>>(
+                TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: $"At most {MaxAssumed} orders can be assumed."))
+            : ReadOptionsAsync(transportOrderNumber, assumed, mediator, time, cancellationToken);
+    }
 
     private static async Task<Results<Ok<PlannerAgentAssignmentOptionsView>, ProblemHttpResult>> ReadOptionsAsync(
         string transportOrderNumber, IReadOnlyList<string>? alreadyAssumed, IMediator mediator, TimeProvider time, CancellationToken cancellationToken)

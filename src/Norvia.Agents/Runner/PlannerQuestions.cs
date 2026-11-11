@@ -26,7 +26,7 @@ public static class PlannerQuestions
         }
 
         var number = question[Prefix.Length..^Suffix.Length];
-        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+        return IsKey(number) ? number : null;
     }
 
     private const string TallyMiddle = " The Transport Orders already assumed on Own fleet in this plan: ";
@@ -85,7 +85,7 @@ public static class PlannerQuestions
         }
 
         var number = question[NotePrefix.Length..^NoteSuffix.Length];
-        return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
+        return IsKey(number) ? number : null;
     }
 
     private const string NotifyPrefix = "Draft the Notify Shipper message for the Exception ";
@@ -109,7 +109,7 @@ public static class PlannerQuestions
         }
 
         var parts = question[NotifyPrefix.Length..^NotifySuffix.Length].Split(NotifyMiddle);
-        return parts.Length == 2 && parts.All(part => part.Length > 0 && part.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'))
+        return parts.Length == 2 && parts.All(IsKey)
             ? (parts[0], parts[1])
             : null;
     }
