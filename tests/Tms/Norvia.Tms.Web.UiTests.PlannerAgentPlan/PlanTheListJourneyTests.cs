@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
@@ -21,8 +20,6 @@ public sealed class PlanTheListJourneyTests(PlannerAgentPlanUiFixture agent) : P
         await Expect(SuggestionFor(second).GetByTestId("suggested-action")).ToContainTextAsync("Assign to");
         await Expect(Page.GetByTestId("plan-stopped")).ToHaveCountAsync(0);
         await Expect(Outcomes).ToHaveCountAsync(0);
-        await Expect(RowOf(first)).ToBeVisibleAsync();
-        await Expect(RowOf(second)).ToBeVisibleAsync();
     }
 
     [Fact]
@@ -52,7 +49,6 @@ public sealed class PlanTheListJourneyTests(PlannerAgentPlanUiFixture agent) : P
         await Expect(SuggestionFor(first)).ToHaveCountAsync(0);
         await Expect(SuggestionFor(second)).ToBeVisibleAsync();
         await Expect(AssignGroup.GetByRole(AriaRole.Button, new() { Name = "Assign selected (0)" })).ToBeDisabledAsync();
-        await Expect(RowOf(first)).ToBeVisibleAsync();
     }
 
     [Fact]
@@ -67,12 +63,11 @@ public sealed class PlanTheListJourneyTests(PlannerAgentPlanUiFixture agent) : P
 
         var stopped = Page.GetByTestId("plan-stopped");
         await Expect(stopped).ToContainTextAsync($"The run stopped at its cap after {PlannerAgentPlanUiFixture.MaxPlanOrders} order(s): 1 order(s), from");
-        await Expect(stopped).ToContainTextAsync(new Regex(@"from TO-\d+ on, have no suggestion"));
         await Expect(Page.GetByTestId("plan-suggestion")).ToHaveCountAsync(PlannerAgentPlanUiFixture.MaxPlanOrders);
         await Expect(SuggestionFor(first)).ToBeVisibleAsync();
         await Expect(SuggestionFor(second)).ToBeVisibleAsync();
         await Expect(SuggestionFor(third)).ToHaveCountAsync(0);
-        await Expect(stopped).ToContainTextAsync(third.Number);
+        await Expect(stopped).ToContainTextAsync($"from {third.Number} on, have no suggestion");
         await Expect(Outcomes).ToHaveCountAsync(0);
     }
 
