@@ -9,8 +9,7 @@ namespace Norvia.Tms.Web.UiTests.PlannerAgent;
 /// </summary>
 public abstract class OpenExceptionsPage(PlannerAgentUiFixture fixture) : BrowserPage(fixture)
 {
-    // The assistant reads the timeline through the MCP stand-in and the model before it answers; the first call on a cold host takes longer than a page does.
-    protected const float AgentTimeout = 30_000;
+    protected const float AgentTimeout = PlannerAgentTimeouts.Answer;
 
     protected PlannerAgentUiFixture Agent { get; } = fixture;
 
@@ -47,5 +46,13 @@ public abstract class OpenExceptionsPage(PlannerAgentUiFixture fixture) : Browse
         var note = panel.GetByRole(AriaRole.Textbox, new() { Name = "Note" });
         await Expect(note).Not.ToHaveValueAsync(string.Empty, new() { Timeout = AgentTimeout });
         return note;
+    }
+
+    /// <summary>Adds the note in the open panel, waits for the page to confirm it, then opens the list again to read what was stored (this fixture slows the live list down).</summary>
+    protected async Task AddNoteAndReopenAsync(string exceptionNumber)
+    {
+        await NotePanel(exceptionNumber).GetByRole(AriaRole.Button, new() { Name = "Add note", Exact = true }).ClickAsync();
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync(exceptionNumber);
+        await OpenListAsync(exceptionNumber);
     }
 }
