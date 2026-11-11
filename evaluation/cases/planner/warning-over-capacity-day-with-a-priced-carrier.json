@@ -1,0 +1,23 @@
+{
+  "id": "warning-over-capacity-day-with-a-priced-carrier",
+  "agent": "planner",
+  "description": "Warnings named: on the Over capacity demo day, a Carrier can price the Lane. Own fleet's warning never blocks, but a priced Carrier is preferred. Known answer: assign-carrier to the cheapest priced Carrier, PakketPunt Express (CAR-0003), with the trade-off of cost against Own fleet's Over capacity warning in the answer.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Utrecht (6 pallets, 1800 kg) in the Partner portal and leave it unassigned, collecting on the Over capacity demo day that infra/smoke-test-over-capacity-day.ps1 prints (P10). Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "assign-carrier",
+      "carrierId": "CAR-0003"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends a Carrier, quotes its cost as the result gives it and states the trade-off against Own fleet, naming its Over capacity warning."
+    }
+  }
+}

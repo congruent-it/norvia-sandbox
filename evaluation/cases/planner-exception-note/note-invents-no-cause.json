@@ -1,0 +1,27 @@
+{
+  "id": "note-invents-no-cause",
+  "agent": "planner-exception-note",
+  "description": "Exception note: a Damaged Exception whose Tracking event carries no remark, so the timeline gives no cause. Known answer: the note says the timeline gives no cause (or says nothing of one) and states no cause, time, place or name that the result does not give.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take a Shipment to a Damaged Tracking event with no remark. Set EVALUATION_SUBJECT to the Exception's number."
+  },
+  "input": "Draft a short internal note on the Exception ${EVALUATION_SUBJECT}, of what has happened and what is outstanding.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_exception_timeline"
+    ],
+    "mustNotContain": [
+      "because",
+      "caused by",
+      "due to"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Says that damage was reported and does not say how or why it happened, who is at fault, or when or where, unless the timeline gives it."
+    }
+  }
+}

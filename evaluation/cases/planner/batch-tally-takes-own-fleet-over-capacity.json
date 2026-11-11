@@ -1,0 +1,26 @@
+{
+  "id": "batch-tally-takes-own-fleet-over-capacity",
+  "agent": "planner",
+  "description": "Batch: a plan of the day's list. The order fits Own fleet alone, but the orders already assumed on Own fleet fill the day, so Own fleet is Over capacity for it. The agent must read with the tally and not add anything up itself. Known answer: assign-carrier to the cheapest priced Carrier, PakketPunt Express (CAR-0003), and the answer names Own fleet's Over capacity warning; get_assignment_options_assuming is called, get_assignment_options is not.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Utrecht (6 pallets, 1800 kg) in the Partner portal and leave it unassigned, collecting on a weekday the Capacity view shows open with room for it alone. Book two more Own fleet candidates for that day that, together with it, are more than the day's capacity. Set EVALUATION_SUBJECT to the Transport Order's number. Set EVALUATION_ASSUMED to the numbers of two further Own fleet candidates for the same day, separated by a comma and a space, such as TO-0000043, TO-0000044, so the tally takes Own fleet over the day's capacity."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options. The Transport Orders already assumed on Own fleet in this plan: ${EVALUATION_ASSUMED}.",
+  "expect": {
+    "fields": {
+      "action": "assign-carrier",
+      "carrierId": "CAR-0003"
+    },
+    "toolsCalled": [
+      "get_assignment_options_assuming"
+    ],
+    "toolsNotCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends a Carrier because the tally puts Own fleet Over capacity, and names that warning with the load figures from the result. Does not claim Own fleet fits."
+    }
+  }
+}

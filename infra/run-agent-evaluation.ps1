@@ -17,7 +17,9 @@
     Needs: FOUNDRY_PROJECT_ENDPOINT (or the azd environment), and the signed-in `az` user holding Foundry User on the project.
     A case whose input holds ${EVALUATION_CORRELATION_ID} needs that variable: the correlation ID of the trail its setup seeds.
     A case whose input holds ${EVALUATION_SUBJECT} needs that variable: the ID of the Rejected booking, or the number of the Transport
-    Order, its setup seeds.
+    Order, its setup seeds. ${EVALUATION_ORDER} (the Planner notification agent) is the number of the Transport Order of that Exception,
+    and ${EVALUATION_ASSUMED} (a plan of the waiting list) is the numbers of the Transport Orders already assumed on Own fleet,
+    separated by a comma and a space.
     The explanation check is graded by the estate's own model deployment (EVALUATION_JUDGE_MODEL, else the account's first one).
     It prints names, scores and the answers' checked fields; never a token. Exit code 0 even when cases fail; non-zero only when
     the harness itself cannot run.
@@ -83,17 +85,19 @@ if (@($cases | Group-Object Id | Where-Object Count -GT 1).Count -gt 0) { Write-
 if ($Case -and $cases.Id -cnotcontains $Case) { Write-Abort "no case $Case for $Agent" }
 $selected = @($cases | Where-Object { -not $Case -or $_.Id -ceq $Case })
 
-if (-not $env:EVALUATION_CORRELATION_ID) {
-    foreach ($item in $selected) {
-        if ($item.Data.input.Contains('${EVALUATION_CORRELATION_ID}')) {
-            Write-Abort "$($item.Id) asks about a seeded Message trail: set EVALUATION_CORRELATION_ID to its correlation ID (and run it with -Case)"
-        }
-    }
+# The placeholders an input may hold, each filled from the environment: what it is, so a missing one is named.
+$placeholders = [ordered]@{
+    EVALUATION_CORRELATION_ID = 'the correlation ID of the seeded Message trail'
+    EVALUATION_SUBJECT        = 'the ID of the Rejected booking, or the number of the Transport Order or Exception, its setup seeds'
+    EVALUATION_ORDER          = "the number of the Transport Order of the seeded Exception"
+    EVALUATION_ASSUMED        = 'the numbers of the Transport Orders already assumed on Own fleet, separated by a comma and a space'
 }
-if (-not $env:EVALUATION_SUBJECT) {
-    foreach ($item in $selected) {
-        if ($item.Data.input.Contains('${EVALUATION_SUBJECT}')) {
-            Write-Abort "$($item.Id) asks about a seeded record: set EVALUATION_SUBJECT to the ID of the Rejected booking or the number of the Transport Order its setup seeds (and run it with -Case)"
+foreach ($name in $placeholders.Keys) {
+    if (-not [Environment]::GetEnvironmentVariable($name)) {
+        foreach ($item in $selected) {
+            if ($item.Data.input.Contains('${' + $name + '}')) {
+                Write-Abort "$($item.Id) asks about a seeded record: set $name to $($placeholders[$name]) (and run it with -Case)"
+            }
         }
     }
 }
@@ -149,7 +153,8 @@ function Get-Grade($CaseData, [string] $Explanation) {
 function Invoke-Run($Item) {
     $correlationId = [string] $env:EVALUATION_CORRELATION_ID
     # ${EVALUATION_CORRELATION_ID} in an input is the correlation ID of the seeded Message trail, which only exists once the fault ran.
-    $question = $Item.Data.input.Replace('${EVALUATION_CORRELATION_ID}', $correlationId).Replace('${EVALUATION_SUBJECT}', [string] $env:EVALUATION_SUBJECT)
+    $question = $Item.Data.input
+    foreach ($name in $placeholders.Keys) { $question = $question.Replace('${' + $name + '}', [string] [Environment]::GetEnvironmentVariable($name)) }
     $reply = Send-Response @{ agent_reference = @{ type = 'agent_reference'; name = $Agent }; input = $question; store = $false }
     if ($null -eq $reply) {
         return [pscustomobject]@{

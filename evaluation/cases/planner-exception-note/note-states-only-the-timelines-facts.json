@@ -1,0 +1,22 @@
+{
+  "id": "note-states-only-the-timelines-facts",
+  "agent": "planner-exception-note",
+  "description": "Exception note: an open Collection failed Exception with a Collection failed Tracking event from the Carrier and no action taken yet. Known answer: a note of two to five sentences saying what happened in order and that the Shipper has not been notified; the Exception stays open.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take a Shipment to a Collection failed Tracking event (Carrier remark \"Nobody at the site\"), which opens the Exception. Do not notify the Shipper. Set EVALUATION_SUBJECT to the Exception's number."
+  },
+  "input": "Draft a short internal note on the Exception ${EVALUATION_SUBJECT}, of what has happened and what is outstanding.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_exception_timeline"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "A note of two to five plain sentences. Says what happened from the timeline in order, quotes the remark as a quotation, says the Shipper has not been notified and that the Exception stays open. States no outcome."
+    }
+  }
+}

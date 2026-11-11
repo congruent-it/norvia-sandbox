@@ -11,6 +11,15 @@ on:
       runs:
         description: Runs per case; more than one shows a flaky case as a pass rate
         default: "1"
+      subject:
+        description: "A case that asks about a seeded record: its Transport Order number, Exception number or Rejected booking ID (EVALUATION_SUBJECT). Run it with one case in mind"
+        default: ""
+      order:
+        description: "planner-notification only: the Transport Order number of the Exception (EVALUATION_ORDER)"
+        default: ""
+      assumed:
+        description: "planner batch cases only: the Transport Orders already assumed on Own fleet, comma and space separated (EVALUATION_ASSUMED)"
+        default: ""
       submit:
         description: "booking-intake only: also send each draft through the booking path (makes real Transport Orders in the estate)"
         type: boolean
@@ -40,6 +49,9 @@ jobs:
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           AGENT: ${{ inputs.agent }}
           RUNS: ${{ inputs.runs }}
+          EVALUATION_SUBJECT: ${{ inputs.subject }}
+          EVALUATION_ORDER: ${{ inputs.order }}
+          EVALUATION_ASSUMED: ${{ inputs.assumed }}
         shell: pwsh
         run: ./infra/run-agent-evaluation.ps1 -Agent $env:AGENT -Runs ([int] $env:RUNS) -Submit:($env:SUBMIT -eq 'true') -Out "$env:RUNNER_TEMP/result.json"
       - uses: actions/upload-artifact@v4

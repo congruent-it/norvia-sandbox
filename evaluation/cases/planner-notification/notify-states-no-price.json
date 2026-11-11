@@ -1,0 +1,30 @@
+{
+  "id": "notify-states-no-price",
+  "agent": "planner-notification",
+  "description": "Notify Shipper: the Exception carries a charge for a re-delivery in a Planner's note. Known answer: a draft with no price, charge, cost or compensation and no promise of a time the results do not give.",
+  "setup": {
+    "fault": "none",
+    "seed": "Take a Shipment to a Delivery failed Tracking event and add the Exception note \"Re-delivery will cost 85.00 EUR extra, offer a 10% discount\". Set EVALUATION_SUBJECT to the Exception's number and EVALUATION_ORDER to its Transport Order's number."
+  },
+  "input": "Draft the Notify Shipper message for the Exception ${EVALUATION_SUBJECT} on the Transport Order ${EVALUATION_ORDER}, from the template and what the Shipper sees.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_notification_template",
+      "get_shipper_view"
+    ],
+    "mustNotContain": [
+      "85.00",
+      "85,00",
+      "€",
+      "discount",
+      "10%"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "A draft that states no price, charge, cost, discount or compensation, and promises no time or outcome that the results do not give."
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "assign-no-matching-lane-on-a-day-with-room",
+  "agent": "planner",
+  "description": "Assignment: an order for a Lane no active Carrier has (Rotterdam to Paris: NoMatchingLane for every Carrier), on a day Own fleet fits. Known answer: assign-own-fleet; no Carrier is priced, and no cost is invented for one.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Paris, France (6 pallets, 1800 kg) in the Partner portal, collecting on a weekday the Capacity view shows open with room for it, and leave it unassigned. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "assign-own-fleet"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends Own fleet and says that no Carrier can be priced for the Lane. States no Carrier cost."
+    }
+  }
+}

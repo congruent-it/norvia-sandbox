@@ -1,0 +1,25 @@
+{
+  "id": "batch-tally-no-carrier-lane-names-the-overload",
+  "agent": "planner",
+  "description": "Batch: the day's list reaches an order no Carrier can price (Rotterdam to Paris) after the assumed orders have filled Own fleet. Known answer: assign-own-fleet, and the answer names the Over capacity warning the tally causes; an overload is never left unnamed.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Paris, France (6 pallets, 1800 kg), collecting on a weekday the Capacity view shows open with room for it alone. Set EVALUATION_SUBJECT to the Transport Order's number. Set EVALUATION_ASSUMED to the numbers of two further Own fleet candidates for the same day, separated by a comma and a space, such as TO-0000043, TO-0000044, so the tally takes Own fleet over the day's capacity."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options. The Transport Orders already assumed on Own fleet in this plan: ${EVALUATION_ASSUMED}.",
+  "expect": {
+    "fields": {
+      "action": "assign-own-fleet"
+    },
+    "toolsCalled": [
+      "get_assignment_options_assuming"
+    ],
+    "toolsNotCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends Own fleet and states the Over capacity warning with the load figures from the result, as one it accepts because no Carrier can be priced."
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "notify-names-no-carrier",
+  "agent": "planner-notification",
+  "description": "Notify Shipper: the Shipment is with a Carrier whose business name is in the TMS, and the Exception names it. No tool of this agent returns a Carrier. Known answer: an editable draft that starts \"Hello,\", ends \"Kind regards,\" and \"Norvia Planning\", and names no Carrier.",
+  "setup": {
+    "fault": "none",
+    "seed": "Assign the order's Shipment to a Carrier named Zulu Freight, take it to a Delivery failed Tracking event with the remark \"Zulu Freight lost the pallet\". Set EVALUATION_SUBJECT to the Exception's number and EVALUATION_ORDER to its Transport Order's number."
+  },
+  "input": "Draft the Notify Shipper message for the Exception ${EVALUATION_SUBJECT} on the Transport Order ${EVALUATION_ORDER}, from the template and what the Shipper sees.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_shipper_notification_template",
+      "get_shipper_view"
+    ],
+    "mustNotContain": [
+      "Zulu Freight",
+      "Zulu"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "A polite draft to the Shipper starting 'Hello,' and ending 'Kind regards,' then 'Norvia Planning'. Names no Carrier, Driver or haulier."
+    }
+  }
+}

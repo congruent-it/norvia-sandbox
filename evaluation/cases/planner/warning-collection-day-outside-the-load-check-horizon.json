@@ -1,0 +1,22 @@
+{
+  "id": "warning-collection-day-outside-the-load-check-horizon",
+  "agent": "planner",
+  "description": "Warnings named: the collection day is further out than the load check looks, so Own fleet has no load check (OutsideHorizon), and no Carrier prices the Lane. Known answer: assign-own-fleet, naming that there is no load check for the day.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Paris, France (6 pallets, 1800 kg) collecting well beyond the Capacity view's horizon, and leave it unassigned. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "assign-own-fleet"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Recommends Own fleet and says there is no load check for the collection day, as a warning it accepts."
+    }
+  }
+}

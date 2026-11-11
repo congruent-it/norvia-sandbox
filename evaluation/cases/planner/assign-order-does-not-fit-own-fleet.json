@@ -1,0 +1,23 @@
+{
+  "id": "assign-order-does-not-fit-own-fleet",
+  "agent": "planner",
+  "description": "Assignment: an order whose collection day is not open for Own fleet (a Sunday: DayNotOpen), so Own fleet has nobody to drive it. Known answer: assign-carrier to the cheapest priced active Carrier, PakketPunt Express (CAR-0003, about 23% below the Shipper's Rate Card on the Lane against 20% and 16% for the others). Check the cost of each Carrier in the tool call if the seed's Carrier Rate Cards have changed.",
+  "setup": {
+    "fault": "none",
+    "seed": "Book a Transport Order as Brouwer Dranken from Rotterdam to Utrecht (6 pallets, 1800 kg) in the Partner portal and leave it unassigned, collecting on a Sunday. Set EVALUATION_SUBJECT to the Transport Order's number."
+  },
+  "input": "Suggest who should carry the Transport Order ${EVALUATION_SUBJECT}, with the reasoning and the trade-off against the other options.",
+  "expect": {
+    "fields": {
+      "action": "assign-carrier",
+      "carrierId": "CAR-0003"
+    },
+    "toolsCalled": [
+      "get_assignment_options"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Does not recommend Own fleet. Recommends the cheapest priced Carrier, quotes its cost as the result gives it and compares it with the other Carriers' costs."
+    }
+  }
+}
