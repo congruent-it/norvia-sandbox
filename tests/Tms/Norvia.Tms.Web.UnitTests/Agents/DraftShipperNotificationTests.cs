@@ -102,6 +102,7 @@ public sealed class DraftShipperNotificationTests : TmsWebContext
         DraftButton(page).Click();
 
         page.WaitForAssertion(() => page.Find($"{Section} fluent-text-area").GetAttribute("value")!.Length.Should().Be(Norvia.Tms.Domain.ShipperNotifications.ShipperNotification.MaxMessageLength));
+        page.Find(Section).TextContent.Should().Contain("has been shortened");
     }
 
     [Fact]

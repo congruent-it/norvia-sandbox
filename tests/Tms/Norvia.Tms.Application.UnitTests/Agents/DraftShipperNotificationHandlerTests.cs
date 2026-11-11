@@ -4,7 +4,9 @@ using Norvia.Agents;
 using Norvia.Agents.Runner;
 using Norvia.Tms.Application.Agents;
 using Norvia.Tms.Application.Agents.Planner;
+using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
@@ -16,7 +18,14 @@ public sealed class DraftShipperNotificationHandlerTests
     private readonly IReadRepository<ExceptionCase> _repository = Substitute.For<IReadRepository<ExceptionCase>>();
     private readonly IAgentClient _agent = Substitute.For<IAgentClient>();
 
-    private DraftShipperNotificationHandler Handler => new(_repository, _agent);
+    private readonly ICarrierDirectory _carriers = Substitute.For<ICarrierDirectory>();
+
+    public DraftShipperNotificationHandlerTests()
+    {
+        _carriers.ListActive().Returns([new Carrier(new CarrierId("CAR-0001"), "Van Dijk Transport", true)]);
+    }
+
+    private DraftShipperNotificationHandler Handler => new(_repository, _agent, _carriers);
 
     [Fact]
     public async Task Handle_AnOpenException_AsksTheNotificationAgent_ForItsExceptionAndOrder_OnTheExceptionsOwnTrail()
@@ -72,5 +81,35 @@ public sealed class DraftShipperNotificationHandlerTests
         var result = await Handler.Handle(new DraftShipperNotificationQuery("EX-0000005"), CancellationToken.None);
 
         result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+    }
+
+    [Theory]
+    [InlineData("Hello, Van Dijk Transport could not deliver.")]
+    [InlineData("Hello, van dijk transport could not deliver.")]
+    [InlineData("Hello, about EX-0000005: delivery failed.")]
+    [InlineData("Hello, we will refund €50.")]
+    [InlineData("Hello, a credit of 50 euros follows.")]
+    [InlineData("Hello, the fee is USD 20.")]
+    public async Task Handle_ADraftThatNamesACarrierTheExceptionOrAPrice_NeverReachesThePlanner(string draft)
+    {
+        _repository.FirstOrDefaultAsync(Arg.Any<ExceptionByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(Exceptions.OpenExceptions.DeliveryFailed());
+        _agent.AskAsync(Arg.Any<AgentRequest>(), Arg.Any<CancellationToken>()).Returns(new Suggestion(draft, [], "Edit it.", Confidence.Medium));
+
+        var result = await Handler.Handle(new DraftShipperNotificationQuery("EX-0000005"), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Unavailable);
+        result.Errors.Should().Equal(AgentFailureCodes.DraftNotAllowed);
+    }
+
+    [Fact]
+    public async Task Handle_ACleanDraft_PassesThrough()
+    {
+        _repository.FirstOrDefaultAsync(Arg.Any<ExceptionByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(Exceptions.OpenExceptions.DeliveryFailed());
+        var suggestion = new Suggestion("Hello, your order is in transit. We have no update on a new delivery time yet.", [], "Edit it.", Confidence.Medium);
+        _agent.AskAsync(Arg.Any<AgentRequest>(), Arg.Any<CancellationToken>()).Returns(suggestion);
+
+        var result = await Handler.Handle(new DraftShipperNotificationQuery("EX-0000005"), CancellationToken.None);
+
+        result.Value.Should().Be(suggestion);
     }
 }

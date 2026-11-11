@@ -63,7 +63,7 @@
                         }
                         else if (_draftRun is not null)
                         {
-                            <p class="!mb-0 text-muted">This is a draft written from the template and what the Shipper sees of the order. Edit it, then send the notification yourself: nothing is sent until you do.</p>
+                            <p class="!mb-0 text-muted">This is a draft written from the template and what the Shipper sees of the order. Edit it, then send the notification yourself: nothing is sent until you do.@(_draftCut ? " The draft was too long for a notification and has been shortened: check how it ends." : string.Empty)</p>
                         }
                     }
                     <FluentTextArea @bind-Value="_text" Immediate="true" Label="Message to the Shipper" Rows="5" Style="width: 100%;" />
@@ -136,6 +136,7 @@
     private bool _working;
     private bool _drafting;
     private bool _unavailable;
+    private bool _draftCut;
     private AgentRun? _draftRun;
 
     [Parameter, EditorRequired]
@@ -334,7 +335,8 @@
             if (result.IsSuccess)
             {
                 // A message is at most ShipperNotification.MaxMessageLength characters, so a longer draft is cut rather than refused when the Planner sends it.
-                _text = result.Value.Cause.Length > ShipperNotification.MaxMessageLength ? result.Value.Cause[..ShipperNotification.MaxMessageLength] : result.Value.Cause;
+                _draftCut = result.Value.Cause.Length > ShipperNotification.MaxMessageLength;
+                _text = _draftCut ? result.Value.Cause[..ShipperNotification.MaxMessageLength] : result.Value.Cause;
                 _draftRun = result.Value.Run;
             }
             else
