@@ -11,6 +11,9 @@ namespace Norvia.Tms.Web.UiTests.PlannerAgentPlan;
 /// </summary>
 public sealed class PlannerAgentPlanUiFixture : TmsUiFixture
 {
+    /// <summary>The cap on one run. The journeys submit this many orders for a run that fits and one more for a run over its cap.</summary>
+    public const int MaxPlanOrders = 2;
+
     private const string McpStandIn = "agent-mcp";
 
     protected override string[] AppHostArguments => ["Agents:Enabled=true"];
@@ -20,7 +23,7 @@ public sealed class PlannerAgentPlanUiFixture : TmsUiFixture
         builder.RemoveWhatTheCustomerServiceAgentUiTestsDontUse();
         builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "tms-web"))
             .WithEnvironment("LiveList__RefreshInterval", "00:00:45")
-            .WithEnvironment("Agents__MaxPlanOrders", "2");
+            .WithEnvironment("Agents__MaxPlanOrders", MaxPlanOrders.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     public override async ValueTask InitializeAsync()

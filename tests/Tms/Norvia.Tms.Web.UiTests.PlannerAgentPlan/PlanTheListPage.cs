@@ -12,6 +12,7 @@ namespace Norvia.Tms.Web.UiTests.PlannerAgentPlan;
 /// </summary>
 public abstract class PlanTheListPage(PlannerAgentPlanUiFixture fixture) : BrowserPage(fixture), IAsyncLifetime
 {
+    /// <summary>A run asks the assistant once per order of the list (two at most here); the first call on a cold host takes longer than a page does.</summary>
     protected const float PlanTimeout = 120_000;
 
     private readonly List<string> _submitted = [];
@@ -52,22 +53,39 @@ public abstract class PlanTheListPage(PlannerAgentPlanUiFixture fixture) : Brows
     // The base class's lifetime is not virtual, so the page names the interface again and wraps it.
     public new ValueTask InitializeAsync() => base.InitializeAsync();
 
-    /// <summary>Plans every order the test submitted to Own fleet, as another Planner would, so none is left waiting for the next test.</summary>
+    /// <summary>
+    /// Plans every order the test submitted to Own fleet, as another Planner would, so none is left waiting for the next test: this project's tests share one AppHost and a cap on the run, so a
+    /// leftover order would change what the next run covers. A refused assignment is reported after the rest are tried and the browser is closed, so it never hides the test's own failure.
+    /// </summary>
     public new async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
-        foreach (var number in _submitted)
+        var failures = new List<string>();
+        try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{number}/assign", UriKind.Relative))
+            foreach (var number in _submitted)
             {
-                Content = JsonContent.Create(new JsonObject { ["assignedTo"] = "OwnFleet" }),
-            };
-            request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
-            using var response = await fixture.Manage.SendAsync(request, CancellationToken.None);
-            response.EnsureSuccessStatusCode();
+                using var request = new HttpRequestMessage(HttpMethod.Post, new Uri($"/v1/transport-orders/{number}/assign", UriKind.Relative))
+                {
+                    Content = JsonContent.Create(new JsonObject { ["assignedTo"] = "OwnFleet" }),
+                };
+                request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
+                using var response = await fixture.Manage.SendAsync(request, CancellationToken.None);
+                if (!response.IsSuccessStatusCode)
+                {
+                    failures.Add($"{number}: {(int)response.StatusCode}");
+                }
+            }
+        }
+        finally
+        {
+            await base.DisposeAsync();
         }
 
-        await base.DisposeAsync();
+        if (failures.Count > 0 && TestContext.Current.TestState?.Result != TestResult.Failed)
+        {
+            throw new InvalidOperationException($"Could not take the test's orders off the waiting list ({string.Join(", ", failures)}); the next test would plan them too.");
+        }
     }
 
     protected sealed record Order(string Reference, string Number);

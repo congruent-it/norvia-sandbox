@@ -19,7 +19,7 @@
     <Using Include="Norvia.Tms.TestSupport" />
   </ItemGroup>
   <ItemGroup>
-    <!-- One AppHost for the whole run, with Plan the list capped at two orders. -->
+    <!-- One AppHost for the whole run, and the tests run one at a time: each assigns its orders away when done, so the next finds the waiting list empty. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

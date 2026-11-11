@@ -66,9 +66,9 @@ public sealed class PlanTheListJourneyTests(PlannerAgentPlanUiFixture agent) : P
         await PlanTheListAsync();
 
         var stopped = Page.GetByTestId("plan-stopped");
-        await Expect(stopped).ToContainTextAsync("The run stopped at its cap after 2 order(s): 1 order(s), from");
+        await Expect(stopped).ToContainTextAsync($"The run stopped at its cap after {PlannerAgentPlanUiFixture.MaxPlanOrders} order(s): 1 order(s), from");
         await Expect(stopped).ToContainTextAsync(new Regex(@"from TO-\d+ on, have no suggestion"));
-        await Expect(Page.GetByTestId("plan-suggestion")).ToHaveCountAsync(2);
+        await Expect(Page.GetByTestId("plan-suggestion")).ToHaveCountAsync(PlannerAgentPlanUiFixture.MaxPlanOrders);
         await Expect(SuggestionFor(first)).ToBeVisibleAsync();
         await Expect(SuggestionFor(second)).ToBeVisibleAsync();
         await Expect(SuggestionFor(third)).ToHaveCountAsync(0);
