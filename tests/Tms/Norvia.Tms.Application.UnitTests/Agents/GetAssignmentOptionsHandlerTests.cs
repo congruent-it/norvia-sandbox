@@ -221,10 +221,42 @@ public sealed class GetAssignmentOptionsHandlerTests
         result.Status.Should().Be(ResultStatus.NotFound);
     }
 
-    private async Task<Result<AssignmentOptions>> HandleAsync(TransportOrder order, IReadOnlyList<Carrier>? activeCarriers = null)
+    // The what-if tally (#445): orders suggested to Own fleet earlier in a run count against the day, though nothing is assigned.
+    [Fact]
+    public async Task Handle_OrdersAlreadyAssumedOnOwnFleetTheSameDay_CountAgainstTheDay_SoTheNextOneIsOverCapacity()
+    {
+        var first = Build(Friday, 8, withoutWindow: false, new GoodsLine("pallet", 20, 2000m, null));
+        var second = Build(Friday, 9, withoutWindow: false, new GoodsLine("pallet", 20, 2000m, null));
+        _orders.Add(first);
+
+        var alone = (await HandleAsync(second)).Value.OwnFleet;
+        var withTally = (await HandleAsync(second, alreadyAssumed: ["TO-0000008"])).Value.OwnFleet;
+
+        alone.Fit.Should().Be(OwnFleetFit.Fits);
+        withTally.Fit.Should().Be(OwnFleetFit.OverCapacity);
+        withTally.Warning!.Text.Should().Be("Fri 25 Sep: Over capacity, 40 of 30 pallet places after this assignment");
+        withTally.Load.Should().Be(new Norvia.Tms.Application.Fleet.Planning.DayLoadView(30000, 30, 4000m, 40, Over: true));
+    }
+
+    [Fact]
+    public async Task Handle_AnAssumedOrderOnAnotherDay_TheOrderItself_OrAnOrderNotWaitingForPlanning_CountsForNothing()
+    {
+        var otherDay = Build(Friday.AddDays(1), 8, withoutWindow: false, new GoodsLine("pallet", 20, 2000m, null));
+        var planned = Build(Friday, 10, withoutWindow: false, new GoodsLine("pallet", 20, 2000m, null));
+        Samples.Planned(planned, CarriedBy.OwnFleet, sequence: 5);
+        var order = Build(Friday, 9, withoutWindow: false, new GoodsLine("pallet", 20, 2000m, null));
+        _orders.AddRange([otherDay, planned]);
+
+        var own = (await HandleAsync(order, alreadyAssumed: ["TO-0000008", "TO-0000009", "TO-0000010", "TO-0000099", "not-a-number"])).Value.OwnFleet;
+
+        own.Fit.Should().Be(OwnFleetFit.Fits);
+        own.Load!.DemandPalletPlaces.Should().Be(20);
+    }
+
+    private async Task<Result<AssignmentOptions>> HandleAsync(TransportOrder order, IReadOnlyList<Carrier>? activeCarriers = null, IReadOnlyList<string>? alreadyAssumed = null)
     {
         _orders.Add(order);
-        return await Handler(activeCarriers).Handle(new GetAssignmentOptionsQuery(order.Number!.Value), CancellationToken.None);
+        return await Handler(activeCarriers).Handle(new GetAssignmentOptionsQuery(order.Number!.Value, alreadyAssumed), CancellationToken.None);
     }
 
     private GetAssignmentOptionsHandler Handler(IReadOnlyList<Carrier>? activeCarriers = null)

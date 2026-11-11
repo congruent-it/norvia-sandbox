@@ -9,4 +9,7 @@ public sealed class AgentsOptions
     public const string SectionName = "Agents";
 
     public bool Enabled { get; set; }
+
+    /// <summary>The most orders one "Plan the list" run works through (#445); one tool call each, so it caps the run's tool calls too. The rest are left for the next run.</summary>
+    public int MaxPlanOrders { get; set; } = 10;
 }

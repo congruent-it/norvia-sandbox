@@ -48,7 +48,7 @@ public sealed class PlannerServerTests : IAsyncLifetime
         using var response = await Post(client, Rpc("tools/list"));
 
         var tools = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["result"]!["tools"]!.AsArray();
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_assignment_options", "get_exception_timeline");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_assignment_options", "get_assignment_options_assuming", "get_exception_timeline");
     }
 
     [Fact]
@@ -66,6 +66,34 @@ public sealed class PlannerServerTests : IAsyncLifetime
         call.Headers.GetValues("X-Tool-Name").Should().Equal("get_assignment_options");
         var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(call.Headers.Authorization!.Parameter);
         token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal(LocalAgentMcpFactory.PlannerRole);
+    }
+
+    [Fact]
+    public async Task ToolCall_WithTheWhatIfTally_CallsTheAssumingRoute_WithTheOrdersCommaSeparated()
+    {
+        using var client = _factory.AgentClient(_factory.PlannerToken());
+        var call = Call("get_assignment_options_assuming");
+        call["arguments"]!["alreadyAssumed"] = "TO-0000040,TO-0000041";
+
+        using var response = await Post(client, Rpc("tools/call", call));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        _factory.Console.Calls.Should().ContainSingle().Subject.RequestUri!.ToString()
+            .Should().Be("http://tms-api/v1/agent/planner/transport-orders/TO-0000042/assignment-options/assuming/TO-0000040%2CTO-0000041");
+    }
+
+    [Theory]
+    [InlineData("TO-1;drop")]
+    [InlineData("TO-1,,TO-2/../x")]
+    public async Task ToolCall_WithAnythingButOrderNumbersInTheTally_IsRefused(string tally)
+    {
+        using var client = _factory.AgentClient(_factory.PlannerToken());
+        var call = Call("get_assignment_options_assuming");
+        call["arguments"]!["alreadyAssumed"] = tally;
+
+        using var response = await Post(client, Rpc("tools/call", call));
+
+        _factory.Console.Calls.Should().BeEmpty();
     }
 
     [Fact]

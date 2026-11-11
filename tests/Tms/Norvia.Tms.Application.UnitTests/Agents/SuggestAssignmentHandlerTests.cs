@@ -29,6 +29,18 @@ public sealed class SuggestAssignmentHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WithATally_AsksTheQuestionThatNamesTheOrdersAlreadyAssumed()
+    {
+        _repository.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(Samples.AcceptedOrder(sequence: 42, correlationId: "corr-7"));
+        _agent.AskAsync(Arg.Any<AgentRequest>(), Arg.Any<CancellationToken>()).Returns(new Suggestion("c", [], "a", Confidence.High));
+
+        await new SuggestAssignmentHandler(_repository, _agent).Handle(new SuggestAssignmentQuery("TO-0000042", ["TO-0000040"]), CancellationToken.None);
+
+        await _agent.Received(1).AskAsync(
+            new AgentRequest("planner", PlannerQuestions.SuggestAssignment("TO-0000042", ["TO-0000040"]), "corr-7"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Handle_AnUnavailableAgent_ReturnsItsFailureCode()
     {
         _repository.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns(Samples.AcceptedOrder(sequence: 42));

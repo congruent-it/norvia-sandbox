@@ -4,6 +4,7 @@
 @using Norvia.Tms.Application.Shipments
 @using Norvia.Agents
 @using Norvia.Tms.Web.Agents
+@using Norvia.Tms.Application.Agents.Planner
 @using Norvia.Tms.Application.TransportOrders.ToPlan
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
@@ -81,6 +82,10 @@
                 <span>Loading the Carriers…</span>
             </FluentStack>
         }
+    </div>
+
+    <div class="mb-4">
+        <PlanTheList ForPlanner="RoleKey == NorviaRole.Planner.Key" Stale="_stale" OnAccepted="AcceptPlanned" />
     </div>
 
     @* The earliest collection first, as the query gives them: what is collected first is planned first. *@
@@ -172,6 +177,14 @@
         _suggested[number] = suggested;
         _assignee = suggested.CarrierId ?? OwnFleetOption;
         _selected.Add(number);
+    }
+
+    // Accepting one Suggestion of the plan selects that order alone, with who it suggests: the others stay as they were, unaccepted. Nothing is
+    // assigned until the Planner presses Assign.
+    private void AcceptPlanned(ListedSuggestion listed)
+    {
+        _selected.Clear();
+        Preselect(listed.TransportOrderNumber, listed.Suggestion);
     }
 
     private void Select(string number, bool selected)

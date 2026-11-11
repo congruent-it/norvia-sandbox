@@ -45,10 +45,18 @@ public sealed partial class LoadCheckWarnings(
     /// assigned to Own fleet now (P10). Null when the order has no collection day, or the day is within the horizon but not open.
     /// Unlike <see cref="ForAsync"/>, a failure to work it out is not swallowed: nothing is saved that it could be late for.
     /// </summary>
-    public async Task<LoadCheckWarning?> IfAssignedAsync(TransportOrder order, CancellationToken cancellationToken)
+    public async Task<LoadCheckWarning?> IfAssignedAsync(TransportOrder order, CancellationToken cancellationToken) =>
+        await IfAssignedAsync(order, [], cancellationToken);
+
+    /// <summary>
+    /// As above, with <paramref name="alsoAssumed"/> counted too: Transport Orders a plan assumes are on Own fleet already, though none is
+    /// assigned (the what-if tally, #445). An assumed order that collects on another day adds nothing to this order's day.
+    /// </summary>
+    public async Task<LoadCheckWarning?> IfAssignedAsync(TransportOrder order, IReadOnlyList<TransportOrder> alsoAssumed, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(order);
-        return await LoadCheckAsync(order, countOrder: true, cancellationToken);
+        ArgumentNullException.ThrowIfNull(alsoAssumed);
+        return await LoadCheckAsync(order, countOrder: true, alsoAssumed, cancellationToken);
     }
 
     private async Task<LoadCheckWarning?> WarningForAsync(Shipment shipment, CancellationToken cancellationToken)
@@ -59,11 +67,11 @@ public sealed partial class LoadCheckWarnings(
             return null;
         }
 
-        var check = await LoadCheckAsync(order, countOrder: false, cancellationToken);
+        var check = await LoadCheckAsync(order, countOrder: false, [], cancellationToken);
         return check is { OutsideHorizon: true } or { Load.Over: true } ? check : null;
     }
 
-    private async Task<LoadCheckWarning?> LoadCheckAsync(TransportOrder order, bool countOrder, CancellationToken cancellationToken)
+    private async Task<LoadCheckWarning?> LoadCheckAsync(TransportOrder order, bool countOrder, IReadOnlyList<TransportOrder> alsoAssumed, CancellationToken cancellationToken)
     {
         if (CollectionDate.Of(order.Details) is not { } date)
         {
@@ -85,7 +93,12 @@ public sealed partial class LoadCheckWarnings(
         {
             demand = new Dictionary<DateOnly, FleetLoad>(demand)
             {
-                [date] = LoadCheck.Sum([demand.GetValueOrDefault(date, FleetLoad.None), LoadCheck.DemandOf(order.Details)]),
+                [date] = LoadCheck.Sum(
+                [
+                    demand.GetValueOrDefault(date, FleetLoad.None),
+                    LoadCheck.DemandOf(order.Details),
+                    .. alsoAssumed.Where(assumed => CollectionDate.Of(assumed.Details) == date).Select(assumed => LoadCheck.DemandOf(assumed.Details)),
+                ]),
             };
         }
 

@@ -15,18 +15,29 @@ public static class PlannerScript
 {
     public const string GetAssignmentOptions = "get_assignment_options";
 
+    /// <summary>The same read with the what-if tally (#445): the orders the plan has already suggested for Own fleet count against the day.</summary>
+    public const string GetAssignmentOptionsAssuming = "get_assignment_options_assuming";
+
     public static IChatClient Model() => new ScriptedChatClient(Next);
 
     private static IReadOnlyList<AIContent> Next(ScriptContext context)
     {
-        if (PlannerQuestions.ParseSuggestAssignment(context.Question) is not { } number)
+        if (PlannerQuestions.ParseSuggestAssignmentWithTally(context.Question) is not (var number, var assumed))
         {
             return [new TextContent("{}")];
         }
 
-        return context.Results.Count == 0
+        if (context.Results.Count > 0)
+        {
+            return [new TextContent(Answer(number, context.Results[0]))];
+        }
+
+        return assumed.Count == 0
             ? [new FunctionCallContent($"call-{context.Turn}", GetAssignmentOptions, new Dictionary<string, object?> { ["transportOrderNumber"] = number })]
-            : [new TextContent(Answer(number, context.Results[0]))];
+            : [new FunctionCallContent(
+                $"call-{context.Turn}",
+                GetAssignmentOptionsAssuming,
+                new Dictionary<string, object?> { ["transportOrderNumber"] = number, ["alreadyAssumed"] = string.Join(',', assumed) })];
     }
 
     private static string Answer(string number, ScriptedToolResult result)

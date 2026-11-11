@@ -28,7 +28,7 @@ public sealed class SuggestAssignmentHandler(IReadRepository<TransportOrder> rep
 
         // The order's own correlation ID, so the Agent's tool call joins its Message trail.
         return await agent.AskAsync(
-            new AgentRequest(AgentName, PlannerQuestions.SuggestAssignment(number.Value), order.CorrelationId.Value),
+            new AgentRequest(AgentName, PlannerQuestions.SuggestAssignment(number.Value, query.AlreadyAssumed ?? []), order.CorrelationId.Value),
             cancellationToken);
     }
 }

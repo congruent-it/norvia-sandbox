@@ -5,7 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using Norvia.Tms.Application.Agents;
+using Norvia.Tms.Application.Agents.Planner;
 
 namespace Norvia.Tms.Infrastructure.Agents;
 
@@ -20,7 +22,10 @@ public static class AgentsInfrastructure
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.SectionName);
+        builder.Services.AddOptions<AgentsOptions>().BindConfiguration(AgentsOptions.SectionName)
+            .Validate(options => options.MaxPlanOrders > 0, "Agents:MaxPlanOrders must be at least 1.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton(services => new PlanTheListLimits(services.GetRequiredService<IOptions<AgentsOptions>>().Value.MaxPlanOrders));
         if (!builder.Configuration.GetValue<bool>($"{AgentClientOptions.SectionName}:{nameof(AgentClientOptions.Enabled)}"))
         {
             builder.Services.AddSingleton<IAgentClient, DisabledAgentClient>();
