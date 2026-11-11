@@ -8,4 +8,7 @@ public static class AgentFailureCodes
 
     /// <summary>A tool call was refused: no token, the wrong role, a rate limit, a tool the definition doesn't list, or the cap on tool calls.</summary>
     public const string AgentToolRefused = "AgentToolRefused";
+
+    /// <summary>The host refused the draft because it named something the Shipper must not be told, such as a Carrier, an Exception number or a price (ADR 0011).</summary>
+    public const string DraftNotAllowed = "DraftNotAllowed";
 }

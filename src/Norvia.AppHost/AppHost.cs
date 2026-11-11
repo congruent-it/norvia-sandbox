@@ -991,6 +991,12 @@ else
             .WithEnvironment("AgentMcp__Planner__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/planner"))
             .WithEnvironment("AgentMcp__Planner__ApiTokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__Planner__ApiTokens__Audience", LocalTokens.TmsAudience)
+            // The Planner notification agent's server, at /mcp/planner-notification. Its own audience, role and agent view on the TMS API.
+            .WithEnvironment("AgentMcp__PlannerNotification__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__PlannerNotification__Tokens__Audience", LocalTokens.PlannerNotificationAgentAudience)
+            .WithEnvironment("AgentMcp__PlannerNotification__Api", ReferenceExpression.Create($"{tmsApi.GetEndpoint("http")}/v1/agent/planner-notification"))
+            .WithEnvironment("AgentMcp__PlannerNotification__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__PlannerNotification__ApiTokens__Audience", LocalTokens.TmsAudience)
             // The fifth server: the Carrier invoice matching agent's, at /mcp/finance-matching. It calls the ERP API's Finance agent view as the
             // Agent's identity, with a token for the ERP API's audience.
             .WithEnvironment("AgentMcp__FinanceMatching__Tokens__Issuer", LocalTokens.Issuer)
@@ -1041,7 +1047,12 @@ else
             .WithEnvironment("Agents__PlannerTokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__PlannerTokens__Audience", LocalTokens.PlannerAgentAudience)
             .WithEnvironment("Agents__PlannerTokens__ClientId", LocalTokens.PlannerAgentClientId)
-            .WithEnvironment("Agents__PlannerTokens__Role", LocalTokens.PlannerAgentReadRole);
+            .WithEnvironment("Agents__PlannerTokens__Role", LocalTokens.PlannerAgentReadRole)
+            .WithEnvironment("Agents__PlannerNotificationMcpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/planner-notification"))
+            .WithEnvironment("Agents__PlannerNotificationTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__PlannerNotificationTokens__Audience", LocalTokens.PlannerNotificationAgentAudience)
+            .WithEnvironment("Agents__PlannerNotificationTokens__ClientId", LocalTokens.PlannerNotificationAgentClientId)
+            .WithEnvironment("Agents__PlannerNotificationTokens__Role", LocalTokens.PlannerNotificationAgentReadRole);
         healthCheck
             .WithEnvironment("Agents__Enabled", "true")
             .WithEnvironment("Agents__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/health-check"))
@@ -1087,6 +1098,9 @@ else
             (agentMcp.Resource, "AgentMcp__Planner__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__Planner__ApiTokens__SigningKey"),
             (tmsWeb.Resource, "Agents__PlannerTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__PlannerNotification__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__PlannerNotification__ApiTokens__SigningKey"),
+            (tmsWeb.Resource, "Agents__PlannerNotificationTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceMatching__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceMatching__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__FinanceRejectionReason__Tokens__SigningKey"),

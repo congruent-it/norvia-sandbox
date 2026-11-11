@@ -16,6 +16,7 @@ public sealed class CustomerServiceAgentAzureTests
     private const string Role = "TransportOrders.CustomerServiceAgent.Read";
     private const string ReplyRole = "TransportOrders.CustomerServiceReplyAgent.Read";
     private const string PlannerRole = "TransportOrders.PlannerAgent.Read";
+    private const string PlannerNotificationRole = "TransportOrders.PlannerNotificationAgent.Read";
     private const string ApimPrincipal = "00000000-0000-0000-0000-000000000001";
     private const string ApimClient = "00000000-0000-0000-0000-000000000002";
 
@@ -93,7 +94,7 @@ public sealed class CustomerServiceAgentAzureTests
         {
             var roles = app["appRoles"]!.AsArray().Select(role => role!).ToList();
             var isTmsApi = app["displayName"]!.GetValue<string>() == "Norvia TMS agent API (env)";
-            roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal(isTmsApi ? [Role, ReplyRole, PlannerRole] : [Role]);
+            roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal(isTmsApi ? [Role, ReplyRole, PlannerRole, PlannerNotificationRole] : [Role]);
             roles.Should().OnlyContain(role => role["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>()).SequenceEqual(ApplicationOnly));
             app["api"]!["requestedAccessTokenVersion"]!.GetValue<int>().Should().Be(2, "azp is the caller's client ID in a v2 token");
         }
@@ -117,7 +118,7 @@ public sealed class CustomerServiceAgentAzureTests
     {
         var assignments = Of(McpResources(), "Microsoft.Graph/appRoleAssignedTo@v1.0").ToList();
 
-        assignments.Should().HaveCount(3, "the Customer service agent's role, the reply agent's and the Planner agent's, all on the TMS agent API")
+        assignments.Should().HaveCount(4, "the Customer service agent's role, the reply agent's, the Planner agent's and the Planner notification agent's, all on the TMS agent API")
             .And.OnlyContain(assignment => assignment["properties"]!["principalId"]!.GetValue<string>() == ApimPrincipal);
         Script("assign-agent-roles.ps1").Should().Contain("appRoleAssignedTo");
         File.ReadAllText(Path.Combine(RepositoryRoot.Path, McpModule)).Should().NotContain("roleAssignments", "the Agent holds no Azure role");

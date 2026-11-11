@@ -24,6 +24,9 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
     /// <summary>The Planner agent's server, <c>/mcp/planner</c>: one tool, the assignment options of a Transport Order, and a role of its own.</summary>
     public const string Planner = "planner";
 
+    /// <summary>The Planner notification agent's server, <c>/mcp/planner-notification</c>: two tools, the Notify Shipper template and the Shipper view, and a role of its own.</summary>
+    public const string PlannerNotification = "planner-notification";
+
     /// <summary>The Carrier invoice matching agent's server, <c>/mcp/finance-matching</c>: it calls the ERP API's Finance agent view.</summary>
     public const string FinanceMatching = "finance-matching";
 
@@ -45,6 +48,7 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
                 CustomerService when settings.CustomerService is { Api: { } api } customerService => new AgentServer(contract, customerService.Tokens, api, customerService.ApiTokens),
                 CustomerServiceReply when settings.CustomerServiceReply is { Api: { } api } reply => new AgentServer(contract, reply.Tokens, api, reply.ApiTokens),
                 Planner when settings.Planner is { Api: { } api } planner => new AgentServer(contract, planner.Tokens, api, planner.ApiTokens),
+                PlannerNotification when settings.PlannerNotification is { Api: { } api } notification => new AgentServer(contract, notification.Tokens, api, notification.ApiTokens),
                 FinanceMatching when settings.FinanceMatching is { Api: { } api } finance => new AgentServer(contract, finance.Tokens, api, finance.ApiTokens),
                 FinanceRejectionReason when settings.FinanceRejectionReason is { Api: { } api } reason => new AgentServer(contract, reason.Tokens, api, reason.ApiTokens),
                 _ => null,

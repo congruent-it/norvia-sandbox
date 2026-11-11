@@ -49,7 +49,7 @@ public sealed class TmsApiClientExceptionsTests : IDisposable
     {
         _tmsApi.Answer(HttpStatusCode.OK, Acted);
 
-        var answer = await _client.NotifyShipperAsync("EX-0000005", "Your delivery failed.", Cancel);
+        var answer = await _client.NotifyShipperAsync("EX-0000005", "Your delivery failed.", null, Cancel);
 
         answer.Should().Be(new ExceptionAnswer.Done());
         _tmsApi.Request!.Method.Should().Be(HttpMethod.Post);
@@ -57,6 +57,16 @@ public sealed class TmsApiClientExceptionsTests : IDisposable
         _tmsApi.Request.Headers.Authorization!.Parameter.Should().Be("tms-ui-token");
         BodyShouldBe("""{ "message": "Your delivery failed.", "planner": "Anna de Vries" }""");
         _spans.Should().ContainSingle().Which.DisplayName.Should().Be("Notify Shipper");
+    }
+
+    [Fact]
+    public async Task NotifyShipperAsync_SentFromADraft_NamesTheAgentAndItsRun()
+    {
+        _tmsApi.Answer(HttpStatusCode.OK, Acted);
+
+        await _client.NotifyShipperAsync("EX-0000005", "Your delivery failed.", new Norvia.Agents.AgentRun("planner-notification", "run-9"), Cancel);
+
+        BodyShouldBe("""{ "message": "Your delivery failed.", "planner": "Anna de Vries", "agentName": "planner-notification", "agentRunId": "run-9" }""");
     }
 
     [Fact]

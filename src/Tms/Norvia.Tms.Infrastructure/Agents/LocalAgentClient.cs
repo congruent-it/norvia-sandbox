@@ -34,6 +34,9 @@ internal sealed partial class LocalAgentClient(
     // The draft note is its own definition on the Planner's server and identity: it holds the Planner's role and no other.
     private const string PlannerNoteAgentName = DraftExceptionNoteHandler.AgentName;
 
+    // The draft Notify Shipper message is an identity of its own, with its own server and role: it holds none of the Planner agent's.
+    private const string PlannerNotificationAgentName = DraftShipperNotificationHandler.AgentName;
+
     public async Task<Result<Suggestion>> AskAsync(AgentRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -53,6 +56,7 @@ internal sealed partial class LocalAgentClient(
             var (address, tokens, name) = request.AgentName switch
             {
                 ReplyAgentName => (settings.ReplyMcpAddress, settings.ReplyTokens, "Agents:Reply"),
+                PlannerNotificationAgentName => (settings.PlannerNotificationMcpAddress, settings.PlannerNotificationTokens, "Agents:PlannerNotification"),
                 PlannerAgentName or PlannerNoteAgentName => (settings.PlannerMcpAddress, settings.PlannerTokens, "Agents:Planner"),
                 _ => (settings.McpAddress, null, "Agents:"),
             };

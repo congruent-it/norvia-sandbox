@@ -50,7 +50,8 @@ public interface ITransportOrderCommands
     Task<WithdrawAnswer> WithdrawAsync(string carrierBookingNumber, CancellationToken cancellationToken);
 
     /// <summary>Notifies the Shipper from an open Exception, with the message the Planner wrote, starting from the template for its type (P7).</summary>
-    Task<ExceptionAnswer> NotifyShipperAsync(string exceptionNumber, string message, CancellationToken cancellationToken);
+    /// <param name="actingOn">The Agent run whose draft the message was sent from, edited or not, which the notification's trace then names; null when the Planner wrote it themselves.</param>
+    Task<ExceptionAnswer> NotifyShipperAsync(string exceptionNumber, string message, AgentRun? actingOn, CancellationToken cancellationToken);
 
     /// <summary>Cancels the Confirmed Carrier booking of the Shipment of an open Exception, with a reason, so the Shipment goes back to Planned (P7).</summary>
     Task<ExceptionAnswer> CancelCarrierBookingAsync(string exceptionNumber, string reason, CancellationToken cancellationToken);

@@ -3188,6 +3188,68 @@
         }
       }
     },
+    "/v1/agent/planner-notification/exceptions/{exceptionNumber}/shipper-notification-template": {
+      "get": {
+        "tags": [
+          "PlannerNotificationAgent"
+        ],
+        "summary": "Read the message Notify Shipper starts with for an Exception's type, as the Planner notification agent. Only the template's words: no Carrier, no remark and no Exception details.",
+        "operationId": "AgentGetShipperNotificationTemplate",
+        "parameters": [
+          {
+            "name": "exceptionNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerNotificationTemplateView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/planner-notification/transport-orders/{transportOrderNumber}/shipper-view": {
+      "get": {
+        "tags": [
+          "PlannerNotificationAgent"
+        ],
+        "summary": "Read what the Shipper sees of a Transport Order, as the Planner notification agent: Tracking status, progress, Proof of delivery availability and the Shipper notifications already sent.",
+        "operationId": "AgentGetShipperViewForNotification",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplyAgentTrackingView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -6014,6 +6076,18 @@
               "null",
               "string"
             ]
+          },
+          "agentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentRunId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
@@ -6837,6 +6911,18 @@
               "string"
             ],
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerNotificationTemplateView": {
+        "required": [
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -9938,6 +10024,9 @@
     },
     {
       "name": "PlannerAgent"
+    },
+    {
+      "name": "PlannerNotificationAgent"
     },
     {
       "name": "Reset"

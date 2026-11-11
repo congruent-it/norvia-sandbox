@@ -13,7 +13,7 @@ namespace Norvia.Tms.ArchitectureTests;
 /// </summary>
 public sealed class PlannerAgentRulesTests
 {
-    private static readonly string[] OtherTmsAgents = ["customer-service", "customer-service-reply"];
+    private static readonly string[] OtherTmsAgents = ["customer-service", "customer-service-reply", "planner-notification"];
 
     private static AgentDefinition Definition(string name) =>
         AgentDefinitionLoader.Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Path, "agents", $"{name}.agent.yaml")));

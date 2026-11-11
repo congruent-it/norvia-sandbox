@@ -51,4 +51,30 @@ public static class PlannerQuestions
         var number = question[NotePrefix.Length..^NoteSuffix.Length];
         return number.All(character => char.IsAsciiLetterOrDigit(character) || character == '-') ? number : null;
     }
+
+    private const string NotifyPrefix = "Draft the Notify Shipper message for the Exception ";
+    private const string NotifyMiddle = " on the Transport Order ";
+    private const string NotifySuffix = ", from the template and what the Shipper sees.";
+
+    public static string DraftShipperNotification(string exceptionNumber, string transportOrderNumber)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(exceptionNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(transportOrderNumber);
+        return NotifyPrefix + exceptionNumber + NotifyMiddle + transportOrderNumber + NotifySuffix;
+    }
+
+    /// <summary>The Exception and Transport Order numbers of a Notify Shipper draft question, or null when the text is another question.</summary>
+    public static (string ExceptionNumber, string TransportOrderNumber)? ParseDraftShipperNotification(string question)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        if (!question.StartsWith(NotifyPrefix, StringComparison.Ordinal) || !question.EndsWith(NotifySuffix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var parts = question[NotifyPrefix.Length..^NotifySuffix.Length].Split(NotifyMiddle);
+        return parts.Length == 2 && parts.All(part => part.Length > 0 && part.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'))
+            ? (parts[0], parts[1])
+            : null;
+    }
 }

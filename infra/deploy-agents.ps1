@@ -119,6 +119,7 @@ foreach ($server in $servers) {
         'finance-matching' { Set-BackendAddress $server erp-api erp-agent-api ESTATE_ERP_BASE_URL -Route '/v1/agent/finance' }
         'finance-rejection-reason' { Set-BackendAddress $server erp-api erp-rejection-reason-agent-api ESTATE_ERP_BASE_URL -Route '/v1/agent/finance-rejection-reason' }
         'customer-service-reply' { Set-BackendAddress $server tms-api tms-reply-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service-reply' }
+        'planner-notification' { Set-BackendAddress $server tms-api tms-planner-notification-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/planner-notification' }
         'planner' { Set-BackendAddress $server tms-api tms-planner-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/planner' }
         default { }
     }
