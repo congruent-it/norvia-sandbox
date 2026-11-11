@@ -137,18 +137,13 @@ internal static class PlannerAgentCalls
         return text;
     }
 
-    /// <summary>The Agent's draft of a note on the Exception, run as the TMS UI runs it: the note definition and its scripted model.</summary>
-    public static Task<AgentRunResult> DraftNoteAsync(
-        PlannerAgentFixture fixture, string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken) =>
-        RunAsync(fixture, agentId, "planner-exception-note.agent.yaml", PlannerExceptionNoteScript.Model(), PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, cancellationToken);
-
     /// <summary>What a timeline holds beyond the Consignee, street and postcode values of <see cref="NeverForTheAgent"/>: the Tracking event's own postcode too. Bare digits are left out, as IDs may hold them.</summary>
     public static readonly string[] NeverInATimeline =
     [
         .. NeverForTheAgent.Where(never => never.Length > 4 && never is not ("street" or "instructions" or "consignee")), "3011 AA", "3011AA",
     ];
 
-    private static async Task<AgentRunResult> RunAsync(
+    internal static async Task<AgentRunResult> RunAsync(
         PlannerAgentFixture fixture, string agentId, string definitionFile, IChatClient model, string question, string correlationId, CancellationToken cancellationToken)
     {
         var definition = AgentDefinitionLoader.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", definitionFile), cancellationToken));

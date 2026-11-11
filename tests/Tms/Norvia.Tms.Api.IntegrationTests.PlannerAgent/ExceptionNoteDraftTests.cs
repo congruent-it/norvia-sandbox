@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using Norvia.Tms.TestSupport.Exceptions;
+using Norvia.Tms.TestSupport.ProofsOfDelivery;
 using Norvia.Tms.TestSupport.TrackingEvents;
 
 namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
@@ -11,10 +12,8 @@ namespace Norvia.Tms.Api.IntegrationTests.PlannerAgent;
 /// </summary>
 public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
 {
-    // The sample order's delivery window ends two days from today at 16:00.
-    private static DateTimeOffset WindowLatest => DateTimeOffset.UtcNow.Date.AddDays(2).AddHours(16);
-
-    private static DateTimeOffset LateEta => WindowLatest.AddHours(3);
+    // The sample order's delivery window ends two days from today at 16:00; an ETA days after it is late whichever day the test runs on.
+    private static readonly DateTimeOffset LateEta = DateTimeOffset.UtcNow.Date.AddDays(5);
 
     // Written out, not read from the handler's constant, so a changed name shows.
     private const string NoteAgentName = "planner-exception-note";
@@ -40,6 +39,21 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
         departed["source"]!.GetValue<string>().Should().Be(PlanningCalls.CarrierId, "the Planner sees who reported it");
         DateTimeOffset.Parse(departed["eta"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture).Should().Be(LateEta);
         timeline["carrierBookings"]!.AsArray().Single()!["status"]!.GetValue<string>().Should().Be("Confirmed");
+    }
+
+    [Fact]
+    public async Task TheTimelineOfALateDelivery_HoldsNoContentOfAProofOfDeliveryFile()
+    {
+        var (shipmentNumber, reference) = await fixture.BookedShipmentAsync(_cancellationToken);
+        await fixture.RecordedAsync(TrackingEventCalls.Event("Departed", reference, DateTimeOffset.UtcNow.AddMinutes(-1), eta: LateEta), _cancellationToken);
+        var exceptionNumber = await OpenExceptionOfAsync(shipmentNumber);
+        var file = ProofOfDeliveryCalls.Cmr($"cmr-{Guid.NewGuid():N}.pdf");
+        await fixture.RecordedProofAsync(ProofOfDeliveryCalls.Metadata(reference), [file], _cancellationToken);
+        using var client = fixture.CreateMcpClient(fixture.AgentToken());
+
+        var text = await client.TimelineTextOfAsync(exceptionNumber, _cancellationToken);
+
+        text.Should().NotContainAny([file.Name, Convert.ToBase64String(file.Content), "signed CMR", "J. Becker", "40213"], "the Agent reads no file, and nothing of what the Proof of delivery's file or form holds");
     }
 
     [Fact]
@@ -69,7 +83,7 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
     public async Task ANoteSavedFromADraft_NamesTheAgentAndItsRunOnItsTrace_EditedOrNot(bool edited)
     {
         var (_, exceptionNumber) = await fixture.CollectedWithDeliveryFailedAsync(_cancellationToken);
-        var run = await PlannerAgentCalls.DraftNoteAsync(fixture, PlannerAgentFixture.NewAgentId(), exceptionNumber, Guid.NewGuid().ToString(), _cancellationToken);
+        var run = await fixture.DraftNoteAsync(PlannerAgentFixture.NewAgentId(), exceptionNumber, Guid.NewGuid().ToString(), _cancellationToken);
         run.Suggestion.Cause.Should().NotContainAny(PlannerAgentCalls.NeverForTheAgent);
         var note = ExceptionCalls.Note(edited ? run.Suggestion.Cause + " Called the depot." : run.Suggestion.Cause);
         note["agentName"] = NoteAgentName;
