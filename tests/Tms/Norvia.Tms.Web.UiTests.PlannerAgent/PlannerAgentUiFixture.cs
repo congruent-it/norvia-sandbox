@@ -16,8 +16,15 @@ public sealed class PlannerAgentUiFixture : TmsUiFixture
 
     protected override string[] AppHostArguments => ["Agents:Enabled=true"];
 
-    protected override void ConfigureAppHost(IDistributedApplicationTestingBuilder builder) =>
+    protected override void ConfigureAppHost(IDistributedApplicationTestingBuilder builder)
+    {
         builder.RemoveWhatTheCustomerServiceAgentUiTestsDontUse();
+
+        // The waiting-for-planning list reads again every second and drops an order planned meanwhile. The journey of a refused assignment plans the order behind the page and then presses Assign,
+        // so the list reads again rarely enough that the order is still on it. Every journey opens the list after its order exists, and the first read is at once.
+        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "tms-web"))
+            .WithEnvironment("LiveList__RefreshInterval", "00:00:45");
+    }
 
     public override async ValueTask InitializeAsync()
     {

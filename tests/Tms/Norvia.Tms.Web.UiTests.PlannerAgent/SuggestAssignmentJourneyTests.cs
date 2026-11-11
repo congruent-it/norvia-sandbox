@@ -6,7 +6,7 @@ namespace Norvia.Tms.Web.UiTests.PlannerAgent;
 
 /// <summary>
 /// The Planner asks the assistant who should carry a row of the waiting-for-planning list, against the scripted fake model: an order on a day Own fleet can carry, and an order on the demo
-/// seed's Over capacity day, where Own fleet would carry a warning. The answer is shown only: the order is still on the list, assigned to no one.
+/// seed's Over capacity day, where Own fleet would carry a warning. The answer pre-selects the order and who carries it; the order is still on the list, assigned to no one (see ActOnSuggestionJourneyTests).
 /// </summary>
 public sealed class SuggestAssignmentJourneyTests(PlannerAgentUiFixture agent) : WaitingForPlanningPage(agent)
 {
@@ -29,8 +29,8 @@ public sealed class SuggestAssignmentJourneyTests(PlannerAgentUiFixture agent) :
         await Expect(suggestion.GetByRole(AriaRole.Listitem).First).ToContainTextAsync("get_assignment_options");
         await Expect(suggestion).ToContainTextAsync("nothing is assigned until you do");
 
-        // It recommends and leaves the choice to the Planner: the order is still waiting, unselected, and no outcome was announced.
-        await Expect(row.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" })).Not.ToBeCheckedAsync();
+        // It pre-selects and leaves the confirming to the Planner: the order is still waiting, and no outcome was announced.
+        await Expect(row.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" })).ToBeCheckedAsync();
         await Expect(Page.GetByRole(AriaRole.List, new() { Name = "Assignment outcomes" })).ToHaveCountAsync(0);
         await Expect(row).ToBeVisibleAsync();
     }
@@ -54,7 +54,7 @@ public sealed class SuggestAssignmentJourneyTests(PlannerAgentUiFixture agent) :
         await Expect(suggestion.GetByRole(AriaRole.Listitem)).ToContainTextAsync([new Regex(@"prices it at \d+\.\d{2} EUR, the lowest Carrier cost"), new Regex("Own fleet: OverCapacity")]);
         await Expect(suggestion).ToContainTextAsync("you decide");
 
-        await Expect(row.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" })).Not.ToBeCheckedAsync();
+        await Expect(row.GetByRole(AriaRole.Checkbox, new() { Name = $"Select {number}" })).ToBeCheckedAsync();
         await Expect(Page.GetByRole(AriaRole.List, new() { Name = "Assignment outcomes" })).ToHaveCountAsync(0);
         await Expect(row).ToBeVisibleAsync();
     }
