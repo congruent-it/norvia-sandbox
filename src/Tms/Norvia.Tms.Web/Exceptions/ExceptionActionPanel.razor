@@ -1,10 +1,18 @@
+@using Ardalis.Result
+@using Microsoft.Extensions.Options
+@using Norvia.Agents
+@using Norvia.Tms.Application.Agents
+@using Norvia.Tms.Application.Agents.Planner
 @using Norvia.Tms.Application.Exceptions.ListOpen
+@using Norvia.Tms.Web.Agents
 @using Norvia.Tms.Domain.Exceptions
 @using Norvia.Tms.Web.TransportOrders
 @implements IDisposable
 @inject ITransportOrderQueries Queries
 @inject ITransportOrderCommands Commands
 @inject ILogger<ExceptionActionPanel> Logger
+@inject IOptions<AgentsOptions> Agents
+@inject IExplainRequests Requests
 
 @* One Planner action on one open Exception, as a form under the list. It asks the TMS API to do it and says what came of it. *@
 <section role="group" aria-label="@Title" class="mb-6 rounded-flatly border border-border p-4">
@@ -36,6 +44,32 @@
                     <FluentTextArea @bind-Value="_text" Immediate="true" Label="Reason" Rows="3" Style="width: 100%;" />
                     break;
                 case ExceptionActionKind.AddNote:
+                    @* The Planner agent can draft the note from the Exception's timeline. The draft only fills this box: nothing is saved until the
+                       Planner adds the note, and it names the Agent run only then. Off unless Agents:Enabled, and only in the Planner role view (ADR 0040). *@
+                    @if (Agents.Value.Enabled && ForPlanner)
+                    {
+                        <div>
+                            <FluentButton Appearance="Appearance.Outline" Disabled="_drafting || _working" OnClick="DraftAsync"
+                                          aria-label="@($"Draft note for {OpenException.ExceptionNumber}")">Draft note</FluentButton>
+                        </div>
+                        @if (_drafting)
+                        {
+                            <FluentStack VerticalAlignment="VerticalAlignment.Center" role="status">
+                                <FluentProgressRing />
+                                <span>The assistant is drafting…</span>
+                            </FluentStack>
+                        }
+                        else if (_unavailable)
+                        {
+                            <div role="alert">
+                                <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+                            </div>
+                        }
+                        else if (_draftRun is not null)
+                        {
+                            <p class="!mb-0 text-muted">This is a draft written from the Exception's timeline. Edit it, then add the note yourself: nothing is saved until you do.</p>
+                        }
+                    }
                     <FluentTextArea @bind-Value="_text" Immediate="true" Label="Note" Rows="3" Style="width: 100%;" />
                     break;
                 case ExceptionActionKind.AgreeDeliveryWindow:
@@ -72,12 +106,19 @@
     private string? _failure;
     private bool _ready;
     private bool _working;
+    private bool _drafting;
+    private bool _unavailable;
+    private AgentRun? _draftRun;
 
     [Parameter, EditorRequired]
     public OpenExceptionSummary OpenException { get; set; } = null!;
 
     [Parameter, EditorRequired]
     public ExceptionActionKind Kind { get; set; }
+
+    /// <summary>Whether the page is the Planner role's view. The Draft note button shows nowhere else.</summary>
+    [Parameter]
+    public bool ForPlanner { get; set; }
 
     /// <summary>Raised when the Planner closes the form without acting.</summary>
     [Parameter, EditorRequired]
@@ -182,7 +223,7 @@
         ExceptionActionKind.NotifyShipper => Commands.NotifyShipperAsync(number, _text.Trim(), _closed.Token),
         ExceptionActionKind.CancelCarrierBooking => Commands.CancelCarrierBookingAsync(number, _text.Trim(), _closed.Token),
         ExceptionActionKind.AgreeDeliveryWindow => AgreeAsync(number),
-        ExceptionActionKind.AddNote => Commands.AddNoteAsync(number, _text.Trim(), _closed.Token),
+        ExceptionActionKind.AddNote => Commands.AddNoteAsync(number, _text.Trim(), _draftRun, _closed.Token),
         ExceptionActionKind.Resolve => Commands.ResolveAsync(number, Enum.Parse<ExceptionOutcome>(_outcome), _text.Trim(), _closed.Token),
         _ => throw new InvalidOperationException($"Unknown action {Kind}."),
     };
@@ -218,6 +259,41 @@
         ExceptionActionKind.Resolve => $"{OpenException.ExceptionNumber} is resolved.",
         _ => throw new InvalidOperationException($"Unknown action {Kind}."),
     };
+
+    // Fills the note box with the assistant's draft. Saving is the Planner's own Add note, which names the run because it came from the draft.
+    private async Task DraftAsync()
+    {
+        _drafting = true;
+        _unavailable = false;
+        try
+        {
+            var result = await Requests.DraftNoteAsync(new DraftExceptionNoteQuery(OpenException.ExceptionNumber), _closed.Token);
+            if (result.IsSuccess)
+            {
+                // A note is at most ExceptionNote.MaxTextLength characters, so a longer draft is cut rather than refused when the Planner saves it.
+                _text = result.Value.Cause.Length > ExceptionNote.MaxTextLength ? result.Value.Cause[..ExceptionNote.MaxTextLength] : result.Value.Cause;
+                _draftRun = result.Value.Run;
+            }
+            else
+            {
+                _unavailable = true;
+                AgentPageLog.NoteDraftFailed(Logger, OpenException.ExceptionNumber, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _unavailable = true;
+            AgentPageLog.NoteDraftCrashed(Logger, exception, OpenException.ExceptionNumber);
+        }
+        finally
+        {
+            _drafting = false;
+        }
+    }
 
     private Task Close() => OnClosed.InvokeAsync();
 

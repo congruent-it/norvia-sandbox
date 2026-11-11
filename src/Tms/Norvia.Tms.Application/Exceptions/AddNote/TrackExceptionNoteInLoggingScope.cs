@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Norvia.Tms.Application.IntegrationEvents;
 
 namespace Norvia.Tms.Application.Exceptions.AddNote;
 
@@ -7,6 +8,15 @@ public sealed partial class TrackExceptionNoteInLoggingScope(ILogger<TrackExcept
     : TrackExceptionActionInLoggingScope<AddExceptionNoteCommand, AddExceptionNoteResult>
 {
     protected override ILogger Logger => logger;
+
+    // Only a note saved from an Agent's draft names the Agent and its run (ADR 0040), edited or not.
+    protected override Dictionary<string, object?> ExtraKeysOf(AddExceptionNoteCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return command.ActingOn is { } run
+            ? new() { [TrackingKeys.AgentId] = run.AgentName, [TrackingKeys.AgentRunId] = run.RunId }
+            : [];
+    }
 
     protected override string CorrelationIdOf(AddExceptionNoteCommand command) => command.CorrelationId;
 

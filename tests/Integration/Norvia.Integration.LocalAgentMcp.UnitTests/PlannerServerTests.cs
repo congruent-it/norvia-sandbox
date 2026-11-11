@@ -41,14 +41,14 @@ public sealed class PlannerServerTests : IAsyncLifetime
         new() { ["name"] = tool, ["arguments"] = new JsonObject { ["transportOrderNumber"] = "TO-0000042" } };
 
     [Fact]
-    public async Task ToolsList_IsExactlyTheAssignmentOptions()
+    public async Task ToolsList_IsTheAssignmentOptionsAndTheExceptionTimeline()
     {
         using var client = _factory.AgentClient(_factory.PlannerToken());
 
         using var response = await Post(client, Rpc("tools/list"));
 
         var tools = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!["result"]!["tools"]!.AsArray();
-        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_assignment_options");
+        tools.Select(tool => tool!["name"]!.GetValue<string>()).Should().Equal("get_assignment_options", "get_exception_timeline");
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class PlannerServerTests : IAsyncLifetime
         var contract = ToolListContract.Parse(Embedded("planner.tools.json"));
 
         contract.Unknown(definition).Should().BeEmpty();
-        contract.Tools.Should().ContainSingle().Which.IsRead.Should().BeTrue();
+        contract.Tools.Should().OnlyContain(tool => tool.IsRead);
         contract.Role.Should().Be(LocalAgentMcpFactory.PlannerRole);
     }
 

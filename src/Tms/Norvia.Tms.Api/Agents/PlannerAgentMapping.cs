@@ -88,6 +88,37 @@ internal static class PlannerAgentMapping
                 carrier.CarrierId, carrier.Name, carrier.Refusal is null, carrier.Refusal?.Code.ToString(), carrier.CarrierCost, carrier.NotPriced?.ToString()))]);
     }
 
+    public static PlannerAgentExceptionTimelineView Of(ExceptionTimelineForAgent timeline, DateTimeOffset asOf)
+    {
+        ArgumentNullException.ThrowIfNull(timeline);
+
+        var exception = timeline.Exception;
+        return new PlannerAgentExceptionTimelineView(
+            exception.ExceptionNumber,
+            timeline.ShipmentNumber,
+            exception.Type.ToString(),
+            exception.Status.ToString(),
+            exception.OpenedAt,
+            exception.AfterDelivered,
+            exception.CauseCleared,
+            timeline.ShipmentStatus.ToString(),
+            timeline.CarriedBy.Carrier is { } carrier ? carrier.Name ?? carrier.Id : "Own fleet",
+            asOf,
+            [.. exception.Causes.Select(cause => new PlannerAgentCauseView(cause.Kind.ToString(), cause.AddedAt))],
+            [.. timeline.TrackingEvents.Select(entry => new PlannerAgentTrackingEventView(
+                entry.Type.ToString(), entry.EventTime, entry.Place, entry.CountryCode, entry.Eta, entry.Remark, entry.Source, entry.MovedShipment))],
+            [.. timeline.CarrierBookings.Select(booking => new PlannerAgentCarrierBookingView(
+                booking.CarrierBookingNumber, booking.Carrier.Name ?? booking.Carrier.Id, booking.Status.ToString(), booking.RequestedAt, booking.AnsweredAt, booking.ReasonText, booking.WithdrawnAt))],
+            [.. exception.Notifications.Select(notification => new PlannerAgentShipperNotificationView(
+                notification.Message, notification.Status.ToString(), notification.RequestedAt, notification.SentAt))],
+            [.. exception.CarrierBookingCancellations.Select(cancellation => new PlannerAgentCancellationView(
+                cancellation.CarrierBookingNumber, cancellation.Reason, cancellation.CancelledAt, cancellation.CarrierNotTold))],
+            [.. timeline.AgreedDeliveryWindows.Select(window => new PlannerAgentAgreedWindowView(window.Earliest, window.Latest, window.AgreedAt))],
+            [.. exception.Notes.Select(note => new PlannerAgentNoteView(note.Text, note.Planner, note.AddedAt))],
+            exception.Outcome?.ToString(),
+            exception.ResolvedAt);
+    }
+
     private static PlannerAgentPlaceView? Place(PlaceView? place) => place is null
         ? null
         : new PlannerAgentPlaceView(place.City, PostcodeArea(place.Postcode), place.Country);

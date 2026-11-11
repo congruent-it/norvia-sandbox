@@ -334,7 +334,7 @@ public sealed class AgentMcpServerTests
 
     // The Planner's policy as a deployment would apply it, with the values of its contract: the checks (token, role, rate limit, tool list) hold for it as for the example.
     [Fact]
-    public void ThePlannersPolicy_IsFilledWithItsContractsRole_ItsOneTool_AndItsRateLimit()
+    public void ThePlannersPolicy_IsFilledWithItsContractsRole_ItsTools_AndItsRateLimit()
     {
         var contract = JsonNode.Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Path, ContractFolder, "planner.tools.json")))!;
         var tools = contract["tools"]!.AsArray();
@@ -344,16 +344,25 @@ public sealed class AgentMcpServerTests
             $"param audience = '{Audience}'", $"param requiredRole = '{contract["role"]}'", "param tenantId = 'tenant-1'", "param rateLimitCalls = 60",
         };
         var resources = BicepSnapshot.Resources(Module, parameters);
-        var operationPolicy = Single(resources, "Microsoft.ApiManagement/service/apis/operations/policies")["properties"]!["value"]!.GetValue<string>();
+        var operationPolicies = resources.Where(resource => resource["type"]!.GetValue<string>() == "Microsoft.ApiManagement/service/apis/operations/policies")
+            .Select(resource => resource["properties"]!["value"]!.GetValue<string>()).ToList();
         var inbound = XElement.Parse(Single(resources, "Microsoft.ApiManagement/service/apis/policies")["properties"]!["value"]!.GetValue<string>()).Element("inbound")!;
 
         inbound.Element("validate-azure-ad-token")!.Element("audiences")!.Elements("audience").Select(audience => audience.Value).Should().Equal(Audience);
-        inbound.Elements("choose").Elements("when").Select(when => when.Attribute("condition")!.Value)
-            .Should().Contain(condition => condition.Contains($"\"{contract["role"]}\"", StringComparison.Ordinal))
-            .And.Contain(condition => condition.Contains($"\"{tools[0]!["name"]}\".Split('|')", StringComparison.Ordinal));
+        var conditions = inbound.Elements("choose").Elements("when").Select(when => when.Attribute("condition")!.Value).ToList();
+        conditions.Should().Contain(condition => condition.Contains($"\"{contract["role"]}\"", StringComparison.Ordinal));
+        // The policy lists every tool's name once, joined with a bar.
+        var toolNames = string.Join('|', tools.Select(tool => tool!["name"]!.GetValue<string>()));
+        conditions.Should().Contain(condition => condition.Contains($"\"{toolNames}\".Split('|')", StringComparison.Ordinal));
+
         inbound.Element("rate-limit-by-key")!.Attribute("calls")!.Value.Should().Be("60");
-        operationPolicy.Should().Contain(contract["role"]!.GetValue<string>()).And.Contain(tools[0]!["path"]!.GetValue<string>());
-        Regex.IsMatch(operationPolicy, "__[A-Z_]+__").Should().BeFalse();
+        operationPolicies.Should().HaveCount(tools.Count);
+        foreach (var tool in tools)
+        {
+            operationPolicies.Should().Contain(policy => policy.Contains(contract["role"]!.GetValue<string>(), StringComparison.Ordinal) && policy.Contains(tool!["path"]!.GetValue<string>(), StringComparison.Ordinal));
+        }
+
+        operationPolicies.Should().OnlyContain(policy => !Regex.IsMatch(policy, "__[A-Z_]+__"));
     }
 
     private static string Header(XElement scope, string name) => scope.Elements("set-header").Single(header => header.Attribute("name")!.Value == name).Element("value")!.Value;

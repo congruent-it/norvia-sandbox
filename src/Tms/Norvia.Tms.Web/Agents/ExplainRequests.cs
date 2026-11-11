@@ -31,6 +31,9 @@ internal sealed class ExplainRequests(IServiceScopeFactory scopes) : IExplainReq
     public Task<Result<Suggestion>> SuggestAsync(SuggestAssignmentQuery query, CancellationToken cancellationToken) =>
         SendAsync(query, cancellationToken);
 
+    public Task<Result<Suggestion>> DraftNoteAsync(DraftExceptionNoteQuery query, CancellationToken cancellationToken) =>
+        SendAsync(query, cancellationToken);
+
     private async Task<Result<Suggestion>> SendAsync(IQuery<Result<Suggestion>> query, CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();

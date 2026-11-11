@@ -3157,6 +3157,37 @@
         }
       }
     },
+    "/v1/agent/planner/exceptions/{exceptionNumber}/timeline": {
+      "get": {
+        "tags": [
+          "PlannerAgent"
+        ],
+        "summary": "Read an Exception's timeline as the Planner agent, to draft an internal note: its type and cause, status, the Shipment's Tracking events with their sources, the Carrier booking's state, the actions already taken and the notes so far. No Consignee personal data and no file contents.",
+        "operationId": "AgentGetExceptionTimeline",
+        "parameters": [
+          {
+            "name": "exceptionNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlannerAgentExceptionTimelineView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -3326,6 +3357,18 @@
             ]
           },
           "planner": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "agentRunId": {
             "type": [
               "null",
               "string"
@@ -6119,6 +6162,29 @@
         },
         "additionalProperties": false
       },
+      "PlannerAgentAgreedWindowView": {
+        "required": [
+          "earliest",
+          "latest",
+          "agreedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "earliest": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latest": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "agreedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "PlannerAgentAssignmentOptionsView": {
         "required": [
           "transportOrderNumber",
@@ -6213,6 +6279,79 @@
         },
         "additionalProperties": false
       },
+      "PlannerAgentCancellationView": {
+        "required": [
+          "carrierBookingNumber",
+          "reason",
+          "cancelledAt",
+          "carrierNotTold"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierBookingNumber": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "carrierNotTold": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentCarrierBookingView": {
+        "required": [
+          "carrierBookingNumber",
+          "carrier",
+          "status",
+          "requestedAt",
+          "answeredAt",
+          "reasonText",
+          "withdrawnAt"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierBookingNumber": {
+            "type": "string"
+          },
+          "carrier": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "answeredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "reasonText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "withdrawnAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "PlannerAgentCarrierView": {
         "required": [
           "carrierId",
@@ -6253,6 +6392,137 @@
               "null",
               "string"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentCauseView": {
+        "required": [
+          "kind",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentExceptionTimelineView": {
+        "required": [
+          "exceptionNumber",
+          "shipmentNumber",
+          "type",
+          "status",
+          "openedAt",
+          "afterDelivered",
+          "causeCleared",
+          "shipmentStatus",
+          "carriedBy",
+          "asOf",
+          "causes",
+          "trackingEvents",
+          "carrierBookings",
+          "shipperNotifications",
+          "carrierBookingCancellations",
+          "agreedDeliveryWindows",
+          "notes",
+          "outcome",
+          "resolvedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "exceptionNumber": {
+            "type": "string"
+          },
+          "shipmentNumber": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "afterDelivered": {
+            "type": "boolean"
+          },
+          "causeCleared": {
+            "type": "boolean"
+          },
+          "shipmentStatus": {
+            "type": "string"
+          },
+          "carriedBy": {
+            "type": "string"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "causes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentCauseView"
+            }
+          },
+          "trackingEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentTrackingEventView"
+            }
+          },
+          "carrierBookings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentCarrierBookingView"
+            }
+          },
+          "shipperNotifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentShipperNotificationView"
+            }
+          },
+          "carrierBookingCancellations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentCancellationView"
+            }
+          },
+          "agreedDeliveryWindows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentAgreedWindowView"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlannerAgentNoteView"
+            }
+          },
+          "outcome": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -6327,6 +6597,27 @@
           },
           "over": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentNoteView": {
+        "required": [
+          "text",
+          "planner",
+          "addedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "planner": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -6442,6 +6733,86 @@
               "null",
               "string"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentShipperNotificationView": {
+        "required": [
+          "message",
+          "status",
+          "requestedAt",
+          "sentAt"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PlannerAgentTrackingEventView": {
+        "required": [
+          "type",
+          "eventTime",
+          "place",
+          "countryCode",
+          "eta",
+          "remark",
+          "source",
+          "movedShipment"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "eventTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "place": {
+            "type": "string"
+          },
+          "countryCode": {
+            "type": "string"
+          },
+          "eta": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "remark": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "movedShipment": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

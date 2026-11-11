@@ -1,4 +1,5 @@
 using AngleSharp.Dom;
+using Norvia.Agents;
 using Norvia.Tms.Application.Exceptions.ListOpen;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.ShipperNotifications;
@@ -19,7 +20,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
         Commands.NotifyShipperAsync(default!, default!, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
         Commands.CancelCarrierBookingAsync(default!, default!, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
         Commands.AgreeDeliveryWindowAsync(default!, default, default, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
-        Commands.AddNoteAsync(default!, default!, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
+        Commands.AddNoteAsync(default!, default!, default, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
         Commands.ResolveAsync(default!, default, default!, default).ReturnsForAnyArgs(new ExceptionAnswer.Done());
     }
 
@@ -265,7 +266,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
         page.WaitForElement("section[aria-label='Add note to EX-0000005'] fluent-text-area").Input("Phoned Kessler, redelivery Thursday");
         Click(Panel(page, "Add note to EX-0000005"), "Add note");
 
-        page.WaitForAssertion(() => Commands.Received(1).AddNoteAsync("EX-0000005", "Phoned Kessler, redelivery Thursday", Arg.Any<CancellationToken>()));
+        page.WaitForAssertion(() => Commands.Received(1).AddNoteAsync("EX-0000005", "Phoned Kessler, redelivery Thursday", null, Arg.Any<CancellationToken>()));
         page.WaitForAssertion(() => page.Find("[role=status]").TextContent.Should().Contain("The note is added to EX-0000005."));
     }
 
@@ -303,7 +304,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
     [Fact]
     public void AnAction_TheTmsRefuses_KeepsTheFormOpen_WithTheReason()
     {
-        Commands.AddNoteAsync("EX-0000005", Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new ExceptionAnswer.Refused("Exception EX-0000005 is Resolved, not Open."));
+        Commands.AddNoteAsync("EX-0000005", Arg.Any<string>(), Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns(new ExceptionAnswer.Refused("Exception EX-0000005 is Resolved, not Open."));
         var page = RenderWithOne();
 
         page.Find("fluent-button[aria-label='Add note to EX-0000005']").Click();
@@ -316,7 +317,7 @@ public sealed class OpenExceptionsTests : TmsWebContext
     [Fact]
     public void AnAction_WhenTheTmsApiCantBeReached_SaysToTryAgain()
     {
-        Commands.AddNoteAsync("EX-0000005", Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns<Task<ExceptionAnswer>>(_ => throw new HttpRequestException("down"));
+        Commands.AddNoteAsync("EX-0000005", Arg.Any<string>(), Arg.Any<AgentRun?>(), Arg.Any<CancellationToken>()).Returns<Task<ExceptionAnswer>>(_ => throw new HttpRequestException("down"));
         var page = RenderWithOne();
 
         page.Find("fluent-button[aria-label='Add note to EX-0000005']").Click();

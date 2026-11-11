@@ -115,7 +115,7 @@ P7 adds no Shipment status. Cancelling a Carrier booking moves the Shipment from
 | Notify the Shipper | Always, while the Exception is open | A Shipper notification goes out (see [Notifying the Shipper](#notifying-the-shipper)) |
 | Cancel the Carrier booking | A Carrier Shipment that is Booked, not yet Collected | The Carrier booking is Cancelled, the Shipment goes back to Planned and the Carrier is told (see [Cancelling a Carrier booking](#cancelling-a-carrier-booking)) |
 | Agree a delivery window | A Shipment that is Collected or In transit | The Shipment gets an agreed delivery window (see [Agreeing a delivery window](#agreeing-a-delivery-window)) |
-| Add a note | Always, while the Exception is open | A free-text note on the Exception, for example "phoned Kessler, redelivery Thursday" |
+| Add a note | Always, while the Exception is open | A free-text note on the Exception, for example "phoned Kessler, redelivery Thursday". With `Agents:Enabled` on, the Planner view also offers **Draft note** (see [Draft note](#draft-note)) |
 
 Every action is recorded on the Exception with the Planner and the time.
 
@@ -320,6 +320,7 @@ P7 leaves several Message trails, one per cause or Planner action. Each is named
 
 *Editable source: [message-trail-p7-3.excalidraw](../../architecture/diagrams/message-trail-p7-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
 
+- A note saved from the Planner agent's draft names the Agent and its run in the trace (`agentId` is `planner-exception-note`, next to `agentRunId`), edited or not; a note the Planner wrote themselves names none.
 - Agreeing a delivery window, adding a note and resolving each leave one short trail in the Flow `exception-handling`: `tms-web: Agree delivery window`, `tms-web: Add note` or `tms-web: Resolve Exception`, then the call. Only the first and the last publish, `ShipmentDeliveryWindowAgreed` and `ExceptionResolved`. A note publishes nothing, so its trail ends at the call.
 - A refused action stops at the call, with the failure code of the [action rules](#action-rules), and publishes nothing.
 - The send Hop is `Failed` with `ShipperUnavailable` (no answer, 408, 429 or 5xx) or `ShipperRefused` (another 4xx) for a Shipper, and with `CarrierUnavailable` or `CarrierRefused` for a Carrier. The Logic App then calls `Report_the_notification_not_delivered` or `Report_the_cancellation_not_delivered` instead, and the TMS publishes `ShipperNotificationNotDelivered` or `CarrierCancellationNotDelivered`.
@@ -400,3 +401,9 @@ These were left out on purpose while designing P7, each with its reason.
   - Toggle: no alert on failed Shipper notification or Carrier cancellation Logic App runs.
   - Toggle: the Late delivery check switched off. Built: `lateDeliveryCheckOff` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)). Together with the unset Stale thresholds from P5, only a Consignee's phone call reveals the problem, as in the headline incident.
   - Presenter-panel fault: a Carrier's cancellation endpoint is down, so the Carrier booking is flagged Carrier not told. Built: `carrier-cancellation-endpoint-down` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).
+
+## Draft note
+
+With `Agents:Enabled` on, the **Add note** form of an open Exception in the Planner view has a **Draft note** button (#443). It puts one fixed question to the Planner agent's note definition (`planner-exception-note`), which reads the Exception's timeline with its one tool, `get_exception_timeline` ([GetExceptionTimelineHandler.cs](../../../src/Tms/Norvia.Tms.Application/Agents/Planner/GetExceptionTimelineHandler.cs)): the Exception's type and causes, its status, the Shipment's Tracking events with their sources, the Carrier booking's state, the actions already taken (Shipper notifications, Carrier booking cancellations, agreed delivery windows) and the notes so far. These are staff-side facts, so the Carrier's and the Planner's remarks may appear, but the view has no postcode, no Consignee personal data and no file.
+
+The draft is a short note of what has happened and what is outstanding. It fills the note box and nothing is saved until the Planner edits it and adds the note. The agent never resolves an Exception, never picks an outcome and never states a cause the timeline does not show. If the agent is unavailable the form says "Assistant unavailable" and the Planner writes the note as before.

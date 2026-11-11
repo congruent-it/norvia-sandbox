@@ -1,8 +1,10 @@
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TransportOrders;
+using Norvia.Tms.Application.Agents.Planner;
 using Norvia.Tms.Application.Exceptions.AddNote;
 using Norvia.Tms.Application.Exceptions.AgreeDeliveryWindow;
 using Norvia.Tms.Application.Exceptions.CancelCarrierBooking;
@@ -187,6 +189,9 @@ public static class ExceptionEndpoints
             : RefusalProblem.Of<ExceptionRefusalCode, ResolveExceptionResult>(result, "The Exception can't be resolved.", command.CorrelationId, StatusCodeOf);
     }
 
+    // The only Agent whose draft leads to a note.
+    private static readonly string[] NoteDraftingAgents = [DraftExceptionNoteHandler.AgentName];
+
     private static async Task<Results<Ok<AddExceptionNoteResult>, ProblemHttpResult, ValidationProblem>> AddNoteAsync(
         string exceptionNumber,
         AddExceptionNoteRequest request,
@@ -212,12 +217,16 @@ public static class ExceptionEndpoints
             errors[nameof(AddExceptionNoteRequest.Planner)] = [$"A Planner's name is at most {ExceptionNote.MaxPlannerLength} characters."];
         }
 
+        // The Agent's name and run come together or not at all, and are short: they are only for the trace.
+        ActingOnCalls.Check(errors, nameof(AddExceptionNoteRequest.AgentRunId), request.AgentName, request.AgentRunId, NoteDraftingAgents);
+
         if (errors.Count > 0)
         {
             return TypedResults.ValidationProblem(errors);
         }
 
-        var command = new AddExceptionNoteCommand(exceptionNumber, request.Text!, request.Planner!, CorrelationId.New().Value);
+        var command = new AddExceptionNoteCommand(
+            exceptionNumber, request.Text!, request.Planner!, CorrelationId.New().Value, ActingOnCalls.Of(request.AgentName, request.AgentRunId));
         var result = await mediator.Send(command, cancellationToken);
         return result.IsSuccess
             ? TypedResults.Ok(result.Value)

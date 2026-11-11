@@ -32,4 +32,10 @@ internal static partial class AgentPageLog
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Suggesting an assignment for Transport Order {TransportOrderNumber} failed")]
     public static partial void SuggestCrashed(ILogger logger, Exception exception, string transportOrderNumber);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Drafting a note on Exception {ExceptionNumber} failed with {FailureCode}")]
+    public static partial void NoteDraftFailed(ILogger logger, string exceptionNumber, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Drafting a note on Exception {ExceptionNumber} failed")]
+    public static partial void NoteDraftCrashed(ILogger logger, Exception exception, string exceptionNumber);
 }

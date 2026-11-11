@@ -121,17 +121,8 @@ public sealed class PlannerAgentViewTests
         view.DeliveryWindow.Should().BeNull();
     }
 
-    [Fact]
-    public void TheView_IsAnAllowlist_SoANewFieldIsExcludedUntilSomeoneAddsItHere()
-    {
-        var names = typeof(PlannerAgentAssignmentOptionsView).Assembly.GetTypes()
-            .Where(type => type.Namespace == typeof(PlannerAgentAssignmentOptionsView).Namespace && type.Name.StartsWith("PlannerAgent", StringComparison.Ordinal) && type.Name.EndsWith("View", StringComparison.Ordinal))
-            .SelectMany(type => type.GetProperties())
-            .Select(property => property.Name)
-            .ToList();
-
-        names.Should().BeEquivalentTo(
-            [
+    private static readonly string[] Allowed =
+    [
                 "TransportOrderNumber", "Status", "Shipper", "RatingResult", "AsOf", "Collection", "Delivery", "CollectionWindow", "DeliveryWindow", "Goods", "OwnFleet", "Carriers",
                 "City", "PostcodeArea", "Country",
                 "Earliest", "Latest",
@@ -139,6 +130,27 @@ public sealed class PlannerAgentViewTests
                 "MeetsAssignmentRules", "RuleBroken", "Fit", "CollectionDay", "Warning", "Load", "AvailableVehicles", "AvailableDrivers", "DriversWithDrivingHoursLeft", "MostDrivingHoursLeft",
                 "CapacityKg", "CapacityPalletPlaces", "DemandKg", "DemandPalletPlaces", "Over",
                 "CarrierId", "Name", "MeetsAssignmentRules", "RuleBroken", "CarrierCost", "NotPriced",
-            ]);
+                // get_exception_timeline (#443)
+                "ExceptionNumber", "ShipmentNumber", "Type", "OpenedAt", "AfterDelivered", "CauseCleared", "ShipmentStatus", "CarriedBy", "Causes", "TrackingEvents", "CarrierBookings",
+                "ShipperNotifications", "CarrierBookingCancellations", "AgreedDeliveryWindows", "Notes", "Outcome", "ResolvedAt",
+                "Kind", "AddedAt",
+                "EventTime", "Place", "CountryCode", "Eta", "Remark", "Source", "MovedShipment",
+                "CarrierBookingNumber", "Carrier", "RequestedAt", "AnsweredAt", "ReasonText", "WithdrawnAt",
+                "Message", "SentAt",
+                "Reason", "CancelledAt", "CarrierNotTold", "AgreedAt",
+                "Text", "Planner",
+    ];
+
+    [Fact]
+    public void TheView_IsAnAllowlist_SoANewFieldIsExcludedUntilSomeoneAddsItHere()
+    {
+        var names = typeof(PlannerAgentAssignmentOptionsView).Assembly.GetTypes()
+            .Where(type => type.Namespace == typeof(PlannerAgentAssignmentOptionsView).Namespace && type.Name.StartsWith("PlannerAgent", StringComparison.Ordinal) && type.Name.EndsWith("View", StringComparison.Ordinal))
+            .SelectMany(type => type.GetProperties())
+            .Select(property => property.Name)
+            .Distinct()
+            .ToList();
+
+        names.Should().BeEquivalentTo(Allowed.Distinct());
     }
 }

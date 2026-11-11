@@ -10,8 +10,8 @@ using Norvia.Tms.Application.UnitTests.TransportOrders;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Fleet;
 using Norvia.Tms.Domain.RateCards;
-using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.Shipments;
+using Norvia.Tms.Domain.Shippers;
 using Norvia.Tms.Domain.TransportOrders;
 using NSubstitute;
 

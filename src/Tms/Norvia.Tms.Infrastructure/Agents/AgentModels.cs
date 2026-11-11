@@ -3,6 +3,7 @@ using Azure.Identity;
 using Microsoft.Extensions.AI;
 using Norvia.Agents.Definitions;
 using Norvia.Agents.Scripts;
+using Norvia.Tms.Application.Agents.Planner;
 
 namespace Norvia.Tms.Infrastructure.Agents;
 
@@ -15,5 +16,6 @@ internal static class AgentModels
             : definition.Name == "customer-service" ? CustomerServiceScript.Model()
             : definition.Name == "customer-service-reply" ? CustomerServiceReplyScript.Model()
             : definition.Name == "planner" ? PlannerScript.Model()
+            : definition.Name == DraftExceptionNoteHandler.AgentName ? PlannerExceptionNoteScript.Model()
             : throw new InvalidOperationException($"There is no scripted model for the Agent '{definition.Name}'.");
 }

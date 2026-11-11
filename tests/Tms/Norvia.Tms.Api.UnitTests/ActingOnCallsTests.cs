@@ -30,6 +30,17 @@ public sealed class ActingOnCallsTests
     }
 
     [Fact]
+    public void Check_AnAgentThatIsNotKnownForTheAction_IsRefused_AndAKnownOneIsNot()
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        ActingOnCalls.Check(errors, "Known", "planner-exception-note", "run-7", ["planner-exception-note"]);
+        ActingOnCalls.Check(errors, "Unknown", "customer-service", "run-7", ["planner-exception-note"]);
+
+        errors.Keys.Should().BeEquivalentTo("Unknown");
+    }
+
+    [Fact]
     public void Check_TooLong_IsRefused()
     {
         var errors = new Dictionary<string, string[]>();

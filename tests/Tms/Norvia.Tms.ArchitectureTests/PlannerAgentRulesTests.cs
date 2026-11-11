@@ -28,9 +28,25 @@ public sealed class PlannerAgentRulesTests
         var contract = Contract(definition.Tools.Server);
 
         definition.Tools.Names.Should().Equal("get_assignment_options");
-        contract.Tools.Should().ContainSingle().Which.Path.Should().EndWith("/assignment-options");
+        contract.Tools.Select(tool => tool.Name).Should().Equal("get_assignment_options", "get_exception_timeline");
+        contract.Tools.Single(tool => tool.Name == "get_assignment_options").Path.Should().EndWith("/assignment-options");
         contract.Tools.Should().OnlyContain(tool => tool.IsRead, "an Agent has no write tool (ADR 0040)");
         contract.Unknown(definition).Should().BeEmpty();
+        definition.Model.MaxToolCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public void TheDraftNoteAgent_HasExactlyOneTool_AReadOfTheExceptionTimeline_OnThePlannersServerAndRole()
+    {
+        var definition = Definition("planner-exception-note");
+        var contract = Contract(definition.Tools.Server);
+
+        definition.Tools.Server.Should().Be(Definition("planner").Tools.Server);
+        definition.Tools.Names.Should().Equal("get_exception_timeline");
+        contract.Tools.Single(tool => tool.Name == "get_exception_timeline").Path.Should().EndWith("/timeline");
+        contract.Tools.Should().OnlyContain(tool => tool.IsRead, "an Agent has no write tool (ADR 0040)");
+        contract.Unknown(definition).Should().BeEmpty();
+        contract.Role.Should().Be(AgentRoles.PlannerRead);
         definition.Model.MaxToolCalls.Should().Be(1);
     }
 
@@ -89,7 +105,7 @@ public sealed class PlannerAgentRulesTests
             ["param environmentName = 'env'", "param apiManagementName = 'apim'", "param apiManagementClientId = '00000000-0000-0000-0000-000000000002'", "param tmsAgentApiAppId = '00000000-0000-0000-0000-000000000003'"]);
 
         resources.Where(resource => resource["type"]!.GetValue<string>() == "Microsoft.ApiManagement/service/apis/tools")
-            .Select(tool => tool["properties"]!["displayName"]!.GetValue<string>()).Should().Equal("get_assignment_options");
+            .Select(tool => tool["properties"]!["displayName"]!.GetValue<string>()).Should().Equal("get_assignment_options", "get_exception_timeline");
         var app = resources.Single(resource => resource["type"]!.GetValue<string>() == "Microsoft.Graph/applications@v1.0")["properties"]!;
         app["displayName"]!.GetValue<string>().Should().Be("Norvia planner agent view (env)", "assign-agent-roles.ps1 looks the view up by this name");
         app["appRoles"]!.AsArray().Select(role => role!["value"]!.GetValue<string>()).Should().Equal(AgentRoles.PlannerRead);

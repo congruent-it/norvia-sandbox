@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
 @using Norvia.Tms.Application.Exceptions.ListOpen
+@using Norvia.Tms.Web.Roles
 @using Norvia.Tms.Web.TransportOrders
 @implements IAsyncDisposable
 @inject ITransportOrderQueries Queries
@@ -23,7 +24,7 @@
 @if (_action is var (number, kind) && _list.Items?.FirstOrDefault(exception => exception.ExceptionNumber == number) is { } acting)
 {
     @* Keyed by the Exception and the action, so a new choice starts a new form. *@
-    <ExceptionActionPanel @key="(number, kind)" OpenException="acting" Kind="kind" OnClosed="CloseAction" OnDone="Done" />
+    <ExceptionActionPanel @key="(number, kind)" OpenException="acting" Kind="kind" ForPlanner="RoleKey == NorviaRole.Planner.Key" OnClosed="CloseAction" OnDone="Done" />
 }
 
 <LiveListStates Items="_list.Items" LastReadFailed="_list.LastReadFailed" Name="Open Exceptions"
@@ -88,8 +89,17 @@
     private (string Number, ExceptionActionKind Kind)? _action;
     private string? _done;
 
+    // The role comes from the request's cookie. The page is interactive, so it reads the role while it prerenders and carries it into the
+    // circuit; a page that couldn't read it shows no Draft note button.
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    [PersistentState]
+    public string? RoleKey { get; set; }
+
     protected override void OnInitialized()
     {
+        RoleKey ??= HttpContext is null ? null : NorviaRole.Current(HttpContext.Request).Key;
         _list = new LiveTransportOrderList<OpenExceptionSummary>(
             Queries.ListOpenExceptionsAsync, "the Open Exceptions", Time, Options.Value.RefreshInterval, Logger);
         _list.Changed += () => InvokeAsync(StateHasChanged);
