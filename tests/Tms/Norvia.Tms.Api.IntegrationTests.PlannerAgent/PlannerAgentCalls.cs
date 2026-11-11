@@ -124,11 +124,6 @@ internal static class PlannerAgentCalls
         return (result["isError"]!.GetValue<bool>(), result["content"]![0]!["text"]!.GetValue<string>());
     }
 
-    /// <summary>The Agent's run, as the TMS UI runs it in process: its definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
-    public static Task<AgentRunResult> SuggestAsync(
-        PlannerAgentFixture fixture, string agentId, string transportOrderNumber, string correlationId, CancellationToken cancellationToken) =>
-        RunAsync(fixture, agentId, "planner.agent.yaml", PlannerScript.Model(), PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, cancellationToken);
-
     /// <summary>Calls <c>get_exception_timeline</c> and returns the text the tool answered with, which must be a success.</summary>
     public static async Task<string> TimelineTextOfAsync(this HttpClient client, string exceptionNumber, CancellationToken cancellationToken)
     {
