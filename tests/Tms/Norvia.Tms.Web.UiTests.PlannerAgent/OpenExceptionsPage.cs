@@ -48,6 +48,24 @@ public abstract class OpenExceptionsPage(PlannerAgentUiFixture fixture) : Browse
         return note;
     }
 
+    protected ILocator NotifyPanel(string exceptionNumber) => Page.GetByRole(AriaRole.Group, new() { Name = $"Notify Shipper of {exceptionNumber}" });
+
+    /// <summary>Opens the Notify Shipper panel of the Exception, which starts from the template, and returns its message box.</summary>
+    protected async Task<ILocator> OpenNotifyPanelAsync(string exceptionNumber)
+    {
+        await RowOf(exceptionNumber).GetByRole(AriaRole.Button, new() { Name = $"Notify Shipper of {exceptionNumber}" }).ClickAsync();
+        var message = NotifyPanel(exceptionNumber).GetByRole(AriaRole.Textbox, new() { Name = "Message to the Shipper" });
+        await Expect(message).Not.ToHaveValueAsync(string.Empty);
+        return message;
+    }
+
+    /// <summary>Presses Draft message in the open Notify Shipper panel and waits until the assistant's draft has replaced the template the box started from.</summary>
+    protected async Task DraftMessageAsync(string exceptionNumber, ILocator message, string template)
+    {
+        await NotifyPanel(exceptionNumber).GetByRole(AriaRole.Button, new() { Name = $"Draft message for {exceptionNumber}" }).ClickAsync();
+        await Expect(message).Not.ToHaveValueAsync(template, new() { Timeout = AgentTimeout });
+    }
+
     /// <summary>Adds the note in the open panel, waits for the page to confirm it, then opens the list again to read what was stored (this fixture slows the live list down).</summary>
     protected async Task AddNoteAndReopenAsync(string exceptionNumber)
     {
