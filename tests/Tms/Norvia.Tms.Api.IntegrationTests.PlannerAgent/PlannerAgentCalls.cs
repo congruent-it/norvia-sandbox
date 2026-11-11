@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.AI;
 using Norvia.Agents.Definitions;
 using Norvia.Agents.Runner;
 using Norvia.Agents.Scripts;
@@ -124,18 +125,9 @@ internal static class PlannerAgentCalls
     }
 
     /// <summary>The Agent's run, as the TMS UI runs it in process: its definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
-    public static async Task<AgentRunResult> SuggestAsync(
-        PlannerAgentFixture fixture, string agentId, string transportOrderNumber, string correlationId, CancellationToken cancellationToken)
-    {
-        var definition = AgentDefinitionLoader.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", "planner.agent.yaml"), cancellationToken));
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", fixture.AgentToken(agentId));
-        var runner = new AgentRunner(PlannerScript.Model(), new McpToolSource(http, fixture.McpAddress), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
-        return await runner.RunAsync(
-            definition,
-            new AgentQuestion(PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, Guid.NewGuid().ToString("N")),
-            cancellationToken);
-    }
+    public static Task<AgentRunResult> SuggestAsync(
+        PlannerAgentFixture fixture, string agentId, string transportOrderNumber, string correlationId, CancellationToken cancellationToken) =>
+        RunAsync(fixture, agentId, "planner.agent.yaml", PlannerScript.Model(), PlannerQuestions.SuggestAssignment(transportOrderNumber), correlationId, cancellationToken);
 
     /// <summary>Calls <c>get_exception_timeline</c> and returns the text the tool answered with, which must be a success.</summary>
     public static async Task<string> TimelineTextOfAsync(this HttpClient client, string exceptionNumber, CancellationToken cancellationToken)
@@ -145,18 +137,24 @@ internal static class PlannerAgentCalls
         return text;
     }
 
-    /// <summary>The Agent's draft of a note on the Exception, as the TMS UI runs it in process: the note definition, the scripted model and the stand-in's tool, with the Agent's token.</summary>
-    public static async Task<AgentRunResult> DraftNoteAsync(
-        PlannerAgentFixture fixture, string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken)
+    /// <summary>The Agent's draft of a note on the Exception, run as the TMS UI runs it: the note definition and its scripted model.</summary>
+    public static Task<AgentRunResult> DraftNoteAsync(
+        PlannerAgentFixture fixture, string agentId, string exceptionNumber, string correlationId, CancellationToken cancellationToken) =>
+        RunAsync(fixture, agentId, "planner-exception-note.agent.yaml", PlannerExceptionNoteScript.Model(), PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, cancellationToken);
+
+    /// <summary>What a timeline holds beyond the Consignee, street and postcode values of <see cref="NeverForTheAgent"/>: the Tracking event's own postcode too. Bare digits are left out, as IDs may hold them.</summary>
+    public static readonly string[] NeverInATimeline =
+    [
+        .. NeverForTheAgent.Where(never => never.Length > 4 && never is not ("street" or "instructions" or "consignee")), "3011 AA", "3011AA",
+    ];
+
+    private static async Task<AgentRunResult> RunAsync(
+        PlannerAgentFixture fixture, string agentId, string definitionFile, IChatClient model, string question, string correlationId, CancellationToken cancellationToken)
     {
-        var definition = AgentDefinitionLoader.Parse(
-            await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", "planner-exception-note.agent.yaml"), cancellationToken));
+        var definition = AgentDefinitionLoader.Parse(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "agents", definitionFile), cancellationToken));
         using var http = new HttpClient();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", fixture.AgentToken(agentId));
-        var runner = new AgentRunner(PlannerExceptionNoteScript.Model(), new McpToolSource(http, fixture.McpAddress), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
-        return await runner.RunAsync(
-            definition,
-            new AgentQuestion(PlannerQuestions.DraftExceptionNote(exceptionNumber), correlationId, Guid.NewGuid().ToString("N")),
-            cancellationToken);
+        var runner = new AgentRunner(model, new McpToolSource(http, fixture.McpAddress), new AgentRunnerOptions(TimeSpan.FromSeconds(30)));
+        return await runner.RunAsync(definition, new AgentQuestion(question, correlationId, Guid.NewGuid().ToString("N")), cancellationToken);
     }
 }

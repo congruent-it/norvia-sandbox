@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Norvia.Tms.Application.Agents.Planner;
 using Norvia.Tms.TestSupport.Exceptions;
 using Norvia.Tms.TestSupport.TrackingEvents;
 
@@ -17,6 +16,9 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
 
     private static DateTimeOffset LateEta => WindowLatest.AddHours(3);
 
+    // Written out, not read from the handler's constant, so a changed name shows.
+    private const string NoteAgentName = "planner-exception-note";
+
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
@@ -25,11 +27,9 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
         var (shipmentNumber, reference) = await fixture.BookedShipmentAsync(_cancellationToken);
         await fixture.RecordedAsync(TrackingEventCalls.Event("Departed", reference, DateTimeOffset.UtcNow.AddMinutes(-1), eta: LateEta), _cancellationToken);
         var exceptionNumber = await OpenExceptionOfAsync(shipmentNumber);
-        using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
-        var text = await client.TimelineTextOfAsync(exceptionNumber, _cancellationToken);
+        var timeline = await TimelineAsync(exceptionNumber);
 
-        var timeline = JsonNode.Parse(text)!;
         timeline["exceptionNumber"]!.GetValue<string>().Should().Be(exceptionNumber);
         timeline["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
         timeline["type"]!.GetValue<string>().Should().Be("LateDelivery");
@@ -40,7 +40,6 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
         departed["source"]!.GetValue<string>().Should().Be(PlanningCalls.CarrierId, "the Planner sees who reported it");
         DateTimeOffset.Parse(departed["eta"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture).Should().Be(LateEta);
         timeline["carrierBookings"]!.AsArray().Single()!["status"]!.GetValue<string>().Should().Be("Confirmed");
-        text.Should().NotContainAny(NeverInATimeline(), "the Agent reads no Consignee, street or postcode");
     }
 
     [Fact]
@@ -49,11 +48,9 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
         var (shipmentNumber, carrierBookingNumber, _, exceptionNumber) = await fixture.BookedWithDeliveryFailedAsync(_cancellationToken);
         using var noted = await fixture.AddNoteAsync(exceptionNumber, ExceptionCalls.Note("Phoned the Carrier, redelivery Thursday"), _cancellationToken);
         noted.StatusCode.Should().Be(HttpStatusCode.OK);
-        using var client = fixture.CreateMcpClient(fixture.AgentToken());
 
-        var text = await client.TimelineTextOfAsync(exceptionNumber, _cancellationToken);
+        var timeline = await TimelineAsync(exceptionNumber);
 
-        var timeline = JsonNode.Parse(text)!;
         timeline["type"]!.GetValue<string>().Should().Be("DeliveryFailed");
         timeline["shipmentNumber"]!.GetValue<string>().Should().Be(shipmentNumber);
         timeline["status"]!.GetValue<string>().Should().Be("Open");
@@ -64,32 +61,25 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
         booking["status"]!.GetValue<string>().Should().Be("Confirmed");
         timeline["carrierBookingCancellations"]!.AsArray().Should().BeEmpty("nothing was cancelled yet");
         timeline["notes"]!.AsArray().Single()!["text"]!.GetValue<string>().Should().Be("Phoned the Carrier, redelivery Thursday");
-        text.Should().NotContainAny(NeverInATimeline(), "the Agent reads no Consignee, street or postcode");
     }
 
-    [Fact]
-    public async Task ANoteSavedFromADraft_NamesTheAgentAndItsRunOnItsTrace_EditedOrNot()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ANoteSavedFromADraft_NamesTheAgentAndItsRunOnItsTrace_EditedOrNot(bool edited)
     {
         var (_, exceptionNumber) = await fixture.CollectedWithDeliveryFailedAsync(_cancellationToken);
-        var agentName = DraftExceptionNoteHandler.AgentName;
         var run = await PlannerAgentCalls.DraftNoteAsync(fixture, PlannerAgentFixture.NewAgentId(), exceptionNumber, Guid.NewGuid().ToString(), _cancellationToken);
         run.Suggestion.Cause.Should().NotContainAny(PlannerAgentCalls.NeverForTheAgent);
-        var edited = ExceptionCalls.Note(run.Suggestion.Cause + " Called the depot.");
-        var asDrafted = ExceptionCalls.Note(run.Suggestion.Cause);
-        foreach (var note in new[] { asDrafted, edited })
-        {
-            note["agentName"] = agentName;
-            note["agentRunId"] = run.RunId;
-        }
+        var note = ExceptionCalls.Note(edited ? run.Suggestion.Cause + " Called the depot." : run.Suggestion.Cause);
+        note["agentName"] = NoteAgentName;
+        note["agentRunId"] = run.RunId;
 
-        foreach (var note in new[] { asDrafted, edited })
-        {
-            var added = await AddedAsync(exceptionNumber, note);
+        var added = await AddedAsync(exceptionNumber, note);
 
-            var trace = await SucceededTraceAsync(added["correlationId"]!.GetValue<string>());
-            trace["agentId"].Should().Be(agentName);
-            trace["agentRunId"].Should().Be(run.RunId);
-        }
+        var trace = await SucceededTraceAsync(added["correlationId"]!.GetValue<string>());
+        trace["agentId"].Should().Be(NoteAgentName);
+        trace["agentRunId"].Should().Be(run.RunId);
     }
 
     [Fact]
@@ -118,7 +108,12 @@ public sealed class ExceptionNoteDraftTests(PlannerAgentFixture fixture)
     private Task<TmsLog> SucceededTraceAsync(string correlationId) =>
         fixture.TmsLogAsync(log => log["correlationId"] == correlationId && log["outcome"] == "Succeeded", _cancellationToken);
 
-    // What the Tracking event's own location holds beyond a city and a country is not for the Agent either.
-    private static string[] NeverInATimeline() =>
-        [.. PlannerAgentCalls.NeverForTheAgent.Where(never => never.Length > 4 && never is not ("street" or "instructions" or "consignee")), "3011 AA", "3011AA"];
+    // The timeline as the Agent reads it, which holds no Consignee, street or postcode.
+    private async Task<JsonNode> TimelineAsync(string exceptionNumber)
+    {
+        using var client = fixture.CreateMcpClient(fixture.AgentToken());
+        var text = await client.TimelineTextOfAsync(exceptionNumber, _cancellationToken);
+        text.Should().NotContainAny(PlannerAgentCalls.NeverInATimeline, "the Agent reads no Consignee, street or postcode");
+        return JsonNode.Parse(text)!;
+    }
 }
