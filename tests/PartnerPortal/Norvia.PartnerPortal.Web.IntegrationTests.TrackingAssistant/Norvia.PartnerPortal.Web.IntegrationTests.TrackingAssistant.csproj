@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\Norvia.Agents\Norvia.Agents.csproj" />
+    <ProjectReference Include="..\..\..\src\PartnerPortal\Norvia.PartnerPortal.Web\Norvia.PartnerPortal.Web.csproj" Aliases="PortalWeb" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- One fixture starts the AppHost bar the UIs; each test starts a portal of its own in the tests' process and runs one at a time. -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\seed\norvia.seed.json" Link="norvia.seed.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\agents\shipper-tracking-assistant.agent.yaml" Link="shipper-tracking-assistant.agent.yaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
