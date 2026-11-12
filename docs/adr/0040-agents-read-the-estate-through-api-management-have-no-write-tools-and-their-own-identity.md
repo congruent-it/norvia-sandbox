@@ -27,7 +27,7 @@ Norvia's staff get **Agents**, built on Microsoft Foundry (Foundry Agent Service
 - **Foundry connected straight to the applications or to Azure (the Azure MCP server):** no API Management work, but nothing is on a Message trail, role scoping is per application, and the estate's single door and rate limiting are bypassed.
 - **One shared identity for all Agents:** fewer role assignments, but a single role would be the union of every Agent's tools, and one Agent's compromise reaches them all.
 - **Suggestions stored as a domain concept** (a table in each application): an audit of what was proposed, but a new system of record in every application for text that is only advice. The history is the telemetry, which the Integration console already reads.
-- **Agents that call the Shipper-facing tracking API on a Shipper's behalf:** the Shipper's token would have to pass through the Agent. That is a different, higher risk (an external user, free text, a made-up delivery date) and needs its own ADR before it is built (#428).
+- **Agents that call the Shipper-facing tracking API on a Shipper's behalf:** the Shipper's token would have to pass through the Agent. That is a different, higher risk (an external user, free text, a made-up delivery date). [ADR 0049](0049-the-shipper-tracking-assistant-has-no-tools-and-only-restates-what-the-portal-fetched-with-the-personas-token.md) decides it another way: the portal calls the tracking API with the Persona's token and the Agent gets the result as input, with no tool (#428).
 
 ## Consequences
 
