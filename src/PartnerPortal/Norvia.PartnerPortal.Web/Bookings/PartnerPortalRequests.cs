@@ -34,6 +34,7 @@ using Norvia.PartnerPortal.Application.ShipperTracking.DownloadFile;
 using Norvia.PartnerPortal.Application.ShipperTracking.FindTransportOrder;
 using Norvia.PartnerPortal.Application.ShipperTracking.GetTransportOrder;
 using Norvia.PartnerPortal.Application.ShipperTracking.List;
+using Norvia.PartnerPortal.Application.TrackingAssistant;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.CarrierShipments;
@@ -46,6 +47,19 @@ namespace Norvia.PartnerPortal.Web.Bookings;
 /// </summary>
 internal sealed class PartnerPortalRequests(IServiceScopeFactory scopes) : IPartnerPortal
 {
+    public bool TrackingAssistantEnabled
+    {
+        get
+        {
+            using var scope = scopes.CreateScope();
+            return scope.ServiceProvider.GetRequiredService<IAssistantSwitch>().Enabled;
+        }
+    }
+
+    public Task<AssistantAnswer> AskTrackingAssistantAsync(
+        PersonaId personaId, string question, IReadOnlyList<AssistantTurn> history, string? openOrderNumber, CancellationToken cancellationToken) =>
+        SendAsync(new AskTrackingAssistantCommand(personaId, question, history, openOrderNumber), cancellationToken);
+
     public Task<IReadOnlyList<FaultView>> ListFaultsAsync(CancellationToken cancellationToken) =>
         SendAsync(new ListFaultsQuery(), cancellationToken);
 

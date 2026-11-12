@@ -1073,6 +1073,9 @@ else
             .WithEnvironment("Agents__Api__Audience", LocalTokens.ConsoleAgentApiAudience);
         // The Intake agent's Booking drafts: the Partner API stand-in runs it in process with the scripted fake. It has no tools, so it needs no token.
         partnerApi.WithEnvironment("Agents__Enabled", "true");
+        // The Shipper tracking assistant (ADR 0049): the Partner portal fetches the tracking data with the Persona's own token and runs the Agent in process with the
+        // scripted fake. The Agent has no tool, so there is no MCP stand-in and no token for it. The counters of its limits are in memory: one replica.
+        partnerPortal.WithEnvironment("Agents__Enabled", "true");
         // The Simulator's plans get their pools of Carrier texts from the personas agent, which has no tools: it needs no stand-in and no token.
         simulator.WithEnvironment("Agents__Enabled", "true");
         // A developer's own model deployment in Foundry replaces the scripted fake (Agents:Model:Endpoint, optionally Agents:Model:Deployment).

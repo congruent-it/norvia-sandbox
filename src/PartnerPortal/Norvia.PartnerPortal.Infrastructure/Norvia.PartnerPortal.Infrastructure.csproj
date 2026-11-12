@@ -12,6 +12,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Norvia.PartnerPortal.Application\Norvia.PartnerPortal.Application.csproj" />
     <ProjectReference Include="..\..\Norvia.ServiceDefaults\Norvia.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Norvia.Agents\Norvia.Agents.csproj" />
+  </ItemGroup>
+  <!-- The Shipper tracking assistant's definition, which the in-process runner reads as the Foundry deployment script reads it (ADR 0040, ADR 0049). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\agents\shipper-tracking-assistant.agent.yaml" LogicalName="agents/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.PartnerPortal.Infrastructure.UnitTests" />

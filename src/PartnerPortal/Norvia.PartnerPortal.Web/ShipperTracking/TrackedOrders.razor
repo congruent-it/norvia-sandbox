@@ -26,6 +26,8 @@ else
 {
     <p class="mb-6">Where @Persona.DisplayName's Transport Orders stand, newest collection first. The screen asks Norvia again every @PollSeconds seconds. Times are local to the place they are about.</p>
 
+    <TrackingAssistantPanel PersonaId="PersonaKey" />
+
     <form role="search" class="mb-6 flex max-w-3xl flex-wrap items-end gap-4" @onsubmit="SearchAsync" @onsubmit:preventDefault>
         <div class="grow">
             <label for="tracking-search" class="lux-label">Transport Order number or Shipper reference</label>

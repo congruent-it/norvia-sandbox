@@ -83,6 +83,22 @@ public sealed class DependencyRuleTests
             .ShouldNot().HaveDependencyOnAny("Norvia.Tms", "Norvia.Integration"));
     }
 
+    [Fact]
+    public void OnlyInfrastructure_ReferencesTheFoundrySdkOrTheAgentsRunner()
+    {
+        // ADR 0049: the Foundry client is the Partner portal's Infrastructure; the layers around it know the port and nothing about the model.
+        ShouldHold(Types.InAssemblies([Domain, Application, Web])
+            .That().DoNotHaveName("Program")
+            .ShouldNot().HaveDependencyOnAny("Azure.AI", "Azure.Identity", "Norvia.Agents", "Microsoft.Extensions.AI", "OpenAI"));
+    }
+
+    [Fact]
+    public void TheAssistantsPort_IsOwnedByTheApplicationLayer()
+    {
+        typeof(Norvia.PartnerPortal.Application.TrackingAssistant.IAgentClient).Assembly.Should().BeSameAs(Application);
+        ShouldHold(Types.InAssembly(Infrastructure).That().ImplementInterface(typeof(Norvia.PartnerPortal.Application.TrackingAssistant.IAgentClient)).Should().ResideInNamespace("Norvia.PartnerPortal.Infrastructure.Assistant"));
+    }
+
     private static void ShouldHold(ConditionList rule)
     {
         var result = rule.GetResult();

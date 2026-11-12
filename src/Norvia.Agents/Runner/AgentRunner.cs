@@ -34,7 +34,7 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
 
     /// <summary>Runs the loop of an Agent without tools to its final reply as it came, for a caller that reads and checks the reply itself.</summary>
     public Task<ReplyRunResult> RunReplyAsync(Definitions.AgentDefinition definition, AgentQuestion question, CancellationToken cancellationToken) =>
-        GuardedAsync(definition, question, transcript => new ReplyRunResult(question.RunId, JsonReplies.WithoutFence(transcript.Reply)), cancellationToken);
+        GuardedAsync(definition, question, transcript => new ReplyRunResult(question.RunId, JsonReplies.WithoutFence(transcript.Reply), transcript.Tokens), cancellationToken);
 
     private async Task<T> GuardedAsync<T>(Definitions.AgentDefinition definition, AgentQuestion question, Func<Transcript, T> finish, CancellationToken cancellationToken)
     {
@@ -76,16 +76,18 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
         List<ChatMessage> messages = [new(ChatRole.System, definition.Instructions), new(ChatRole.User, question.Text)];
         var calls = new List<ToolCallRecord>();
         var results = new Dictionary<string, ToolResultText>(StringComparer.Ordinal);
+        var tokens = 0;
 
         while (true)
         {
             var response = await model.GetResponseAsync(messages, chat, cancellationToken);
             messages.AddRange(response.Messages);
+            tokens += (int)(response.Usage?.TotalTokenCount ?? 0);
 
             var requested = response.Messages.SelectMany(message => message.Contents).OfType<FunctionCallContent>().ToList();
             if (requested.Count == 0)
             {
-                return new Transcript(response.Text, calls, results);
+                return new Transcript(response.Text, calls, results, tokens);
             }
 
             var answers = new List<AIContent>();
@@ -113,7 +115,7 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
     }
 
     // What a loop ended with: the model's last reply, the calls it made and what each returned.
-    private sealed record Transcript(string Reply, IReadOnlyList<ToolCallRecord> Calls, IReadOnlyDictionary<string, ToolResultText> Results);
+    private sealed record Transcript(string Reply, IReadOnlyList<ToolCallRecord> Calls, IReadOnlyDictionary<string, ToolResultText> Results, int Tokens);
 
     private static async Task<string> InvokeAsync(AIFunction tool, FunctionCallContent call, CancellationToken cancellationToken)
     {
