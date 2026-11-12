@@ -185,6 +185,9 @@ jobs:
           - application: Partner portal (Carrier and Shipper faults)
             directory: PartnerPortal
             kinds: IntegrationTests.Faults
+          - application: Partner portal (Shipper tracking assistant)
+            directory: PartnerPortal
+            kinds: IntegrationTests.TrackingAssistant
           - application: Partner portal (UI, Intake agent)
             directory: PartnerPortal
             kinds: UiTests.IntakeAgent
