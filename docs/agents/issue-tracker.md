@@ -32,6 +32,14 @@ A feature issue covers the code and its unit and architecture tests (80% line co
 
 Both are blocked by the feature issue. Open them when the feature issue is written, so the cases are chosen while the design is fresh, and move the feature's `Testing Decisions` cases to the issue they belong to. Post-deploy smoke runs stay with the issue that deploys. Create them with `gh issue create`, make each a GitHub sub-issue of the feature issue (`gh api --method POST repos/<owner>/<repo>/issues/<feature>/sub_issues -F sub_issue_id=<database id>`) with a native `blocked_by` dependency on it (see Wayfinding operations), begin the body with `Blocked by #<feature>`, and label them `needs-triage` or `ready-for-agent` like any issue. In the feature issue, replace the test criteria with `Integration tests: #<n>` and `UI tests: #<n>`.
 
+## Refining an old issue
+
+An issue's body is a snapshot from when it was written. Before you refine or build one, check it against what has landed since:
+
+- **Blockers.** For each `Blocked by #<n>` line and each phrase such as "an ADR (to write)", run `gh issue view <n>`. A closed blocker is gone: remove the line.
+- **Decisions.** Find the ADRs that touch the issue's area (`grep -il <term> docs/adr/*`) and read them. A question the issue lists as open that an ADR settles moves to an "Already decided" section, with the ADR's number.
+- **Tests.** Run the existing test project of the area before changing it, so a failure an earlier issue left behind is known and not yours.
+
 ## Unblocking issues when you finish one
 
 When an issue is done (its PR is merged and you close it), unblock the issues that were waiting on it, in the same step:
