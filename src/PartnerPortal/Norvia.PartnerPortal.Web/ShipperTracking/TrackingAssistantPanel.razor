@@ -39,7 +39,7 @@
 }
 
 @code {
-    private const int MaxQuestionCharacters = 500;
+    private const int MaxQuestionCharacters = AssistantLimits.DefaultMaxQuestionCharacters;
 
     private readonly AssistantConversation _conversation = new();
     private string _question = string.Empty;

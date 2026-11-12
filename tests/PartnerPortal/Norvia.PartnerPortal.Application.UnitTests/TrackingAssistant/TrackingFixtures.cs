@@ -16,5 +16,5 @@ internal static class TrackingFixtures
     public static readonly DateTimeOffset Now = new(2030, 10, 1, 12, 0, 0, TimeSpan.Zero);
 
     public static AssistantInput Input(ShipperTrackingDetail? detail = null, IReadOnlyList<ShipperTrackingSummary>? orders = null) =>
-        AssistantInputBuilder.Build("Where is my order?", [], new TrackingData(detail ?? Detail, orders ?? [Summary("TO-0000042", "BD-1")], Found: null), Now);
+        AssistantInputBuilder.Build("Where is my order?", [], new TrackingData(detail ?? Detail, orders ?? [Summary("TO-0000042", "BD-1")], Found: null), Now, new AssistantLimits());
 }

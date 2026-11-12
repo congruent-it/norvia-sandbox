@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using Microsoft.Extensions.Options;
 using Norvia.PartnerPortal.Application.TrackingAssistant;
 
 namespace Norvia.PartnerPortal.Infrastructure.Assistant;
@@ -13,7 +15,9 @@ public sealed class AssistantOptions
     public bool Enabled { get; set; }
 
     /// <summary>How long a run may take before the Shipper is told the assistant is unavailable.</summary>
+    [Range(1, int.MaxValue)]
     public int TimeoutSeconds { get; set; } = 30;
 
+    [ValidateObjectMembers]
     public AssistantLimits Limits { get; set; } = new();
 }

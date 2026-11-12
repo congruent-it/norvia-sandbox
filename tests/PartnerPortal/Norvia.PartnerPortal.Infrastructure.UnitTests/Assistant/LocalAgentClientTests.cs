@@ -16,7 +16,7 @@ public sealed class LocalAgentClientTests
         new ShipperPlace("Utrecht", "NL"), "02-10-2030 09:00", "02-10-2030 13:00", Eta: "02-10-2030 11:30", LastUpdate: "01-10-2030 14:05", Progress: [], ProofOfDelivery: null);
 
     private static AssistantRequest Request(string question) =>
-        new("run-1", AssistantInputBuilder.Build(question, [], new TrackingData(Detail, [], null), new DateTimeOffset(2030, 10, 1, 12, 0, 0, TimeSpan.Zero)), 400);
+        new("run-1", AssistantInputBuilder.Build(question, [], new TrackingData(Detail, [], null), new DateTimeOffset(2030, 10, 1, 12, 0, 0, TimeSpan.Zero), new AssistantLimits()), 400);
 
     private static LocalAgentClient Client(IChatClient? model = null) => new(Options.Create(new AssistantOptions { Enabled = true }), NullLogger<LocalAgentClient>.Instance, model);
 

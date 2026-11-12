@@ -58,7 +58,7 @@ public static partial class AnswerCheck
     private static HashSet<string> Tokens(string text)
     {
         var tokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pattern in new[] { Date(), Time(), TransportOrder(), Number() })
+        foreach (var pattern in new[] { TrackingPatterns.Date(), TrackingPatterns.Time(), TransportOrder(), Number() })
         {
             foreach (Match match in pattern.Matches(text))
             {
@@ -73,12 +73,6 @@ public static partial class AnswerCheck
 
     [GeneratedRegex(@"^(?<name>[A-Za-z][A-Za-z0-9]*)(\[(?<index>\d+)\])?$")]
     private static partial Regex PathPart();
-
-    [GeneratedRegex(@"(?<!\d)\d{2}-\d{2}-\d{4}(?!\d)")]
-    private static partial Regex Date();
-
-    [GeneratedRegex(@"(?<!\d)\d{1,2}:\d{2}(?!\d)")]
-    private static partial Regex Time();
 
     [GeneratedRegex(@"\bTO-\d{7}\b", RegexOptions.IgnoreCase)]
     private static partial Regex TransportOrder();

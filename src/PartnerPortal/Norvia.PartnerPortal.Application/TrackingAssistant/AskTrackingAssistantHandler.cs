@@ -28,7 +28,7 @@ public sealed partial class AskTrackingAssistantHandler(
     public const string Flow = "shipper-tracking-assistant";
 
     /// <summary>The Agent's name, which is also the <c>agentId</c> of its spans.</summary>
-    public const string AgentName = "shipper-tracking-assistant";
+    public const string AgentName = Flow;
 
     public async ValueTask<AssistantAnswer> Handle(AskTrackingAssistantCommand command, CancellationToken cancellationToken)
     {
@@ -41,7 +41,7 @@ public sealed partial class AskTrackingAssistantHandler(
         span?.SetTag("partyId", command.PersonaId.Value);
         span?.SetTag("agentId", AgentName);
         span?.SetTag("runId", runId);
-        using var trail = logger.BeginScope(new Dictionary<string, object?> { ["flow"] = Flow, ["partyId"] = command.PersonaId.Value, ["runId"] = runId });
+        using var trail = logger.BeginScope(new Dictionary<string, object?> { ["flow"] = Flow, ["partyId"] = command.PersonaId.Value, ["agentId"] = AgentName, ["runId"] = runId });
 
         var correlationIds = new List<string>();
         var tokens = 0;

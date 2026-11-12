@@ -145,7 +145,7 @@ Every flow records the same keys under the same names, so the [Integration conso
 | `partyId` | The Shipper or Carrier ID from the token (ADR 0005) |
 | `transportOrderNumber`, `shipmentNumber`, `carrierBookingNumber`, `tripNumber`, `documentNumber` (a Shipper invoice or Credit note) | The business keys the message carries |
 | `sourceMessageId` | The Carrier's event ID or document ID, or the Driver app event ID |
-| `outcome` | `Succeeded`, `Refused`, `Retrying`, `DeadLettered` or `Failed` |
+| `outcome` | `Succeeded`, `Refused`, `Retrying`, `DeadLettered` or `Failed`. The Shipper tracking assistant's run says `Answered` for `Succeeded` ([ADR 0049](adr/0049-the-shipper-tracking-assistant-has-no-tools-and-only-restates-what-the-portal-fetched-with-the-personas-token.md)) |
 | `failureCode` | The stable failure code, when there is one |
 | `fault` | The name of the runtime Fault (`driver-app-unavailable`) that made the hop fail. Set only by the application the Fault breaks, on the hop it caused, and on the log of the switch itself; the Integration console shows it |
 | `agentId` | The calling Agent's identity, the token's `azp` (set by an Agent MCP server's policy, ADR 0040) |

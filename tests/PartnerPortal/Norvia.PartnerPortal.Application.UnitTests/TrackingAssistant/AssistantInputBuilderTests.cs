@@ -6,7 +6,7 @@ namespace Norvia.PartnerPortal.Application.UnitTests.TrackingAssistant;
 public sealed class AssistantInputBuilderTests
 {
     private static AssistantInput Build(string question, IReadOnlyList<AssistantTurn>? turns = null, TrackingData? data = null, AssistantLimits? limits = null) =>
-        AssistantInputBuilder.Build(question, turns ?? [], data ?? new TrackingData(TrackingFixtures.Detail, [], null), TrackingFixtures.Now, limits);
+        AssistantInputBuilder.Build(question, turns ?? [], data ?? new TrackingData(TrackingFixtures.Detail, [], null), TrackingFixtures.Now, limits ?? new AssistantLimits());
 
     [Fact]
     public void Build_HasTheThreeDelimitedParts()
@@ -55,6 +55,15 @@ public sealed class AssistantInputBuilderTests
 
         input.Data["orders"]!.AsArray().Count.Should().Be(20);
         input.Data["detail"]!["progress"]!.AsArray().Count.Should().Be(20);
+    }
+
+    [Fact]
+    public void Build_TellsTheModelWhenItCutTheData_SoTheAnswerCannotClaimToHaveSeenItAll()
+    {
+        var orders = Enumerable.Range(1, 21).Select(i => TrackingFixtures.Summary($"TO-{i:0000000}")).ToList();
+
+        Build("hi", data: new TrackingData(TrackingFixtures.Detail, orders, null)).Data["truncated"]!.GetValue<bool>().Should().BeTrue();
+        Build("hi").Data["truncated"]!.GetValue<bool>().Should().BeFalse();
     }
 
     [Fact]

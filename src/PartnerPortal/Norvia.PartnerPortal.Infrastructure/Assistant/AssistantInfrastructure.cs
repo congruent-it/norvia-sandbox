@@ -16,10 +16,7 @@ public static class AssistantInfrastructure
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.Services.AddOptions<AssistantOptions>().BindConfiguration(AssistantOptions.SectionName)
-            .Validate(options => options.TimeoutSeconds > 0, "Agents:TimeoutSeconds must be at least 1.")
-            .Validate(options => options.Limits.QuestionsPerMinute > 0 && options.Limits.QuestionsPerHour > 0 && options.Limits.MaxQuestionCharacters > 0
-                && options.Limits.MaxOrders > 0 && options.Limits.MaxEventsPerOrder > 0 && options.Limits.MaxOutputTokens > 0
-                && options.Limits.DailyTokensPerPersona > 0 && options.Limits.DailyTokensEstate > 0, "Every Agents:Limits value must be at least 1.")
+            .ValidateDataAnnotations()
             .ValidateOnStart();
         builder.Services.AddSingleton(services => services.GetRequiredService<IOptions<AssistantOptions>>().Value.Limits);
         builder.Services.AddSingleton<AssistantLimiter>();
