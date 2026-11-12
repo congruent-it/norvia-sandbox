@@ -2,6 +2,25 @@
 
 One file per Agent, `<name>.agent.yaml` ([ADR 0040](../docs/adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)): the Agent's instructions, tool list and model settings, versioned in the repo and never edited in the portal. Two readers use the same file: the in-process runner in `Norvia.Agents` ([ADR 0041](../docs/adr/0041-locally-an-in-process-runner-and-an-mcp-stand-in-play-foundry-and-api-managements-mcp-server.md)), through `AgentDefinitionLoader`, and `infra/deploy-agents.ps1`, which publishes each file as a Foundry prompt agent. It is plain YAML, so a script reads it with `yq`.
 
+## Wiring a new Agent that calls MCP tools
+
+Start from a reference, not from the list below: `git show --stat 01add106` is `planner-notification` (#444), a complete Agent with two tools on its own MCP server, and `12e7f0ef` is `planner` (#440). Copy the touchpoints of the closest one, renamed. Every touchpoint is a file or folder; the architecture tests (`tests/Tms/Norvia.Tms.ArchitectureTests/*AgentRulesTests.cs`, one per Agent) fail when the definition and the tool list disagree or a tool writes.
+
+| Touchpoint | Where |
+|---|---|
+| Definition | `agents/<name>.agent.yaml` (fields below), a row in this file |
+| Tool list, one per MCP server | `contracts/agent-mcp/<server>.tools.json` |
+| Agent view of the data, in the application that owns it | `src/Tms/Norvia.Tms.Api/Agents/<Name>AgentEndpoints.cs`, its handler and query under `src/Tms/Norvia.Tms.Application/Agents/`, the route in `Program.cs`, the role in `AgentRoles.cs`, the operation in `docs/applications/openapi/tms.v1.json` |
+| Local run | Script and questions in `src/Norvia.Agents/Scripts/` and `Runner/`, the server in `src/Integration/Norvia.Integration.LocalAgentMcp/` (`AgentServers.cs`, `AgentMcpOptions.cs`, `Program.cs`), the Agent's token in `src/Norvia.AppHost/LocalTokens.cs`, its wiring in `AppHost.cs` |
+| The UI that asks it | `src/Tms/Norvia.Tms.Infrastructure/Agents/` (`LocalAgentClient.cs`, `AgentClientOptions.cs`) and `src/Tms/Norvia.Tms.Web/Agents/` (`IExplainRequests.cs`, `ExplainRequests.cs`, the panel) |
+| Azure | `infra/estate/<server>-mcp.bicep`, `infra/estate.bicep`, `infra/deploy-agents.ps1`, `infra/assign-agent-roles.ps1` |
+| Tests | `tests/Integration/Norvia.Agents.UnitTests/`, `tests/Integration/Norvia.Integration.LocalAgentMcp.UnitTests/`, the Api, Application, Infrastructure and Web unit projects of the application, the Agent's `*AgentRulesTests.cs`. Integration and UI tests are separate issues |
+| Docs | `docs/architecture/identity-and-access.md`, `local-vs-azure.md`, `failure-behaviour.md`, the process page under `docs/processes/`, `docs/applications/<app>.md`, and `GLOSSARY.md` for a new term |
+
+An Agent with no MCP tools, or one that the Partner Portal asks rather than the TMS (`shipper-tracking-assistant`, #878: `git show --stat 52f4e6b3`), skips the tool list, the Api view and the Azure MCP module, and keeps the rest.
+
+## Definition fields
+
 | Field | Meaning |
 |---|---|
 | `name` | The Agent's name: lower-case letters, digits and hyphens, and the file's name before `.agent.yaml` |

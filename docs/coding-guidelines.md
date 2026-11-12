@@ -189,6 +189,22 @@ A key that doesn't apply is left out, never sent empty.
 
 ## 10. Testing
 
+### Where tests go
+
+Test projects live in `tests/<Application>/` and are named `Norvia.<Application>.<Layer>.<Kind>[.<Feature>]`: the layer is `Domain`, `Application`, `Infrastructure`, `Api` or `Web`; the kind is `UnitTests`, `ArchitectureTests`, `IntegrationTests` or `UiTests`. A feature suffix (`.PlannerAgent`, `.Billing`, `.Faults`) groups the cases of one feature into a project of its own, so its fixture starts its own AppHost and the project runs alone. `Norvia.<Application>.TestSupport` holds the helpers an application's integration and UI projects share. Worker, Logic App stand-in and Agent tests are under `tests/Integration/`.
+
+| You are testing | Project | Look at first |
+|---|---|---|
+| A handler, specification or domain method | `<Application>.Domain.UnitTests`, `<Application>.Application.UnitTests` | a neighbouring `*HandlerTests.cs` |
+| An endpoint's mapping, with no host | `<Application>.Api.UnitTests` | a neighbouring `*ViewTests.cs` |
+| A Blazor component | `<Application>.Web.UnitTests` (bUnit) | a neighbouring component test |
+| An Agent's scripted run, or an MCP stand-in server | `tests/Integration/Norvia.Agents.UnitTests`, `Norvia.Integration.LocalAgentMcp.UnitTests` | `Planner*Tests.cs` |
+| A dependency rule or an Agent rule | `<Application>.ArchitectureTests` | the `*RulesTests.cs` of the closest Agent |
+| An API against a real database and the AppHost | `<Application>.Api.IntegrationTests[.<Feature>]` | its `*Fixture.cs` in the project, then `TestSupport` |
+| A browser journey | `<Application>.Web.UiTests[.<Feature>]` | its `*UiFixture.cs` |
+
+A new feature that needs an AppHost gets a feature-suffixed project, not a case in the shared one. Name the integration and UI projects in their own issues ([Splitting work into issues](agents/issue-tracker.md#splitting-work-into-issues)).
+
 ### Unit tests
 
 - Use xUnit for all test projects.
