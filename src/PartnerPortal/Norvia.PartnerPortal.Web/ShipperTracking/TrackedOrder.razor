@@ -54,6 +54,8 @@ else
             <dd class="m-0">@TrackingText.Time(order.LastUpdate)</dd>
         </dl>
 
+        <TrackingAssistantPanel PersonaId="PersonaKey" OpenOrderNumber="@order.TransportOrderNumber" />
+
         <h2>Progress</h2>
         @if (order.Progress.Count == 0)
         {

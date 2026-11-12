@@ -1,0 +1,88 @@
+@* The Shipper tracking assistant's panel on the tracking screen (P8, ADR 0049). It shows only while the assistant is on. The answer is plain text, and the portal has checked it
+   against what Norvia returned for this Persona before it gets here. *@
+@inject IPartnerPortal Portal
+@using Norvia.PartnerPortal.Application.TrackingAssistant
+
+@if (Portal.TrackingAssistantEnabled)
+{
+    <section aria-labelledby="assistant-heading" class="mb-8 max-w-3xl rounded border border-border p-4">
+        <h2 id="assistant-heading">Ask about your orders</h2>
+        <p class="text-sm text-muted">Ask in English or Dutch (Nederlands). The assistant only repeats what tracking shows for your Transport Orders. It is not a promise from Norvia.</p>
+
+        <ul class="m-0 mb-4 list-none p-0" aria-label="Conversation" aria-live="polite">
+            @foreach (var entry in _conversation.Entries)
+            {
+                <li class="mb-3">
+                    <p class="m-0 font-semibold">@entry.Question</p>
+                    @if (entry.Answer.Outcome == AssistantOutcome.Answered)
+                    {
+                        <p class="m-0" data-testid="assistant-answer">@entry.Answer.Text</p>
+                    }
+                    else
+                    {
+                        <div role="status" data-testid="assistant-notice">
+                            <FluentMessageBar Intent="@IntentOf(entry.Answer)" AllowDismiss="false">@entry.Answer.Text</FluentMessageBar>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+
+        <form class="flex flex-wrap items-end gap-4" @onsubmit="AskAsync" @onsubmit:preventDefault>
+            <div class="grow">
+                <label for="assistant-question" class="lux-label">Your question</label>
+                <input id="assistant-question" type="text" class="lux-input" maxlength="@MaxQuestionCharacters" @bind="_question" @bind:event="oninput" disabled="@_asking" />
+            </div>
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Disabled="@(_asking || string.IsNullOrWhiteSpace(_question))">Ask</FluentButton>
+        </form>
+    </section>
+}
+
+@code {
+    private const int MaxQuestionCharacters = 500;
+
+    private readonly AssistantConversation _conversation = new();
+    private string _question = string.Empty;
+    private bool _asking;
+
+    [Parameter, EditorRequired]
+    public PersonaId PersonaId { get; set; } = null!;
+
+    /// <summary>The Transport Order open on the screen, if any: the assistant gets it in full.</summary>
+    [Parameter]
+    public string? OpenOrderNumber { get; set; }
+
+    private static MessageIntent IntentOf(AssistantAnswer answer) => answer.FailureCode switch
+    {
+        null => MessageIntent.Info,
+        AssistantFailureCodes.AgentAnswerRejected => MessageIntent.Info,
+        AssistantFailureCodes.AgentRateLimited => MessageIntent.Warning,
+        _ => MessageIntent.Error,
+    };
+
+    private async Task AskAsync()
+    {
+        var question = _question.Trim();
+        if (question.Length == 0 || _asking)
+        {
+            return;
+        }
+
+        _asking = true;
+        try
+        {
+            var answer = await Portal.AskTrackingAssistantAsync(PersonaId, question, _conversation.History, OpenOrderNumber, CancellationToken.None);
+            _conversation.Add(question, answer);
+            _question = string.Empty;
+        }
+        catch (Exception)
+        {
+            // The tracking screen keeps working whatever the assistant does (ADR 0040): the Shipper is told it is unavailable.
+            _conversation.Add(question, new AssistantAnswer(AssistantOutcome.Failed, AssistantTexts.Unavailable(AssistantLanguage.Detect(question)), AssistantFailureCodes.AgentUnavailable, null));
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
+}

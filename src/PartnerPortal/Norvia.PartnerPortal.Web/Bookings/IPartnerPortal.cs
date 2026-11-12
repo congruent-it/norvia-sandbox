@@ -17,6 +17,7 @@ using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.ShipperInvoices;
 using Norvia.PartnerPortal.Application.ShipperNotifications;
 using Norvia.PartnerPortal.Application.ShipperTracking;
+using Norvia.PartnerPortal.Application.TrackingAssistant;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
 using Norvia.PartnerPortal.Domain.Personas;
 using Norvia.PartnerPortal.Web.CarrierShipments;
@@ -127,6 +128,16 @@ public interface IPartnerPortal
 
     /// <summary>One of the Shipper Persona's Transport Orders by the Shipper's own reference.</summary>
     Task<TrackingAnswer<ShipperTrackingDetail>> FindTrackedTransportOrderAsync(PersonaId personaId, string shipperReference, CancellationToken cancellationToken);
+
+    /// <summary>Whether the Shipper tracking assistant is on (<c>Agents:Enabled</c>). The tracking screen shows its panel only then (ADR 0049).</summary>
+    bool TrackingAssistantEnabled { get; }
+
+    /// <summary>
+    /// Asks the Shipper tracking assistant a question about the Persona's own Transport Orders. The answer is what the Shipper is shown, the answer
+    /// itself or one of the fixed texts; a failure is an answer, never an error (ADR 0049).
+    /// </summary>
+    Task<AssistantAnswer> AskTrackingAssistantAsync(
+        PersonaId personaId, string question, IReadOnlyList<AssistantTurn> history, string? openOrderNumber, CancellationToken cancellationToken);
 
     /// <summary>A file of the Transport Order's current Proof of delivery, as Norvia streams it.</summary>
     Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(

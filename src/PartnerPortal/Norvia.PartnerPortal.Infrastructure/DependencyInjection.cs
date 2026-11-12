@@ -12,6 +12,7 @@ using Norvia.PartnerPortal.Application.DriverSignIns;
 using Norvia.PartnerPortal.Application.Faults;
 using Norvia.PartnerPortal.Application.Personas;
 using Norvia.PartnerPortal.Application.Reset;
+using Norvia.PartnerPortal.Infrastructure.Assistant;
 using Norvia.PartnerPortal.Infrastructure.Data;
 using Norvia.PartnerPortal.Infrastructure.DriverSignIns;
 using Norvia.PartnerPortal.Infrastructure.Faults;
@@ -44,6 +45,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IDriverSignInDirectory, SeedFileDriverSignInDirectory>();
 
         builder.AddNorviaPartnerApi();
+        builder.AddTrackingAssistant();
         builder.AddFaultSwitches();
 
         // The reset the Simulator's Reset estate calls (ADR 0039). Off unless the estate switches it on.

@@ -12,9 +12,15 @@ public sealed class ScriptedChatClient(Func<ScriptContext, IReadOnlyList<AIConte
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        IReadOnlyList<AIContent> contents = script(new ScriptContext(messages.ToList(), options));
+        var all = messages.ToList();
+        IReadOnlyList<AIContent> contents = script(new ScriptContext(all, options));
 
-        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, [.. contents])));
+        var response = new ChatResponse(new ChatMessage(ChatRole.Assistant, [.. contents]));
+        // A deterministic stand-in for the usage a real model reports: about four characters a token, so a run's budget can be counted locally.
+        var input = all.Sum(message => message.Text.Length) / 4;
+        var output = response.Text.Length / 4;
+        response.Usage = new UsageDetails { InputTokenCount = input, OutputTokenCount = output, TotalTokenCount = input + output };
+        return Task.FromResult(response);
     }
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>

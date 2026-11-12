@@ -130,6 +130,17 @@ While the screen is open, it polls the API every few seconds. The interval is a 
 
 The notification inbox from P7 stays where it is. The tracking screen doesn't show notifications.
 
+### Ask about your orders (the Shipper tracking assistant)
+
+While `Agents:Enabled` is on, the list and the detail also show a panel where the Persona asks a question about its own Transport Orders, in English or Dutch, such as "Where is my order?" ([ADR 0049](../../adr/0049-the-shipper-tracking-assistant-has-no-tools-and-only-restates-what-the-portal-fetched-with-the-personas-token.md), #878). The answer restates what the API returned for that Persona (the Tracking status, the ETA as an estimate with the last update time beside it, the delivery window when there is no ETA) and nothing more: no price, no cause for a delay, no promise. The portal checks the answer in code before it is shown. What the panel shows when something is wrong:
+
+- "I have no information about that" when the data does not answer the question, or the check rejected the answer (Dutch: "Daar heb ik geen informatie over.").
+- "You have asked a lot of questions. Try again in a few minutes." over a limit (Dutch: "U heeft veel vragen gesteld. Probeer het over enkele minuten opnieuw.").
+- "I can't reach tracking right now" when the portal's own fetch failed (Dutch: "Ik kan de tracking nu niet bereiken").
+- "Assistant unavailable" when the model is down (Dutch: "Assistent niet beschikbaar").
+
+The rest of the screen works as before in every case. The Partner portal's [architecture page](../../architecture/partner-portal-architecture.md#the-shipper-tracking-assistant) describes the parts.
+
 ## TMS API
 
 The Shipper tracking API returns only the Canonical Model (ADR 0003).
