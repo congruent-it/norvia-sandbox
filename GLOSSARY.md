@@ -492,6 +492,10 @@ _Avoid_: step (that is an action inside a Logic App run), span, event
 A Microsoft Foundry agent that reads the estate through API Management's MCP door and answers a person. It has its own Entra agent identity holding only read roles and no write tool, so it never changes anything: the person decides and acts (ADR 0040).
 _Avoid_: bot, copilot, AI, assistant
 
+**Shipper tracking assistant**:
+The Agent in the Partner portal that answers a Persona's questions about its own Transport Orders, in Dutch or English. It has no tool and no credential: the portal fetches the tracking data with the Persona's token and gives it to the assistant, which states only what that data holds and otherwise says it has no information (ADR 0049).
+_Avoid_: chatbot, tracking bot
+
 **Agent run**:
 One question put to an Agent, with its tool calls and its answer, identified by a run ID. It is a span in the host application, and its tool calls are hops on a Message trail tagged with the Agent's identity and the tool name.
 _Avoid_: chat, session, conversation (that is Foundry's own record of a run)
