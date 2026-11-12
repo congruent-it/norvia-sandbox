@@ -7,7 +7,7 @@ public static partial class AssistantLanguage
 {
     private static readonly HashSet<string> Dutch = new(StringComparer.OrdinalIgnoreCase)
     {
-        "waar", "mijn", "mijn", "zending", "bestelling", "wanneer", "wordt", "geleverd", "is", "het", "de", "een", "ik", "wat", "hoe", "niet", "nog", "komt", "aan", "vrachtwagen", "levering", "ophalen", "opgehaald", "onderweg", "ontvangen", "ingepland", "afgeleverd", "hoelaat", "alstublieft", "dank", "bedankt",
+        "waar", "mijn", "zending", "bestelling", "wanneer", "wordt", "geleverd", "is", "het", "de", "een", "ik", "wat", "hoe", "niet", "nog", "komt", "aan", "vrachtwagen", "levering", "ophalen", "opgehaald", "onderweg", "ontvangen", "ingepland", "afgeleverd", "hoelaat", "alstublieft", "dank", "bedankt",
     };
 
     private static readonly HashSet<string> English = new(StringComparer.OrdinalIgnoreCase)
@@ -27,10 +27,4 @@ public static partial class AssistantLanguage
 
     [GeneratedRegex(@"\p{L}+")]
     private static partial Regex Word();
-}
-
-public enum AssistantLanguageKind
-{
-    English,
-    Dutch,
 }

@@ -18,6 +18,3 @@ public sealed class AssistantConversation
 
     public void Add(string question, AssistantAnswer answer) => _entries.Add(new AssistantEntry(question, answer));
 }
-
-/// <summary>One question and what the Shipper was shown for it.</summary>
-public sealed record AssistantEntry(string Question, AssistantAnswer Answer);

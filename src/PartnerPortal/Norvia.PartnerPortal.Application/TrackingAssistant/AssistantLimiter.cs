@@ -2,18 +2,6 @@ using Norvia.PartnerPortal.Domain.Personas;
 
 namespace Norvia.PartnerPortal.Application.TrackingAssistant;
 
-/// <summary>Whether a question may reach the model.</summary>
-public enum Admission
-{
-    Allowed,
-
-    /// <summary>Over the Persona's rate, the question size or its daily token budget: <c>AgentRateLimited</c>.</summary>
-    RateLimited,
-
-    /// <summary>The estate's daily token budget is used up, so every Persona sees "Assistant unavailable": <c>AgentUnavailable</c>.</summary>
-    EstateBudgetUsed,
-}
-
 /// <summary>
 /// The portal's own limits (ADR 0049), counted in memory, so the portal runs one replica while the assistant is on. The rate and size limits count
 /// questions; the daily budgets count the tokens Foundry reports, and reset at midnight UTC.
