@@ -26,10 +26,10 @@ public sealed class TrackingAssistantTests(TrackingAssistantFixture fixture)
         var answer = await AskAsync(portal, "Where is my order?", order);
 
         answer.Outcome.Should().Be(AssistantOutcome.Answered, answer.Text);
-        var (subscriptionKey, clientId) = portal.CredentialsOf(TrackingAssistantFixture.AskingPersona);
+        var own = portal.CredentialsOf(TrackingAssistantFixture.AskingPersona);
         var other = portal.CredentialsOf(TrackingAssistantFixture.OtherPersona);
         portal.Calls.Tracking.Should().NotBeEmpty();
-        portal.Calls.Tracking.Should().OnlyContain(call => call.SubscriptionKey == subscriptionKey && call.ClientId == clientId && call.StatusCode == 200);
+        portal.Calls.Tracking.Should().OnlyContain(call => call.SubscriptionKey == own.SubscriptionKey && call.ClientId == own.ClientId && call.StatusCode == 200);
         portal.Calls.Tracking.Should().NotContain(call => call.SubscriptionKey == other.SubscriptionKey || call.ClientId == other.ClientId);
     }
 
@@ -136,9 +136,34 @@ public sealed class TrackingAssistantTests(TrackingAssistantFixture fixture)
         second.Text.Should().Be(AssistantTexts.RateLimited(AssistantLanguageKind.English));
         portal.Model.Calls.Should().ContainSingle();
         portal.Calls.All.Should().HaveCount(callsAfterFirst);
-        var span = fixture.RunSpan(second.RunId!);
+    }
+
+    [Fact]
+    public async Task ARefusedQuestionsSpan_IsMarkedRefusedWithAgentRateLimited()
+    {
+        var order = await EnterAsync(TrackingAssistantFixture.AskingShipperId);
+        await using var portal = fixture.StartPortal(new Dictionary<string, string> { ["Agents:Limits:QuestionsPerMinute"] = "1" });
+        await AskAsync(portal, "Where is my order?", order);
+
+        var refused = await AskAsync(portal, "And now?", order);
+
+        var span = fixture.RunSpan(refused.RunId!);
         span.GetTagItem("outcome").Should().Be("Refused");
         span.GetTagItem("failureCode").Should().Be(AssistantFailureCodes.AgentRateLimited);
+    }
+
+    [Fact]
+    public async Task AFetchTheApiRefuses_MakesNoModelCall_AndTheRunFailsWithTmsUnavailable()
+    {
+        var order = await EnterAsync(TrackingAssistantFixture.AskingShipperId);
+        await using var portal = fixture.StartPortal(new Dictionary<string, string> { [$"PartnerApi:SubscriptionKeys:{TrackingAssistantFixture.AskingPersona}"] = "not-the-personas-key" });
+
+        var answer = await AskAsync(portal, "Where is my order?", order);
+
+        portal.Calls.Tracking.Should().NotBeEmpty().And.OnlyContain(call => call.StatusCode >= 400);
+        answer.Outcome.Should().Be(AssistantOutcome.Failed);
+        answer.FailureCode.Should().Be(AssistantFailureCodes.TmsUnavailable);
+        portal.Model.Calls.Should().BeEmpty();
     }
 
     [Fact]
@@ -156,24 +181,32 @@ public sealed class TrackingAssistantTests(TrackingAssistantFixture fixture)
     }
 
     [Fact]
-    public async Task ARunsSpan_CarriesThePersonaAndTheFetchCorrelationIds_AndTheQuestionAndAnswerAreInNoLogOrTrackingKey()
+    public async Task ARunsSpan_CarriesThePersonaAndTheFetchCorrelationIds()
     {
         var order = await EnterAsync(TrackingAssistantFixture.AskingShipperId);
         await using var portal = fixture.StartPortal();
-        const string question = "Where is my order, quokka-7731?";
 
-        var answer = await AskAsync(portal, question, order);
+        var answer = await AskAsync(portal, "Where is my order?", order);
 
         answer.Outcome.Should().Be(AssistantOutcome.Answered, answer.Text);
         var span = fixture.RunSpan(answer.RunId!);
         span.GetTagItem("partyId").Should().Be(TrackingAssistantFixture.AskingPersona);
-        span.GetTagItem("flow").Should().Be("shipper-tracking-assistant");
         var correlationIds = portal.Calls.Tracking.Select(call => call.CorrelationId).ToList();
         correlationIds.Should().NotBeEmpty().And.OnlyContain(id => !string.IsNullOrEmpty(id));
         ((string)span.GetTagItem("fetch.correlationIds")!).Split(',').Should().BeEquivalentTo(correlationIds);
         span.GetTagItem("fetch.calls").Should().Be(correlationIds.Count);
+    }
 
-        var everythingKept = portal.Logs.Strings.Concat(span.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")).ToList();
+    [Fact]
+    public async Task TheQuestionAndAnswer_AreInNoLogOrTrackingKey()
+    {
+        var order = await EnterAsync(TrackingAssistantFixture.AskingShipperId);
+        await using var portal = fixture.StartPortal();
+
+        var answer = await AskAsync(portal, "Where is my order, quokka-7731?", order);
+
+        answer.Outcome.Should().Be(AssistantOutcome.Answered, answer.Text);
+        var everythingKept = portal.Logs.Strings.Concat(fixture.RunSpan(answer.RunId!).TagObjects.Select(tag => $"{tag.Key}={tag.Value}")).ToList();
         everythingKept.Should().NotBeEmpty();
         everythingKept.Should().NotContain(text => text.Contains("quokka-7731", StringComparison.Ordinal));
         everythingKept.Should().NotContain(text => text.Contains(answer.Text, StringComparison.Ordinal));

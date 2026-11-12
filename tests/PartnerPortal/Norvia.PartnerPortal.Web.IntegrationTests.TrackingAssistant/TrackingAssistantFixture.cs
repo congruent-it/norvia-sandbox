@@ -30,7 +30,7 @@ public sealed class TrackingAssistantFixture : IAsyncLifetime
     public const string OtherShipperId = "SHP-0003";
 
     // What the assistant's tests don't use only costs startup time and memory.
-    private static readonly string[] Unneeded = ["dbgate", "tms-web", "driver-app-web", "simulator-web", "simulator-migrations"];
+    private static readonly string[] ResourcesTheTestsDontNeed = ["dbgate", "tms-web", "driver-app-web", "simulator-web", "simulator-migrations"];
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
     private readonly string _tokenSigningKey = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
@@ -62,7 +62,7 @@ public sealed class TrackingAssistantFixture : IAsyncLifetime
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [$"Parameters:{LocalTokens.SigningKeyParameter}={_tokenSigningKey}", "Agents:Enabled=true"], startup.Token);
         foreach (var resource in builder.Resources
-            .Where(resource => Unneeded.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
+            .Where(resource => ResourcesTheTestsDontNeed.Any(name => resource.Name == name || resource.Name == $"{name}-rebuilder"))
             .ToList())
         {
             builder.Resources.Remove(resource);

@@ -43,10 +43,10 @@ public sealed class AssistantPortal : IAsyncDisposable
     public LogCapture Logs { get; } = new();
 
     /// <summary>The subscription key and the client ID of the Persona, as the AppHost gave them to the portal.</summary>
-    public (string SubscriptionKey, string ClientId) CredentialsOf(string persona)
+    public PersonaCredentials CredentialsOf(string persona)
     {
         var clientId = Settings["PartnerApi:PersonaClientIds"].Split(';').Select(pair => pair.Split('=', 2)).Single(pair => pair[0] == persona)[1];
-        return (Settings[$"PartnerApi:SubscriptionKeys:{persona}"], clientId);
+        return new PersonaCredentials(Settings[$"PartnerApi:SubscriptionKeys:{persona}"], clientId);
     }
 
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
@@ -71,6 +71,9 @@ public sealed class AssistantPortal : IAsyncDisposable
         }
     }
 }
+
+/// <summary>What a Persona calls the Partner API with: its subscription key and the client its token is issued to.</summary>
+public sealed record PersonaCredentials(string SubscriptionKey, string ClientId);
 
 /// <summary>One call the portal made to another service.</summary>
 public sealed record RecordedCall(HttpMethod Method, Uri Uri, string? SubscriptionKey, string? Token, int StatusCode, string? CorrelationId)
@@ -161,6 +164,7 @@ public sealed class LogCapture : ILoggerProvider, ISupportExternalScope
 
     private sealed class CapturingLogger(LogCapture capture) : ILogger
     {
+        // The scopes are read through ISupportExternalScope when a record is written, so there is nothing to track here.
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
         public bool IsEnabled(LogLevel logLevel) => true;
