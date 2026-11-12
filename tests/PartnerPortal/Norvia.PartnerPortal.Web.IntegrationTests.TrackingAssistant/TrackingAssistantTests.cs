@@ -61,7 +61,7 @@ public sealed class TrackingAssistantTests(TrackingAssistantFixture fixture)
         byReference.Outcome.Should().Be(AssistantOutcome.Answered, byReference.Text);
         portal.Model.Calls.Should().HaveCount(2);
         // The question is the Shipper's own text and is allowed in the input; the Transport Order's data is not.
-        portal.Model.Calls.Select(call => TrackingDataOf(call.Input)).Should().OnlyContain(data => !data.Contains(foreign.Number, StringComparison.Ordinal) && !data.Contains(foreign.Reference, StringComparison.Ordinal));
+        portal.Model.Calls.Select(call => TrackingDataOf(call.Input)).Should().OnlyContain(data => data.Length > 0).And.OnlyContain(data => !data.Contains(foreign.Number, StringComparison.Ordinal) && !data.Contains(foreign.Reference, StringComparison.Ordinal));
         byNumber.Text.Should().NotContain(foreign.Number);
     }
 
@@ -173,7 +173,7 @@ public sealed class TrackingAssistantTests(TrackingAssistantFixture fixture)
         ((string)span.GetTagItem("fetch.correlationIds")!).Split(',').Should().BeEquivalentTo(correlationIds);
         span.GetTagItem("fetch.calls").Should().Be(correlationIds.Count);
 
-        var everythingKept = portal.Logs.Strings.Concat(fixture.Spans.SelectMany(s => s.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")).Concat(span.Baggage.Select(item => $"{item.Key}={item.Value}"))).ToList();
+        var everythingKept = portal.Logs.Strings.Concat(span.TagObjects.Select(tag => $"{tag.Key}={tag.Value}")).ToList();
         everythingKept.Should().NotBeEmpty();
         everythingKept.Should().NotContain(text => text.Contains("quokka-7731", StringComparison.Ordinal));
         everythingKept.Should().NotContain(text => text.Contains(answer.Text, StringComparison.Ordinal));

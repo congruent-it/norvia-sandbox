@@ -14,7 +14,7 @@ namespace Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant;
 /// <summary>
 /// Runs the AppHost once for the whole test run with the Agents switched on (as a developer does with <c>Agents:Enabled</c>), the TMS, the Partner API's stand-in and what they need, without the UIs. The assistant's tests ask through a Partner portal in the
 /// tests' process, started with the AppHost's own settings, so the portal calls the real Partner API stand-in with the Persona's own token and subscription key and the real TMS
-/// answers from the Transport Orders each test enters for itself. Each test starts a portal of its own (<see cref="StartPortalAsync"/>), because the assistant's limits are counted in the
+/// answers from the Transport Orders each test enters for itself. Each test starts a portal of its own (<see cref="StartPortal"/>), because the assistant's limits are counted in the
 /// portal's memory: no test spends another's questions.
 /// </summary>
 public sealed class TrackingAssistantFixture : IAsyncLifetime
@@ -105,7 +105,7 @@ public sealed class TrackingAssistantFixture : IAsyncLifetime
 
     /// <summary>Starts a Partner portal in the tests' process with the AppHost's settings and the test's own on top of them.</summary>
     public AssistantPortal StartPortal(IReadOnlyDictionary<string, string>? settings = null) =>
-        new(new Dictionary<string, string>(_settings).Concat(settings ?? new Dictionary<string, string>()).GroupBy(pair => pair.Key).ToDictionary(group => group.Key, group => group.Last().Value), this);
+        new(new Dictionary<string, string>(_settings).Concat(settings ?? new Dictionary<string, string>()).GroupBy(pair => pair.Key).ToDictionary(group => group.Key, group => group.Last().Value));
 
     /// <summary>The span of the assistant run with this run ID.</summary>
     public Activity RunSpan(string runId) =>

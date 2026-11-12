@@ -20,16 +20,13 @@ public sealed class AssistantPortal : IAsyncDisposable
 {
     private readonly PortalFactory _factory;
 
-    internal AssistantPortal(IReadOnlyDictionary<string, string> settings, TrackingAssistantFixture fixture)
+    internal AssistantPortal(IReadOnlyDictionary<string, string> settings)
     {
-        Fixture = fixture;
         Settings = settings;
         Model = new RecordingChatClient(ShipperTrackingAssistantScript.Model());
         _factory = new PortalFactory(settings, Model, Calls, Logs);
         Portal = _factory.Services.GetRequiredService<IPartnerPortal>();
     }
-
-    public TrackingAssistantFixture Fixture { get; }
 
     public IReadOnlyDictionary<string, string> Settings { get; }
 
