@@ -39,6 +39,11 @@ jobs:
         shell: pwsh
         run: ./infra/test-scripts.ps1
 
+      # Every process doc under docs/processes is in its catalogue's table and in docs/status.md.
+      - name: Check that every process doc is catalogued
+        shell: pwsh
+        run: ./infra/check-process-docs.ps1
+
   # Dead relative links and deleted pages in the Markdown, nothing else (lychee.toml).
   links:
     name: Markdown links
