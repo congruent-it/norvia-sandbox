@@ -90,13 +90,13 @@ public sealed class FoundryAgentClientTests
     }
 
     [Fact]
-    public async Task Ask_WhenFoundryReportsNoUsage_CountsNothing()
+    public async Task Ask_WhenFoundryReportsNoUsage_ChargesTheCapOnTheAnswer()
     {
         var (client, _) = Client(body: new JsonObject { ["status"] = "completed", ["output"] = JsonNode.Parse(JsonNode.Parse(Response())!["output"]!.ToJsonString()) }.ToJsonString());
 
         var result = await client.AskAsync(Request(), TestContext.Current.CancellationToken);
 
-        result.Value.TokensUsed.Should().Be(0);
+        result.Value.TokensUsed.Should().Be(400);
     }
 
     [Theory]

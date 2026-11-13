@@ -38,7 +38,9 @@ internal sealed partial class FoundryAgentClient(
             deadline.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
 
             var response = await CreateResponseAsync(request, settings.Foundry, deadline.Token);
-            var (text, tokens) = Read(response);
+            var (text, reportedTokens) = Read(response);
+            // A response without usage is charged at the cap on the answer, so the daily budgets cannot be skipped by it.
+            var tokens = reportedTokens ?? request.MaxOutputTokens;
             var reply = TrackingAssistantReplies.Parse(text);
             return new AssistantReply(reply.Answer, [.. reply.Fields.Select(field => new AssistantClaim(field))], reply.NoInformation, tokens);
         }
@@ -74,7 +76,7 @@ internal sealed partial class FoundryAgentClient(
         return await response.Content.ReadFromJsonAsync<JsonNode>(cancellationToken) ?? throw new AgentRunException("Foundry answered with nothing.");
     }
 
-    private static (string Text, int Tokens) Read(JsonNode response)
+    private static (string Text, int? Tokens) Read(JsonNode response)
     {
         if (response["error"] is JsonObject { Count: > 0 } || response["status"]?.GetValue<string>() is "failed" or "cancelled" or "incomplete")
         {
@@ -104,7 +106,7 @@ internal sealed partial class FoundryAgentClient(
         }
 
         var usage = response["usage"]?["total_tokens"];
-        return (text.ToString(), usage is null ? 0 : usage.GetValue<int>());
+        return (text.ToString(), usage?.GetValue<int>());
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The tracking assistant failed ({ExceptionType}) in run {RunId}")]

@@ -50,6 +50,15 @@ public sealed class ShipperTrackingAssistantAzureTests
     }
 
     [Fact]
+    public void TheAssistantsModelCost_IsTaggedOnTheFoundryResources_AndTheModelIsTheSharedDataZoneStandardDeployment()
+    {
+        var foundry = Read("infra/estate/foundry.bicep");
+
+        foundry.Should().Contain("'cost-category': 'ai-model'").And.Contain("name: 'DataZoneStandard'");
+        Read("agents/shipper-tracking-assistant.agent.yaml").Should().Contain("deployment: gpt-5.4-mini");
+    }
+
+    [Fact]
     public void TheLimits_AreEstateParameters_WithTheAdrsNumbersAsDefaults()
     {
         var script = Read("infra/provision-estate.ps1");
