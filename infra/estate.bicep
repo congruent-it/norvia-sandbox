@@ -302,6 +302,7 @@ module identities 'estate/identities.bicep' = {
     driverAppRedirectUris: driverAppRedirectUris
     simulatorRedirectUris: simulatorRedirectUris
     erpRedirectUris: erpRedirectUris
+    healthCheckPrincipalId: healthCheck.outputs.principalId
   }
 }
 

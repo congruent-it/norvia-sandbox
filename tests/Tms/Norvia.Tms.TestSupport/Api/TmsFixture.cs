@@ -62,6 +62,9 @@ public class TmsFixture : IAsyncLifetime
     /// <summary>The app role only API Management's managed identity holds: a Shipper's tracking queries go through it (P8).</summary>
     public const string ShipperTrackingReadRole = "ShipperTracking.Read";
 
+    /// <summary>The app role only the Estate health check's managed identity holds: it reads the Transport Orders received per day.</summary>
+    public const string VolumeReadRole = "TransportOrders.Volume.Read";
+
     /// <summary>The client ID the TMS takes as the WMS handoff's caller. No WMS exists yet, so only the tests call as it.</summary>
     public const string WmsClientId = "norvia-test-wms";
 
@@ -91,6 +94,9 @@ public class TmsFixture : IAsyncLifetime
 
     /// <summary>A client holding the manage role, as the TMS UI's managed identity does.</summary>
     public HttpClient TmsUi { get; private set; } = null!;
+
+    /// <summary>A client holding the volume read role, as the Estate health check's managed identity does.</summary>
+    public HttpClient HealthCheck { get; private set; } = null!;
 
     /// <summary>A client holding the answer role, as the Carrier-answer Logic App's managed identity will (P4, later ticket).</summary>
     public HttpClient CarrierAnswer { get; private set; } = null!;
@@ -169,6 +175,7 @@ public class TmsFixture : IAsyncLifetime
 
         Tms = CreateTmsClient(IssueToken([IntakeRole]));
         TmsUi = CreateTmsClient(IssueToken([ManageRole], clientId: LocalTokens.TmsUiClientId));
+        HealthCheck = CreateTmsClient(IssueToken([VolumeReadRole], clientId: "norvia-test-health-check"));
         CarrierAnswer = CreateTmsClient(IssueToken([AnswerRole], clientId: "norvia-test-carrier-answer-logic-app"));
         CarrierReport = CreateTmsClient(IssueToken([ReportRole], clientId: "norvia-test-p4-booking-logic-app"));
         ShipperNotificationReport = CreateTmsClient(IssueToken([ShipperNotificationReportRole], clientId: "norvia-test-p7-shipper-notification-logic-app"));
@@ -500,6 +507,7 @@ public class TmsFixture : IAsyncLifetime
 
         Tms?.Dispose();
         TmsUi?.Dispose();
+        HealthCheck?.Dispose();
         CarrierAnswer?.Dispose();
         CarrierReport?.Dispose();
         ShipperNotificationReport?.Dispose();

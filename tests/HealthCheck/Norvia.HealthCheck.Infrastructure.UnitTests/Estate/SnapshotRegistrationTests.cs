@@ -2,7 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Estate;
+using Norvia.HealthCheck.Infrastructure.Cost;
 using Norvia.HealthCheck.Infrastructure.Estate;
 
 namespace Norvia.HealthCheck.Infrastructure.UnitTests.Estate;
@@ -17,6 +19,16 @@ public sealed class SnapshotRegistrationTests
         var estate = await services.GetRequiredService<IEstateConfiguration>().ReadAsync(TestContext.Current.CancellationToken);
 
         estate.Name.Should().Be("fixed");
+    }
+
+    [Fact]
+    public async Task AddHealthCheckInfrastructure_ReadsTheCostFromTheModelledSnapshot_WhichTheEstateSettingChooses()
+    {
+        using var services = ServicesWith(new Dictionary<string, string?> { ["Estate:CostSnapshot"] = "chatty-telemetry" });
+
+        var days = await services.GetRequiredService<ICostReader>().ReadAsync(new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 1), TestContext.Current.CancellationToken);
+
+        days.Should().ContainSingle().Which.Spend.Should().Contain(spend => spend.Resource == "log-workspace" && spend.Eur == 0.53m);
     }
 
     [Fact]
@@ -59,12 +71,29 @@ public sealed class AzureRegistrationTests
         {
             ["Estate:ResourceGroupId"] = ResourceGroupId,
             ["Estate:ServiceBusNamespace"] = "sb-norvia-abc",
+            ["TmsApi:BaseAddress"] = "http://tms-api",
+            ["TmsApi:Scope"] = "api://norvia-tms/.default",
         });
 
         var start = () => services.GetRequiredService<IStartupValidator>().Validate();
 
         start.Should().NotThrow();
         services.GetRequiredService<IEstateConfiguration>().Should().BeOfType<AzureEstateConfiguration>();
+        services.GetRequiredService<ICostReader>().Should().BeOfType<CostManagementCostReader>();
+    }
+
+    [Fact]
+    public void AddHealthCheckInfrastructure_WithAnEstateInAzureButNoTmsApi_DoesNotStart()
+    {
+        using var services = ServicesWith(new Dictionary<string, string?>
+        {
+            ["Estate:ResourceGroupId"] = ResourceGroupId,
+            ["Estate:ServiceBusNamespace"] = "sb-norvia-abc",
+        });
+
+        var start = () => services.GetRequiredService<IStartupValidator>().Validate();
+
+        start.Should().Throw<OptionsValidationException>().WithMessage("*BaseAddress*");
     }
 
     [Fact]

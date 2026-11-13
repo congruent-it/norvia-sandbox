@@ -157,6 +157,24 @@ public sealed class TransportOrderSpecsTests
         found.Select(order => order.Number).Should().BeEquivalentTo([TransportOrderNumber.FromSequence(1), TransportOrderNumber.FromSequence(3)]);
     }
 
+    [Fact]
+    public void ReceivedBetween_Evaluated_ListsWhenTheAcceptedOrdersOfTheWindowCameInAndNotTheRejectedBookings()
+    {
+        var from = new DateTimeOffset(2026, 9, 24, 0, 0, 0, TimeSpan.Zero);
+        var orders = new[]
+        {
+            Accepted(1, from.AddSeconds(-1)),
+            Accepted(2, from),
+            Rejected(from.AddHours(1)),
+            Accepted(3, from.AddDays(1).AddSeconds(-1)),
+            Accepted(4, from.AddDays(1)),
+        };
+
+        var listed = new TransportOrdersReceivedBetweenSpec(from, from.AddDays(1)).Evaluate(orders);
+
+        listed.Should().Equal(from, from.AddDays(1).AddSeconds(-1));
+    }
+
     private static TransportOrder Rejected(DateTimeOffset receivedAt) => TransportOrder.Reject(
         new ShipperId("SHP-0001"),
         TransportOrderTests.SampleDetails(),

@@ -1,5 +1,5 @@
-// The Estate health check app in Azure (#392, ADR 0026 as for the Integration console): the identity it runs as, with Reader on the
-// estate's resource group, and the app registration Easy Auth signs Integration operators in to. The privileged role belongs to the
+// The Estate health check app in Azure (#392, ADR 0026 as for the Integration console): the identity it runs as, with Reader and
+// Cost Management Reader on the estate's resource group, and the app registration Easy Auth signs Integration operators in to. The privileged role belongs to the
 // app, never to the Agent (#371, question 1): the Agent's identity holds the one call role on the agent view
 // (health-check-mcp.bicep) and no Azure role. Aspire deploys the app; the estate owns its identity because the estate grants it
 // what it may read.
@@ -24,6 +24,7 @@ var readRole = 'HealthCheck.Read'
 var readRoleId = guid('norvia-health-check', environmentName, readRole)
 
 var reader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')
+var costManagementReader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '72fafb9e-0641-4937-9268-a91bfd8191a3')
 
 // The app's own identity, which it reads the estate as, never with the operator's token (ADR 0017) and never the Agent's.
 resource healthCheckIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
@@ -40,6 +41,17 @@ resource healthCheckReadsTheEstate 'Microsoft.Authorization/roleAssignments@2022
   properties: {
     principalId: healthCheckIdentity.properties.principalId
     roleDefinitionId: reader
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Cost Management Reader on the estate's resource group (#504): the cost view reads the group's daily cost per resource. It reads cost and
+// budgets and nothing else, and it is the app's, never the Agent's.
+resource healthCheckReadsTheEstatesCost 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(resourceGroup().id, healthCheckIdentity.id, costManagementReader)
+  properties: {
+    principalId: healthCheckIdentity.properties.principalId
+    roleDefinitionId: costManagementReader
     principalType: 'ServicePrincipal'
   }
 }
