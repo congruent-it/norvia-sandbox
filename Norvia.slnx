@@ -23,6 +23,7 @@
     <Project Path="src/Integration/Norvia.Integration.LocalShipperNotificationWorker/Norvia.Integration.LocalShipperNotificationWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalCarrierCancellationWorker/Norvia.Integration.LocalCarrierCancellationWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalBillingWorker/Norvia.Integration.LocalBillingWorker.csproj" />
+    <Project Path="src/Integration/Norvia.Integration.LocalMasterDataSyncWorker/Norvia.Integration.LocalMasterDataSyncWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalCarrierCostWorker/Norvia.Integration.LocalCarrierCostWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalShipperInvoiceWorker/Norvia.Integration.LocalShipperInvoiceWorker.csproj" />
     <Project Path="src/Integration/Norvia.Integration.LocalCarrierInvoiceWorker/Norvia.Integration.LocalCarrierInvoiceWorker.csproj" />
@@ -96,6 +97,7 @@
     <Project Path="tests/Integration/Norvia.Integration.LocalShipperNotificationWorker.UnitTests/Norvia.Integration.LocalShipperNotificationWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierCancellationWorker.UnitTests/Norvia.Integration.LocalCarrierCancellationWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalBillingWorker.UnitTests/Norvia.Integration.LocalBillingWorker.UnitTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.LocalMasterDataSyncWorker.UnitTests/Norvia.Integration.LocalMasterDataSyncWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierCostWorker.UnitTests/Norvia.Integration.LocalCarrierCostWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalShipperInvoiceWorker.UnitTests/Norvia.Integration.LocalShipperInvoiceWorker.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalCarrierInvoiceWorker.UnitTests/Norvia.Integration.LocalCarrierInvoiceWorker.UnitTests.csproj" />

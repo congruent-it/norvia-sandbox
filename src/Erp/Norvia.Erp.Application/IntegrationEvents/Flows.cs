@@ -23,4 +23,7 @@ public static class Flows
     /// Management created for it, which the ERP keeps and <c>CarrierInvoiceApproved</c> carries.
     /// </summary>
     public const string CarrierInvoices = "carrier-invoices";
+
+    /// <summary>Master-data sync (E3): Finance edits master data in the ERP, which replicates each change to the TMS, on a correlation ID of its own.</summary>
+    public const string MasterData = "master-data";
 }

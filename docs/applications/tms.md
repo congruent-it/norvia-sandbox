@@ -19,6 +19,7 @@ Every consumer reaches the TMS API **directly**, with a token for its own identi
 |---|---|---|---|
 | **TMS UI** (`tms-web`) | `tms-ui`, `TransportOrders.Manage`. Plays the Planner and Customer service | [P2](../processes/tms/p2-rating.md), [P3](../processes/tms/p3-transport-planning.md), [P4](../processes/tms/p4-carrier-booking.md), [P7](../processes/tms/p7-exception-handling.md), [P9](../processes/tms/p9-freight-settlement.md), [P10](../processes/tms/p10-fleet-capacity-planning.md), [P11](../processes/tms/p11-trip-dispatch.md) | No: direct |
 | **Simulator** | `simulator`, `TransportOrders.Manage` and `Estate.Reset`. Plays the Planner ([ADR 0039](../adr/0039-the-simulator-books-only-through-the-estates-real-doors.md)) | [P3](../processes/tms/p3-transport-planning.md), [P7](../processes/tms/p7-exception-handling.md), [P11](../processes/tms/p11-trip-dispatch.md), Reset estate | No: direct. Its Shipper bookings go to the Norvia Partner API instead, which is P1 below |
+| **Master-data sync Logic App** | `master-data-sync`, `MasterData.Replace` | [E3](../processes/erp/e3-master-data-sync.md) | No: reads the `master-data-sync` subscription of `master-data-events`, then calls the TMS API directly |
 | **Intake Logic App** | `intake`, `TransportOrders.Intake` | [P1](../processes/tms/p1-transport-order-intake.md) | The Logic App is called by API Management ([ADR 0020](../adr/0020-only-api-management-may-call-the-intake-logic-app.md)); its call to the TMS is direct |
 | **Carrier-answer Logic App** | `answer`, `CarrierBookings.Answer` | [P4](../processes/tms/p4-carrier-booking.md) | Called by API Management; its call to the TMS is direct |
 | **Carrier booking Logic App** | `booking`, `CarrierBookings.Report` | [P4](../processes/tms/p4-carrier-booking.md) | No: reads the `carrier-booking` subscription, then calls direct |
@@ -39,6 +40,7 @@ No Agent calls the TMS today, so no endpoint below lists one. [c4.md](../archite
 |---|---|---|---|---|
 | `POST /v1/transport-orders` | Submit a Transport Order on behalf of the Shipper it names. A repeat of the same booking gets the original back (200); a booking that breaks the rules is kept as a Rejected booking (422). | `TransportOrders.Intake` | `CanonicalTransportOrder` (`X-Correlation-ID`) → `AcceptedTransportOrder` (201, or 200 for a repeat) | Intake Logic App (P1); upstream of it a Shipper Persona through API Management |
 | `GET /v1/transport-orders` | List Transport Orders by `status`. | any valid token | → `[TransportOrderSummary]` | None over HTTP: the TMS UI reads in process |
+| `PUT /v1/shippers/{id}` | Replace the TMS's copy of a Shipper with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceShipperRequest` → `ReplaceShipperResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `GET /v1/agent/customer-service/rejected-bookings/{id}` | The Customer service agent's view of a Rejected booking (ADR 0040): when it was received, the Shipper's business name, every rejection reason with its code, message and the submitted field that failed, and the submitted content with the Consignee fields removed (an allowlist: a new field stays out until someone adds it; no Consignee name, delivery address or contact, no instructions, no file contents). Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentRejectedBookingView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (audience the TMS agent API, Entra's keys; the gateway names the Agent in `X-Agent-ID`) |
 | `GET /v1/agent/customer-service/transport-orders/{transportOrderNumber}` | The Customer service agent's view of a Transport Order (ADR 0040, tool `get_transport_order`): status, the Shipper's business name and reference, rating result with the failure code and message, the Shipment's number and status, and the billing state with the reasons that block it (`NotRated`, `NoProofOfDelivery`, `OpenException`). Same allowlist: no Consignee, address, contact, instructions or file contents. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentTransportOrderView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
 | `GET /v1/agent/customer-service/shipments/{shipmentNumber}/tracking-events` | A Shipment's Tracking events in event-time order with their source (a Carrier ID, or Own fleet), place, ETA and whether each moved the status (tool `get_shipment_timeline`). No remark a Carrier or Driver typed, no postcode. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentShipmentTimelineView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
@@ -432,6 +434,17 @@ Primary key `PK_Shipments`: `Id`.
 |---|---|---|---|
 | `IX_Shipments_Number` | `Number` | yes |  |
 | `IX_Shipments_TransportOrderId` | `TransportOrderId` | yes |  |
+
+#### `ShipperCopies`
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK |  |
+| `Active` | `bit` | no |  |  |  |
+| `Name` | `nvarchar(200)` | no |  |  |  |
+| `Revision` | `int` | no |  |  |  |
+
+Primary key `PK_ShipperCopies`: `Id`.
 
 #### `ShipperNotifications`
 

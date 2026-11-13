@@ -544,6 +544,11 @@ else
     invoicingEvents.AddServiceBusSubscription("invoicing-events-monitoring", subscriptionName: "monitoring");
     invoicingEvents.AddServiceBusSubscription("shipper-invoice");
     invoicingEvents.AddServiceBusSubscription("carrier-invoice-outcome");
+    // The topic for the ERP's master-data events (E3): the entity type is the event type. Monitoring is its first consumer; the E3 Logic App has a
+    // subscription of its own for the entity types it replicates (see ResubmitAwareFilters).
+    var masterDataEvents = messagingEdge.AddServiceBusTopic("master-data-events");
+    masterDataEvents.AddServiceBusSubscription("master-data-events-monitoring", subscriptionName: "monitoring");
+    masterDataEvents.AddServiceBusSubscription("master-data-sync");
     // The tracking queue API Management puts a Carrier's tracking message on and the Carrier-tracking Logic App reads
     // (ADR 0008). A message the TMS refuses is dead-lettered; one it can't be given to is delivered again up to the
     // maximum delivery count, then dead-lettered by Service Bus itself. The estate Bicep sets the same count.
@@ -722,6 +727,15 @@ else
         .WithEnvironment("Billing__ErpTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Billing__ErpTokens__Audience", LocalTokens.ErpAudience)
         .WithEnvironment("Billing__ErpTokens__ClientId", LocalTokens.BillingLogicAppClientId);
+    // Locally a worker plays the E3 master-data sync Logic App too. It reads its subscription of the ERP's master-data events and replaces each
+    // record in the TMS as the identity holding the replace role.
+    var masterDataSyncWorker = builder.AddProject<Projects.Norvia_Integration_LocalMasterDataSyncWorker>("master-data-sync-worker")
+        .WithReference(messagingEdge, "messaging").WaitFor(messagingEdge)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("MasterDataSync__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("MasterDataSync__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("MasterDataSync__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("MasterDataSync__TmsTokens__ClientId", LocalTokens.MasterDataSyncLogicAppClientId);
     // Locally a worker plays the P9 Carrier cost Logic App as well. It reads the Carrier cost subscription and records each Carrier cost with
     // the ERP billing API as the identity holding the Carrier cost record role.
     var carrierCostWorker = builder.AddProject<Projects.Norvia_Integration_LocalCarrierCostWorker>("carrier-cost-worker")
@@ -950,6 +964,7 @@ else
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
         (billingWorker.Resource, "Billing__ErpTokens__SigningKey"),
+        (masterDataSyncWorker.Resource, "MasterDataSync__TmsTokens__SigningKey"),
         (carrierCostWorker.Resource, "CarrierCost__ErpTokens__SigningKey"),
         (shipperInvoiceWorker.Resource, "ShipperInvoice__ErpTokens__SigningKey"),
         (carrierInvoiceOutcomeWorker.Resource, "CarrierInvoiceOutcome__ErpTokens__SigningKey"),

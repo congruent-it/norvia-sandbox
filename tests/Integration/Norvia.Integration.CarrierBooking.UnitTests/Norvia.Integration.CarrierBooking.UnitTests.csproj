@@ -63,6 +63,8 @@
     <EmbeddedResource Include="..\..\..\src\Integration\DriverReportsLogicApp\driver-reports\workflow.json" LogicalName="DriverReportsLogicApp/driver-reports/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\*.json" LogicalName="BillingLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\BillingLogicApp\billing\workflow.json" LogicalName="BillingLogicApp/billing/workflow.json" />
+    <EmbeddedResource Include="..\..\..\src\Integration\MasterDataSyncLogicApp\*.json" LogicalName="MasterDataSyncLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\MasterDataSyncLogicApp\master-data-sync\workflow.json" LogicalName="MasterDataSyncLogicApp/master-data-sync/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCostLogicApp\*.json" LogicalName="CarrierCostLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCostLogicApp\carrier-cost\workflow.json" LogicalName="CarrierCostLogicApp/carrier-cost/workflow.json" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-cost-incurred\*.json" LogicalName="CanonicalModel/samples/carrier-cost-incurred/%(Filename)%(Extension)" />

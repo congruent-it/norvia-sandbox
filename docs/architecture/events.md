@@ -40,6 +40,14 @@ Published by the ERP.
 | [`CarrierInvoiceOutcomeNotDelivered`](../../contracts/canonical-model/carrier-invoice-outcome-not-delivered.v1.schema.json) | `monitoring` (every message) | Monitoring | [E2](../processes/erp/e2-carrier-invoice-matching.md). The Carrier invoice outcome Logic App reported the outcome of an Approved Carrier invoice not delivered, after the retries or on a client error. Carries the Carrier ID, the Carrier's invoice number, the status code and technical cause, under the Carrier invoice's correlation ID; published once, through the outbox, in the transaction that flagged the invoice Carrier not told. An alert comes later |
 | [`CreditNoteIssued`](../../contracts/canonical-model/credit-note-issued.v1.schema.json) | `monitoring` (every message)<br/>`shipper-invoice` (`ShipperInvoiceIssued` and `CreditNoteIssued`) | Monitoring<br/>Shipper invoice Logic App ([E1](../processes/erp/e1-invoicing.md)) | [E1](../processes/erp/e1-invoicing.md#credit-notes). Finance issued a Credit note on one invoice line, or sent it again. Carries the whole Credit note with the invoice and line credited, amounts, reason and Shipper, under a correlation ID created for the Credit note. The Shipper invoice Logic App maps it to a `CREDIT_NOTE`, sends it to the Shipper Persona's invoice endpoint and reports it Sent or Not delivered to the ERP |
 
+### `master-data-events`
+
+Published by the ERP.
+
+| Event | Subscriptions | Subscribers | Process |
+|---|---|---|---|
+| [`Shipper`](../../contracts/canonical-model/shipper.v1.schema.json) | `monitoring` (every message)<br/>`master-data-sync` (`Shipper` only) | Monitoring<br/>Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) | [E3](../processes/erp/e3-master-data-sync.md). Finance created or edited a Shipper. The event carries the whole Shipper and its Master-data revision, and the Logic App replaces the TMS's copy with it. The other master-data entities follow with their own event types |
+
 ### `shipment-events`
 
 Published by the TMS.

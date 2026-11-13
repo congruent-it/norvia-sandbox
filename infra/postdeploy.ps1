@@ -34,6 +34,7 @@ Invoke-Step deploy-trip-dispatch-logic-app.ps1
 Invoke-Step deploy-driver-reports-logic-app.ps1
 Invoke-Step deploy-conversation-sweeper-logic-app.ps1
 Invoke-Step deploy-billing-logic-app.ps1
+Invoke-Step deploy-master-data-sync-logic-app.ps1
 Invoke-Step deploy-carrier-cost-logic-app.ps1
 Invoke-Step deploy-shipper-invoice-logic-app.ps1
 Invoke-Step deploy-answer-logic-app.ps1

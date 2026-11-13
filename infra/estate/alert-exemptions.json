@@ -4,6 +4,7 @@
     "transport-order-events/monitoring": "Nobody reads the subscription, so nothing is delivered to fail",
     "trip-events/monitoring": "Nobody reads the subscription, so nothing is delivered to fail",
     "shipment-events/monitoring": "Nobody reads the subscription, so nothing is delivered to fail",
-    "invoicing-events/monitoring": "Nobody reads the subscription, so nothing is delivered to fail"
+    "invoicing-events/monitoring": "Nobody reads the subscription, so nothing is delivered to fail",
+    "master-data-events/monitoring": "Nobody reads the subscription, so nothing is delivered to fail"
   }
 }

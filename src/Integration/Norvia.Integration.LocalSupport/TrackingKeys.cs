@@ -36,6 +36,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Carrier cancellation or withdrawal, from the event to the report to the TMS.</summary>
     public const string CarrierCancellation = "carrier-cancellation";
 
+    /// <summary>The <see cref="Flow"/> of a master-data record, from the ERP's event to the TMS's answer (E3).</summary>
+    public const string MasterData = "master-data";
+
     /// <summary>The <see cref="Flow"/> of a Billable line, from TransportOrderBillable to the ERP billing API's answer.</summary>
     public const string Billing = "billing";
 

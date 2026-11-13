@@ -36,6 +36,8 @@ var tmsResetRole = 'Estate.Reset'
 var tmsResetRoleId = guid('norvia-tms-api', environmentName, tmsResetRole)
 var driverAppResetRole = 'Estate.Reset'
 var driverAppResetRoleId = guid('norvia-driver-app-api', environmentName, driverAppResetRole)
+var masterDataReplaceRole = 'MasterData.Replace'
+var masterDataReplaceRoleId = guid('norvia-tms-api', environmentName, masterDataReplaceRole)
 var answerRole = 'CarrierBookings.Answer'
 var answerRoleId = guid('norvia-tms-api', environmentName, answerRole)
 var reportRole = 'CarrierBookings.Report'
@@ -151,6 +153,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: volumeReadRole
       displayName: 'Read how many Transport Orders came in per day'
       description: 'Read the count of Transport Orders received each day, which the Estate health check sets the estate\'s bill against. Only the Estate health check holds it; it opens no Transport Order.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: masterDataReplaceRoleId
+      value: masterDataReplaceRole
+      displayName: 'Replace master data'
+      description: 'Replace the TMS\'s read copy of a Shipper, with the ERP\'s record (E3). Only the master-data sync Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -1289,6 +1301,20 @@ resource billingRecordRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   principalId: billingIdentity.properties.principalId
 }
 
+// The E3 master-data sync Logic App's identity, which it runs as. It is the one principal holding the TMS's replace role, so no master
+// data reaches the TMS without passing the integration layer, and it holds nothing else on the ERP or the TMS.
+resource masterDataSyncIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-mdsync-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource masterDataSyncReplaceRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: masterDataReplaceRoleId
+  principalId: masterDataSyncIdentity.properties.principalId
+}
+
 // The E1 Shipper invoice Logic App's identity, which it runs as. It is the one principal holding the ERP's report role, so no Shipper
 // invoice is reported sent without passing the integration layer. It reads its subscription and the Shipper endpoints' credentials,
 // and holds nothing else on the ERP or the TMS.
@@ -1442,8 +1468,15 @@ output shipperInvoice object = {
   identityName: shipperInvoiceIdentity.name
   principalId: shipperInvoiceIdentity.properties.principalId
 }
-output billingIdentityName string = billingIdentity.name
-output billingPrincipalId string = billingIdentity.properties.principalId
+// Bicep allows 64 outputs, so the Billing and master-data sync Logic Apps' identities are one object each.
+output billing object = {
+  identityName: billingIdentity.name
+  principalId: billingIdentity.properties.principalId
+}
+output masterDataSync object = {
+  identityName: masterDataSyncIdentity.name
+  principalId: masterDataSyncIdentity.properties.principalId
+}
 output carrierCostIdentityName string = carrierCostIdentity.name
 output carrierInvoice object = {
   identityName: carrierInvoiceIdentity.name

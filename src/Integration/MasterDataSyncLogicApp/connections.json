@@ -1,0 +1,25 @@
+{
+  "serviceProviderConnections": {},
+  "managedApiConnections": {
+    "servicebus": {
+      "api": {
+        "id": "@appsetting('SERVICE_BUS_API_ID')"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity",
+        "identity": "@appsetting('MASTER_DATA_SYNC_IDENTITY_ID')"
+      },
+      "connection": {
+        "id": "@appsetting('SERVICE_BUS_CONNECTION_ID')"
+      },
+      "connectionProperties": {
+        "authentication": {
+          "audience": "https://servicebus.azure.net",
+          "type": "ManagedServiceIdentity",
+          "identity": "@appsetting('MASTER_DATA_SYNC_IDENTITY_ID')"
+        }
+      },
+      "connectionRuntimeUrl": "@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')"
+    }
+  }
+}

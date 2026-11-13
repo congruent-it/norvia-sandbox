@@ -344,6 +344,10 @@ _Avoid_: ad-hoc rate, quote
 Said of a Transport Order that is ready to invoice: Delivered, Rated, with a current Proof of delivery and no open Exception, or released by Customer service without a Proof of delivery. Once Billable, it stays Billable.
 _Avoid_: invoiceable, ready to bill
 
+**Master-data revision**:
+A number the ERP raises by one on every edit of a master-data record, starting at 1 for a record loaded from the seed file. Each master-data event carries the record whole with its revision, and the TMS keeps the latest it applied: a revision that is not higher is answered successfully and changes nothing, so a redelivered or resubmitted event is harmless.
+_Avoid_: version (a Rate Card has dated versions of its own)
+
 **Billable line**:
 The ERP's record of one Billable Transport Order: what `TransportOrderBillable` carries, including the Freight Charge, which the ERP never recalculates. It is Waiting until an Invoice run puts it on a Shipper invoice, then Invoiced with that invoice's number, once and only once.
 _Avoid_: invoice line (that is a line on a Shipper invoice)

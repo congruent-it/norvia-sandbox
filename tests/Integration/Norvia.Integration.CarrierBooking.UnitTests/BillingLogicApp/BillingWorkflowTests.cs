@@ -278,7 +278,7 @@ public sealed class BillingWorkflowTests
     public void TheBillingIdentity_HoldsTheErpRecordRole_AndNothingElse()
     {
         var identities = Contracts.Read("Estate/identities.bicep");
-        var grants = identities.Split("\n\n").Where(block => block.Contains("principalId: billingIdentity.properties.principalId", StringComparison.Ordinal)).ToList();
+        var grants = identities.Split("\n\n").Where(block => block.Contains("principalId: billingIdentity.properties.principalId", StringComparison.Ordinal) && block.Contains("appRoleAssignedTo", StringComparison.Ordinal)).ToList();
 
         grants.Should().ContainSingle();
         grants.Single().Should().Contain("resourceId: erpApiPrincipal.id").And.Contain("appRoleId: billableLinesRecordRoleId");

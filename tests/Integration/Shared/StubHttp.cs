@@ -33,9 +33,9 @@ public sealed class StubHttp(TimeProvider time) : HttpMessageHandler
     {
         Requests.Add(new(
             request.RequestUri!, request.Headers.ToDictionary(header => header.Key, header => header.Value.First()),
-            request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken), time.GetUtcNow()));
+            request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken), time.GetUtcNow(), request.Method));
         return _answers.TryDequeue(out var answer) ? answer() : _otherwise();
     }
 
-    public sealed record Request(Uri Uri, Dictionary<string, string> Headers, string Body, DateTimeOffset At);
+    public sealed record Request(Uri Uri, Dictionary<string, string> Headers, string Body, DateTimeOffset At, HttpMethod? Method = null);
 }
