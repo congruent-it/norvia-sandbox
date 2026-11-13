@@ -25,8 +25,6 @@ internal sealed partial class FoundryAgentClient(
     TokenCredential credential,
     ILogger<FoundryAgentClient> logger) : IAgentClient
 {
-    internal const string AgentName = "shipper-tracking-assistant";
-
     public async Task<Result<AssistantReply>> AskAsync(AssistantRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -58,7 +56,7 @@ internal sealed partial class FoundryAgentClient(
         {
             Content = JsonContent.Create(new JsonObject
             {
-                ["agent_reference"] = new JsonObject { ["type"] = "agent_reference", ["name"] = AgentName },
+                ["agent_reference"] = new JsonObject { ["type"] = "agent_reference", ["name"] = AskTrackingAssistantHandler.AgentName },
                 ["input"] = new JsonArray(new JsonObject { ["type"] = "message", ["role"] = "user", ["content"] = request.Input.Text }),
                 // Nothing is kept by the service, and no conversation is made: a question is a single response (ADR 0049).
                 ["store"] = false,

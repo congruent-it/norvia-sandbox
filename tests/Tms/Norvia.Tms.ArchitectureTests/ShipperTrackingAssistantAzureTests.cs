@@ -59,6 +59,13 @@ public sealed class ShipperTrackingAssistantAzureTests
     }
 
     [Fact]
+    public void AgentsEnabled_IsOffUnlessTheEnvironmentSaysSo_SoThePanelIsHiddenByDefault()
+    {
+        Read("infra/provision-estate.ps1").Should().Contain("$agentsEnabled = (\"$env:ESTATE_AGENTS_ENABLED_SETTING\".ToLowerInvariant() -eq 'true') ? 'true' : 'false'");
+        Read("src/Norvia.AppHost/AppHost.cs").Should().Contain(".WithEnvironment(\"Agents__Enabled\", estate.AgentsEnabled)");
+    }
+
+    [Fact]
     public void TheLimits_AreEstateParameters_WithTheAdrsNumbersAsDefaults()
     {
         var script = Read("infra/provision-estate.ps1");
