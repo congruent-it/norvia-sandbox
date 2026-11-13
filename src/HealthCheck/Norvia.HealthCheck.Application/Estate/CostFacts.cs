@@ -7,4 +7,8 @@ namespace Norvia.HealthCheck.Application.Estate;
 /// <see cref="CostDay.Provisional"/> day may still change), so a Check never compares a number that is not final.
 /// </summary>
 /// <param name="Days">Settled whole days with their spend per resource and their Transport Order count, in any order.</param>
-public sealed record CostFacts(IReadOnlyList<CostDay> Days);
+public sealed record CostFacts(IReadOnlyList<CostDay> Days)
+{
+    /// <summary>The days of each of the two periods the cost Check compares, and so half the days an adapter reads.</summary>
+    public const int PeriodDays = 7;
+}

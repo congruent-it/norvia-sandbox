@@ -5,8 +5,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Azure.Core;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Norvia.HealthCheck.Application.Checks;
 using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Estate;
 
@@ -33,7 +33,8 @@ internal sealed partial class AzureEstateConfiguration(
     TokenCredential credential,
     IOptions<AzureEstateOptions> options,
     TimeProvider time,
-    ICostReader costReader) : IEstateConfiguration
+    ICostReader costReader,
+    ILogger<AzureEstateConfiguration> logger) : IEstateConfiguration
 {
     public const string ManagementClient = "estate-management";
 
@@ -146,16 +147,21 @@ internal sealed partial class AzureEstateConfiguration(
 
     // The settled whole days of two periods of the cost Check. Null when Cost Management or the TMS API cannot be read (the app lacks the
     // role, or the lag has left no settled day), so the Check gives no Finding for what it could not see.
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The spend and the Transport Order volume could not be read, so the cost Check gives no Finding")]
+    private static partial void CostUnreadable(ILogger logger, Exception exception);
+
     private async Task<CostFacts?> ReadCostAsync(CancellationToken cancellationToken)
     {
         var yesterday = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddDays(-1);
         try
         {
-            var days = await costReader.ReadAsync(yesterday.AddDays(1 - 2 * RisingSpendCheck.PeriodDays), yesterday, cancellationToken);
+            var days = await costReader.ReadAsync(yesterday.AddDays(1 - 2 * CostFacts.PeriodDays), yesterday, cancellationToken);
             return new CostFacts([.. days.Where(day => !day.Provisional)]);
         }
-        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or Azure.RequestFailedException or JsonException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
+            // Whatever the reason (no role, a timeout, a bad answer), the cost is unread and the Check says nothing; the log says why.
+            CostUnreadable(logger, exception);
             return null;
         }
     }

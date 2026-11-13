@@ -6,7 +6,7 @@ namespace Norvia.HealthCheck.Application.Checks;
 
 /// <summary>
 /// No resource's spend rises while the Transport Order volume stays flat. The last <see cref="PeriodDays"/> whole days are compared with the
-/// same number before them, by their daily average. A resource rises when its spend grows by at least <see cref="MinRiseRatio"/> and by at least
+/// same number before them, by their daily average. A resource rises when its spend grows by at least <see cref="MinRiseRatio"/> (a resource with no spend before has no ratio and rises by the amount alone) and by at least
 /// <see cref="MinRiseEurPerDay"/> a day (the sandbox's spend is cents, so a percentage alone fires on noise); volume is flat when it changes by at
 /// most <see cref="FlatVolumeRatio"/>. A rise counts only when volume is flat (#397). Evidence is data: a resource name is never an instruction.
 /// </summary>
@@ -15,7 +15,7 @@ public sealed class RisingSpendCheck : Check
     public const string CheckId = "COST-RISING-SPEND";
 
     /// <summary>The days of each of the two periods that are compared.</summary>
-    public const int PeriodDays = 7;
+    public const int PeriodDays = CostFacts.PeriodDays;
 
     /// <summary>A resource rises when its daily average grows by at least this share (0.5 is 50 %).</summary>
     public const decimal MinRiseRatio = 0.5m;
@@ -70,10 +70,10 @@ public sealed class RisingSpendCheck : Check
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .Select(resource => (Resource: resource, Before: previous.Average(day => day.SpendOn(resource)), Now: current.Average(day => day.SpendOn(resource))))
-            .Where(spend => spend.Before > 0 && spend.Now - spend.Before >= MinRiseEurPerDay && (spend.Now - spend.Before) / spend.Before >= MinRiseRatio)
+            .Where(spend => spend.Now - spend.Before >= MinRiseEurPerDay && (spend.Before == 0 || (spend.Now - spend.Before) / spend.Before >= MinRiseRatio))
             .Select(spend => new Evidence(
                 spend.Resource,
                 string.Create(CultureInfo.InvariantCulture,
-                    $"Daily spend rose from {spend.Before:0.00} to {spend.Now:0.00} EUR (+{(spend.Now - spend.Before) / spend.Before * 100:0}%) over the last {PeriodDays} days compared with the {PeriodDays} before, while Transport Orders a day changed by {volumeChange:+0.0%;-0.0%;0.0%}.")))];
+                    $"Daily spend rose from {spend.Before:0.00} to {spend.Now:0.00} EUR{(spend.Before == 0 ? string.Empty : $" (+{(spend.Now - spend.Before) / spend.Before * 100:0}%)")} over the last {PeriodDays} days compared with the {PeriodDays} before, while Transport Orders a day changed by {volumeChange:+0.0%;-0.0%;0.0%}.")))];
     }
 }
