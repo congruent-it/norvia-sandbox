@@ -140,14 +140,14 @@ public sealed class HealthCheckAgentAzureTests
     }
 
     [Fact]
-    public void TheAppsRegistration_HasTheTwoOperatorRoles_ForUsersOnly_AndEntraSignsInNobodyWithoutOne()
+    public void TheAppsRegistration_HasTheThreeOperatorRoles_ForUsersOnly_AndEntraSignsInNobodyWithoutOne()
     {
         var resources = AppResources();
         var app = Of(resources, "Microsoft.Graph/applications@v1.0").Single()["properties"]!;
 
         app["displayName"]!.GetValue<string>().Should().Be("Norvia Estate health check (env)");
         var roles = app["appRoles"]!.AsArray().Select(role => role!).ToList();
-        roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal("HealthCheck.Run", "HealthCheck.Read");
+        roles.Select(role => role["value"]!.GetValue<string>()).Should().Equal("HealthCheck.Run", "HealthCheck.Read", "HealthCheck.Cost");
         roles.SelectMany(role => role["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>())).Should().OnlyContain(type => type == "User");
         Of(resources, "Microsoft.Graph/servicePrincipals@v1.0").Single()["properties"]!["appRoleAssignmentRequired"]!.GetValue<bool>().Should().BeTrue();
         Of(resources, "Microsoft.Graph/appRoleAssignedTo@v1.0").Select(grant => grant["properties"]!["principalId"]!.GetValue<string>()).Should().OnlyContain(id => id == Presenter);
