@@ -8,4 +8,7 @@ public static class OperatorRoles
 
     /// <summary>Read health check results. Reserved for the report (#394), which will show a result to someone who may not run one.</summary>
     public const string Read = "HealthCheck.Read";
+
+    /// <summary>See the spend page (#506): the estate's spend per resource next to Transport Order volume. Not the cost Agent's call role, which is its own.</summary>
+    public const string Cost = "HealthCheck.Cost";
 }

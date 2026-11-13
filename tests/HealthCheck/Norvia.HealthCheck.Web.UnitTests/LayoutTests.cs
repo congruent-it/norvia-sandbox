@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
+using Norvia.HealthCheck.Application.Operators;
 using Norvia.HealthCheck.Web.Components.Layout;
+using Norvia.HealthCheck.Web.Operators;
 using Norvia.HealthCheck.Web.Components.Pages;
 
 namespace Norvia.HealthCheck.Web.UnitTests;
@@ -24,6 +26,22 @@ public sealed class LayoutTests : HealthCheckWebContext
         var layout = RenderLayout();
 
         layout.Find("nav").TextContent.Trim().Should().Be("Estate health check");
+    }
+
+    [Fact]
+    public void Render_ForAnOperatorWithTheCostRole_LinksToTheSpendPage()
+    {
+        Operator.SetAuthorized("Iris Operator").SetRoles(OperatorRoles.Cost).SetPolicies(OperatorSignIn.CostPolicy);
+
+        RenderLayout().Find("nav a[href='/cost']").TextContent.Should().Be("Spend");
+    }
+
+    [Fact]
+    public void Render_ForAnOperatorWithoutTheCostRole_ShowsNoSpendLink()
+    {
+        Operator.SetAuthorized("Iris Operator").SetRoles(OperatorRoles.Run);
+
+        RenderLayout().FindAll("nav a[href='/cost']").Should().BeEmpty();
     }
 
     [Fact]
@@ -56,6 +74,7 @@ public sealed class LayoutTests : HealthCheckWebContext
     public void PageTitles_NameTheAppFirst()
     {
         PageTitles.Run.Should().StartWith("Estate health check");
+        PageTitles.Cost.Should().StartWith("Estate health check");
         PageTitles.Refused.Should().StartWith("Estate health check");
     }
 

@@ -15,6 +15,9 @@ public static class OperatorSignIn
 
     public const string ReadPolicy = OperatorRoles.Read;
 
+    /// <summary>Seeing the estate's spend.</summary>
+    public const string CostPolicy = OperatorRoles.Cost;
+
     public static IHostApplicationBuilder AddOperatorSignIn(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -41,7 +44,8 @@ public static class OperatorSignIn
 
         builder.Services.AddAuthorizationBuilder()
             .AddPolicy(RunPolicy, policy => policy.RequireRole(OperatorRoles.Run))
-            .AddPolicy(ReadPolicy, policy => policy.RequireRole(OperatorRoles.Read));
+            .AddPolicy(ReadPolicy, policy => policy.RequireRole(OperatorRoles.Read))
+            .AddPolicy(CostPolicy, policy => policy.RequireRole(OperatorRoles.Cost));
         builder.Services.AddCascadingAuthenticationState();
 
         return builder;

@@ -22,6 +22,8 @@ var runRole = 'HealthCheck.Run'
 var runRoleId = guid('norvia-health-check', environmentName, runRole)
 var readRole = 'HealthCheck.Read'
 var readRoleId = guid('norvia-health-check', environmentName, readRole)
+var costRole = 'HealthCheck.Cost'
+var costRoleId = guid('norvia-health-check', environmentName, costRole)
 
 var reader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'acdd72a7-3385-48ef-bd42-f606fba81ae7')
 var costManagementReader = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '72fafb9e-0641-4937-9268-a91bfd8191a3')
@@ -92,6 +94,16 @@ resource healthCheck 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: costRoleId
+      value: costRole
+      displayName: 'See the estate\'s spend'
+      description: 'See the spend page: spend per resource next to Transport Order volume. The Integration operator holds it.'
+      allowedMemberTypes: [
+        'User'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -101,7 +113,7 @@ resource healthCheckPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
   appRoleAssignmentRequired: true
 }
 
-// The presenter plays the Integration operator in demos, so holds both roles.
+// The presenter plays the Integration operator in demos, so holds all three roles.
 resource runRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
   resourceId: healthCheckPrincipal.id
   appRoleId: runRoleId
@@ -111,6 +123,12 @@ resource runRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(pres
 resource readRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
   resourceId: healthCheckPrincipal.id
   appRoleId: readRoleId
+  principalId: presenterPrincipalId
+}
+
+resource costRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!empty(presenterPrincipalId)) {
+  resourceId: healthCheckPrincipal.id
+  appRoleId: costRoleId
   principalId: presenterPrincipalId
 }
 

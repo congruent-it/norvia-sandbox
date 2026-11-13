@@ -7,5 +7,7 @@ public static class PageTitles
 
     public const string Run = App;
 
+    public const string Cost = $"{App} · Spend";
+
     public const string Refused = $"{App} · Not allowed";
 }

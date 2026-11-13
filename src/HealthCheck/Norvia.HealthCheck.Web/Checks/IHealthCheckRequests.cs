@@ -1,5 +1,6 @@
 using Ardalis.Result;
 using Norvia.Agents;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Narrate;
 using Norvia.HealthCheck.Application.Run;
 
@@ -13,4 +14,6 @@ public interface IHealthCheckRequests
     Task<Result<Narration>> NarrateAsync(NarrateHealthCheckQuery query, CancellationToken cancellationToken);
 
     Task<Result<NarratedItem>> ExplainAsync(ExplainFindingQuery query, CancellationToken cancellationToken);
+
+    Task<Result<CostView>> CostAsync(GetCostViewQuery query, CancellationToken cancellationToken);
 }
