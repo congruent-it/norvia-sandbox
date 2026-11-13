@@ -48,6 +48,58 @@ public sealed class ShipperTests
     }
 
     [Fact]
+    public void Create_StartsAtRevisionOne()
+    {
+        new Shipper(Id, "Brouwer Dranken", active: true).Revision.Should().Be(1);
+    }
+
+    [Fact]
+    public void Edit_ReplacesTheFieldsAndRaisesTheRevision()
+    {
+        var shipper = new Shipper(Id, "Brouwer Dranken", active: true);
+
+        shipper.Edit("Brouwer Dranken BV", active: false);
+
+        shipper.Name.Should().Be("Brouwer Dranken BV");
+        shipper.Active.Should().BeFalse();
+        shipper.Revision.Should().Be(2);
+    }
+
+    [Fact]
+    public void Edit_WithoutAName_ThrowsAndChangesNothing()
+    {
+        var shipper = new Shipper(Id, "Brouwer Dranken", active: true);
+
+        var editing = () => shipper.Edit(" ", active: false);
+
+        editing.Should().Throw<ArgumentException>();
+        shipper.Revision.Should().Be(1);
+        shipper.Active.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Reload_AfterAnEdit_LeavesTheEditAlone()
+    {
+        var shipper = new Shipper(Id, "Brouwer Dranken", active: true);
+        shipper.Edit("Brouwer Dranken BV", active: true);
+
+        shipper.Reload("Seed name", active: false);
+
+        shipper.Name.Should().Be("Brouwer Dranken BV");
+        shipper.Revision.Should().Be(2);
+    }
+
+    [Fact]
+    public void Reload_BeforeAnyEdit_KeepsRevisionOne()
+    {
+        var shipper = new Shipper(Id, "Brouwer Dranken", active: true);
+
+        shipper.Reload("Brouwer Dranken BV", active: true);
+
+        shipper.Revision.Should().Be(1);
+    }
+
+    [Fact]
     public void ShipperId_WithoutAValue_Throws()
     {
         var creating = () => new ShipperId(" ");

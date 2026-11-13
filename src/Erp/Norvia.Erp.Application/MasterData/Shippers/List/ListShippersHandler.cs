@@ -10,6 +10,6 @@ public sealed class ListShippersHandler(IReadRepository<Shipper> shippers) : IQu
     {
         ArgumentNullException.ThrowIfNull(query);
         var all = await shippers.ListAsync(new ShippersSpec(), cancellationToken);
-        return [.. all.Select(shipper => new ShipperView(shipper.Id.Value, shipper.Name, shipper.Active))];
+        return [.. all.Select(shipper => new ShipperView(shipper.Id.Value, shipper.Name, shipper.Active, shipper.Revision))];
     }
 }

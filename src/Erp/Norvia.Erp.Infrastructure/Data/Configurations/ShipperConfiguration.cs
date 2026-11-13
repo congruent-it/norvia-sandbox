@@ -13,5 +13,6 @@ internal sealed class ShipperConfiguration : IEntityTypeConfiguration<Shipper>
         builder.HasKey(shipper => shipper.Id);
         builder.Property(shipper => shipper.Id).HasConversion(id => id.Value, value => new ShipperId(value)).HasMaxLength(50).ValueGeneratedNever();
         builder.Property(shipper => shipper.Name).HasMaxLength(200).IsRequired();
+        builder.Property(shipper => shipper.Revision).HasDefaultValue(1);
     }
 }

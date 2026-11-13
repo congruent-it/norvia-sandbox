@@ -1,0 +1,58 @@
+using Mediator;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Norvia.Erp.Api.Tracking;
+using Norvia.Erp.Application;
+using Norvia.Erp.Application.IntegrationEvents;
+using Norvia.Erp.Application.MasterData;
+using Norvia.Erp.Application.MasterData.Shippers.Save;
+
+namespace Norvia.Erp.Api.MasterData;
+
+public static class MasterDataEndpoints
+{
+    /// <summary>The app role of the ERP UI's own identity, which is how Finance's edits reach the ERP API (ADR 0028's split, for the ERP).</summary>
+    public const string ManageRole = "MasterData.Manage";
+
+    public static IEndpointRouteBuilder MapMasterData(this IEndpointRouteBuilder app)
+    {
+        var shippers = app.NewVersionedApi("MasterData")
+            .MapGroup("/v{version:apiVersion}/shippers")
+            .HasApiVersion(1);
+
+        shippers.MapPut("/{id}", SaveShipperAsync)
+            .WithName("SaveShipper")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.MasterData))
+            .WithSummary("Create or edit a Shipper, and replicate it to the TMS.")
+            .WithDescription(
+                "What Finance's Shipper form does, through the same command. Creates the Shipper (201, Master-data revision 1) or replaces its name and "
+                + "active flag (200, the revision raised by one) and publishes the whole Shipper as the Shipper event, in one transaction. Idempotent on content: "
+                + "a repeat of what the Shipper already is answers 200 with the unchanged revision and publishes nothing. A Shipper is never deleted, only made inactive. "
+                + "Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.");
+
+        return app;
+    }
+
+    internal static async Task<Results<Ok<SaveShipperResult>, Created<SaveShipperResult>, ProblemHttpResult>> SaveShipperAsync(
+        string id,
+        SaveShipperRequest request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveShipperCommand(id, request.Name, request.Active), cancellationToken).AsTask());
+        if (!result.IsSuccess)
+        {
+            var refusal = result.ValidationErrors.First();
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The Shipper can't be saved.",
+                detail: refusal.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
+        }
+
+        return result.Value.Outcome == MasterDataSaveOutcome.Created
+            ? TypedResults.Created($"/v1/shippers/{id}", result.Value)
+            : TypedResults.Ok(result.Value);
+    }
+}

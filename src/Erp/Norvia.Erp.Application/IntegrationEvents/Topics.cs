@@ -4,4 +4,7 @@ public static class Topics
 {
     /// <summary>Where the ERP publishes its Shipper invoices (E1), with Credit notes and delivery reports to follow.</summary>
     public const string InvoicingEvents = "invoicing-events";
+
+    /// <summary>Where the ERP publishes a master-data record Finance created or edited (E3): the entity type is the event type.</summary>
+    public const string MasterDataEvents = "master-data-events";
 }
