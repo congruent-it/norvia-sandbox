@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using Azure.Storage.Blobs;
 using static Norvia.Tms.TestSupport.ProofsOfDelivery.ProofOfDeliveryCalls;
 
 namespace Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery;
@@ -60,6 +61,32 @@ public sealed class ProofOfDeliveryPlannerQueryTests(TmsFixture tms) : IClassFix
             content.StatusCode.Should().Be(HttpStatusCode.OK);
             (await content.Content.ReadAsByteArrayAsync(_cancellationToken)).Should().Equal(sent.Content);
         }
+    }
+
+    [Fact]
+    public async Task ReadingAFile_WhoseBlobTheRetentionPeriodDeleted_IsGoneWithTheExpiredCode_WhileTheRecordAndItsOtherFilesStay()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var expiring = Cmr("expiring.pdf");
+        var kept = Cmr("kept.pdf");
+        await tms.RecordedProofAsync(Metadata(reference), [expiring, kept], _cancellationToken);
+        var files = (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!["files"]!.AsArray();
+        var expiringId = files.Single(file => file!["name"]!.GetValue<string>() == expiring.Name)!["id"]!.GetValue<string>();
+        var keptId = files.Single(file => file!["name"]!.GetValue<string>() == kept.Name)!["id"]!.GetValue<string>();
+
+        // The lifecycle rule of an Azure storage account does not run on Azurite: delete the blob as the rule would, by its name.
+        var container = new BlobServiceClient(await tms.ConnectionStringAsync("blobs", _cancellationToken)).GetBlobContainerClient("proofs-of-delivery");
+        (await container.DeleteBlobIfExistsAsync($"{shipmentNumber}/{Guid.Parse(expiringId):N}", cancellationToken: _cancellationToken)).Value
+            .Should().BeTrue("the file was stored under the Shipment number and its ID");
+
+        using var gone = await tms.GetProofFileAsync(shipmentNumber, expiringId, _cancellationToken);
+        gone.StatusCode.Should().Be(HttpStatusCode.Gone);
+        (await JsonNode.ParseAsync(await gone.Content.ReadAsStreamAsync(_cancellationToken), cancellationToken: _cancellationToken))!["code"]!
+            .GetValue<string>().Should().Be("ProofOfDeliveryFileExpired");
+        using var stillThere = await tms.GetProofFileAsync(shipmentNumber, keptId, _cancellationToken);
+        stillThere.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!["files"]!.AsArray()
+            .Select(file => file!["name"]!.GetValue<string>()).Should().BeEquivalentTo(expiring.Name, kept.Name);
     }
 
     [Fact]
