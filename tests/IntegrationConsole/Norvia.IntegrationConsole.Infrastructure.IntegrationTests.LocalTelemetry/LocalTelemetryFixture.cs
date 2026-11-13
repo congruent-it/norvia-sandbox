@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
-namespace Norvia.IntegrationConsole.Infrastructure.IntegrationTests.Refusals;
+namespace Norvia.IntegrationConsole.Infrastructure.IntegrationTests.LocalTelemetry;
 
 /// <summary>
 /// Runs the AppHost under Aspire's test host, cut down to the stand-in that plays API Management (ADR 0023) and the Aspire dashboard

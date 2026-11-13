@@ -18,7 +18,7 @@
     <ProjectReference Include="..\..\..\src\IntegrationConsole\Norvia.IntegrationConsole.Infrastructure\Norvia.IntegrationConsole.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The Service Bus emulator's AppHost and the dashboard's each cost about 6 GB, so one test collection runs at a time (coding guidelines §10). -->
+    <!-- The Service Bus emulator's AppHost costs about 6 GB, so one test collection runs at a time (coding guidelines §10). -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

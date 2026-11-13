@@ -126,6 +126,7 @@
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Agents.Emulator.IntegrationTests/Norvia.IntegrationConsole.Agents.Emulator.IntegrationTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.ArchitectureTests/Norvia.IntegrationConsole.ArchitectureTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.IntegrationTests/Norvia.IntegrationConsole.Infrastructure.IntegrationTests.csproj" />
+    <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.IntegrationTests.LocalTelemetry/Norvia.IntegrationConsole.Infrastructure.IntegrationTests.LocalTelemetry.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Infrastructure.UnitTests/Norvia.IntegrationConsole.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UiTests/Norvia.IntegrationConsole.Web.UiTests.csproj" />
     <Project Path="tests/IntegrationConsole/Norvia.IntegrationConsole.Web.UnitTests/Norvia.IntegrationConsole.Web.UnitTests.csproj" />

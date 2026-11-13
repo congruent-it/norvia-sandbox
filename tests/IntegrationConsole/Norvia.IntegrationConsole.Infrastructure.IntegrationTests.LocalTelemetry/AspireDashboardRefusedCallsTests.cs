@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Norvia.IntegrationConsole.Application.Refusals;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
-namespace Norvia.IntegrationConsole.Infrastructure.IntegrationTests.Refusals;
+namespace Norvia.IntegrationConsole.Infrastructure.IntegrationTests.LocalTelemetry;
 
 /// <summary>
 /// Locally the console lists the refusals of the stand-in that plays API Management from the Aspire dashboard, read through its telemetry API as
@@ -30,14 +30,16 @@ public sealed class AspireDashboardRefusedCallsTests(LocalTelemetryFixture local
         noRole.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         noShipper.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var refusals = await EventuallyAsync(before, found => found.Count >= 4);
+        // The dashboard is shared with the other test, so only the refusals these four calls caused are looked at.
+        var ownIds = new[] { noKey, noToken, noRole, noShipper }.Select(response => response.Headers.GetValues("X-Correlation-ID").Single()).ToList();
+        var refusals = (await EventuallyAsync(before, found => found.Count(refusal => ownIds.Contains(refusal.CorrelationId ?? "")) >= 4))
+            .Where(refusal => ownIds.Contains(refusal.CorrelationId ?? "")).ToList();
 
         refusals.Select(refusal => (refusal.StatusCode, refusal.FailureCode)).Should().BeEquivalentTo(
             [(401, "Unauthorized"), (401, "Unauthorized"), (403, "NotAllowedToSubmit"), (403, "NoShipperForClient")]);
         // Each opens its Message trail by the correlation ID API Management answered with, and no caller's subscription is known locally.
         refusals.Should().OnlyContain(refusal => refusal.CorrelationId != null && refusal.Caller == null);
-        refusals.Select(refusal => refusal.CorrelationId).Should().BeEquivalentTo(
-            new[] { noKey, noToken, noRole, noShipper }.Select(response => response.Headers.GetValues("X-Correlation-ID").Single()));
+        refusals.Select(refusal => refusal.CorrelationId).Should().BeEquivalentTo(ownIds);
     }
 
     [Fact]
@@ -45,17 +47,19 @@ public sealed class AspireDashboardRefusedCallsTests(LocalTelemetryFixture local
     {
         var before = local.ReadyAt;
         var token = local.Token(LocalTelemetryFixture.ShipperClientId, "Tracking.Read");
-        HttpResponseMessage? last = null;
-        for (var call = 0; call <= TrackingCallsPerMinute; call++)
+        // The limit is a fixed window of a minute: a window that rolls over mid-run restarts the count, so call until it answers 429
+        // (at most two windows' worth) rather than for exactly one window's worth.
+        HttpStatusCode status = default;
+        for (var call = 0; call <= 2 * TrackingCallsPerMinute && status != HttpStatusCode.TooManyRequests; call++)
         {
-            last?.Dispose();
             using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/partner/v1/transport-orders", UriKind.Relative));
             request.Headers.Add("Ocp-Apim-Subscription-Key", LocalTelemetryFixture.SubscriptionKey);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            last = await local.StandIn.SendAsync(request, TestContext.Current.CancellationToken);
+            using var response = await local.StandIn.SendAsync(request, TestContext.Current.CancellationToken);
+            status = response.StatusCode;
         }
 
-        last!.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        status.Should().Be(HttpStatusCode.TooManyRequests);
         var refusals = await EventuallyAsync(before, found => found.Any(refusal => refusal.StatusCode == 429));
 
         refusals.Should().ContainSingle(refusal => refusal.StatusCode == 429).Which.FailureCode.Should().Be("RateLimitExceeded");
