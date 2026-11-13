@@ -224,7 +224,7 @@ These were left out on purpose while designing E1, each with its reason.
 - **Invoice layouts and PDFs.** The Shipper receives the invoice as data in its Persona's inbox.
 - **Credit notes across several lines, and re-invoicing.** One Credit note credits one line. A corrected charge is a new Credit note, not a new invoice.
 - **Editing master data in the ERP, and syncing it to the TMS.** That is E3.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built. The candidates:
+- **As-found toggles and presenter-panel faults.** The [as-found estate](../../operations/as-found.md) is built. Of the candidates, the two toggles are built (`flowsWithoutFailedRunAlert=shipper-invoice` and `entitiesWithoutDeadLetterAlert`) and the fault is not:
   - Presenter-panel fault: the Shipper invoice endpoint is down, so the invoice ends Not delivered.
   - Toggle: no alert on failed Shipper invoice Logic App runs.
   - Toggle: no alert on the dead-letter queue of the `TransportOrderBillable` subscription (also listed in [P9](../tms/p9-freight-settlement.md#deferred)).

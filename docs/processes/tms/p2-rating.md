@@ -176,4 +176,4 @@ These were left out on purpose while designing P2, each with its reason.
 - **Showing the Freight Charge to Shippers, and Quotes before booking.** Out of scope because a displayed price reads as a commitment.
 - **Carrier cost.** Designed in [P9](p9-freight-settlement.md#carrier-cost) with the same method as Rating, against a Carrier Rate Card (ADR 0013).
 - **A pricing desk role** separate from Customer service.
-- **As-found toggles**, for example no alert on `TransportOrderRatingFailed`, or an event nobody subscribes to. They are added after the fixed state is built, as for P1.
+- **As-found toggles specific to P2**, for example no alert on `TransportOrderRatingFailed`, or an event nobody subscribes to. The [as-found estate](../../operations/as-found.md) is built, but it has no toggle for these: nothing in the estate reads `TransportOrderRatingFailed`, so there is no alert to remove.

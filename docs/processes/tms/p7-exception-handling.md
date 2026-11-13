@@ -396,7 +396,7 @@ These were left out on purpose while designing P7, each with its reason.
 - **Shipper replies, email notifications and notifying the Consignee.** The notification is one-way to the Shipper's endpoint. Consignee tracking is deferred in [P8](p8-shipper-visibility.md).
 - **Claims.** Damage and shortages are settled outside the TMS and resolved as `ClaimHandledOutsideTms`. They don't affect invoicing: an open Exception holds billing back until it is resolved, and Finance issues a Credit note by hand if a claim is settled against the invoice ([P9](p9-freight-settlement.md#billable-is-final)).
 - **Stale opening an Exception.** Stale means the Shipment has gone quiet, which is about the integration's health, not news for the Shipper.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P6. The candidates:
+- **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built (the alert toggle as `flowsWithoutFailedRunAlert`):
   - Presenter-panel fault: the Shipper notification endpoint is down, so notifications end Not delivered. Built: `shipper-notification-endpoint-down` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).
   - Toggle: no alert on failed Shipper notification or Carrier cancellation Logic App runs.
   - Toggle: the Late delivery check switched off. Built: `lateDeliveryCheckOff` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)). Together with the unset Stale thresholds from P5, only a Consignee's phone call reveals the problem, as in the headline incident.

@@ -295,7 +295,7 @@ These were left out on purpose while designing P4, each with its reason.
 - **Carrier rates and a price on the Carrier booking.** Now designed in [P9](p9-freight-settlement.md#carrier-cost) (ADR 0013): the Carrier cost is frozen at release and sent in the booking request.
 - **Driver and vehicle details from the Carrier.** Nothing needs them yet, including P5.
 - **Notifying the Shipper that its Shipment is booked.** Push to the Shipper is deferred in [P8](p8-shipper-visibility.md). The Shipper sees Scheduled when it queries.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P3. The candidates:
+- **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built:
   - Toggle: the Carrier endpoint's secret inlined in the P4 booking Logic App instead of read from Key Vault. Built: `carrierSecretInlined` ([as-found](../../operations/as-found.md#storage-secrets-and-retention)).
   - Toggle: no alert on the dead-letter queue of the `ShipmentReleased` subscription (from P3).
   - Presenter-panel fault: a Carrier's booking endpoint is down, which shows up as Not delivered. Built: `carrier-booking-endpoint-down` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).

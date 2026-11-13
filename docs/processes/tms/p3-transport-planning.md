@@ -214,10 +214,10 @@ Designed in this document and not built yet:
 
 These were left out on purpose while designing P3, each with its reason.
 
-- **Automatic assignment, and coverage rules** such as "Own fleet only within the Benelux". Planning is manual for now, so the demo has a visible human step and needs no rules or lane-to-Carrier data.
+- **Automatic assignment, and coverage rules** such as "Own fleet only within the Benelux". Planning is manual for now, so the demo has a visible human step and needs no rules or lane-to-Carrier data. A *suggested* assignment is built as the [Suggest button](#suggest-an-assignment), but the Planner still confirms it. Assigning without the Planner is deferred.
 - **Choosing on Carrier cost.** Carrier Rate Cards exist since [P9](p9-freight-settlement.md#carrier-cost), but planning stays manual.
 - **Groupage, and splitting a Transport Order over several Shipments.** The one-Shipment-per-Transport-Order rule stands (ADR 0007).
 - **Un-planning, and changes after release.** Reassigning covers mistakes before release. After release, changes go through P4 (withdrawing) and P7 (cancelling from an Exception). Cancelling a Transport Order is already deferred in P1.
 - **A separate dispatcher role for Trips.** The Planner does P11 too (see [P11](p11-trip-dispatch.md)).
 - **The ERP and the Carrier master-data sync.** Carriers come from the seed file for now.
-- **As-found toggles**, for example a `ShipmentReleased` subscription with no alert on its dead-letter queue. They are added after the fixed state is built, as for P1 and P2.
+- **As-found toggles**, for example a `ShipmentReleased` subscription with no alert on its dead-letter queue. Built in the [as-found estate](../../operations/as-found.md): it is one case of `entitiesWithoutDeadLetterAlert`.

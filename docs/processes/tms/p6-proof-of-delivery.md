@@ -287,7 +287,7 @@ These were left out on purpose while designing P6, each with its reason.
 - **A legal retention period, and deleting Proof of delivery files after it.**
 - **Polling Carrier APIs for Proofs of delivery.** Push through the Partner portal, as in P5.
 - **How the Driver app captures a Proof of delivery.** Designed in [P12](p12-trip-execution.md#capturing-a-proof-of-delivery).
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P5. The candidates:
+- **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built (the alert toggles as `flowsWithoutFailedRunAlert` and `entitiesWithoutDeadLetterAlert`):
   - Toggle: no alert on failed Carrier Proof of delivery Logic App runs, or on the dead-letter queue of the Proof of delivery queue.
   - Presenter-panel fault: a Carrier sends a `.heic` photo. The TMS refuses it with `FileNotAccepted` and the message is dead-lettered, while the Carrier believes it succeeded. Built: `carrier-proof-heic-photo` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).
   - Toggle: no lifecycle rule on the inbound container, so storage grows silently. This ties to the headline incident's unexplained Azure bill. Built: `noInboundLifecycleRule` ([as-found](../../operations/as-found.md#storage-secrets-and-retention)). The Logic App still deletes the blobs it processed.

@@ -234,4 +234,4 @@ These were left out on purpose while designing P10, each with its reason.
 - **Suggesting what to move to a Carrier**, or rostering automatically. Planning stays manual, as in P3.
 - **Loading metres and volume.** Goods lines don't carry them.
 - **The ERP and the Vehicle and Driver master-data sync.** They come from the seed file for now.
-- **As-found toggles.** They are added after the fixed state is built, as for P1 and P2.
+- **As-found toggles.** The [as-found estate](../../operations/as-found.md) is built. P10 has no toggle of its own.
