@@ -36,6 +36,9 @@ public sealed class Checklist(IReadOnlyList<Check> checks)
         new AgentCostTagCheck(),
         new AgentsEnabledInPublicDemoUiCheck(),
         new UnlimitedModelQuotaCheck(),
+        new AssistantLimitsCheck(),
+        new AssistantOutputCheckCheck(),
+        new AssistantAccessCheck(),
     ]);
 
     public IReadOnlyList<Check> Checks => checks;

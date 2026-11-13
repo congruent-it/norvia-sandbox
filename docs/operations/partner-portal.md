@@ -16,3 +16,13 @@ A Shipper Persona's booking form has a **Fill from an email** link (`/personas/{
 - "Assistant unavailable" is shown when the call fails or is refused (`Agents:Enabled` off, no `TransportOrders.Draft` role, the rate limit, the model failing or replying something that is not a draft). The form is then filled in by hand. Text with more than one booking, and text over the size limit, get their own message.
 - Locally the Partner API stand-in answers with the scripted fake, which knows three synthetic emails (`BookingIntakeSamples` in `Norvia.Agents`): a good English one, a partial Dutch one and one with two bookings. Paste one of them to see the flow; anything else gives an empty draft with everything flagged. Turn the Agents on with `Agents:Enabled` in the AppHost's user secrets.
 - Failure behaviour: [failure-behaviour.md](../architecture/failure-behaviour.md); where it runs: [local-vs-azure.md](../architecture/local-vs-azure.md); the role: [identity-and-access.md](../architecture/identity-and-access.md).
+
+## Tracking assistant
+
+The panel on the tracking screen ([P8](../processes/tms/p8-shipper-visibility.md#ask-about-your-orders-the-shipper-tracking-assistant), [ADR 0049](../adr/0049-the-shipper-tracking-assistant-has-no-tools-and-only-restates-what-the-portal-fetched-with-the-personas-token.md)) shows only while `Agents:Enabled` is on.
+
+- **Turn it on in Azure:** `azd env set ESTATE_AGENTS_ENABLED_SETTING true`, then `azd up`. `infra/deploy-agents.ps1` (a postdeploy hook) publishes the Agent into the `norvia-intake` project with no role. Without a model answer the panel says "Assistant unavailable" and the screen works as before.
+- **Limits** are estate parameters, set before `azd up` with `ESTATE_ASSISTANT_<NAME>_SETTING`: `QUESTIONS_PER_MINUTE` (6), `QUESTIONS_PER_HOUR` (60), `MAX_QUESTION_CHARACTERS` (500), `MAX_ORDERS` (20), `MAX_EVENTS_PER_ORDER` (20), `MAX_OUTPUT_TOKENS` (400), `DAILY_TOKENS_PER_PERSONA` (50000) and `DAILY_TOKENS_ESTATE` (500000). The counters are in the portal's memory, so it runs one replica and a restart resets them.
+- **Locally** the scripted fake plays the Agent; there is nothing to configure.
+- **Post-deploy smoke run:** [infra/smoke-test-tracking-assistant.ps1](../../infra/smoke-test-tracking-assistant.ps1) (a presenter asks as two Shipper Personas; the script checks the Agent's identity holds no role, the answer's values are in the data, the other Shipper's order is not reachable and no question is in the log).
+- **What the model costs** is tagged `workload: foundry-agents`, `cost-category: ai-model` on the Foundry resources, as for every Agent.

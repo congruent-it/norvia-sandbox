@@ -44,9 +44,9 @@ $endpoint = $env:FOUNDRY_PROJECT_ENDPOINT ? $env:FOUNDRY_PROJECT_ENDPOINT : $env
 $published = Join-Path $repo '.azure' $env:AZURE_ENV_NAME 'published-agents.json'
 $gateway = $env:AZURE_ESTATE_PARTNER_API_URL -replace '/partner/v1$', ''
 $apiVersion = 'v1'
-# The Agents that read a Shipper's text are published into the Intake project, which has no Application Insights connection
+# The Agents that read a Shipper's text (the Intake agent's booking email, the tracking assistant's question) are published into the Intake project, which has no Application Insights connection
 # (docs/operations/foundry.md). Every other Agent is published into the norvia project.
-$intakeAgents = @('booking-intake')
+$intakeAgents = @('booking-intake', 'shipper-tracking-assistant')
 $intakeEndpoint = $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT ? $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT : $env:AZURE_ESTATE_FOUNDRY_INTAKE_PROJECT_ENDPOINT
 
 if (-not (Get-Command yq -ErrorAction SilentlyContinue)) { Write-Fail 'yq is not installed' }
@@ -126,7 +126,7 @@ foreach ($server in $servers) {
 }
 
 # The Booking draft host is the Intake agent's door, not an MCP server: the Partner API's booking-drafts operation calls it.
-if ($files | Where-Object { (Split-Path -Leaf $_) -replace '\.agent\.yaml$' -in $intakeAgents }) {
+if ($files | Where-Object { (Split-Path -Leaf $_) -replace '\.agent\.yaml$' -eq 'booking-intake' }) {
     Set-BackendAddress 'booking-draft' booking-draft-api booking-draft-host ESTATE_BOOKING_DRAFT_BASE_URL -Route ''
 }
 

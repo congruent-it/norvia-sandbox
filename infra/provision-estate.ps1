@@ -296,6 +296,25 @@ Set-AzdValue FOUNDRY_INTAKE_PROJECT_ENDPOINT $foundryIntakeProjectEndpoint
 Set-AzdValue AZURE_ESTATE_FOUNDRY_INTAKE_PROJECT_ENDPOINT $foundryIntakeProjectEndpoint
 Set-AzdParameter estate_foundry_intake_project_endpoint $foundryIntakeProjectEndpoint
 
+# The Shipper tracking assistant's limits (ADR 0049): estate parameters, the ADR's numbers unless the environment says otherwise with
+# ESTATE_ASSISTANT_<NAME>_SETTING. The Partner portal enforces them in memory, so it runs one replica.
+$assistantLimits = [ordered]@{
+    questions_per_minute     = 6
+    questions_per_hour       = 60
+    max_question_characters  = 500
+    max_orders               = 20
+    max_events_per_order     = 20
+    max_output_tokens        = 400
+    daily_tokens_per_persona = 50000
+    daily_tokens_estate      = 500000
+}
+foreach ($limit in $assistantLimits.Keys) {
+    $setting = [Environment]::GetEnvironmentVariable("ESTATE_ASSISTANT_$($limit.ToUpperInvariant())_SETTING")
+    $value = $setting ? $setting : [string]$assistantLimits[$limit]
+    if ($value -notmatch '^[1-9][0-9]*$') { Write-Fail "ESTATE_ASSISTANT_$($limit.ToUpperInvariant())_SETTING must be a positive whole number" }
+    Set-AzdParameter "estate_assistant_$limit" $value
+}
+
 # The Integration console's agent API: the app registration API Management's identity calls it as, and that identity.
 # The estate is at its 64 outputs, so they are found by name (infra/estate/integration-operations-mcp.bicep).
 $consoleAgentApiClientId = [string](Get-AzTsvLines ad app list --filter "displayName eq 'Norvia Integration console agent API ($envName)'" --query '[0].appId')

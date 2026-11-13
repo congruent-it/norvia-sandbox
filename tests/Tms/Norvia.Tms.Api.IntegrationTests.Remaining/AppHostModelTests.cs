@@ -654,6 +654,35 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
+    public async Task InAzure_ThePartnerPortal_AsksTheTrackingAssistantInTheIntakeProject_AsItsOwnIdentity_WithTheEstatesLimits()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        var portal = await EnvironmentOfAsync(builder, "partner-portal-web");
+
+        portal.Should().Contain("Agents__Enabled", "{estate-agents-enabled.value}")
+            .And.Contain("Agents__Foundry__ProjectEndpoint", "{estate-foundry-intake-project-endpoint.value}", "a Shipper's question is not traced server-side")
+            .And.Contain("Agents__ManagedIdentityClientId", "{estate-partner-portal-client-id.value}")
+            .And.Contain("Agents__Limits__QuestionsPerMinute", "{estate-assistant-questions-per-minute.value}")
+            .And.Contain("Agents__Limits__QuestionsPerHour", "{estate-assistant-questions-per-hour.value}")
+            .And.Contain("Agents__Limits__MaxQuestionCharacters", "{estate-assistant-max-question-characters.value}")
+            .And.Contain("Agents__Limits__MaxOrders", "{estate-assistant-max-orders.value}")
+            .And.Contain("Agents__Limits__MaxEventsPerOrder", "{estate-assistant-max-events-per-order.value}")
+            .And.Contain("Agents__Limits__MaxOutputTokens", "{estate-assistant-max-output-tokens.value}")
+            .And.Contain("Agents__Limits__DailyTokensPerPersona", "{estate-assistant-daily-tokens-per-persona.value}")
+            .And.Contain("Agents__Limits__DailyTokensEstate", "{estate-assistant-daily-tokens-estate.value}");
+        portal.Keys.Should().NotContain(key => key.StartsWith("Agents__Api__", StringComparison.Ordinal), "the Agent has no tool, so there is no agent API to take a token on");
+    }
+
+    [Fact]
+    public async Task InAzure_ThePartnerPortal_RunsOneReplica_BecauseTheAssistantsCountersAreInItsMemory()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        ContainerAppBicepOf(builder, "partner-portal-web").Should().MatchRegex(@"minReplicas: 1\s+maxReplicas: 1");
+    }
+
+    [Fact]
     public async Task InAzure_TheIntegrationConsole_AsksThePublishedAgentInFoundry_AndTakesApiManagementsEntraTokenOnItsAgentApi()
     {
         await using var builder = await CreateForAzureAsync();

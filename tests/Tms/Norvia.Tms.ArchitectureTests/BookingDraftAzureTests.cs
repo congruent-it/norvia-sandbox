@@ -95,7 +95,7 @@ public sealed class BookingDraftAzureTests
         var applications = estate[estate.IndexOf("applicationPrincipalIds:", StringComparison.Ordinal)..];
         applications = applications[..applications.IndexOf('\n', StringComparison.Ordinal)];
 
-        estate.Should().Contain("intakeApplicationPrincipalIds: [bookingDraft.outputs.principalId]");
+        estate.Should().Contain("intakeApplicationPrincipalIds: [bookingDraft.outputs.principalId, identities.outputs.partnerPortalPrincipalId]");
         applications.Should().NotContain("bookingDraft", "the norvia project is never the Booking draft host's");
         Regex.Match(foundry, @"(?ms)^resource applicationsUseTheIntakeProject .*?^\}\]$").Value.Should().Contain("scope: intakeProject").And.Contain("roleDefinitionId: foundryUser");
     }
@@ -130,7 +130,7 @@ public sealed class BookingDraftAzureTests
     {
         var script = Read("infra/deploy-agents.ps1");
 
-        script.Should().Contain("$intakeAgents = @('booking-intake')").And.Contain("FOUNDRY_INTAKE_PROJECT_ENDPOINT");
+        script.Should().Contain("$intakeAgents = @('booking-intake', 'shipper-tracking-assistant')").And.Contain("FOUNDRY_INTAKE_PROJECT_ENDPOINT");
         script.Should().Contain("booking-draft-host").And.Contain("ESTATE_BOOKING_DRAFT_BASE_URL");
         script.Should().MatchRegex(@"-ProjectEndpoint \$projectEndpoint");
         Read("infra/provision-estate.ps1").Should().Contain("Norvia booking draft API (").And.Contain("estate_booking_draft_api_client_id").And.Contain("estate_foundry_intake_project_endpoint");

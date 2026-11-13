@@ -139,7 +139,7 @@ While `Agents:Enabled` is on, the list and the detail also show a panel where th
 - "I can't reach tracking right now" when the portal's own fetch failed (Dutch: "Ik kan de tracking nu niet bereiken").
 - "Assistant unavailable" when the model is down (Dutch: "Assistent niet beschikbaar").
 
-The rest of the screen works as before in every case. The Partner portal's [architecture page](../../architecture/partner-portal-architecture.md#the-shipper-tracking-assistant) describes the parts.
+In Azure the answer is written by the real model (#879) from the same data; the Persona's question and the data go to the Foundry project of the Intake agent, which keeps nothing (`store: false`) and traces no content. Over a per-Persona limit the Shipper is refused without a model call. The rest of the screen works as before in every case. The Partner portal's [architecture page](../../architecture/partner-portal-architecture.md#the-shipper-tracking-assistant) describes the parts.
 
 ## TMS API
 

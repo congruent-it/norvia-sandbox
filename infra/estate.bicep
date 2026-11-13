@@ -219,8 +219,9 @@ module foundry 'estate/foundry.bicep' = {
     foundryUserPrincipalIds: concat(empty(presenterPrincipalId) ? [] : [presenterPrincipalId], foundryUserPrincipalIds)
     // The Integration console asks its Agent as its own identity (Explain), and so does the Estate health check, the TMS UI (Explain on a Rejected booking), the ERP UI (Explain on a Carrier invoice line) and the Simulator (its plans' pools of Carrier texts).
     applicationPrincipalIds: [identities.outputs.integrationConsolePrincipalId, healthCheck.outputs.principalId, tmsUiIdentity.properties.principalId, erpIdentity.properties.principalId, identities.outputs.simulatorPrincipalId]
-    // The Booking draft host asks the Intake agent as its own identity, in the Intake project only.
-    intakeApplicationPrincipalIds: [bookingDraft.outputs.principalId]
+    // The Booking draft host asks the Intake agent as its own identity, in the Intake project only, and so does the Partner portal for the Shipper tracking
+    // assistant (ADR 0049): a Shipper's question is text of the same kind, so its Agent is published there too, where nothing is traced server-side.
+    intakeApplicationPrincipalIds: [bookingDraft.outputs.principalId, identities.outputs.partnerPortalPrincipalId]
   }
 }
 

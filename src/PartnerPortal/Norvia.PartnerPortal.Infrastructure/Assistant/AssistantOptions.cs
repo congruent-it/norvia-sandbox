@@ -18,6 +18,15 @@ public sealed class AssistantOptions
     [Range(1, int.MaxValue)]
     public int TimeoutSeconds { get; set; } = 30;
 
+    /// <summary>The Foundry project the assistant is published in (the Intake project, whose prompts are not traced), which the portal calls as its own identity.</summary>
+    public FoundryOptions Foundry { get; set; } = new();
+
+    /// <summary>The Entra client ID of the portal's managed identity, which asks the Agent in Azure.</summary>
+    public string ManagedIdentityClientId { get; set; } = string.Empty;
+
+    /// <summary>Whether the Agent runs in Foundry, which is the case wherever the estate gave the portal a project endpoint.</summary>
+    public bool UsesFoundry => Foundry.ProjectEndpoint is not null;
+
     [ValidateObjectMembers]
     public AssistantLimits Limits { get; set; } = new();
 }

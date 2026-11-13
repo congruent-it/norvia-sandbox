@@ -35,11 +35,13 @@ public sealed record ApiManagementFacts(int? ShipperTrackingCacheSeconds = 0, bo
 /// <param name="Identities">One per agent.</param>
 /// <param name="EnabledInPublicDemoUi"><c>Agents:Enabled</c> is on in a Demo UI the public can reach.</param>
 /// <param name="ModelQuotaUnlimited">The model deployment has no quota to stop a runaway bill.</param>
+/// <param name="TrackingAssistant">What guards the Shipper tracking assistant (ADR 0049); <c>null</c> where the estate has none.</param>
 public sealed record AgentFacts(
     bool ContentFilterAndPromptShield = true,
     IReadOnlyList<AgentIdentity>? Identities = null,
     bool EnabledInPublicDemoUi = false,
-    bool ModelQuotaUnlimited = false)
+    bool ModelQuotaUnlimited = false,
+    TrackingAssistantFacts? TrackingAssistant = null)
 {
     public IReadOnlyList<AgentIdentity> Identities { get; init; } = Identities ?? [];
 }
