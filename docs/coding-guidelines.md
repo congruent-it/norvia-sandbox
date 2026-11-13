@@ -259,12 +259,13 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 ## 11. Workflow
 
 - Every change goes through a pull request with at least one review.
-- A PR is mergeable only when the build has no warnings, `dotnet format --verify-no-changes` passes, all tests pass and the coverage gate is met.
+- A PR is mergeable only when the build has no warnings, `dotnet format --verify-no-changes` passes, all tests pass, the coverage gate is met and the Markdown link check (`lychee --offline`, [lychee.toml](../lychee.toml)) finds no dead relative link.
 - Unit and architecture tests are part of the change, not a follow-up. Bug fixes start with a failing test that reproduces the bug.
 - Integration tests and UI tests are not: each is built in an issue of its own, linked to the feature issue it covers (see [Splitting work into issues](agents/issue-tracker.md#splitting-work-into-issues)). A feature issue does not list them in its acceptance criteria; it names the issues that will.
 - A decision that is hard to reverse, surprising, or the result of a real trade-off gets an ADR in [docs/adr/](adr/).
 - A PR that adds or changes an event, a subscription, a Flow, a Logic App, an app role or a local stand-in updates the matching page in [docs/architecture/](architecture/README.md) and the process's Implementation section in the same PR.
 - A PR that adds or changes an endpoint, an OpenAPI document or the database schema (an entity, its configuration or a migration) regenerates [docs/applications/](applications/README.md) in the same PR with `dotnet run --project src/Docs/Norvia.Docs.Generator`, redraws the ER diagrams with `python3 docs/architecture/diagrams/entities.py` (see [the diagram styles](architecture/diagrams/README.md#entity-relationships)), and updates the application page's hand-written parts: the endpoint's consumers, the table and column descriptions and the logical references.
+- A PR that adds or changes an application, a process or an Agent updates its row in [docs/status.md](status.md) in the same PR.
 - Keep PRs small and focused on one issue.
 
 ## 12. Scripts

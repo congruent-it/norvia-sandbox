@@ -39,6 +39,19 @@ jobs:
         shell: pwsh
         run: ./infra/test-scripts.ps1
 
+  # Dead relative links and deleted pages in the Markdown, nothing else (lychee.toml).
+  links:
+    name: Markdown links
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: lycheeverse/lychee-action@v2.4.1
+        with:
+          args: --config lychee.toml --no-progress '**/*.md'
+          fail: true
+
   build:
     name: Build, format, Bicep and vulnerable packages
     runs-on: ubuntu-latest

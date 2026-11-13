@@ -1,0 +1,3 @@
+# Relative links between files only: dead links and deleted pages. No network, no anchors.
+offline = true
+include_fragments = false
