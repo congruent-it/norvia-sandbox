@@ -109,12 +109,8 @@ internal sealed class CostManagementCostReader(
             }
 
             var name = row[resourceId]!.GetValue<string>().Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? Unassigned;
-            if (!spendPerDay.TryGetValue(date, out var spend))
-            {
-                spendPerDay[date] = spend = [];
-            }
-
-            spend.Add(new ResourceSpend(name, row[cost]!.GetValue<decimal>()));
+            spendPerDay.TryAdd(date, []);
+            spendPerDay[date].Add(new ResourceSpend(name, row[cost]!.GetValue<decimal>()));
         }
     }
 }
