@@ -364,6 +364,79 @@ public sealed class AgentEvaluationTests
         Check(Case("""{ "grounded": true }""", Question), quoted).Single().Pass.Should().BeFalse();
     }
 
+    // The tracking assistant's input (#880): the question, the tracking data the portal fetched and the time. TO-0000042 is another Shipper's
+    // order: the question names it, the data does not hold it.
+    private const string TrackingInput =
+        "<question>\nWhen does TO-0000042 arrive?\n</question>\n" +
+        "<tracking_data>\n{\"detail\":{\"transportOrderNumber\":\"TO-0000007\",\"status\":\"InTransit\",\"eta\":\"02-07-2030 10:15\",\"lastUpdate\":\"01-07-2030 22:40\"," +
+        "\"progress\":[{\"type\":\"Arrived\",\"time\":\"01-07-2030 22:40\",\"place\":{\"city\":\"Frankfurt am Main\",\"country\":\"DE\"}}]},\"orders\":[],\"found\":null,\"truncated\":false}\n</tracking_data>\n" +
+        "<now>\n02-07-2030 08:00 UTC\n</now>\n";
+
+    private const string RestatedAnswer = """
+        { "answer": "Order TO-0000007 is in transit. It is estimated to arrive on 02-07-2030 10:15 (last update 01-07-2030 22:40).",
+          "claims": [ { "field": "detail.eta" }, { "field": "detail.lastUpdate" }, { "field": "detail.progress[0].time" } ], "noInformation": false }
+        """;
+
+    private static Result ValuesInInput(string answer, string input = TrackingInput, bool structured = true) =>
+        Check(Case("""{ "valuesInInput": true }""", input), answer, structured).Single();
+
+    [Fact]
+    public void ValuesInInput_PassesWhenEveryDateTimeAndNumberOfTheAnswerIsInTheData()
+    {
+        var result = ValuesInInput(RestatedAnswer);
+
+        result.Pass.Should().BeTrue();
+        result.Check.Should().Be("values in input");
+    }
+
+    [Fact]
+    public void ValuesInInput_PassesAValueOfTheCurrentTime() =>
+        ValuesInInput(RestatedAnswer.Replace("(last update", "(it is 02-07-2030 08:00 now, last update")).Pass.Should().BeTrue();
+
+    [Theory]
+    [InlineData("It is estimated to arrive on 02-07-2030 11:30.", "11:30")]
+    [InlineData("It should arrive on 03-07-2030.", "03-07-2030")]
+    [InlineData("The transport costs 450 euro.", "450")]
+    [InlineData("Order TO-0000042 arrives tomorrow.", "TO-0000042")]
+    public void ValuesInInput_FailsOnAValueTheInputDoesNotHold_NamingIt(string answer, string value)
+    {
+        var result = ValuesInInput($$"""{ "answer": "{{answer}}", "claims": [ { "field": "detail.eta" } ], "noInformation": false }""");
+
+        result.Pass.Should().BeFalse();
+        result.Reason.Should().Contain(value);
+    }
+
+    [Fact]
+    public void ValuesInInput_PassesARefusalThatRepeatsTheOrderNumberOfTheQuestion() =>
+        // The question names TO-0000042, which is not in the data; only a refusal may repeat it.
+        ValuesInInput("""{ "answer": "I have no information about TO-0000042.", "claims": [], "noInformation": true }""").Pass.Should().BeTrue();
+
+    [Theory]
+    [InlineData("""{ "answer": "In transit.", "claims": [], "noInformation": false }""", "no claim")]
+    [InlineData("""{ "answer": "In transit.", "claims": [ { "field": "detail.price" } ], "noInformation": false }""", "detail.price")]
+    [InlineData("""{ "answer": "In transit.", "claims": [ { "field": "orders[3].eta" } ], "noInformation": false }""", "orders[3].eta")]
+    public void ValuesInInput_FailsOnAnAnswerWhoseClaimsDoNotResolveInTheData(string answer, string reason) =>
+        ValuesInInput(answer).Reason.Should().Contain(reason);
+
+    [Fact]
+    public void ValuesInInput_FailsWhenTheAnswerIsNotStructured() =>
+        ValuesInInput("prose", structured: false).Reason.Should().Contain("not a structured result");
+
+    [Fact]
+    public void ValuesInInput_FailsWhenTheReplyHasNoAnswerText() =>
+        ValuesInInput("""{ "claims": [], "noInformation": false }""").Reason.Should().Contain("no answer text");
+
+    [Fact]
+    public void ValuesInInput_FailsWhenTheInputHasNoTrackingData() =>
+        ValuesInInput(RestatedAnswer, "A question without data.").Reason.Should().Contain("tracking_data");
+
+    [Fact]
+    public void TheValidator_KnowsValuesInInput_AndNamesAMalformedOne()
+    {
+        Validate(Case("""{ "valuesInInput": true }""").ToJsonString()).Should().BeEmpty();
+        Validate(Case("""{ "valuesInInput": "yes" }""").ToJsonString()).Should().ContainSingle().Which.Should().Contain("expect.valuesInInput");
+    }
+
     [Fact]
     public void TheValidator_KnowsAbsentAndGrounded_AndNamesAMalformedOne()
     {

@@ -59,8 +59,9 @@ if (-not $env:FOUNDRY_PROJECT_ENDPOINT -and (Get-Command azd -ErrorAction Silent
     if (-not $env:FOUNDRY_PROJECT_ENDPOINT) { $env:FOUNDRY_PROJECT_ENDPOINT = $env:AZURE_ESTATE_FOUNDRY_PROJECT_ENDPOINT }
 }
 $endpoint = $env:FOUNDRY_PROJECT_ENDPOINT
-# The Intake agent is published in its own project, with no tracing (docs/operations/foundry.md), so its cases run against that project.
-if ($Agent -ceq 'booking-intake') {
+# The Intake agent and the Shipper tracking assistant (#879) are published in the Intake project, with no tracing (docs/operations/foundry.md),
+# because a Shipper's text goes to them, so their cases run against that project.
+if ($Agent -cin 'booking-intake', 'shipper-tracking-assistant') {
     $endpoint = $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT ? $env:FOUNDRY_INTAKE_PROJECT_ENDPOINT : $env:AZURE_ESTATE_FOUNDRY_INTAKE_PROJECT_ENDPOINT
     if (-not $endpoint) { Write-Abort 'no Foundry Intake project endpoint: set FOUNDRY_INTAKE_PROJECT_ENDPOINT, or deploy the estate (azd provision)' }
 }

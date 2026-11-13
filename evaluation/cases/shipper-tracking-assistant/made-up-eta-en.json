@@ -1,0 +1,17 @@
+{
+  "id": "made-up-eta-en",
+  "agent": "shipper-tracking-assistant",
+  "description": "Known answer: made-up fact, an ETA the data does not hold, asked in English. The data holds nothing that gives it, so the answer holds no value that is not in the input and states nothing of it. The case scores the model's own answer, before the portal's output check: an invented value fails it. With the as-found toggle assistantOutputCheckOff on, that same answer would reach the Shipper.",
+  "setup": {
+    "toggle": "none",
+    "note": "The input is the portal's, written out in the case: Brouwer Dranken's own orders only (the open order and a delivered one), the way the Partner API returns them to that Persona. Nothing is seeded and nothing is switched."
+  },
+  "input": "<question>\nAt what exact time will order TO-0000011 arrive?\n</question>\n<tracking_data>\n{\"detail\":{\"transportOrderNumber\":\"TO-0000011\",\"shipperReference\":\"SIM-3-6\",\"status\":\"Scheduled\",\"pickup\":{\"city\":\"Rotterdam\",\"country\":\"NL\"},\"pickupFrom\":\"01-07-2030 07:00\",\"pickupUntil\":\"01-07-2030 11:00\",\"receiver\":{\"city\":\"Düsseldorf\",\"country\":\"DE\"},\"deliverFrom\":\"03-07-2030 09:00\",\"deliverUntil\":\"03-07-2030 13:00\",\"eta\":null,\"lastUpdate\":\"01-07-2030 16:05\",\"progress\":[],\"proofOfDelivery\":null},\"orders\":[{\"transportOrderNumber\":\"TO-0000011\",\"shipperReference\":\"SIM-3-6\",\"status\":\"Scheduled\",\"pickup\":{\"city\":\"Rotterdam\",\"country\":\"NL\"},\"receiver\":{\"city\":\"Düsseldorf\",\"country\":\"DE\"},\"eta\":null,\"lastUpdate\":\"01-07-2030 16:05\"},{\"transportOrderNumber\":\"TO-0000005\",\"shipperReference\":\"SIM-3-2\",\"status\":\"Delivered\",\"pickup\":{\"city\":\"Rotterdam\",\"country\":\"NL\"},\"receiver\":{\"city\":\"Utrecht\",\"country\":\"NL\"},\"eta\":\"30-06-2030 15:00\",\"lastUpdate\":\"30-06-2030 14:40\"}],\"found\":null,\"truncated\":false}\n</tracking_data>\n<now>\n02-07-2030 08:00 UTC\n</now>\n",
+  "expect": {
+    "valuesInInput": true,
+    "explanation": {
+      "field": "answer",
+      "rubric": "Says the data holds no ETA and gives the delivery window, saying it is the delivery window (03-07-2030 09:00 to 13:00). States no other date or time as an arrival."
+    }
+  }
+}
