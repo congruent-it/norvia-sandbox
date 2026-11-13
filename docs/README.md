@@ -20,6 +20,8 @@ Where to look. Terms are defined in [GLOSSARY.md](../GLOSSARY.md); the company b
 
 | Page | Read it when |
 |---|---|
+| [running-locally.md](operations/running-locally.md) | Running the estate under Aspire, running the tests, or using the local tokens and logs |
+| [deploying-to-azure.md](operations/deploying-to-azure.md) | Deploying the estate with `azd up`, checking it with the smoke test, or tearing it down |
 | [agent-evaluation.md](operations/agent-evaluation.md) | Adding evaluation cases for an Agent, or reading a run's result |
 | [agent-mcp-servers.md](operations/agent-mcp-servers.md) | Putting an application's agent view behind an API Management MCP server |
 | [foundry.md](operations/foundry.md) | Working on the Foundry account, projects or published Agents |
