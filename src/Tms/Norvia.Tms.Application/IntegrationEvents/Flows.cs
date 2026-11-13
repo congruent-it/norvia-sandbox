@@ -69,4 +69,7 @@ public static class Flows
     /// correlation ID for each action the Driver reports Logic App continues.
     /// </summary>
     public const string TripExecution = "trip-execution";
+
+    /// <summary>Master-data sync (E3): the ERP replicates a record Finance changed, on the correlation ID the ERP gave the change.</summary>
+    public const string MasterData = "master-data";
 }

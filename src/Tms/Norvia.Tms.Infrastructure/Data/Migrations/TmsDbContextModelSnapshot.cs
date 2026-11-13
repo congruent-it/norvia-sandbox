@@ -1043,6 +1043,28 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.ToTable("OutboxMessages", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Tms.Infrastructure.Shippers.ShipperCopy", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ShipperCopies", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Tms.Domain.CarrierBookings.CarrierBooking", b =>
                 {
                     b.HasOne("Norvia.Tms.Domain.Shipments.Shipment", null)
