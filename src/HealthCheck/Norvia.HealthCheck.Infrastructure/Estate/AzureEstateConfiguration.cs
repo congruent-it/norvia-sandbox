@@ -155,8 +155,7 @@ internal sealed partial class AzureEstateConfiguration(
         var yesterday = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddDays(-1);
         try
         {
-            // One day more than the two periods: yesterday is always provisional and left out, and the Check needs two whole periods of settled days.
-            var days = await costReader.ReadAsync(yesterday.AddDays(-2 * CostFacts.PeriodDays), yesterday, cancellationToken);
+            var days = await costReader.ReadAsync(yesterday.AddDays(1 - CostFacts.WindowDays), yesterday, cancellationToken);
             return new CostFacts([.. days.Where(day => !day.Provisional)]);
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

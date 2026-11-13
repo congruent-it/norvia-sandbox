@@ -3,6 +3,7 @@ using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.HealthCheck.Application.Checks;
+using Norvia.HealthCheck.Application.Estate;
 using Norvia.HealthCheck.Application.Run;
 using static Norvia.HealthCheck.Agents.IntegrationTests.FakeAzure;
 
@@ -20,11 +21,11 @@ public sealed class CostCheckAgainstAzureTests
     private const string Sql = $"{AzureHost.ResourceGroupId}/providers/Microsoft.Sql/servers/sql-norvia";
     private const string Workspace = $"{AzureHost.ResourceGroupId}/providers/Microsoft.OperationalInsights/workspaces/log-norvia";
 
-    private static readonly DateOnly Yesterday = new(2026, 11, 12);
-    private static readonly DateOnly CurrentFirst = new(2026, 11, 5);
-    private static readonly DateOnly PreviousFirst = new(2026, 10, 29);
-    private static readonly DateOnly PreviousLast = new(2026, 11, 4);
-    private static readonly DateOnly CurrentLast = new(2026, 11, 11);
+    private static readonly DateOnly Yesterday = DateOnly.FromDateTime(AzureHost.Now.UtcDateTime).AddDays(-1);
+    private static readonly DateOnly CurrentLast = Yesterday.AddDays(-1);
+    private static readonly DateOnly CurrentFirst = CurrentLast.AddDays(-(CostFacts.PeriodDays - 1));
+    private static readonly DateOnly PreviousLast = CurrentFirst.AddDays(-1);
+    private static readonly DateOnly PreviousFirst = PreviousLast.AddDays(-(CostFacts.PeriodDays - 1));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -37,8 +38,20 @@ public sealed class CostCheckAgainstAzureTests
 
     private static void Orders(AzureHost host, int previous, int current) =>
         host.Tms.Volume([
-            .. Enumerable.Range(0, 7).Select(offset => (PreviousFirst.AddDays(offset), previous)),
-            .. Enumerable.Range(0, 8).Select(offset => (CurrentFirst.AddDays(offset), current))]);
+            .. Enumerable.Range(0, CostFacts.PeriodDays).Select(offset => (PreviousFirst.AddDays(offset), previous)),
+            .. Enumerable.Range(0, CostFacts.PeriodDays).Select(offset => (CurrentFirst.AddDays(offset), current)),
+            (Yesterday, current)]);
+
+    /// <summary>An app whose workspace's spend rose from 2 to 5 EUR a day while <paramref name="volumeNow"/> orders a day arrive, against 40 before.</summary>
+    private static AzureHost HostWithRisingWorkspace(int volumeNow = 40)
+    {
+        var host = new AzureHost();
+        host.Azure.Cost(Spend(Workspace, 2m, 5m));
+        Orders(host, 40, volumeNow);
+        return host;
+    }
+
+    private static int AllChecks => Checklist.Default.Checks.Count;
 
     [Fact]
     public async Task RunHealthCheck_WhenASpendRisesWithFlatVolume_ReportsTheFinding_NamingTheResourceAndBothChanges()
@@ -59,9 +72,7 @@ public sealed class CostCheckAgainstAzureTests
     [Fact]
     public async Task RunHealthCheck_TheFinding_HasTheChecksSeverityAndFix_AndNamesItsToggle()
     {
-        await using var host = new AzureHost();
-        host.Azure.Cost(Spend(Workspace, 2m, 5m));
-        Orders(host, 40, 40);
+        await using var host = HostWithRisingWorkspace();
 
         var finding = (await RunAsync(host)).Findings.Should().ContainSingle().Subject;
 
@@ -88,22 +99,18 @@ public sealed class CostCheckAgainstAzureTests
     [Fact]
     public async Task RunHealthCheck_WhenTheSpendRisesWithTheVolume_ReportsNoFinding()
     {
-        await using var host = new AzureHost();
-        host.Azure.Cost(Spend(Workspace, 2m, 5m));
-        Orders(host, 40, 60);
+        await using var host = HostWithRisingWorkspace(volumeNow: 60);
 
         var report = await RunAsync(host);
 
         report.Findings.Should().BeEmpty("a rise counts only when volume is flat");
-        report.ChecksRun.Should().Be(Checklist.Default.Checks.Count, "no Finding must mean the Check passed, not that it did not run");
+        report.ChecksRun.Should().Be(AllChecks, "no Finding must mean the Check passed, not that it did not run");
     }
 
     [Fact]
     public async Task RunHealthCheck_WhenTheVolumeChangesByExactlyTenPercent_StillCallsItFlat()
     {
-        await using var host = new AzureHost();
-        host.Azure.Cost(Spend(Workspace, 2m, 5m));
-        Orders(host, 40, 44);
+        await using var host = HostWithRisingWorkspace(volumeNow: 44);
 
         (await RunAsync(host)).Findings.Should().ContainSingle("volume is flat when it changes by at most 10 %");
     }
@@ -114,8 +121,8 @@ public sealed class CostCheckAgainstAzureTests
         await using var host = new AzureHost();
         host.Azure.Cost(Spend(Workspace, 2m, 5m));
         host.Tms.Volume([
-            .. Enumerable.Range(0, 7).Select(offset => (PreviousFirst.AddDays(offset), 40)),
-            .. Enumerable.Range(0, 7).Select(offset => (CurrentFirst.AddDays(offset), 40)),
+            .. Enumerable.Range(0, CostFacts.PeriodDays).Select(offset => (PreviousFirst.AddDays(offset), 40)),
+            .. Enumerable.Range(0, CostFacts.PeriodDays).Select(offset => (CurrentFirst.AddDays(offset), 40)),
             (Yesterday, 400)]);
 
         (await RunAsync(host)).Findings.Should().ContainSingle();
@@ -131,6 +138,20 @@ public sealed class CostCheckAgainstAzureTests
         var finding = (await RunAsync(host)).Findings.Should().ContainSingle().Subject;
 
         finding.Evidence.Should().ContainSingle().Which.Detail.Should().Contain("0.00 to 3.00 EUR").And.NotContain("%  ");
+    }
+
+    [Theory]
+    [InlineData(2.0, 3.0, true)] // exactly +50 % and exactly 1 EUR a day
+    [InlineData(2.0, 2.99, false)] // under both
+    [InlineData(20.0, 20.99, false)] // under 50 % though near the amount
+    [InlineData(1.5, 2.49, false)] // under 1 EUR a day
+    public async Task RunHealthCheck_AtTheRiseThresholds_FiresFromExactlyBoth(double before, double now, bool fires)
+    {
+        await using var host = new AzureHost();
+        host.Azure.Cost(Spend(Workspace, (decimal)before, (decimal)now));
+        Orders(host, 40, 40);
+
+        (await RunAsync(host)).Findings.Should().HaveCount(fires ? 1 : 0);
     }
 
     [Fact]
@@ -158,9 +179,7 @@ public sealed class CostCheckAgainstAzureTests
     [Fact]
     public async Task RunHealthCheck_AfterTheSpendIsBackDown_ReportsNoFinding()
     {
-        await using var host = new AzureHost();
-        host.Azure.Cost(Spend(Workspace, 2m, 5m));
-        Orders(host, 40, 40);
+        await using var host = HostWithRisingWorkspace();
         (await RunAsync(host)).Findings.Should().ContainSingle();
 
         host.Azure.Cost(Spend(Workspace, 2m, 2m));
@@ -182,7 +201,7 @@ public sealed class CostCheckAgainstAzureTests
 
         report.Findings.Select(finding => finding.CheckId).Should().NotContain(RisingSpendCheck.CheckId, "what could not be read gives no Finding");
         report.Findings.Should().ContainSingle(finding => finding.Id == "F-DLQ-ALERT", "the rest of the estate is still checked");
-        report.ChecksRun.Should().Be(Checklist.Default.Checks.Count);
+        report.ChecksRun.Should().Be(AllChecks);
     }
 
     [Fact]
@@ -195,7 +214,7 @@ public sealed class CostCheckAgainstAzureTests
         var report = await RunAsync(host);
 
         report.Findings.Should().BeEmpty("a rise cannot be called flat without the volume, so nothing is invented");
-        report.ChecksRun.Should().Be(Checklist.Default.Checks.Count);
+        report.ChecksRun.Should().Be(AllChecks);
     }
 
     [Fact]
@@ -208,7 +227,7 @@ public sealed class CostCheckAgainstAzureTests
         var report = await RunAsync(host);
 
         report.Findings.Should().BeEmpty("amounts in another currency are not compared with a EUR threshold");
-        report.ChecksRun.Should().Be(Checklist.Default.Checks.Count);
+        report.ChecksRun.Should().Be(AllChecks);
     }
 
     [Fact]
