@@ -228,19 +228,7 @@ public sealed class HealthCheckAgentTests
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new NarrateHealthCheckQuery(correlationId), Ct);
     }
 
-    private static Task<HttpResponseMessage> CallAsync(HttpClient client, string method, JsonObject? parameters = null) =>
-        client.PostAsJsonAsync(
-            new Uri(ToolsPath, UriKind.Relative),
-            new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = parameters ?? new JsonObject() },
-            Ct);
+    private static Task<HttpResponseMessage> CallAsync(HttpClient client, string method, JsonObject? parameters = null) => McpCalls.CallAsync(client, ToolsPath, method, parameters);
 
-    /// <summary>Calls a tool and returns the text it answered with, the agent view's JSON.</summary>
-    private static async Task<string> ToolTextAsync(HttpClient client, string tool)
-    {
-        using var response = await CallAsync(client, "tools/call", new JsonObject { ["name"] = tool, ["arguments"] = new JsonObject() });
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var reply = (await response.Content.ReadFromJsonAsync<JsonObject>(Ct))!["result"]!;
-        reply["isError"]!.GetValue<bool>().Should().BeFalse();
-        return reply["content"]![0]!["text"]!.GetValue<string>();
-    }
+    private static Task<string> ToolTextAsync(HttpClient client, string tool) => McpCalls.ToolTextAsync(client, ToolsPath, tool);
 }
