@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Refusals;
 using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
 
@@ -15,7 +16,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.Trails;
 /// the requests those records were written in, from the spans of their traces. With no Logic Apps locally, it also
 /// lists the failures those records tell of as failed runs (<see cref="IFailedRuns"/>).
 /// </summary>
-internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTrailSourceOptions> options) : ITrailSource, IFailedRuns
+internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTrailSourceOptions> options) : ITrailSource, IRefusedCalls, IFailedRuns
 {
     /// <summary>
     /// The dashboard keeps at most this many log records in memory (<c>Dashboard:TelemetryLimits:MaxLogCount</c>), so
@@ -132,6 +133,27 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
                     record.CorrelationId,
                     null,
                     record.Keys.GetValueOrDefault("failureCode") is { } code ? new StepError(code, null) : null)),
+        ];
+    }
+
+    /// <summary>
+    /// A refusal locally is where the stand-in, which plays API Management (ADR 0023), logged <c>outcome=Refused</c> with the
+    /// status it answered: 401, 403 or 429. It tracks no operation but the flow, and no caller.
+    /// </summary>
+    public async Task<IReadOnlyList<RecordedRefusal>> RefusalsAsync(DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        var records = await TrackedRecordsAsync(cancellationToken);
+        return
+        [
+            .. records.Where(record => record.Time >= since && record.Keys.GetValueOrDefault("outcome") == nameof(Outcome.Refused)
+                    && int.TryParse(record.Keys.GetValueOrDefault("StatusCode"), CultureInfo.InvariantCulture, out var status) && status is 401 or 403 or 429)
+                .Select(record => new RecordedRefusal(
+                    record.Time,
+                    record.Keys.GetValueOrDefault("flow") ?? "unknown",
+                    int.Parse(record.Keys["StatusCode"], CultureInfo.InvariantCulture),
+                    record.Keys.GetValueOrDefault("failureCode") ?? "unknown",
+                    null,
+                    record.CorrelationId)),
         ];
     }
 
@@ -325,7 +347,7 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
         private static readonly string[] AuditKeys = ["Actor", "Action", "Entity", "MessageId", "Reason"];
 
         private static readonly string[] TrackedKeys =
-            ["correlationId", "flow", "outcome", "failureCode", "fault", "agentId", "toolName", "eventType", "messageId", .. AuditKeys, .. TrackedBusinessKeys.All.Select(key => key.Key)];
+            ["correlationId", "flow", "outcome", "failureCode", "StatusCode", "fault", "agentId", "toolName", "eventType", "messageId", .. AuditKeys, .. TrackedBusinessKeys.All.Select(key => key.Key)];
 
         public bool IsAudit => Keys.ContainsKey("Actor") && Keys.ContainsKey("Action");
 

@@ -9,11 +9,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.IntegrationConsole.Application.Audit;
 using Norvia.IntegrationConsole.Application.DeadLetters;
+using Norvia.IntegrationConsole.Application.Refusals;
 using Norvia.IntegrationConsole.Application.Runs;
 using Norvia.IntegrationConsole.Application.Trails;
 using Norvia.IntegrationConsole.Infrastructure.Agents;
 using Norvia.IntegrationConsole.Infrastructure.Audit;
 using Norvia.IntegrationConsole.Infrastructure.DeadLetters;
+using Norvia.IntegrationConsole.Infrastructure.Refusals;
 using Norvia.IntegrationConsole.Infrastructure.Runs;
 using Norvia.IntegrationConsole.Infrastructure.Trails;
 
@@ -53,6 +55,7 @@ public static partial class DependencyInjection
             builder.Services.AddTransient<ITrailSource>(services => services.GetRequiredService<DashboardTrailSource>());
             // No Logic Apps run locally, so the failures are the ones the dashboard holds.
             builder.Services.Replace(ServiceDescriptor.Transient<IFailedRuns>(services => services.GetRequiredService<DashboardTrailSource>()));
+            builder.Services.AddTransient<IRefusedCalls>(services => services.GetRequiredService<DashboardTrailSource>());
             return builder;
         }
 
@@ -66,6 +69,7 @@ public static partial class DependencyInjection
             .ValidateOnStart();
         builder.Services.AddSingleton(services => new LogsQueryClient(services.GetRequiredService<TokenCredential>()));
         builder.Services.AddSingleton<ITrailSource, LogAnalyticsTrailSource>();
+        builder.Services.AddSingleton<IRefusedCalls, LogAnalyticsRefusedCalls>();
 
         return builder;
     }

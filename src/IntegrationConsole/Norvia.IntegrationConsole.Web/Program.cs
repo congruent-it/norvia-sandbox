@@ -6,6 +6,7 @@ using Norvia.IntegrationConsole.Web.Agents;
 using Norvia.IntegrationConsole.Web.Components;
 using Norvia.IntegrationConsole.Web.DeadLetters;
 using Norvia.IntegrationConsole.Web.Operators;
+using Norvia.IntegrationConsole.Web.Refusals;
 using Norvia.IntegrationConsole.Web.Runs;
 using Norvia.IntegrationConsole.Web.Trails;
 
@@ -29,6 +30,7 @@ builder.Services.AddOptions<IntegrationRetention>().BindConfiguration(Integratio
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton<ITrailRequests, TrailRequests>();
 builder.Services.AddSingleton<IRunRequests, RunRequests>();
+builder.Services.AddSingleton<IRefusalRequests, RefusalRequests>();
 builder.Services.AddSingleton<IDeadLetterRequests, DeadLetterRequests>();
 builder.Services.AddSingleton<IExplainRequests, ExplainRequests>();
 

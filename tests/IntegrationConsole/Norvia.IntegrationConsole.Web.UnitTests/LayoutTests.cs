@@ -37,7 +37,7 @@ public sealed class LayoutTests : ConsoleWebContext
     {
         var layout = RenderLayout();
 
-        layout.FindAll("nav a").Select(link => link.TextContent.Trim()).Should().Equal("Integration console", "Search", "Failed runs", "Dead-letter queues");
+        layout.FindAll("nav a").Select(link => link.TextContent.Trim()).Should().Equal("Integration console", "Search", "Failed runs", "Refused at the edge", "Dead-letter queues");
     }
 
     [Fact]

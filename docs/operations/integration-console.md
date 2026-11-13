@@ -1,11 +1,11 @@
 # Integration console
 
-The Integration console is where the Integration operator finds out what the integration layer did with a message, and resolves the messages that failed in it. It shows Message trails, failed Logic App runs and dead-lettered messages, and it can resubmit or discard a dead-lettered message. It reads what the estate already records and keeps nothing of its own ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
+The Integration console is where the Integration operator finds out what the integration layer did with a message, and resolves the messages that failed in it. It shows Message trails, failed Logic App runs, calls refused at the edge and dead-lettered messages, and it can resubmit or discard a dead-lettered message. It reads what the estate already records and keeps nothing of its own ([ADR 0017](../adr/0017-the-integration-console-reads-the-estates-telemetry-and-stores-nothing.md)). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
 | | |
 |---|---|
 | **Used by** | The Integration operator. In demos the presenter plays this role, as it plays the Planner in the TMS |
-| **Shows** | Message trails found by correlation ID or business key, failed Logic App runs, dead-lettered messages per queue and subscription |
+| **Shows** | Message trails found by correlation ID or business key, failed Logic App runs, calls API Management refused, dead-lettered messages per queue and subscription |
 | **Changes** | Only dead-letter queues: resubmitting or discarding a dead-lettered message |
 | **Owns** | Nothing. It has no database |
 | **Reads from** | Application Insights (the search index; locally the Aspire dashboard's telemetry), the Logic Apps management API (run history and step bodies), Service Bus (dead-letter queues) |
@@ -96,6 +96,17 @@ The Integration operations agent ([ADR 0040](../adr/0040-agents-read-the-estate-
 - Messages can be selected, one or several, to resubmit or discard.
 - The panel refreshes itself every few seconds while it's open.
 - Queues and subscriptions are discovered, not listed in configuration, so later ones appear with no change to the console. In Azure they come from Azure Resource Manager (Reader on the namespace) and the oldest message's age from a peek of each non-empty dead-letter queue (Data Receiver). Locally the console lists the entities of the Service Bus emulators the AppHost runs, through their management port; it connects only while it reads, as an emulator accepts few connections.
+
+### Refused at the edge
+
+- The calls API Management refused with 401, 403 or 429 over the last 24 hours, newest first, filterable by status and by operation. They never reach a Logic App, so they are on neither the Failed runs nor the Dead-letter queues panel.
+- A summary above the rows counts them by caller and status, most refused first, so a Carrier that is refused again and again stands out.
+- Each row shows the time, the operation, the status, the failure code, the caller and the correlation ID, which opens the trail. A caller is the token's `azp` or, where no token was read, the subscription's name.
+- A refusal is the answer the caller was meant to get, so a 429 is `Refused` like a 401 or a 403, and none of them counts as a failure in search. The panel is for spotting a pattern, not for raising an incident.
+- It reads API Management's request telemetry in Application Insights, which holds every refusal, and joins the policies' traces for the failure code. A missing or wrong subscription key is answered by the gateway before any policy runs, so it has no trace: its failure code is `SubscriptionKeyRejected`. A 429 with no failure code from a policy is `RateLimitExceeded`. The request telemetry's field names (the subscription's name, the correlation ID headers) are the ones to confirm against a deployed estate.
+- It reads telemetry, so it can be a few minutes behind and says so at the top. The page refreshes itself every few seconds while it's open.
+- Locally the stand-in plays API Management ([ADR 0023](../adr/0023-locally-a-stand-in-plays-the-norvia-partner-api.md)), so the panel lists the refusals the Aspire dashboard holds from it: the flow stands for the operation, and there is no caller.
+- No bodies, tokens or subscription keys are read.
 
 ## Resubmit and discard
 
@@ -218,7 +229,6 @@ These were left out on purpose while designing the console, each with its reason
 
 - **Alerts.** They stay in Azure Monitor, where the as-found toggles switch them off. The console doesn't raise alerts, though its panels make a missing one obvious.
 - **Costs and the Azure bill.** The scenario's second incident is about cost, not messages, so the view is not part of the console. It is built as the Spend view of the [Estate health check](estate-health-check.md).
-- **A panel for failures that never reach a Logic App**, such as API Management's 401, 403 and 429. They're findable in search, but there's no panel for them.
 - **A long-term message archive.** It would put Consignee personal data in a second store. Norvia's lasting record is the TMS and the ERP.
 - **Editing a message before resubmitting.** A fault is fixed in the map, not in the message.
 - **Resubmitting a Logic App run.** See [Resubmit and discard](#resubmit-and-discard).
