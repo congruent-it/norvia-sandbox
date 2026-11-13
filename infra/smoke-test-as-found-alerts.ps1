@@ -123,7 +123,7 @@ function Get-LogLevel([string] $App) {
     (Invoke-Az containerapp show --name $App --resource-group $resourceGroup `
             --query "properties.template.containers[0].env[?name == 'Logging__LogLevel__Default'].value | [0]" --output tsv | Out-String).Trim()
 }
-$loggingApps = 'tms-api', 'tms-web', 'partner-portal-web', 'driver-app-api', 'driver-app-web', 'erp-web', 'erp-api', 'integration-console-web', 'health-check-web', 'simulator-web'
+$loggingApps = Get-LoggingContainerApp
 
 Invoke-AsFound fixed
 foreach ($app in $loggingApps) {

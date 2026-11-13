@@ -39,19 +39,34 @@ public sealed class AsFoundChattyTelemetryTests
     }
 
     [Fact]
-    public void TheCostSnapshots_ShowTheShapeOfTheToggle_AWorkspaceThatRisesWhileVolumeStaysFlat()
+    public void TheCostSnapshots_HaveTheSameVolume_SoTheToggleIsTheOnlyDifference() =>
+        CostSnapshot("fixed").Days.Select(day => day.TransportOrders).Should().Equal(CostSnapshot("chatty-telemetry").Days.Select(day => day.TransportOrders));
+
+    [Fact]
+    public void TheFixedCostSnapshot_IsFlat()
     {
-        var fixedEstate = CostSnapshot("fixed");
+        var days = CostSnapshot("fixed").Days;
+
+        days.Max(day => day.Workspace).Should().BeLessThan(days.Min(day => day.Workspace) * 1.5);
+    }
+
+    [Fact]
+    public void TheChattyCostSnapshot_HasTheWorkspaceRiseWhileVolumeStaysFlat()
+    {
+        var chatty = CostSnapshot("chatty-telemetry");
+        var before = chatty.Days.Where(day => day.Date < chatty.ToggleOnFrom).ToList();
+
+        before.Should().NotBeEmpty();
+        chatty.Days.Where(day => day.Date >= chatty.ToggleOnFrom).Min(day => day.Workspace).Should().BeGreaterThan(before.Max(day => day.Workspace) * 3);
+    }
+
+    [Fact]
+    public void TheChattyCostSnapshot_HasNoOtherResourceExplainTheRise()
+    {
         var chatty = CostSnapshot("chatty-telemetry");
 
-        fixedEstate.Days.Select(day => day.TransportOrders).Should().Equal(chatty.Days.Select(day => day.TransportOrders), "volume is flat and the same, so the toggle is the only difference");
-        fixedEstate.Days.Max(day => day.Workspace).Should().BeLessThan(fixedEstate.Days.Min(day => day.Workspace) * 1.5, "the fixed estate's spend is flat");
-
-        var on = chatty.Days.Where(day => day.Date >= chatty.ToggleOnFrom).ToList();
-        var before = chatty.Days.Where(day => day.Date < chatty.ToggleOnFrom).ToList();
-        before.Should().NotBeEmpty();
-        on.Min(day => day.Workspace).Should().BeGreaterThan(before.Max(day => day.Workspace) * 3, "the workspace's spend rises while the volume stays where it was");
-        on.Average(day => day.OtherSpend).Should().BeApproximately(before.Average(day => day.OtherSpend), 0.5, "no other resource explains the rise");
+        chatty.Days.Where(day => day.Date >= chatty.ToggleOnFrom).Average(day => day.OtherSpend)
+            .Should().BeApproximately(chatty.Days.Where(day => day.Date < chatty.ToggleOnFrom).Average(day => day.OtherSpend), 0.5);
     }
 
     private static CostShape CostSnapshot(string name)

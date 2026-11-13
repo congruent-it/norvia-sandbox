@@ -121,11 +121,8 @@ if ($settings.Count -gt 0) {
 # this applies it to the running apps now, as a new revision each.
 if ((Get-Toggle $current 'chattyTelemetry') -ne (Get-Toggle $updated 'chattyTelemetry')) {
     $logLevel = (Get-Toggle $updated 'chattyTelemetry') ? 'Debug' : 'Information'
-    # The migrations are Container App jobs that run once per deploy and log little: they take the level at the next deploy.
-    $containerApps = 'tms-api', 'tms-web', 'partner-portal-web', 'driver-app-api', 'driver-app-web', 'erp-web', 'erp-api',
-    'integration-console-web', 'health-check-web', 'simulator-web'
     Import-AzdEnvironment
-    foreach ($app in $containerApps) {
+    foreach ($app in (Get-LoggingContainerApp)) {
         Write-Host "Setting $app's log level to $logLevel..."
         Invoke-Az containerapp update --subscription $env:AZURE_SUBSCRIPTION_ID --name $app --resource-group (Get-ResourceGroupName) `
             --set-env-vars "Logging__LogLevel__Default=$logLevel" --output none | Out-Null

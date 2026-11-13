@@ -715,7 +715,14 @@ $($keyColumns -join [Environment]::NewLine)
     $summary
 }
 
-Export-ModuleMember -Function Write-Pass, Write-Fail, Invoke-Az, Import-AzdEnvironment, Get-ResourceGroupName,
+function Get-LoggingContainerApp {
+    <#
+    .SYNOPSIS The Container Apps whose log level the chattyTelemetry toggle sets on the running estate. The migrations are jobs that run once per deploy and take the level at the next one.
+    #>
+    'tms-api', 'tms-web', 'partner-portal-web', 'driver-app-api', 'driver-app-web', 'erp-web', 'erp-api', 'integration-console-web', 'health-check-web', 'simulator-web'
+}
+
+Export-ModuleMember -Function Get-LoggingContainerApp, Write-Pass, Write-Fail, Invoke-Az, Import-AzdEnvironment, Get-ResourceGroupName,
 Get-AppFqdn, Get-AppUrl, Wait-Until, Get-LogAnalyticsWorkspaceId, Invoke-LogAnalyticsQuery,
 New-ThrowawayJob, Get-ThrowawayJobName, Start-ThrowawayJob, Remove-ThrowawayJob, Get-RequiredEnvironmentVariable,
 Set-AzdEnvironmentValue, Invoke-AzRest, Publish-LogicApp, Get-AzAccessToken, Get-FoundryHeader, Get-Graph, Get-ThrowawayJobDefinition,
