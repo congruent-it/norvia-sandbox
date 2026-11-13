@@ -25,7 +25,7 @@ public sealed class AgentRunner(IChatClient model, IToolSource toolSource, Agent
         GuardedAsync(
             definition,
             question,
-            transcript => new NarrationRunResult(question.RunId, NarrationParser.Parse(transcript.Reply, transcript.Results), transcript.Calls),
+            transcript => new NarrationRunResult(question.RunId, NarrationParser.Parse(transcript.Reply, transcript.Results, definition.Name == FinOpsQuestions.AgentName), transcript.Calls),
             cancellationToken);
 
     /// <summary>Runs the loop of an Agent without tools to the list of texts it generated.</summary>

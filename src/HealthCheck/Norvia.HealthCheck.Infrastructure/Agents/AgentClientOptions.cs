@@ -46,14 +46,6 @@ public sealed class AgentClientOptions
     public bool UsesFoundry => Foundry.ProjectEndpoint is not null;
 }
 
-/// <summary>An Agent's own MCP server and token, locally.</summary>
-public sealed class AgentEndpointOptions
-{
-    public Uri? McpAddress { get; set; }
-
-    public AgentTokenOptions Tokens { get; set; } = new();
-}
-
 /// <summary>The Foundry project the Agent is published in (ADR 0040), which the app calls as its own managed identity.</summary>
 public sealed class FoundryOptions
 {

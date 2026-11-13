@@ -54,11 +54,11 @@ public sealed class AgentCostApiTests : IAsyncLifetime
         var view = JsonNode.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))!.AsObject();
         view.Select(property => property.Key).Should().BeEquivalentTo("periodDays", "excludesProvisionalDays", "total", "transportOrders", "resources");
         view["periodDays"]!.GetValue<int>().Should().Be(7);
-        view["total"]!["change"]!.GetValue<string>().Should().Be("+80%");
-        view["transportOrders"]!["change"]!.GetValue<string>().Should().Be("+3%");
+        view["total"]!["change"]!.GetValue<string>().Should().Be("+80.5%");
+        view["transportOrders"]!["change"]!.GetValue<string>().Should().Be("+2.5%", because: "one decimal, so a small change never reads as 0%");
         var resources = view["resources"]!.AsArray();
         resources.Select(resource => resource!["name"]!.GetValue<string>()).Should().Equal("log-norvia", "sb-norvia", "new-thing");
-        resources[0]!["change"]!.GetValue<string>().Should().Be("+367%");
+        resources[0]!["change"]!.GetValue<string>().Should().Be("+366.7%");
         resources[1]!["change"]!.GetValue<string>().Should().Be("0%");
         resources[2]!["change"]!.GetValue<string>().Should().Be("n/a", because: "a resource with no spend before has no ratio, and the view never invents one");
         resources[0]!["previousEurPerDay"]!.GetValue<decimal>().Should().Be(0.9m);

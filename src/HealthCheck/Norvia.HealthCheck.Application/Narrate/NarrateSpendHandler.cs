@@ -9,7 +9,7 @@ namespace Norvia.HealthCheck.Application.Narrate;
 public sealed class NarrateSpendHandler(IAgentClient agent) : IQueryHandler<NarrateSpendQuery, Result<Narration>>
 {
     /// <summary>The FinOps agent's definition (agents/finops.agent.yaml).</summary>
-    public const string AgentName = "finops";
+    public const string AgentName = FinOpsQuestions.AgentName;
 
     public async ValueTask<Result<Narration>> Handle(NarrateSpendQuery query, CancellationToken cancellationToken)
     {

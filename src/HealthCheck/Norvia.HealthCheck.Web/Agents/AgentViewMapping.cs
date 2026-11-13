@@ -46,11 +46,11 @@ internal static class AgentViewMapping
 
     private static AgentChangeView Of(PeriodChange change) => new(change.Name, change.Previous, change.Current, Percent(change.Relative));
 
-    // Text, so the agent copies it: "+80%", "-5%" or "n/a" where either period has no figure.
+    // Text, so the agent copies it: "+80.5%", "-5%" or "n/a" where either period has no figure. One decimal, so a small change never shows as 0% and 49.6% never as 50%.
     private static string Percent(decimal? relative) =>
         relative is null
             ? "n/a"
-            : (relative.Value > 0 ? "+" : relative.Value < 0 ? "-" : string.Empty) + (Math.Abs(relative.Value) * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
+            : (relative.Value > 0 ? "+" : relative.Value < 0 ? "-" : string.Empty) + (Math.Round(Math.Abs(relative.Value) * 100, 1)).ToString("0.#", CultureInfo.InvariantCulture) + "%";
 
     public static AgentFailedRunsView Of(FailedRunsReport report)
     {

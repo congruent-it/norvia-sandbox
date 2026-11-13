@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Norvia.Agents.Runner;
@@ -46,13 +45,13 @@ public static class FinOpsScript
 
         return JsonSerializer.Serialize(new
         {
-            summary = $"{overall} {findings.Count.ToString(CultureInfo.InvariantCulture)} resource(s) rose while the number of Transport Orders stayed flat.",
+            summary = $"{overall} Spend rose for at least one resource while the number of Transport Orders stayed flat.",
             findings = findings.Select(finding => new { id = finding.Id, impact = Impact(finding), citation = risingSpend.Id }),
         });
     }
 
     private static string Impact(FindingFacts finding) =>
-        $"{string.Join(" ", finding.Subjects.Zip(finding.Details, (subject, detail) => $"{subject}: {detail}"))} " +
+        $"{string.Join(" ", finding.Evidence.Select(item => $"{item.Subject}: {item.Detail}"))} " +
         $"The spend rose while the number of Transport Orders stayed flat, so no business reason explains it. " +
         $"The as-found toggle behind it is {finding.Toggle}. {finding.Fix}";
 
@@ -94,8 +93,7 @@ public static class FinOpsScript
                         Text(finding, "id")!,
                         Text(finding, "asFoundToggle") ?? "not named",
                         Text(finding, "fix") ?? string.Empty,
-                        [.. evidence.Select(item => Text(item, "subject") ?? string.Empty)],
-                        [.. evidence.Select(item => Text(item, "detail") ?? string.Empty)]);
+                        [.. evidence.Select(item => (Text(item, "subject") ?? string.Empty, Text(item, "detail") ?? string.Empty))]);
                 }),
             ];
         }
@@ -108,5 +106,5 @@ public static class FinOpsScript
     private static string? Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
-    private sealed record FindingFacts(string Id, string Toggle, string Fix, List<string> Subjects, List<string> Details);
+    private sealed record FindingFacts(string Id, string Toggle, string Fix, List<(string Subject, string Detail)> Evidence);
 }
