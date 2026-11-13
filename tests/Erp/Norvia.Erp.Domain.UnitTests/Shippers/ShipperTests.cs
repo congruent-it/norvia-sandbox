@@ -90,6 +90,17 @@ public sealed class ShipperTests
     }
 
     [Fact]
+    public void Reload_OfAShipperFinanceCreated_LeavesItAlone()
+    {
+        var shipper = Shipper.CreateByFinance(Id, "Nieuw", active: true);
+
+        shipper.Reload("Seed name", active: false);
+
+        shipper.Name.Should().Be("Nieuw");
+        shipper.Revision.Should().Be(1);
+    }
+
+    [Fact]
     public void Reload_BeforeAnyEdit_KeepsRevisionOne()
     {
         var shipper = new Shipper(Id, "Brouwer Dranken", active: true);

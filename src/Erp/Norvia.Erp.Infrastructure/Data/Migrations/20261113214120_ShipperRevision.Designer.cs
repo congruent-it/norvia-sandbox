@@ -12,7 +12,7 @@ using Norvia.Erp.Infrastructure.Data;
 namespace Norvia.Erp.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(ErpDbContext))]
-    [Migration("20261113212146_ShipperRevision")]
+    [Migration("20261113214120_ShipperRevision")]
     partial class ShipperRevision
     {
         /// <inheritdoc />
@@ -499,6 +499,11 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.Property<bool>("Active")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("FinanceOwned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -508,6 +513,11 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(1);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.HasKey("Id");
 

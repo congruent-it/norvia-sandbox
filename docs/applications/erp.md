@@ -370,8 +370,10 @@ An organization that pays Norvia to store, move or deliver its goods (a Shipper)
 |---|---|---|---|---|---|
 | `Id` | `nvarchar(50)` | no |  | PK | The Shipper ID (`SHP-0001`), which the other applications store. It is the Shipper's identity in its token (ADR 0005). |
 | `Active` | `bit` | no |  |  | Whether the Shipper is active. An inactive Shipper keeps its history. |
+| `FinanceOwned` | `bit` | no | False |  |  |
 | `Name` | `nvarchar(200)` | no |  |  | The Shipper's name. |
 | `Revision` | `int` | no | 1 |  |  |
+| `RowVersion` | `rowversion` | yes |  |  |  |
 
 Primary key `PK_Shippers`: `Id`.
 

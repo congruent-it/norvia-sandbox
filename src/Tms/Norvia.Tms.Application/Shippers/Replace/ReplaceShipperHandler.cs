@@ -14,6 +14,7 @@ public sealed partial class ReplaceShipperHandler(IShipperDirectory directory, I
         ArgumentNullException.ThrowIfNull(command);
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Name) || command.Revision < 1)
         {
+            using var refused = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Refused, [TrackingKeys.FailureCode] = "MasterDataUnreadable" });
             return Result<ReplaceShipperResult>.Invalid(new ValidationError(
                 "Shipper", "A Shipper needs an ID, a name and a Master-data revision of at least 1.", "MasterDataUnreadable", ValidationSeverity.Error));
         }

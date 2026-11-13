@@ -27,11 +27,18 @@ public sealed class Shipper : EntityBase<ShipperId>, IAggregateRoot
     /// <summary>The Master-data revision: 1 as loaded from the seed file, raised by every edit.</summary>
     public int Revision { get; private set; } = 1;
 
-    /// <summary>Takes over what the seed file says now, silently, and only while nobody has edited the Shipper.</summary>
+    /// <summary>True once Finance created or edited the Shipper, so the seed file no longer speaks for it.</summary>
+    public bool FinanceOwned { get; private set; }
+
+    /// <summary>A Shipper Finance creates: revision 1, and the seed file never reloads it.</summary>
+    public static Shipper CreateByFinance(ShipperId id, string name, bool active) =>
+        new(id, name, active) { FinanceOwned = true };
+
+    /// <summary>Takes over what the seed file says now, silently, and only while Finance has not created or edited the Shipper.</summary>
     public void Reload(string name, bool active)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (Revision > 1)
+        if (FinanceOwned)
         {
             return;
         }
@@ -46,6 +53,7 @@ public sealed class Shipper : EntityBase<ShipperId>, IAggregateRoot
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         Name = name;
         Active = active;
+        FinanceOwned = true;
         Revision++;
     }
 }

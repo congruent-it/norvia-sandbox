@@ -14,5 +14,8 @@ internal sealed class ShipperConfiguration : IEntityTypeConfiguration<Shipper>
         builder.Property(shipper => shipper.Id).HasConversion(id => id.Value, value => new ShipperId(value)).HasMaxLength(50).ValueGeneratedNever();
         builder.Property(shipper => shipper.Name).HasMaxLength(200).IsRequired();
         builder.Property(shipper => shipper.Revision).HasDefaultValue(1);
+        builder.Property(shipper => shipper.FinanceOwned).HasDefaultValue(false);
+        // Two edits at once conflict instead of both winning; the loser is run again and sees the new revision.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
     }
 }

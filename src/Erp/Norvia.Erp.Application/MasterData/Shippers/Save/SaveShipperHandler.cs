@@ -40,7 +40,7 @@ public sealed partial class SaveShipperHandler(
         Shipper shipper;
         if (existing is null)
         {
-            shipper = new Shipper(id, command.Name, command.Active);
+            shipper = Shipper.CreateByFinance(id, command.Name, command.Active);
             await shippers.AddAsync(shipper, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
