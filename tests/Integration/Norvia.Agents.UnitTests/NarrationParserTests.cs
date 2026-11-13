@@ -89,4 +89,37 @@ public sealed class NarrationParserTests
         noReply.Should().Throw<ArgumentNullException>();
         noResults.Should().Throw<ArgumentNullException>();
     }
+
+    private static readonly Dictionary<string, ToolResultText> CostResults = new()
+    {
+        ["r1"] = new ToolResultText("get_cost_view", """{"periodDays":7,"total":{"previousEurPerDay":4.10,"currentEurPerDay":7.4,"change":"+80.5%"}}"""),
+        ["r2"] = new ToolResultText("get_rising_spend_findings", """{"findings":[{"id":"F-COST","evidence":[{"subject":"log-1","detail":"Daily spend rose from 0.90 to 4.20 EUR (+367%)."}]}]}"""),
+    };
+
+    private static string Reply(string summary, string impact) =>
+        System.Text.Json.JsonSerializer.Serialize(new { summary, findings = new[] { new { id = "F-COST", impact, citation = "r2" } } });
+
+    [Fact]
+    public void Parse_WithFiguresFromResults_AcceptsNumbersTheResultsHold_WrittenAnyWay()
+    {
+        var narration = NarrationParser.Parse(Reply("Total changed +80.5% over 7 days.", "log-1 rose from 0.9 to 4.2 EUR (+367%)."), CostResults, figuresFromResults: true);
+
+        narration.Items.Should().ContainSingle();
+    }
+
+    [Theory]
+    [InlineData("Total changed +81% over 7 days.", "ok")]
+    [InlineData("Total changed +80.5%.", "log-1 now costs 5.00 EUR a day.")]
+    public void Parse_WithFiguresFromResults_RefusesANumberNoResultHolds(string summary, string impact)
+    {
+        var parse = () => NarrationParser.Parse(Reply(summary, impact), CostResults, figuresFromResults: true);
+
+        parse.Should().Throw<AgentRunException>().WithMessage("*not in any result*");
+    }
+
+    [Fact]
+    public void Parse_WithoutFiguresFromResults_DoesNotCheckNumbers()
+    {
+        NarrationParser.Parse(Reply("Anything 12345.", "Anything 999."), CostResults).Items.Should().ContainSingle();
+    }
 }

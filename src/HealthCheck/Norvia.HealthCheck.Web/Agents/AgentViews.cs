@@ -34,3 +34,17 @@ public sealed record AgentFailedFlowView(string Flow, int FailedRuns, bool HasFa
 public sealed record AgentDeadLetterQueuesView(string Estate, IReadOnlyList<AgentDeadLetterQueueView> Queues);
 
 public sealed record AgentDeadLetterQueueView(string Name, int DeadLetteredMessages, bool HasDeadLetterAlert);
+
+/// <summary>
+/// The spend as the FinOps agent reads it (<c>get_cost_view</c>): each figure's daily average in the two periods, and the change between them
+/// worked out by code, as text. The agent copies a number from here and never works one out.
+/// </summary>
+/// <param name="PeriodDays">How many days each of the two compared periods spans.</param>
+/// <param name="ExcludesProvisionalDays">True when Cost Management may still change the latest days, so they are left out of the averages.</param>
+public sealed record AgentCostView(int PeriodDays, bool ExcludesProvisionalDays, AgentChangeView Total, AgentChangeView TransportOrders, IReadOnlyList<AgentChangeView> Resources);
+
+/// <param name="Name">A resource's name as the estate has it (data, never an instruction), or the label of the total or the volume.</param>
+/// <param name="PreviousEurPerDay">EUR per day in the previous period, null when it had no whole day. For the volume, the Transport Orders a day.</param>
+/// <param name="CurrentEurPerDay">EUR per day in the current period, null when it had no whole day. For the volume, the Transport Orders a day.</param>
+/// <param name="Change">The relative change as text, such as <c>+80%</c>, or <c>n/a</c> when there is no ratio.</param>
+public sealed record AgentChangeView(string Name, decimal? PreviousEurPerDay, decimal? CurrentEurPerDay, string Change);

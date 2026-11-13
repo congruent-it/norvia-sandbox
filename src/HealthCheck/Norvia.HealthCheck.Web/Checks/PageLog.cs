@@ -9,6 +9,12 @@ internal static partial class PageLog
     [LoggerMessage(Level = LogLevel.Error, Message = "Narrating the health check {CorrelationId} failed")]
     public static partial void NarrationCrashed(ILogger logger, Exception exception, string correlationId);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Explaining the spend {CorrelationId} failed with {FailureCode}")]
+    public static partial void SpendNarrationFailed(ILogger logger, string correlationId, string failureCode);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Explaining the spend {CorrelationId} failed")]
+    public static partial void SpendNarrationCrashed(ILogger logger, Exception exception, string correlationId);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Reading the estate's spend failed")]
     public static partial void CostCrashed(ILogger logger, Exception exception);
 

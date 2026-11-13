@@ -39,6 +39,9 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     public const string PlannerNotificationAgentId = "norvia-local-agent-planner-notification";
     public const string PlannerNotificationRole = "TransportOrders.PlannerNotificationAgent.Read";
     public const string PlannerNotificationAudience = "api://norvia-planner-notification-agent";
+    public const string FinOpsAgentId = "norvia-local-agent-finops";
+    public const string FinOpsRole = "HealthCheck.Cost.Read";
+    public const string FinOpsAudience = "api://norvia-health-check-cost-agent";
     public const string TmsAudience = "api://norvia-tms";
     public const string FinanceAgentId = "norvia-local-agent-finance-matching";
     public const string FinanceRole = "CarrierInvoices.FinanceAgent.Read";
@@ -166,6 +169,20 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
 
         foreach (var (name, value) in new Dictionary<string, string>
         {
+            ["AgentMcp:HealthCheckCost:Tokens:Issuer"] = Issuer,
+            ["AgentMcp:HealthCheckCost:Tokens:Audience"] = FinOpsAudience,
+            ["AgentMcp:HealthCheckCost:Tokens:SigningKey"] = signingKey,
+            ["AgentMcp:HealthCheckCost:Api"] = "http://health-check/agent/v1",
+            ["AgentMcp:HealthCheckCost:ApiTokens:Issuer"] = Issuer,
+            ["AgentMcp:HealthCheckCost:ApiTokens:Audience"] = HealthCheckApiAudience,
+            ["AgentMcp:HealthCheckCost:ApiTokens:SigningKey"] = signingKey,
+        })
+        {
+            builder.UseSetting(name, value);
+        }
+
+        foreach (var (name, value) in new Dictionary<string, string>
+        {
             ["AgentMcp:FinanceRejectionReason:Tokens:Issuer"] = Issuer,
             ["AgentMcp:FinanceRejectionReason:Tokens:Audience"] = FinanceRejectionReasonAudience,
             ["AgentMcp:FinanceRejectionReason:Tokens:SigningKey"] = signingKey,
@@ -212,6 +229,10 @@ public sealed class LocalAgentMcpFactory : WebApplicationFactory<Program>
     /// <summary>The Estate health-check agent's token as Entra issues it to its agent identity.</summary>
     public string HealthCheckToken(string? azp = HealthCheckAgentId, string[]? roles = null) =>
         AgentToken(azp, roles ?? [HealthCheckRole], HealthCheckAudience);
+
+    /// <summary>The FinOps agent's token as Entra issues it to its agent identity.</summary>
+    public string FinOpsToken(string? azp = FinOpsAgentId, string[]? roles = null, string? audience = null) =>
+        AgentToken(azp, roles ?? [FinOpsRole], audience ?? FinOpsAudience);
 
     /// <summary>The Customer service agent's token as Entra issues it to its agent identity.</summary>
     public string CustomerServiceToken(string? azp = CustomerServiceAgentId, string[]? roles = null) =>

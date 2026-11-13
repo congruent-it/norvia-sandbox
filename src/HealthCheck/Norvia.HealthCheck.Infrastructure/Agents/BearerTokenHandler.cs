@@ -8,7 +8,7 @@ internal sealed class BearerTokenHandler(IOptions<AgentClientOptions> options, T
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AgentToken.Create(options.Value.Tokens, time));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AgentToken.Create(options.Value.TokensFor(request.RequestUri), time));
         return base.SendAsync(request, cancellationToken);
     }
 }

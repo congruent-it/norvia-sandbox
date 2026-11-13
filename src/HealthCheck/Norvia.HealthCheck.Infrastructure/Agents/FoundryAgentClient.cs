@@ -166,7 +166,7 @@ internal sealed partial class FoundryAgentClient(
             }
         }
 
-        return NarrationParser.Parse(text.ToString(), results);
+        return NarrationParser.Parse(text.ToString(), results, definition.Name == FinOpsQuestions.AgentName);
     }
 
     // The response was made with store: false, so there is normally nothing to delete and Foundry may say so. Whatever it says, the

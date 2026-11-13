@@ -89,22 +89,21 @@ public sealed class HealthCheckAgentAzureTests
     }
 
     [Fact]
-    public void BothAgentAppRegistrations_HaveOneRole_TheContractsRead_ForApplicationsOnly()
+    public void TheAgentView_HasOneRole_AndTheAgentApi_HasOneRolePerAgent_ForApplicationsOnly()
     {
         var apps = Of(McpResources(), "Microsoft.Graph/applications@v1.0").Select(app => app["properties"]!).ToList();
 
         apps.Should().HaveCount(2);
+        var view = apps.Single(app => app["displayName"]!.GetValue<string>() == "Norvia health-check agent view (env)");
+        var api = apps.Single(app => app["displayName"]!.GetValue<string>() == "Norvia Estate health check agent API (env)");
+        view["appRoles"]!.AsArray().Select(role => role!["value"]!.GetValue<string>()).Should().Equal("HealthCheck.Agent.Read");
+        api["appRoles"]!.AsArray().Select(role => role!["value"]!.GetValue<string>()).Should().Equal("HealthCheck.Agent.Read", "HealthCheck.Cost.Read");
         foreach (var app in apps)
         {
-            var roles = app["appRoles"]!.AsArray().Select(role => role!).ToList();
-            roles.Should().ContainSingle();
-            roles[0]["value"]!.GetValue<string>().Should().Be("HealthCheck.Agent.Read");
-            roles[0]["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>()).Should().Equal("Application");
+            app["appRoles"]!.AsArray().SelectMany(role => role!["allowedMemberTypes"]!.AsArray().Select(type => type!.GetValue<string>())).Should().OnlyContain(type => type == "Application");
             app["api"]!["requestedAccessTokenVersion"]!.GetValue<int>().Should().Be(2, "azp is the caller's client ID in a v2 token");
         }
 
-        apps.Select(app => app["displayName"]!.GetValue<string>()).Should().Contain("Norvia health-check agent view (env)", "the scripts look the view up by this name");
-        apps.Select(app => app["displayName"]!.GetValue<string>()).Should().Contain("Norvia Estate health check agent API (env)", "provision-estate.ps1 and the smoke run look the API up by this name");
         ContractFile["role"]!.GetValue<string>().Should().Be("HealthCheck.Agent.Read");
     }
 
@@ -121,7 +120,7 @@ public sealed class HealthCheckAgentAzureTests
     {
         var assignments = Of(McpResources(), "Microsoft.Graph/appRoleAssignedTo@v1.0").ToList();
 
-        assignments.Should().ContainSingle().Which["properties"]!["principalId"]!.GetValue<string>().Should().Be(ApimPrincipal);
+        assignments.Should().HaveCount(2, "one role for each Agent's tools, on the app's agent API").And.OnlyContain(assignment => assignment["properties"]!["principalId"]!.GetValue<string>() == ApimPrincipal);
         Script("assign-agent-roles.ps1").Should().Contain("appRoleAssignedTo");
     }
 
@@ -167,7 +166,7 @@ public sealed class HealthCheckAgentAzureTests
     {
         var estate = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "infra/estate.bicep"));
 
-        estate.Should().Contain("module healthCheck 'estate/health-check.bicep'").And.Contain("module healthCheckMcp 'estate/health-check-mcp.bicep'");
+        estate.Should().Contain("module healthCheck 'estate/health-check.bicep'").And.Contain("module healthCheckMcp 'estate/health-check-mcp.bicep'").And.Contain("module healthCheckCostMcp 'estate/health-check-cost-mcp.bicep'");
         estate.Should().Contain("healthCheck.outputs.principalId");
         Regex.Count(estate, @"(?m)^output ").Should().BeLessThanOrEqualTo(64, "a template may have 64 outputs");
     }

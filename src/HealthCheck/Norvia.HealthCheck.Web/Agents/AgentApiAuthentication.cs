@@ -15,6 +15,9 @@ public static class AgentApiAuthentication
 
     public const string Policy = AgentRoles.Read;
 
+    /// <summary>The FinOps agent's policy (#511): its own role, so neither Agent's token opens the other's tools.</summary>
+    public const string CostPolicy = AgentRoles.CostRead;
+
     /// <summary>Whether the Agents are on (<c>Agents:Enabled</c>, off unless the AppHost or the estate turns it on).</summary>
     public static bool IsEnabled(IConfiguration configuration) => configuration.GetValue<bool>($"{AgentsOptions.SectionName}:{nameof(AgentsOptions.Enabled)}");
 
@@ -49,7 +52,8 @@ public static class AgentApiAuthentication
                 };
             });
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy(Policy, policy => policy.AddAuthenticationSchemes(Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.Read));
+            .AddPolicy(Policy, policy => policy.AddAuthenticationSchemes(Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.Read))
+            .AddPolicy(CostPolicy, policy => policy.AddAuthenticationSchemes(Scheme).RequireAuthenticatedUser().RequireRole(AgentRoles.CostRead));
 
         return builder;
     }

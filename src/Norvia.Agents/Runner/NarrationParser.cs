@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Norvia.Agents.Runner;
 
@@ -6,9 +8,13 @@ namespace Norvia.Agents.Runner;
 /// Reads the model's final reply as a <see cref="Narration"/>, and refuses one that isn't the expected result, cites a result the run
 /// never had, or explains a Finding that result does not hold: the Agent never invents a Finding.
 /// </summary>
-public static class NarrationParser
+public static partial class NarrationParser
 {
-    public static Narration Parse(string reply, IReadOnlyDictionary<string, ToolResultText> results)
+    /// <param name="figuresFromResults">
+    /// True for an Agent that must never invent a number (the FinOps agent): every number in the summary and in each impact has to be one a
+    /// tool result of the run holds, compared by value (0.90 is 0.9). Anything else is refused as <c>AgentUnavailable</c>.
+    /// </param>
+    public static Narration Parse(string reply, IReadOnlyDictionary<string, ToolResultText> results, bool figuresFromResults = false)
     {
         ArgumentNullException.ThrowIfNull(reply);
         ArgumentNullException.ThrowIfNull(results);
@@ -63,8 +69,27 @@ public static class NarrationParser
             items.Add(new NarratedItem(id, Text(finding, "impact"), citation, result.ToolName));
         }
 
+        if (figuresFromResults)
+        {
+            var known = results.Values.SelectMany(result => Figures(result.Content)).ToHashSet();
+            foreach (var text in items.Select(item => item.Impact).Prepend(summary))
+            {
+                if (Figures(text).Where(figure => !known.Contains(figure)).Select(figure => (decimal?)figure).FirstOrDefault() is { } unknown)
+                {
+                    throw new AgentRunException($"The reply writes the number {unknown.ToString(CultureInfo.InvariantCulture)}, which is not in any result of this run.");
+                }
+            }
+        }
+
         return new Narration(summary, items);
     }
+
+    // Every number in a text, by value, so 0.90 and 0.9 are the same figure.
+    private static IEnumerable<decimal> Figures(string text) =>
+        FigurePattern().Matches(text).Select(match => decimal.Parse(match.Value, NumberStyles.Number, CultureInfo.InvariantCulture));
+
+    [GeneratedRegex(@"\d+(\.\d+)?")]
+    private static partial Regex FigurePattern();
 
     // The IDs of the Findings a tool result lists: its "findings" array of objects with an "id".
     private static IReadOnlyList<string> FindingIds(string content)

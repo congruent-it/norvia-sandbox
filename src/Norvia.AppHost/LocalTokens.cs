@@ -75,6 +75,15 @@ public static class LocalTokens
     /// <summary>The Estate health-check agent's local identity, which stands in for its Entra agent identity. It holds only the call role: no Azure role.</summary>
     public const string EstateHealthCheckAgentClientId = "norvia-local-agent-estate-health-check";
 
+    /// <summary>The FinOps agent's view audience (#511), which its token is for. Its own, so the health-check agent's token opens nothing on its server.</summary>
+    public const string FinOpsAgentAudience = "api://norvia-health-check-cost-agent";
+
+    /// <summary>The FinOps agent's local identity, which stands in for its Entra agent identity. It holds only the cost call role: no Azure role.</summary>
+    public const string FinOpsAgentClientId = "norvia-local-agent-finops";
+
+    /// <summary>The app role the FinOps agent holds on the health-check API: the two cost tools.</summary>
+    public const string FinOpsAgentReadRole = "HealthCheck.Cost.Read";
+
     /// <summary>The Customer service agent's view audience, which the Customer service agent's token is for (the MCP stand-in checks it, as API Management does).</summary>
     public const string CustomerServiceAgentAudience = "api://norvia-customer-service-agent";
 

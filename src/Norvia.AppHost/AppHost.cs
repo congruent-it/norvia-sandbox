@@ -996,6 +996,12 @@ else
             .WithEnvironment("AgentMcp__HealthCheck__Api", ReferenceExpression.Create($"{healthCheck.GetEndpoint("http")}/agent/v1"))
             .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Issuer", LocalTokens.Issuer)
             .WithEnvironment("AgentMcp__HealthCheck__ApiTokens__Audience", LocalTokens.HealthCheckAgentApiAudience)
+            // The FinOps agent's server (#511), at /mcp/health-check-cost: the same agent API, an audience and a role of its own.
+            .WithEnvironment("AgentMcp__HealthCheckCost__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__HealthCheckCost__Tokens__Audience", LocalTokens.FinOpsAgentAudience)
+            .WithEnvironment("AgentMcp__HealthCheckCost__Api", ReferenceExpression.Create($"{healthCheck.GetEndpoint("http")}/agent/v1"))
+            .WithEnvironment("AgentMcp__HealthCheckCost__ApiTokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("AgentMcp__HealthCheckCost__ApiTokens__Audience", LocalTokens.HealthCheckAgentApiAudience)
             // The third server: the Customer service agent's, at /mcp/customer-service. It calls the TMS API's agent view as the Agent's
             // identity, with a token for the TMS API's audience.
             .WithEnvironment("AgentMcp__CustomerService__Tokens__Issuer", LocalTokens.Issuer)
@@ -1084,6 +1090,11 @@ else
             .WithEnvironment("Agents__Tokens__Audience", LocalTokens.HealthCheckAgentAudience)
             .WithEnvironment("Agents__Tokens__ClientId", LocalTokens.EstateHealthCheckAgentClientId)
             .WithEnvironment("Agents__Tokens__Role", LocalTokens.HealthCheckAgentReadRole)
+            .WithEnvironment("Agents__Cost__McpAddress", ReferenceExpression.Create($"{agentMcp.GetEndpoint("http")}/mcp/health-check-cost"))
+            .WithEnvironment("Agents__Cost__Tokens__Issuer", LocalTokens.Issuer)
+            .WithEnvironment("Agents__Cost__Tokens__Audience", LocalTokens.FinOpsAgentAudience)
+            .WithEnvironment("Agents__Cost__Tokens__ClientId", LocalTokens.FinOpsAgentClientId)
+            .WithEnvironment("Agents__Cost__Tokens__Role", LocalTokens.FinOpsAgentReadRole)
             .WithEnvironment("Agents__Api__Issuer", LocalTokens.Issuer)
             .WithEnvironment("Agents__Api__Audience", LocalTokens.HealthCheckAgentApiAudience);
         integrationConsole
@@ -1118,6 +1129,9 @@ else
             (agentMcp.Resource, "AgentMcp__ConsoleTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__HealthCheck__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__HealthCheck__ApiTokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__HealthCheckCost__Tokens__SigningKey"),
+            (agentMcp.Resource, "AgentMcp__HealthCheckCost__ApiTokens__SigningKey"),
+            (healthCheck.Resource, "Agents__Cost__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerService__Tokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerService__ApiTokens__SigningKey"),
             (agentMcp.Resource, "AgentMcp__CustomerServiceReply__Tokens__SigningKey"),

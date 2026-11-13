@@ -26,6 +26,12 @@ public sealed class AgentMcpOptions
     public HealthCheckServerOptions? HealthCheck { get; set; }
 
     /// <summary>
+    /// The FinOps agent's MCP server (<c>health-check-cost</c>), served at <c>/mcp/health-check-cost</c>. It calls the Estate health check's
+    /// agent API too, with its own audience and role, so the health-check agent's token opens nothing here. Not configured, the stand-in does not serve it.
+    /// </summary>
+    public HealthCheckServerOptions? HealthCheckCost { get; set; }
+
+    /// <summary>
     /// The Customer service agent's MCP server (<c>customer-service</c>), served at <c>/mcp/customer-service</c>. Not configured, the
     /// stand-in does not serve it.
     /// </summary>

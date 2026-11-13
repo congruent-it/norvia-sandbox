@@ -3,8 +3,13 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Policy = OperatorSignIn.CostPolicy)]
 @using System.Globalization
+@using Norvia.Agents
+@using Norvia.HealthCheck.Application.Agents
 @using Norvia.HealthCheck.Application.Cost
+@using Norvia.HealthCheck.Application.Narrate
+@using Microsoft.Extensions.Options
 @inject IHealthCheckRequests Requests
+@inject IOptions<AgentsOptions> Agents
 @inject ILogger<CostPage> Logger
 @implements IDisposable
 
@@ -56,6 +61,50 @@ else
         </FluentDataGrid>
     </section>
 
+    @if (Agents.Value.Enabled)
+    {
+        <section aria-label="FinOps assistant's explanation" class="mt-6">
+            <p>
+                <FluentButton Appearance="Appearance.Outline" OnClick="ExplainAsync" Disabled="_explaining" data-testid="explain-spend">Explain the spend</FluentButton>
+            </p>
+            @if (_explaining)
+            {
+                <div role="status">
+                    <FluentStack VerticalAlignment="VerticalAlignment.Center">
+                        <FluentProgressRing />
+                        <span>The assistant is reading the spend…</span>
+                    </FluentStack>
+                </div>
+            }
+            else if (_explainUnavailable)
+            {
+                @* Whatever went wrong, the operator sees this and nothing else changes: the spend above stays. *@
+                <div role="alert">
+                    <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">Assistant unavailable</FluentMessageBar>
+                </div>
+            }
+            else if (_explanation is { } explanation)
+            {
+                @* Text only: what the assistant wrote is data, so it is encoded, never rendered as markup. *@
+                <div class="narration" data-testid="spend-narration">
+                    <h2>What the assistant found</h2>
+                    <p data-testid="spend-narration-summary">@explanation.Summary</p>
+                    <p class="text-muted">
+                        The assistant names the resource and the toggle behind a rise from the cost tools' figures and the rising-spend Check's Findings. It never works out a number or changes a severity or a fix.
+                    </p>
+                    <ol>
+                        @foreach (var item in explanation.Items)
+                        {
+                            <li data-testid="spend-narration-item">
+                                <strong>@item.Id</strong>: @item.Impact <cite class="text-muted">[@item.ResultId, @item.ToolName]</cite>
+                            </li>
+                        }
+                    </ol>
+                </div>
+            }
+        </section>
+    }
+
     <section aria-label="Spend per day">
         <h2 class="mt-6">Spend per day</h2>
         <div class="table-scroll">
@@ -82,6 +131,9 @@ else
 @code {
     private CostView? _view;
     private bool _failed;
+    private bool _explaining;
+    private bool _explainUnavailable;
+    private Narration? _explanation;
     private IQueryable<PeriodChange> _rows = Enumerable.Empty<PeriodChange>().AsQueryable();
     private readonly CancellationTokenSource _lifetime = new();
 
@@ -107,6 +159,40 @@ else
         {
             _failed = true;
             PageLog.CostCrashed(Logger, exception);
+        }
+    }
+
+    private async Task ExplainAsync()
+    {
+        _explaining = true;
+        _explainUnavailable = false;
+        _explanation = null;
+        var correlationId = Guid.NewGuid().ToString("N");
+        try
+        {
+            var result = await Requests.NarrateSpendAsync(new NarrateSpendQuery(correlationId), _lifetime.Token);
+            if (result.IsSuccess)
+            {
+                _explanation = result.Value;
+            }
+            else
+            {
+                _explainUnavailable = true;
+                PageLog.SpendNarrationFailed(Logger, correlationId, result.Errors.FirstOrDefault() ?? "AgentUnavailable");
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            _explainUnavailable = true;
+            PageLog.SpendNarrationCrashed(Logger, exception, correlationId);
+        }
+        finally
+        {
+            _explaining = false;
         }
     }
 

@@ -21,6 +21,9 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
     /// <summary>The Customer service reply agent's server, <c>/mcp/customer-service-reply</c>: one tool, the Shipper view, and a role of its own.</summary>
     public const string CustomerServiceReply = "customer-service-reply";
 
+    /// <summary>The FinOps agent's server, <c>/mcp/health-check-cost</c>: the two cost tools of the Estate health check's agent API, and a role of its own.</summary>
+    public const string HealthCheckCost = "health-check-cost";
+
     /// <summary>The Planner agent's server, <c>/mcp/planner</c>: one tool, the assignment options of a Transport Order, and a role of its own.</summary>
     public const string Planner = "planner";
 
@@ -45,6 +48,7 @@ internal sealed class AgentServers(IEnumerable<ToolListContract> contracts, IOpt
             {
                 Default when settings.ConsoleAgentApi is { } api => new AgentServer(contract, settings.Tokens, api, settings.ConsoleTokens),
                 HealthCheck when settings.HealthCheck is { Api: { } api } health => new AgentServer(contract, health.Tokens, api, health.ApiTokens),
+                HealthCheckCost when settings.HealthCheckCost is { Api: { } api } cost => new AgentServer(contract, cost.Tokens, api, cost.ApiTokens),
                 CustomerService when settings.CustomerService is { Api: { } api } customerService => new AgentServer(contract, customerService.Tokens, api, customerService.ApiTokens),
                 CustomerServiceReply when settings.CustomerServiceReply is { Api: { } api } reply => new AgentServer(contract, reply.Tokens, api, reply.ApiTokens),
                 Planner when settings.Planner is { Api: { } api } planner => new AgentServer(contract, planner.Tokens, api, planner.ApiTokens),

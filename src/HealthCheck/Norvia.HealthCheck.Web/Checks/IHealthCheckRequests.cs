@@ -15,5 +15,7 @@ public interface IHealthCheckRequests
 
     Task<Result<NarratedItem>> ExplainAsync(ExplainFindingQuery query, CancellationToken cancellationToken);
 
+    Task<Result<Narration>> NarrateSpendAsync(NarrateSpendQuery query, CancellationToken cancellationToken);
+
     Task<Result<CostView>> CostAsync(GetCostViewQuery query, CancellationToken cancellationToken);
 }
