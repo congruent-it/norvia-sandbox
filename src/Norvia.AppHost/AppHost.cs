@@ -615,6 +615,7 @@ else
         .WithEnvironment("LocalOperator__Name", $"{Environment.UserName} (local)")
         .WithEnvironment("LocalOperator__Roles__0", "HealthCheck.Run")
         .WithEnvironment("LocalOperator__Roles__1", "HealthCheck.Read")
+        .WithEnvironment("LocalOperator__Roles__2", "HealthCheck.Cost")
         .WithEnvironment("Estate__Snapshot", builder.Configuration["HealthCheck:Snapshot"] ?? "as-found");
 
     // Locally the TMS trusts tokens signed with this key (see LocalTokens).

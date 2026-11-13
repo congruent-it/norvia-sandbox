@@ -5,6 +5,9 @@
 <header class="app-bar">
     <nav aria-label="Main">
         <a href="/" class="brand">Estate health check</a>
+        <AuthorizeView Policy="@OperatorSignIn.CostPolicy">
+            <a href="/cost" class="nav-link">Spend</a>
+        </AuthorizeView>
         @if (_operatorName is not null)
         {
             <span class="operator">@_operatorName</span>
