@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Norvia.IntegrationConsole.Application.Refusals;
 using Norvia.IntegrationConsole.Application.Trails;
@@ -39,7 +40,7 @@ public sealed class RefusedAtTheEdgeJourneyTests(ConsoleUiFixture console) : Bro
 
         await row.GetByRole(AriaRole.Link, new() { Name = correlationId }).ClickAsync();
 
-        await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"/trails/{correlationId}$"));
+        await Expect(Page).ToHaveURLAsync(new Regex($"/trails/{correlationId}$"));
         await Expect(Page.GetByRole(AriaRole.Table, new() { Name = "Hops" })).ToContainTextAsync($"apim-norvia: {operation}");
     }
 
@@ -61,14 +62,14 @@ public sealed class RefusedAtTheEdgeJourneyTests(ConsoleUiFixture console) : Bro
         await Page.GotoAsync("/refused-at-the-edge");
 
         var summary = Page.GetByRole(AriaRole.Table, new() { Name = "Refusals by caller" }).GetByRole(AriaRole.Row);
-        await Expect(summary.Filter(new() { HasText = expired })).ToContainTextAsync("401");
-        await Expect(summary.Filter(new() { HasText = expired })).ToContainTextAsync("2");
+        await Expect(summary.Filter(new() { HasText = expired }).GetByRole(AriaRole.Gridcell)).ToHaveTextAsync([expired, "401", "2"]);
+        await Expect(summary.Filter(new() { HasText = throttled })).ToHaveCountAsync(2);
         await Expect(CallsTable.GetByRole(AriaRole.Row).Filter(new() { HasText = submit })).ToHaveCountAsync(3);
         await Expect(CallsTable.GetByRole(AriaRole.Row).Filter(new() { HasText = track })).ToHaveCountAsync(1);
 
         await ChooseAsync("Status", "401");
 
-        await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex("[?&]status=401"));
+        await Expect(Page).ToHaveURLAsync(new Regex("[?&]status=401"));
         await Expect(CallsTable.GetByRole(AriaRole.Row).Filter(new() { HasText = submit })).ToHaveCountAsync(2);
         await Expect(CallsTable.GetByRole(AriaRole.Row).Filter(new() { HasText = track })).ToHaveCountAsync(0);
         await Expect(summary.Filter(new() { HasText = throttled })).ToHaveCountAsync(0);
@@ -76,7 +77,7 @@ public sealed class RefusedAtTheEdgeJourneyTests(ConsoleUiFixture console) : Bro
         await ChooseAsync("Status", "All statuses");
         await ChooseAsync("Operation", track);
 
-        await Expect(Page).ToHaveURLAsync(new System.Text.RegularExpressions.Regex($"[?&]operation={Uri.EscapeDataString(track)}"));
+        await Expect(Page).ToHaveURLAsync(new Regex($"[?&]operation={Uri.EscapeDataString(track)}"));
         await Expect(CallsTable.GetByRole(AriaRole.Row).Filter(new() { HasText = track })).ToHaveCountAsync(1);
         await Expect(CallsTable.GetByRole(AriaRole.Row).Filter(new() { HasText = submit })).ToHaveCountAsync(0);
         await Expect(summary.Filter(new() { HasText = throttled })).ToContainTextAsync("429");
