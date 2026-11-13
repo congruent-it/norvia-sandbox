@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
+using Azure.Storage.Blobs;
 using Norvia.Tms.TestSupport.Planning;
 using Norvia.Tms.TestSupport.TrackingEvents;
 
@@ -118,6 +119,30 @@ internal static class ProofOfDeliveryCalls
     {
         ArgumentNullException.ThrowIfNull(tms);
         return await tms.Tms.GetAsync(new Uri($"/v1/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId}", UriKind.Relative), cancellationToken);
+    }
+
+    /// <summary>The TMS's blob container for Proof of delivery files, in the storage emulator.</summary>
+    public static async Task<BlobContainerClient> ProofContainerAsync(this TmsFixture tms, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tms);
+        return new BlobServiceClient(await tms.ConnectionStringAsync("blobs", cancellationToken)).GetBlobContainerClient("proofs-of-delivery");
+    }
+
+    /// <summary>The name the TMS stores a file's blob under: its Shipment number and the file's ID.</summary>
+    public static string BlobNameOf(string shipmentNumber, string fileId) => $"{shipmentNumber}/{Guid.Parse(fileId):N}";
+
+    /// <summary>The ID of the file a timeline entry lists under <paramref name="name"/>.</summary>
+    public static string FileIdOf(JsonNode proof, string name)
+    {
+        ArgumentNullException.ThrowIfNull(proof);
+        return proof["files"]!.AsArray().Single(file => file!["name"]!.GetValue<string>() == name)!["id"]!.GetValue<string>();
+    }
+
+    /// <summary>The names of the files a timeline entry lists.</summary>
+    public static IEnumerable<string> FileNamesOf(JsonNode proof)
+    {
+        ArgumentNullException.ThrowIfNull(proof);
+        return proof["files"]!.AsArray().Select(file => file!["name"]!.GetValue<string>());
     }
 
     /// <summary>Every Proof of delivery on a Shipment's timeline, current and superseded, from the API.</summary>

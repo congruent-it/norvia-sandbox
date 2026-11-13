@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using Azure.Storage.Blobs;
 using static Norvia.Tms.TestSupport.ProofsOfDelivery.ProofOfDeliveryCalls;
 
 namespace Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery;
@@ -70,13 +69,12 @@ public sealed class ProofOfDeliveryPlannerQueryTests(TmsFixture tms) : IClassFix
         var expiring = Cmr("expiring.pdf");
         var kept = Cmr("kept.pdf");
         await tms.RecordedProofAsync(Metadata(reference), [expiring, kept], _cancellationToken);
-        var files = (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!["files"]!.AsArray();
-        var expiringId = files.Single(file => file!["name"]!.GetValue<string>() == expiring.Name)!["id"]!.GetValue<string>();
-        var keptId = files.Single(file => file!["name"]!.GetValue<string>() == kept.Name)!["id"]!.GetValue<string>();
+        var proof = (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!;
+        var (expiringId, keptId) = (FileIdOf(proof, expiring.Name), FileIdOf(proof, kept.Name));
 
-        // The lifecycle rule of an Azure storage account does not run on Azurite: delete the blob as the rule would, by its name.
-        var container = new BlobServiceClient(await tms.ConnectionStringAsync("blobs", _cancellationToken)).GetBlobContainerClient("proofs-of-delivery");
-        (await container.DeleteBlobIfExistsAsync($"{shipmentNumber}/{Guid.Parse(expiringId):N}", cancellationToken: _cancellationToken)).Value
+        // The lifecycle rule of an Azure storage account does not run on Azurite: delete the blob as the rule would.
+        var container = await tms.ProofContainerAsync(_cancellationToken);
+        (await container.DeleteBlobIfExistsAsync(BlobNameOf(shipmentNumber, expiringId), cancellationToken: _cancellationToken)).Value
             .Should().BeTrue("the file was stored under the Shipment number and its ID");
 
         using var gone = await tms.GetProofFileAsync(shipmentNumber, expiringId, _cancellationToken);
@@ -85,8 +83,7 @@ public sealed class ProofOfDeliveryPlannerQueryTests(TmsFixture tms) : IClassFix
             .GetValue<string>().Should().Be("ProofOfDeliveryFileExpired");
         using var stillThere = await tms.GetProofFileAsync(shipmentNumber, keptId, _cancellationToken);
         stillThere.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!["files"]!.AsArray()
-            .Select(file => file!["name"]!.GetValue<string>()).Should().BeEquivalentTo(expiring.Name, kept.Name);
+        FileNamesOf((await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!).Should().BeEquivalentTo(expiring.Name, kept.Name);
     }
 
     [Fact]

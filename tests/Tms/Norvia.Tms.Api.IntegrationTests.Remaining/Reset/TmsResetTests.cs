@@ -9,7 +9,6 @@ namespace Norvia.Tms.Api.IntegrationTests.Reset;
 /// </summary>
 public sealed class TmsResetTests(ResetTmsFixture tms) : IClassFixture<ResetTmsFixture>
 {
-    private const string ProofContainer = "proofs-of-delivery";
     private readonly CancellationToken _cancellationToken = TestContext.Current.CancellationToken;
 
     [Fact]
@@ -21,7 +20,7 @@ public sealed class TmsResetTests(ResetTmsFixture tms) : IClassFixture<ResetTmsF
         await tms.RecordedProofAsync(ProofOfDeliveryCalls.Metadata(reference), [ProofOfDeliveryCalls.Cmr()], _cancellationToken);
         var (failedShipmentNumber, _, _) = await tms.DeliveryFailedShipmentAsync(_cancellationToken);
         var tripNumber = await tms.TmsUi.DraftTripAsync(CapacityCalls.DateOf((await tms.ListOpenDaysAsync(_cancellationToken))[1]), _cancellationToken);
-        var proofs = new BlobServiceClient(await tms.ConnectionStringAsync("blobs", _cancellationToken)).GetBlobContainerClient(ProofContainer);
+        var proofs = await tms.ProofContainerAsync(_cancellationToken);
         (await Blobs(proofs)).Should().NotBeEmpty("the Proof of delivery file is stored before the reset");
         (await tms.ListOpenExceptionsAsync(_cancellationToken)).Should().NotBeEmpty();
 
