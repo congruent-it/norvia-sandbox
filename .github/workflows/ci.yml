@@ -229,7 +229,7 @@ jobs:
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
           - application: Integration console
             directory: IntegrationConsole
-            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+            kinds: UnitTests ArchitectureTests IntegrationTests IntegrationTests.LocalTelemetry UiTests
           - application: Integration
             directory: Integration
             kinds: IntegrationTests

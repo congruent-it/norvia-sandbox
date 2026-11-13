@@ -1,0 +1,101 @@
+using System.Net;
+using System.Net.Http.Headers;
+using Microsoft.Extensions.Options;
+using Norvia.IntegrationConsole.Application.Refusals;
+using Norvia.IntegrationConsole.Infrastructure.Trails;
+
+namespace Norvia.IntegrationConsole.Infrastructure.IntegrationTests.LocalTelemetry;
+
+/// <summary>
+/// Locally the console lists the refusals of the stand-in that plays API Management from the Aspire dashboard, read through its telemetry API as
+/// the AppHost configures it (ADR 0027), under Aspire's test host.
+/// </summary>
+public sealed class AspireDashboardRefusedCallsTests(LocalTelemetryFixture local) : IClassFixture<LocalTelemetryFixture>
+{
+    // The stand-in's Shipper tracking limit per subscription and minute.
+    private const int TrackingCallsPerMinute = 120;
+
+    private static readonly Uri SubmitTransportOrder = new("/partner/v1/transport-orders", UriKind.Relative);
+
+    [Fact]
+    public async Task RefusalsAsync_ListsTheRefusalsTheStandInAnsweredWith_ByStatusAndFailureCode()
+    {
+        var before = local.ReadyAt;
+        var noKey = await PostAsync(subscriptionKey: null, token: null);
+        var noToken = await PostAsync(LocalTelemetryFixture.SubscriptionKey, token: null);
+        var noRole = await PostAsync(LocalTelemetryFixture.SubscriptionKey, local.Token(LocalTelemetryFixture.ShipperClientId, "Tracking.Read"));
+        var noShipper = await PostAsync(LocalTelemetryFixture.SubscriptionKey, local.Token(LocalTelemetryFixture.UnregisteredClientId, "TransportOrders.Submit"));
+        noKey.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        noToken.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        noRole.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        noShipper.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // The dashboard is shared with the other test, so only the refusals these four calls caused are looked at.
+        var ownIds = new[] { noKey, noToken, noRole, noShipper }.Select(response => response.Headers.GetValues("X-Correlation-ID").Single()).ToList();
+        var refusals = (await EventuallyAsync(before, found => found.Count(refusal => ownIds.Contains(refusal.CorrelationId ?? "")) >= 4))
+            .Where(refusal => ownIds.Contains(refusal.CorrelationId ?? "")).ToList();
+
+        refusals.Select(refusal => (refusal.StatusCode, refusal.FailureCode)).Should().BeEquivalentTo(
+            [(401, "Unauthorized"), (401, "Unauthorized"), (403, "NotAllowedToSubmit"), (403, "NoShipperForClient")]);
+        // Each opens its Message trail by the correlation ID API Management answered with, and no caller's subscription is known locally.
+        refusals.Should().OnlyContain(refusal => refusal.CorrelationId != null && refusal.Caller == null);
+        refusals.Select(refusal => refusal.CorrelationId).Should().BeEquivalentTo(ownIds);
+    }
+
+    [Fact]
+    public async Task RefusalsAsync_ListsAShipperOverItsRateLimit_As429()
+    {
+        var before = local.ReadyAt;
+        var token = local.Token(LocalTelemetryFixture.ShipperClientId, "Tracking.Read");
+        // The limit is a fixed window of a minute: a window that rolls over mid-run restarts the count, so call until it answers 429
+        // (at most two windows' worth) rather than for exactly one window's worth.
+        HttpStatusCode status = default;
+        for (var call = 0; call <= 2 * TrackingCallsPerMinute && status != HttpStatusCode.TooManyRequests; call++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/partner/v1/transport-orders", UriKind.Relative));
+            request.Headers.Add("Ocp-Apim-Subscription-Key", LocalTelemetryFixture.SubscriptionKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var response = await local.StandIn.SendAsync(request, TestContext.Current.CancellationToken);
+            status = response.StatusCode;
+        }
+
+        status.Should().Be(HttpStatusCode.TooManyRequests);
+        var refusals = await EventuallyAsync(before, found => found.Any(refusal => refusal.StatusCode == 429));
+
+        refusals.Should().ContainSingle(refusal => refusal.StatusCode == 429).Which.FailureCode.Should().Be("RateLimitExceeded");
+    }
+
+    private async Task<HttpResponseMessage> PostAsync(string? subscriptionKey, string? token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, SubmitTransportOrder) { Content = new StringContent("{}") };
+        if (subscriptionKey is not null)
+        {
+            request.Headers.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
+        }
+
+        if (token is not null)
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return await local.StandIn.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // The dashboard takes a moment to receive what the stand-in exported; at the end of a minute, what it has is returned and the assertion says what is missing.
+    private async Task<IReadOnlyList<RecordedRefusal>> EventuallyAsync(DateTimeOffset since, Func<IReadOnlyList<RecordedRefusal>, bool> enough)
+    {
+        using var http = new HttpClient { BaseAddress = local.DashboardUrl };
+        var source = new DashboardTrailSource(http, Options.Create(new DashboardTrailSourceOptions { DashboardUrl = local.DashboardUrl, ApiKey = LocalTelemetryFixture.ApiKey }));
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(60);
+        while (true)
+        {
+            var found = await source.RefusalsAsync(since, TestContext.Current.CancellationToken);
+            if (enough(found) || DateTimeOffset.UtcNow > deadline)
+            {
+                return found;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
+        }
+    }
+}
