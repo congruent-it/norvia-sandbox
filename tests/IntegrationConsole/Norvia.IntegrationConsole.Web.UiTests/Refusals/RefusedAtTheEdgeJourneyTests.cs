@@ -99,6 +99,46 @@ public sealed class RefusedAtTheEdgeJourneyTests(ConsoleUiFixture console) : Bro
         response!.Status.Should().Be((int)HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task TheRefusedCallsPanel_ShowsLoadingThenItsCalls()
+    {
+        var loaded = new TaskCompletionSource<IReadOnlyList<RecordedRefusal>>();
+        var operation = OperationName();
+        Console.Port<IRefusedCalls>().RefusalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(_ => loaded.Task);
+        await SignInAsync(Operator, "IntegrationConsole.Read");
+
+        await Page.GotoAsync("/refused-at-the-edge");
+
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("Loading the refused calls…");
+
+        loaded.SetResult([new RecordedRefusal(DateTimeOffset.UtcNow.AddMinutes(-1), operation, RefusalStatus.Unauthorized, "TokenExpired", CallerName(), null)]);
+
+        await Expect(CallsTable).ToContainTextAsync(operation);
+    }
+
+    [Fact]
+    public async Task TheRefusedCallsPanel_WithNoRefusedCalls_SaysSo()
+    {
+        RefusalsAre();
+        await SignInAsync(Operator, "IntegrationConsole.Read");
+
+        await Page.GotoAsync("/refused-at-the-edge");
+
+        await Expect(Page.GetByRole(AriaRole.Status)).ToContainTextAsync("No refused calls between");
+    }
+
+    [Fact]
+    public async Task TheRefusedCallsPanel_WhenTheTelemetryCantBeRead_ShowsAnError()
+    {
+        Console.Port<IRefusedCalls>().RefusalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<RecordedRefusal>>(_ => throw new InvalidOperationException("Application Insights is down."));
+        await SignInAsync(Operator, "IntegrationConsole.Read");
+
+        await Page.GotoAsync("/refused-at-the-edge");
+
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("The refused calls couldn't be listed.");
+    }
+
     // The Fluent select is a custom element, not a <select>: open it, then pick the option as a person would.
     private async Task ChooseAsync(string label, string option)
     {
