@@ -155,7 +155,7 @@ internal sealed partial class AzureEstateConfiguration(
         var yesterday = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddDays(-1);
         try
         {
-            var days = await costReader.ReadAsync(yesterday.AddDays(1 - 2 * CostFacts.PeriodDays), yesterday, cancellationToken);
+            var days = await costReader.ReadAsync(yesterday.AddDays(1 - CostFacts.WindowDays), yesterday, cancellationToken);
             return new CostFacts([.. days.Where(day => !day.Provisional)]);
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

@@ -11,4 +11,7 @@ public sealed record CostFacts(IReadOnlyList<CostDay> Days)
 {
     /// <summary>The days of each of the two periods the cost Check compares, and so half the days an adapter reads.</summary>
     public const int PeriodDays = 7;
+
+    /// <summary>The days an adapter reads: both periods and one more, because yesterday is always provisional and left out.</summary>
+    public const int WindowDays = 2 * PeriodDays + 1;
 }

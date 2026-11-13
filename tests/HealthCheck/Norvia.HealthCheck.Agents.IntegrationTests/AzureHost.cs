@@ -136,6 +136,7 @@ internal sealed class FakeAzure : HttpMessageHandler
     private JsonObject[] _alerts = [];
     private CostRow[][] _costPages = [[]];
     private HttpStatusCode? _failure;
+    private HttpStatusCode? _costFailure;
 
     public IReadOnlyList<RecordedRequest> Requests
     {
@@ -172,6 +173,9 @@ internal sealed class FakeAzure : HttpMessageHandler
     }
 
     public void Fail(HttpStatusCode status) => _failure = status;
+
+    /// <summary>Cost Management alone refuses, as when the app lacks its role; the rest of Azure answers.</summary>
+    public void FailCost(HttpStatusCode status) => _costFailure = status;
 
     /// <summary>A metric alert rule on the namespace's dead-lettered messages of the entities named (of all of them, when none is).</summary>
     public static JsonObject DeadLetterAlert(string name, params string[] entities) => new()
@@ -212,6 +216,11 @@ internal sealed class FakeAzure : HttpMessageHandler
 
         if (address.Contains("/providers/Microsoft.CostManagement/query?", StringComparison.Ordinal))
         {
+            if (_costFailure is { } costFailure)
+            {
+                return new HttpResponseMessage(costFailure);
+            }
+
             return Json(CostPage(address));
         }
 
