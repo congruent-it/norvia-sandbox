@@ -4,7 +4,9 @@ using System.Text.Json.Nodes;
 using Ardalis.Result;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Norvia.HealthCheck.Application.Estate;
 using Norvia.HealthCheck.Application.Narrate;
+using static Norvia.HealthCheck.Agents.IntegrationTests.McpCalls;
 
 namespace Norvia.HealthCheck.Agents.IntegrationTests;
 
@@ -51,7 +53,7 @@ public sealed class FinOpsAgentTests
     public async Task ACallWithATokenTheStandInDoesNotTrust_IsRefused401()
     {
         await using var host = new HealthCheckAgentHost();
-        using var client = host.CostStandInClient(host.ForgedAgentToken(HealthCheckAgentHost.CostAgentAudience));
+        using var client = host.CostStandInClient(host.ForgedAgentToken(HealthCheckAgentHost.CostAgentAudience, HealthCheckAgentHost.CostAgentId));
 
         using var response = await CallAsync(client, CostToolsPath, "tools/list");
 
@@ -160,7 +162,7 @@ public sealed class FinOpsAgentTests
         await using var host = ChattyEstate();
         using var client = host.CostStandInClient();
 
-        var view = JsonNode.Parse(await ToolTextAsync(client, CostView))!;
+        var view = JsonNode.Parse(await ToolTextAsync(client, CostToolsPath, CostView))!;
 
         view["periodDays"]!.GetValue<int>().Should().Be(7);
         view["total"]!["change"]!.GetValue<string>().Should().StartWith("+");
@@ -178,7 +180,7 @@ public sealed class FinOpsAgentTests
         await using var host = ChattyEstate();
         using var client = host.CostStandInClient();
 
-        var findings = JsonNode.Parse(await ToolTextAsync(client, RisingSpend))!;
+        var findings = JsonNode.Parse(await ToolTextAsync(client, CostToolsPath, RisingSpend))!;
 
         var finding = findings["findings"]!.AsArray().Should().ContainSingle("the one Check of the cost tool, and only its Findings").Subject!;
         finding["id"]!.GetValue<string>().Should().Be(RisingFinding);
@@ -193,7 +195,7 @@ public sealed class FinOpsAgentTests
         await using var host = FlatEstate();
         using var client = host.CostStandInClient();
 
-        var view = JsonNode.Parse(await ToolTextAsync(client, RisingSpend))!;
+        var view = JsonNode.Parse(await ToolTextAsync(client, CostToolsPath, RisingSpend))!;
 
         view["findings"]!.AsArray().Should().BeEmpty();
     }
@@ -219,6 +221,21 @@ public sealed class FinOpsAgentTests
             (StandInFlow, RisingSpend), (AgentViewFlow, RisingSpend),
         ]);
         calls.Should().OnlyContain(hop => hop.AgentId == HealthCheckAgentHost.CostAgentId && hop.Outcome == "Succeeded");
+    }
+
+    [Fact]
+    public async Task GetRisingSpendFindings_WhenTheVolumeRisesWithTheSpend_ReturnsNoFinding()
+    {
+        // The same bill, with twice the Transport Orders a day from the day the spend rises: a rise with a business reason is not a Finding.
+        await using var host = new HealthCheckAgentHost(
+            "incident-2",
+            adjustEstate: estate => estate with { Cost = new CostFacts([.. estate.Cost!.Days.Select(day => day.Date >= new DateOnly(2026, 11, 8) ? day with { TransportOrders = day.TransportOrders * 2 } : day)]) },
+            costSnapshot: "chatty-telemetry");
+        using var client = host.CostStandInClient();
+
+        var findings = JsonNode.Parse(await ToolTextAsync(client, CostToolsPath, RisingSpend))!;
+
+        findings["findings"]!.AsArray().Should().BeEmpty();
     }
 
     [Fact]
@@ -253,21 +270,5 @@ public sealed class FinOpsAgentTests
     {
         using var scope = host.AppServices.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new NarrateSpendQuery(correlationId), Ct);
-    }
-
-    private static Task<HttpResponseMessage> CallAsync(HttpClient client, string path, string method, JsonObject? parameters = null) =>
-        client.PostAsJsonAsync(
-            new Uri(path, UriKind.Relative),
-            new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method, ["params"] = parameters ?? new JsonObject() },
-            Ct);
-
-    /// <summary>Calls a tool of the FinOps agent's server and returns the text it answered with, the agent view's JSON.</summary>
-    private static async Task<string> ToolTextAsync(HttpClient client, string tool)
-    {
-        using var response = await CallAsync(client, CostToolsPath, "tools/call", new JsonObject { ["name"] = tool, ["arguments"] = new JsonObject() });
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var reply = (await response.Content.ReadFromJsonAsync<JsonObject>(Ct))!["result"]!;
-        reply["isError"]!.GetValue<bool>().Should().BeFalse();
-        return reply["content"]![0]!["text"]!.GetValue<string>();
     }
 }

@@ -95,7 +95,7 @@ internal sealed class HealthCheckAgentHost : IAsyncDisposable
     public string CostToken(string[]? roles = null, string audience = CostAgentAudience) => AgentToken(roles ?? [CostRole], audience: audience, agentId: CostAgentId);
 
     /// <summary>A token signed with a key the stand-in and the app don't trust.</summary>
-    public string ForgedAgentToken(string audience = AgentAudience) => AgentToken(signingKey: RandomNumberGenerator.GetBytes(64), audience: audience);
+    public string ForgedAgentToken(string audience = AgentAudience, string agentId = AgentId) => AgentToken(signingKey: RandomNumberGenerator.GetBytes(64), audience: audience, agentId: agentId);
 
     public async ValueTask DisposeAsync()
     {
