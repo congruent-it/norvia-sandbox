@@ -142,6 +142,32 @@ public sealed class CostReaderAgainstAzureTests
     }
 
     [Fact]
+    public async Task ReadAsync_SeveralChargesOfOneResourceOnADay_AreOneSpend()
+    {
+        await using var host = new AzureHost();
+        host.Azure.CostPages(
+            [new CostRow(new DateOnly(2026, 11, 10), $"{AzureHost.ResourceGroupId}/providers/Microsoft.Sql/servers/sql-norvia", 11m)],
+            [new CostRow(new DateOnly(2026, 11, 10), $"{AzureHost.ResourceGroupId}/providers/Microsoft.Sql/servers/sql-norvia", 2.5m)]);
+
+        var days = await ReadAsync(host, new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 10));
+
+        days.Single().Spend.Should().BeEquivalentTo([new ResourceSpend("sql-norvia", 13.5m)]);
+    }
+
+    [Fact]
+    public async Task ReadAsync_AChargeInAnotherCurrencyOutsideTheWindow_IsNotAProblem()
+    {
+        await using var host = new AzureHost();
+        host.Azure.Cost(
+            new CostRow(new DateOnly(2026, 11, 9), $"{AzureHost.ResourceGroupId}/providers/Microsoft.Sql/servers/sql-norvia", 99m, "USD"),
+            new CostRow(new DateOnly(2026, 11, 10), $"{AzureHost.ResourceGroupId}/providers/Microsoft.Sql/servers/sql-norvia", 11m));
+
+        var days = await ReadAsync(host, new DateOnly(2026, 11, 10), new DateOnly(2026, 11, 10));
+
+        days.Single().Spend.Should().BeEquivalentTo([new ResourceSpend("sql-norvia", 11m)]);
+    }
+
+    [Fact]
     public async Task ReadAsync_WhenTheBillIsNotInEur_Fails_RatherThanAddingCurrencies()
     {
         await using var host = new AzureHost();
