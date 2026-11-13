@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+using Azure.Storage.Blobs;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Playwright;
@@ -173,6 +174,18 @@ public class TmsUiFixture : IAsyncLifetime
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/v1/proofs-of-delivery", UriKind.Relative)) { Content = form };
         request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
         return await ProofOfDeliveryRecord.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes a Proof of delivery file's blob as the storage account's lifecycle rule does once the retention period is over: the rule
+    /// does not run on Azurite. The Proof of delivery keeps its metadata and file list. The blob is named by its Shipment number and
+    /// the file's ID.
+    /// </summary>
+    public async Task ExpireProofOfDeliveryFileAsync(string shipmentNumber, Guid fileId, CancellationToken cancellationToken)
+    {
+        var container = new BlobServiceClient(await _app!.GetConnectionStringAsync("blobs", cancellationToken)).GetBlobContainerClient("proofs-of-delivery");
+        (await container.DeleteBlobIfExistsAsync($"{shipmentNumber}/{fileId:N}", cancellationToken: cancellationToken)).Value
+            .Should().BeTrue("the file was stored under the Shipment number and its ID");
     }
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, JsonObject body, CancellationToken cancellationToken)

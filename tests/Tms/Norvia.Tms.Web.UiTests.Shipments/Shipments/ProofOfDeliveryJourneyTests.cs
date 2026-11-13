@@ -8,7 +8,8 @@ namespace Norvia.Tms.Web.UiTests.Shipments;
 /// <summary>
 /// The Planner follows a Carrier Shipment's Proofs of delivery: an early one is marked in Shipments in progress, a Delivered
 /// Shipment without one waits in Delivered without Proof of delivery until it arrives, and the timeline shows each Proof of
-/// delivery with its files, the superseded ones struck through.
+/// delivery with its files, the superseded ones struck through. A file the retention period deleted is shown as expired, and the
+/// Proof of delivery's metadata stays.
 /// </summary>
 public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(tms)
 {
@@ -85,6 +86,33 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
 
         var saved = await Page.APIRequest.GetAsync($"{viewPath}?download=true");
         saved.Headers["content-disposition"].Should().Contain("cmr-served.pdf");
+    }
+
+    [Fact]
+    public async Task AProofOfDeliveryFile_TheRetentionPeriodDeleted_OpensAsExpiredNotAsAnError_WhileTheTimelineKeepsTheMetadata()
+    {
+        var (shipmentNumber, reference) = await InTransitShipmentAsync();
+        await RecordProofAsync(reference, "J. Becker", "cmr-expiring.pdf");
+        await Page.GotoAsync($"/shipments/{shipmentNumber}");
+        var proofs = Page.GetByRole(AriaRole.Region, new() { Name = "Proofs of delivery" });
+        var expiring = proofs.GetByRole(AriaRole.Link, new() { Name = "cmr-expiring.pdf", Exact = true });
+        var fileId = Guid.Parse((await expiring.GetAttributeAsync("href"))!.Split('/')[^1]);
+
+        await _tms.ExpireProofOfDeliveryFileAsync(shipmentNumber, fileId, TestContext.Current.CancellationToken);
+        await Page.ReloadAsync();
+
+        var row = proofs.GetByRole(AriaRole.Row).Filter(new() { HasText = "J. Becker" });
+        await Expect(row).ToContainTextAsync("J. Becker");
+        await Expect(row).ToContainTextAsync("Clean");
+        await Expect(row).ToContainTextAsync("Signed at the dock");
+        await Expect(expiring).ToBeVisibleAsync();
+        await Expect(row.GetByRole(AriaRole.Deletion)).ToHaveCountAsync(0);
+
+        var opened = await Page.RunAndWaitForPopupAsync(async () => await expiring.ClickAsync());
+        await Expect(opened.GetByText("has expired: the retention period deleted it")).ToBeVisibleAsync();
+        await Expect(opened.GetByText("The Proof of delivery itself is kept.")).ToBeVisibleAsync();
+        await Expect(opened.GetByText("ProofOfDeliveryFileExpired")).ToBeVisibleAsync();
+        await opened.CloseAsync();
     }
 
     private async Task RecordProofAsync(string reference, string receivedBy, string fileName)
