@@ -3,7 +3,7 @@
   "agent": "finops",
   "description": "The known answer of the first incident of the epic (#397): chattyTelemetry raises the Log Analytics workspace's ingestion about sixfold while Transport Order volume stays flat. The Check's one Finding is F-COST-RISING-SPEND (Medium; toggle and fix are the Check's). The narration names the workspace from the Finding's evidence, the toggle from asFoundToggle, and copies every number from a result. The local snapshot (chatty-telemetry.cost-snapshot.json) is modelled, so the numbers differ from Azure's; the case checks no number by value, the answer's own number check does.",
   "setup": {
-    "toggle": "chattyTelemetry, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 chattyTelemetry=true (the incident-2 preset), and Cost Management has settled at least 14 whole days with the toggle on for the last 7 of them"
+    "toggle": "chattyTelemetry, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 chattyTelemetry=true (the incident-2 preset), and Cost Management has settled 15 days of history with the toggle on for the last 7 whole days of them (yesterday is always provisional and left out); the Simulator must be running, so Transport Order volume is steady and above zero; and the workspace's daily rise must clear the Check's 1 EUR a day minimum, which only a measured bill shows (the sizes are modelled until #503 measures them)"
   },
   "input": "Finance says the Azure bill went up. Which resource is driving it, and why?",
   "expect": {
