@@ -74,4 +74,16 @@ public sealed class GetCostViewHandlerTests
 
         (await HandleAsync()).Value.Resources.Single(resource => resource.Name == "log-workspace").Relative.Should().BeNull();
     }
+
+    [Fact]
+    public async Task Handle_AResourceCalledTotal_IsNotTakenForTheTotal()
+    {
+        Reads(new CostDay(Yesterday, 40, false, [new("Total", 2m), new("sql", 1m)]));
+
+        var view = (await HandleAsync()).Value;
+
+        view.Resources.Should().ContainSingle(resource => resource.Name == "Total" && resource.Kind == ChangeKind.Resource);
+        view.Total.Kind.Should().Be(ChangeKind.Total);
+        view.Total.Current.Should().Be(3m);
+    }
 }

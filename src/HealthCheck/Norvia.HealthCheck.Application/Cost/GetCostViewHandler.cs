@@ -24,21 +24,17 @@ public sealed class GetCostViewHandler(ICostReader reader, TimeProvider time) : 
         var previous = settled.Where(day => day.Date < currentFrom).ToList();
         var current = settled.Where(day => day.Date >= currentFrom).ToList();
 
-        var resources = days.SelectMany(day => day.Spend).Select(spend => spend.Resource).Distinct(StringComparer.Ordinal)
-            .Select(resource => new PeriodChange(
-                resource,
-                Average(previous, day => day.Spend.Where(spend => spend.Resource == resource).Sum(spend => spend.Eur)),
-                Average(current, day => day.Spend.Where(spend => spend.Resource == resource).Sum(spend => spend.Eur))))
+        PeriodChange Change(string name, Func<CostDay, decimal> figure, ChangeKind kind) =>
+            new(name, Average(previous, figure), Average(current, figure), kind);
+
+        var view = new CostView(PeriodDays, days, [], Change("Total", day => day.TotalEur, ChangeKind.Total), Change("Transport Orders", day => day.TransportOrders, ChangeKind.Volume));
+        var resources = view.ResourceNames
+            .Select(resource => Change(resource, day => day.SpendOn(resource), ChangeKind.Resource))
             .OrderByDescending(change => change.Relative ?? decimal.MinValue)
             .ThenBy(change => change.Name, StringComparer.Ordinal)
             .ToList();
 
-        return new CostView(
-            PeriodDays,
-            days,
-            resources,
-            new PeriodChange("Total", Average(previous, day => day.Spend.Sum(spend => spend.Eur)), Average(current, day => day.Spend.Sum(spend => spend.Eur))),
-            new PeriodChange("Transport Orders", Average(previous, day => day.TransportOrders), Average(current, day => day.TransportOrders)));
+        return view with { Resources = resources };
     }
 
     private static decimal? Average(List<CostDay> days, Func<CostDay, decimal> figure) => days.Count == 0 ? null : days.Average(figure);

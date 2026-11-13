@@ -17,8 +17,8 @@ public sealed class CostPageTests : HealthCheckWebContext
             new(new DateOnly(2026, 11, 12), 40, provisional, [new("log-workspace", 3m), new("sql", 1m)]),
         ],
         [new("log-workspace", 1m, 3m), new("sql", 1m, 1m)],
-        new("Total", 2m, 4m),
-        new("Transport Orders", 40m, 40m));
+        new("Total", 2m, 4m, ChangeKind.Total),
+        new("Transport Orders", 40m, 40m, ChangeKind.Volume));
 
     public CostPageTests() => Operator.SetAuthorized("Iris Operator").SetRoles(OperatorRoles.Cost).SetPolicies(OperatorSignIn.CostPolicy);
 
@@ -33,8 +33,8 @@ public sealed class CostPageTests : HealthCheckWebContext
 
         page.WaitForAssertion(() => page.Find("[data-testid=change][data-resource=log-workspace]").TextContent.Should().Be("+200%"));
         page.Find("[data-testid=change][data-resource=sql]").TextContent.Should().Be("0%");
-        page.Find("[data-testid=change][data-resource='Transport Orders']").TextContent.Should().Be("0%");
-        page.Find("[data-testid=change][data-resource=Total]").TextContent.Should().Be("+100%");
+        page.Find("[data-testid=change][data-kind=Volume]").TextContent.Should().Be("0%");
+        page.Find("[data-testid=change][data-kind=Total]").TextContent.Should().Be("+100%");
     }
 
     [Fact]
@@ -44,9 +44,10 @@ public sealed class CostPageTests : HealthCheckWebContext
 
         var page = Render();
 
-        page.WaitForAssertion(() => page.FindAll("[data-testid=day]").Should().HaveCount(2));
-        page.FindAll("[data-testid=days] thead th").Select(header => header.TextContent).Should().Equal("Day", "log-workspace", "sql", "Total", "Transport Orders");
-        page.FindAll("[data-testid=day]")[0].TextContent.Should().Contain("2026-11-11").And.Contain("3.00").And.Contain("4.00").And.Contain("40");
+        var days = () => page.Find("section[aria-label='Spend per day']");
+        page.WaitForAssertion(() => days().QuerySelectorAll("[role=row]").Should().HaveCount(3));
+        days().QuerySelectorAll("[role=row]")[0].Children.Select(header => header.TextContent.Trim()).Should().Equal("Day", "log-workspace", "sql", "Total", "Transport Orders");
+        days().QuerySelectorAll("[role=row]")[1].TextContent.Should().Contain("2026-11-11").And.Contain("3.00").And.Contain("4.00").And.Contain("40");
     }
 
     [Fact]
@@ -56,9 +57,8 @@ public sealed class CostPageTests : HealthCheckWebContext
 
         var page = Render();
 
-        page.WaitForAssertion(() => page.Find("[data-testid=lag-note]").TextContent.Should().Contain("provisional"));
-        page.FindAll("[data-testid=day]")[1].GetAttribute("data-provisional").Should().Be("true");
-        page.FindAll("[data-testid=day]")[1].TextContent.Should().Contain("(provisional)");
+        page.WaitForAssertion(() => page.Find("[role=note]").TextContent.Should().Contain("provisional"));
+        page.Find("section[aria-label='Spend per day']").QuerySelectorAll("[role=row]")[2].TextContent.Should().Contain("2026-11-12").And.Contain("(provisional)");
     }
 
     [Fact]
@@ -68,17 +68,17 @@ public sealed class CostPageTests : HealthCheckWebContext
 
         var page = Render();
 
-        page.WaitForAssertion(() => page.Find("[data-testid=lag-note]").TextContent.Should().Contain("about a day late").And.NotContain("provisional"));
+        page.WaitForAssertion(() => page.Find("[role=note]").TextContent.Should().Contain("about a day late").And.NotContain("provisional"));
     }
 
     [Fact]
     public void Render_NoPreviousPeriod_SaysNoDataAndNoChange()
     {
-        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(Rising() with { Total = new("Total", null, 4m) });
+        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(Rising() with { Total = new("Total", null, 4m, ChangeKind.Total) });
 
         var page = Render();
 
-        page.WaitForAssertion(() => page.Find("[data-testid=change][data-resource=Total]").TextContent.Should().Be("n/a"));
+        page.WaitForAssertion(() => page.Find("[data-testid=change][data-kind=Total]").TextContent.Should().Be("n/a"));
         page.Markup.Should().Contain("no data");
     }
 
@@ -93,7 +93,7 @@ public sealed class CostPageTests : HealthCheckWebContext
     [Fact]
     public void Render_WithNoDays_SaysThereIsNoSpendYet()
     {
-        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(new CostView(7, [], [], new("Total", null, null), new("Transport Orders", null, null)));
+        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(new CostView(7, [], [], new("Total", null, null, ChangeKind.Total), new("Transport Orders", null, null, ChangeKind.Volume)));
 
         var page = Render();
 
@@ -108,7 +108,7 @@ public sealed class CostPageTests : HealthCheckWebContext
         var page = Render();
 
         page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("could not be read"));
-        page.Markup.Should().NotContain("Cost Management is not in EUR").And.NotContain("data-testid=\"day\"");
+        page.Markup.Should().NotContain("Cost Management is not in EUR").And.NotContain("Spend per day");
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class CostPageTests : HealthCheckWebContext
 
         var page = Render();
 
-        page.WaitForAssertion(() => page.Find("[data-testid=changes]").TextContent.Should().Contain("<b>evil</b>"));
-        page.FindAll("[data-testid=changes] b").Should().BeEmpty();
+        page.WaitForAssertion(() => page.Find("section[aria-label='Change against the previous period']").TextContent.Should().Contain("<b>evil</b>"));
+        page.FindAll("section[aria-label='Change against the previous period'] b").Should().BeEmpty();
     }
 }

@@ -19,16 +19,32 @@ public sealed record CostView(
     PeriodChange Total,
     PeriodChange Volume)
 {
+    /// <summary>Every resource that has spend on any day, by name.</summary>
+    public IReadOnlyList<string> ResourceNames { get; } = [.. Days.SelectMany(day => day.Spend).Select(spend => spend.Resource).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+
     /// <summary>True while any day is provisional: the page says the latest days may still change.</summary>
     public bool HasProvisionalDays => Days.Any(day => day.Provisional);
 }
 
 /// <summary>A figure's daily average in the previous period and the current one.</summary>
-/// <param name="Name">The resource, or "Total" / "Transport Orders".</param>
+/// <param name="Name">The resource's name as the estate has it, or the label of the total or the volume.</param>
 /// <param name="Previous">Average per day over the previous period's settled days, null when it had none.</param>
 /// <param name="Current">Average per day over the current period's settled days, null when it had none.</param>
-public sealed record PeriodChange(string Name, decimal? Previous, decimal? Current)
+public sealed record PeriodChange(string Name, decimal? Previous, decimal? Current, ChangeKind Kind = ChangeKind.Resource)
 {
     /// <summary>The change relative to the previous period (0.25 is 25% more). Null when either period has no figure or the previous is zero.</summary>
     public decimal? Relative => Previous is > 0 && Current is { } current ? (current - Previous.Value) / Previous.Value : null;
+}
+
+/// <summary>What a <see cref="PeriodChange"/> measures, so a resource that happens to be called "Total" is never taken for the total.</summary>
+public enum ChangeKind
+{
+    /// <summary>One resource's spend in EUR.</summary>
+    Resource,
+
+    /// <summary>All resources' spend in EUR.</summary>
+    Total,
+
+    /// <summary>Transport Orders received, a count.</summary>
+    Volume,
 }

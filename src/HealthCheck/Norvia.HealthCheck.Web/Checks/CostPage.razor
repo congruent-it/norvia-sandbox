@@ -37,7 +37,7 @@ else if (_view.Days.Count == 0)
 }
 else
 {
-    <p role="note" class="text-muted" data-testid="lag-note">
+    <p role="note" class="text-muted">
         Cost Management settles a day's cost about a day late, so only whole past days are shown.
         @if (_view.HasProvisionalDays)
         {
@@ -45,54 +45,36 @@ else
         }
     </p>
 
-    <section aria-label="Change against the previous period" data-testid="changes">
+    <section aria-label="Change against the previous period">
         <h2 class="mt-6">Change against the previous @_view.PeriodDays days</h2>
         <p class="text-muted">Average per day over the last @_view.PeriodDays days, against the @_view.PeriodDays days before. The biggest riser is first.</p>
-        <FluentDataGrid Items="@Rows.AsQueryable()" GridTemplateColumns="2fr 1fr 1fr 1fr" TGridItem="PeriodChange" Class="changes-grid">
+        <FluentDataGrid Items="@_rows" aria-label="Change against the previous period" GridTemplateColumns="2fr 1fr 1fr 1fr" TGridItem="PeriodChange" Class="changes-grid">
             <PropertyColumn Title="Resource" Property="@(row => row.Name)" />
             <TemplateColumn Title="Previous" Align="Align.End">@Figure(context.Previous, context)</TemplateColumn>
             <TemplateColumn Title="Current" Align="Align.End">@Figure(context.Current, context)</TemplateColumn>
-            <TemplateColumn Title="Change" Align="Align.End"><span data-testid="change" data-resource="@context.Name">@Percent(context.Relative)</span></TemplateColumn>
+            <TemplateColumn Title="Change" Align="Align.End"><span data-testid="change" data-kind="@context.Kind" data-resource="@context.Name">@Percent(context.Relative)</span></TemplateColumn>
         </FluentDataGrid>
     </section>
 
-    <section aria-label="Spend per day" data-testid="days">
+    <section aria-label="Spend per day">
         <h2 class="mt-6">Spend per day</h2>
         <div class="table-scroll">
-            <table class="spend-table">
-                <caption class="visually-hidden">Spend per resource in EUR and Transport Orders received, per day</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">Day</th>
-                        @foreach (var resource in _resources)
-                        {
-                            <th scope="col" class="num">@resource</th>
-                        }
-                        <th scope="col" class="num">Total</th>
-                        <th scope="col" class="num">Transport Orders</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var day in _view.Days)
+            <FluentDataGrid Items="@_view.Days.AsQueryable()" TGridItem="CostDay" AutoFit="true" aria-label="Spend per resource in EUR and Transport Orders received, per day">
+                <TemplateColumn Title="Day">
+                    @context.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    @if (context.Provisional)
                     {
-                        <tr data-testid="day" data-provisional="@(day.Provisional ? "true" : "false")">
-                            <th scope="row">
-                                @day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                                @if (day.Provisional)
-                                {
-                                    <span class="text-muted"> (provisional)</span>
-                                }
-                            </th>
-                            @foreach (var resource in _resources)
-                            {
-                                <td class="num">@Eur(day.Spend.Where(spend => spend.Resource == resource).Sum(spend => spend.Eur))</td>
-                            }
-                            <td class="num">@Eur(day.Spend.Sum(spend => spend.Eur))</td>
-                            <td class="num">@day.TransportOrders</td>
-                        </tr>
+                        <span class="text-muted"> (provisional)</span>
                     }
-                </tbody>
-            </table>
+                </TemplateColumn>
+                @foreach (var resource in _view.ResourceNames)
+                {
+                    var name = resource;
+                    <TemplateColumn Title="@name" Align="Align.End">@Eur(context.SpendOn(name))</TemplateColumn>
+                }
+                <TemplateColumn Title="Total" Align="Align.End">@Eur(context.TotalEur)</TemplateColumn>
+                <TemplateColumn Title="Transport Orders" Align="Align.End">@context.TransportOrders</TemplateColumn>
+            </FluentDataGrid>
         </div>
     </section>
 }
@@ -100,11 +82,8 @@ else
 @code {
     private CostView? _view;
     private bool _failed;
-    private IReadOnlyList<string> _resources = [];
+    private IQueryable<PeriodChange> _rows = Enumerable.Empty<PeriodChange>().AsQueryable();
     private readonly CancellationTokenSource _lifetime = new();
-
-    // Total and volume sit under the resources, so a rise in one reads against the other.
-    private IEnumerable<PeriodChange> Rows => [.. _view!.Resources, _view.Total, _view.Volume];
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,7 +97,8 @@ else
             }
 
             _view = result.Value;
-            _resources = [.. _view.Days.SelectMany(day => day.Spend).Select(spend => spend.Resource).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+            // Total and volume sit under the resources, so a rise in one reads against the other.
+            _rows = new List<PeriodChange>([.. _view.Resources, _view.Total, _view.Volume]).AsQueryable();
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -131,7 +111,7 @@ else
     }
 
     private RenderFragment Figure(decimal? value, PeriodChange row) => builder =>
-        builder.AddContent(0, value is null ? "no data" : row.Name == _view!.Volume.Name ? value.Value.ToString("0.#", CultureInfo.InvariantCulture) : Eur(value.Value));
+        builder.AddContent(0, value is null ? "no data" : row.Kind == ChangeKind.Volume ? value.Value.ToString("0.#", CultureInfo.InvariantCulture) : Eur(value.Value));
 
     // Text, not a colour alone: a rise is "+", a fall is "−".
     private static string Percent(decimal? relative) =>
