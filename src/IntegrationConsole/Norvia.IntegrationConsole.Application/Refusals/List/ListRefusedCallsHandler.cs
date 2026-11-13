@@ -17,7 +17,7 @@ public sealed class ListRefusedCallsHandler(IRefusedCalls refusals, TimeProvider
         var calls = recorded
             .Where(refusal => refusal.Time >= from)
             .OrderByDescending(refusal => refusal.Time)
-            .Select(refusal => new RefusedCall(refusal.Time, refusal.Operation, refusal.StatusCode, refusal.FailureCode, refusal.Caller ?? "unknown", refusal.CorrelationId))
+            .Select(refusal => new RefusedCall(refusal.Time, refusal.Operation, refusal.StatusCode, refusal.FailureCode, refusal.Caller ?? RefusalStatus.Unknown, refusal.CorrelationId))
             .ToList();
         var operations = calls.Select(call => call.Operation).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
 

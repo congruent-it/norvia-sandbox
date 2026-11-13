@@ -145,15 +145,16 @@ internal sealed class DashboardTrailSource(HttpClient http, IOptions<DashboardTr
         var records = await TrackedRecordsAsync(cancellationToken);
         return
         [
-            .. records.Where(record => record.Time >= since && record.Keys.GetValueOrDefault("outcome") == nameof(Outcome.Refused)
-                    && int.TryParse(record.Keys.GetValueOrDefault("StatusCode"), CultureInfo.InvariantCulture, out var status) && status is 401 or 403 or 429)
-                .Select(record => new RecordedRefusal(
-                    record.Time,
-                    record.Keys.GetValueOrDefault("flow") ?? "unknown",
-                    int.Parse(record.Keys["StatusCode"], CultureInfo.InvariantCulture),
-                    record.Keys.GetValueOrDefault("failureCode") ?? "unknown",
+            .. records.Where(record => record.Time >= since && record.Keys.GetValueOrDefault("outcome") == nameof(Outcome.Refused))
+                .Select(record => (Record: record, Status: int.TryParse(record.Keys.GetValueOrDefault("StatusCode"), CultureInfo.InvariantCulture, out var status) ? status : 0))
+                .Where(refusal => RefusalStatus.All.Contains(refusal.Status))
+                .Select(refusal => new RecordedRefusal(
+                    refusal.Record.Time,
+                    refusal.Record.Keys.GetValueOrDefault("flow") ?? RefusalStatus.Unknown,
+                    refusal.Status,
+                    refusal.Record.Keys.GetValueOrDefault("failureCode") ?? RefusalStatus.Unknown,
                     null,
-                    record.CorrelationId)),
+                    refusal.Record.CorrelationId)),
         ];
     }
 

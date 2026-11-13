@@ -9,7 +9,7 @@ namespace Norvia.IntegrationConsole.Infrastructure.Refusals;
 /// Lists the calls API Management refused at the edge from the Log Analytics workspace behind the estate's Application
 /// Insights, as the console's own identity (ADR 0017). It reads keys only, never a body, a token or a subscription key.
 /// </summary>
-internal sealed class LogAnalyticsRefusedCalls(LogsQueryClient client, IOptions<TrailSourceOptions> options) : IRefusedCalls
+internal sealed class LogAnalyticsRefusedCalls(LogsQueryClient client, IOptions<TrailSourceOptions> options, TimeProvider time) : IRefusedCalls
 {
     public async Task<IReadOnlyList<RecordedRefusal>> RefusalsAsync(DateTimeOffset since, CancellationToken cancellationToken)
     {
@@ -23,14 +23,14 @@ internal sealed class LogAnalyticsRefusedCalls(LogsQueryClient client, IOptions<
         var response = await client.QueryWorkspaceAsync(
             options.Value.LogAnalyticsWorkspaceId,
             RefusalQuery.Text,
-            new LogsQueryTimeRange(since, DateTimeOffset.UtcNow),
+            new LogsQueryTimeRange(since, time.GetUtcNow()),
             cancellationToken: cancellationToken);
 
         return
         [
             .. response.Value.Table.Rows.Select(row => new RecordedRefusal(
                 row.GetDateTimeOffset("time") ?? default,
-                row.GetString("operation") ?? "unknown",
+                row.GetString("operation") ?? RefusalStatus.Unknown,
                 row.GetInt32("statusCode") ?? 0,
                 row.GetString("failureCode") ?? RefusalQuery.SubscriptionKeyRejected,
                 row.GetString("caller") is { Length: > 0 } caller ? caller : null,

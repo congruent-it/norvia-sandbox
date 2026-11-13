@@ -69,6 +69,7 @@ public static partial class DependencyInjection
             .ValidateOnStart();
         builder.Services.AddSingleton(services => new LogsQueryClient(services.GetRequiredService<TokenCredential>()));
         builder.Services.AddSingleton<ITrailSource, LogAnalyticsTrailSource>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRefusedCalls, LogAnalyticsRefusedCalls>();
 
         return builder;

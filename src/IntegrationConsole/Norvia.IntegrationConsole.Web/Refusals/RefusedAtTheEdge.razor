@@ -1,6 +1,7 @@
 @page "/refused-at-the-edge"
 @* Interactive, not prerendered: the page reads the telemetry itself and keeps refreshing for as long as the circuit is open. *@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Norvia.IntegrationConsole.Application.Refusals
 @using Norvia.IntegrationConsole.Application.Refusals.List
 @inject IRefusalRequests Refusals
 @inject NavigationManager Navigation
@@ -19,25 +20,22 @@
     A refusal is the answer the caller was meant to get. Look for a caller refused again and again, such as an expired token or a missing role.
 </p>
 
-@if (_result is { } result)
-{
-    <form role="search" aria-label="Refused calls" class="mb-8 flex flex-wrap items-end gap-4">
-        <FluentSelect TOption="string" Value="@(_status?.ToString() ?? string.Empty)" ValueChanged="FilterStatus" Label="Status">
-            <FluentOption TOption="string" Value="@string.Empty">All statuses</FluentOption>
-            @foreach (var status in Statuses)
-            {
-                <FluentOption TOption="string" Value="@status">@status</FluentOption>
-            }
-        </FluentSelect>
-        <FluentSelect TOption="string" Value="@(_operation ?? string.Empty)" ValueChanged="FilterOperation" Label="Operation">
-            <FluentOption TOption="string" Value="@string.Empty">All operations</FluentOption>
-            @foreach (var operation in result.Operations)
-            {
-                <FluentOption TOption="string" Value="@operation">@operation</FluentOption>
-            }
-        </FluentSelect>
-    </form>
-}
+<form role="search" aria-label="Refused calls" class="mb-8 flex flex-wrap items-end gap-4">
+    <FluentSelect TOption="string" Value="@(_status?.ToString() ?? string.Empty)" ValueChanged="FilterStatus" Label="Status">
+        <FluentOption TOption="string" Value="@string.Empty">All statuses</FluentOption>
+        @foreach (var status in RefusalStatus.All)
+        {
+            <FluentOption TOption="string" Value="@status.ToString()">@status</FluentOption>
+        }
+    </FluentSelect>
+    <FluentSelect TOption="string" Value="@(_operation ?? string.Empty)" ValueChanged="FilterOperation" Label="Operation">
+        <FluentOption TOption="string" Value="@string.Empty">All operations</FluentOption>
+        @foreach (var operation in _result?.Operations ?? [])
+        {
+            <FluentOption TOption="string" Value="@operation">@operation</FluentOption>
+        }
+    </FluentSelect>
+</form>
 
 @if (_loading)
 {
@@ -95,7 +93,6 @@ else if (_result is { } found)
 }
 
 @code {
-    private static readonly string[] Statuses = ["401", "403", "429"];
     private static readonly TimeSpan RefreshEvery = TimeSpan.FromSeconds(5);
 
     private readonly CancellationTokenSource _open = new();
@@ -117,7 +114,6 @@ else if (_result is { } found)
     {
         _status = Status;
         _operation = Operation?.Trim();
-        _result = null;
         await LoadAsync(_open.Token);
     }
 
@@ -155,7 +151,10 @@ else if (_result is { } found)
                 await InvokeAsync(async () =>
                 {
                     await LoadAsync(cancellation);
-                    StateHasChanged();
+                    if (!cancellation.IsCancellationRequested)
+                    {
+                        StateHasChanged();
+                    }
                 });
             }
         }
