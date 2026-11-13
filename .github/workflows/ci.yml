@@ -191,6 +191,9 @@ jobs:
           - application: Partner portal (UI, Intake agent)
             directory: PartnerPortal
             kinds: UiTests.IntakeAgent
+          - application: Partner portal (UI, Shipper tracking assistant)
+            directory: PartnerPortal
+            kinds: UiTests.TrackingAssistant
           - application: ERP
             directory: Erp
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
