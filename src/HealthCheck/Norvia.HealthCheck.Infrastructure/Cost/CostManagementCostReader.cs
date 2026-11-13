@@ -96,21 +96,33 @@ internal sealed class CostManagementCostReader(
 
         foreach (var row in properties["rows"]!.AsArray().Select(row => row!.AsArray()))
         {
-            var billedIn = row[currency]!.GetValue<string>();
-            if (!string.Equals(billedIn, Eur, StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException($"The bill is in {billedIn}, not {Eur}; the cost view does not convert currencies.");
-            }
-
             var date = DateOnly.ParseExact(row[usageDate]!.ToString(), "yyyyMMdd", CultureInfo.InvariantCulture);
             if (date < firstDay || date > lastDay)
             {
                 continue;
             }
 
+            var billedIn = row[currency]!.GetValue<string>();
+            if (!string.Equals(billedIn, Eur, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"The bill is in {billedIn}, not {Eur}; the cost view does not convert currencies.");
+            }
+
             var name = row[resourceId]!.GetValue<string>().Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? Unassigned;
             spendPerDay.TryAdd(date, []);
-            spendPerDay[date].Add(new ResourceSpend(name, row[cost]!.GetValue<decimal>()));
+            var spend = spendPerDay[date];
+
+            // Cost Management bills a resource per meter, so a resource has several rows a day; the view shows one spend per resource.
+            var charge = row[cost]!.GetValue<decimal>();
+            var existing = spend.FindIndex(resource => resource.Resource == name);
+            if (existing >= 0)
+            {
+                spend[existing] = spend[existing] with { Eur = spend[existing].Eur + charge };
+            }
+            else
+            {
+                spend.Add(new ResourceSpend(name, charge));
+            }
         }
     }
 }

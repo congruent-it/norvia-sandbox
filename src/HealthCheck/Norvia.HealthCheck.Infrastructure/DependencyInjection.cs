@@ -7,8 +7,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Estate;
-using Norvia.HealthCheck.Infrastructure.Cost;
 using Norvia.HealthCheck.Infrastructure.Agents;
+using Norvia.HealthCheck.Infrastructure.Cost;
 using Norvia.HealthCheck.Infrastructure.Estate;
 
 namespace Norvia.HealthCheck.Infrastructure;
