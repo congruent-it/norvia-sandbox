@@ -24,6 +24,7 @@ internal sealed class AzureHost : IAsyncDisposable
     public const string Namespace = "sb-norvia-abc";
     public const string NamespaceId = $"{ResourceGroupId}/providers/Microsoft.ServiceBus/namespaces/{Namespace}";
     public const string Project = "https://ais-norvia.services.ai.azure.com/api/projects/norvia";
+    public static readonly string[] AllOperatorRoles = ["HealthCheck.Run", "HealthCheck.Read", "HealthCheck.Cost"];
     public const string TmsAddress = "http://tms-api";
 
     /// <summary>What the app takes as the time: 13 November 2026, ten in the morning UTC. Only the clock reading is fixed; timers run for real.</summary>
@@ -31,9 +32,11 @@ internal sealed class AzureHost : IAsyncDisposable
 
     private readonly AppFactory _app;
 
-    public AzureHost(int timeoutSeconds = 5)
+    /// <param name="timeoutSeconds">How long the app lets its Agent answer.</param>
+    /// <param name="operatorRoles">The roles the local operator holds; all three operator roles unless a test shows what one without a role is refused.</param>
+    public AzureHost(int timeoutSeconds = 5, string[]? operatorRoles = null)
     {
-        _app = new AppFactory(this, timeoutSeconds);
+        _app = new AppFactory(this, timeoutSeconds, operatorRoles ?? AllOperatorRoles);
     }
 
     public FakeAzure Azure { get; } = new();
@@ -59,7 +62,7 @@ internal sealed class AzureHost : IAsyncDisposable
         return _app.DisposeAsync();
     }
 
-    private sealed class AppFactory(AzureHost host, int timeoutSeconds) : WebApplicationFactory<AppProgram>
+    private sealed class AppFactory(AzureHost host, int timeoutSeconds, string[] operatorRoles) : WebApplicationFactory<AppProgram>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -67,8 +70,6 @@ internal sealed class AzureHost : IAsyncDisposable
             foreach (var (name, value) in new Dictionary<string, string>
             {
                 ["LocalOperator:Name"] = "Iris Operator",
-                ["LocalOperator:Roles:0"] = "HealthCheck.Run",
-                ["LocalOperator:Roles:1"] = "HealthCheck.Read",
                 ["Estate:ResourceGroupId"] = ResourceGroupId,
                 ["Estate:ServiceBusNamespace"] = Namespace,
                 ["TmsApi:BaseAddress"] = TmsAddress,
@@ -79,7 +80,7 @@ internal sealed class AzureHost : IAsyncDisposable
                 ["Agents:Api:Issuer"] = "https://norvia.local/tokens",
                 ["Agents:Api:Audience"] = "api://norvia-health-check-agent-api",
                 ["Agents:Api:SigningKey"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
-            })
+            }.Concat(operatorRoles.Select((role, index) => KeyValuePair.Create($"LocalOperator:Roles:{index}", role))))
             {
                 builder.UseSetting(name, value);
             }
