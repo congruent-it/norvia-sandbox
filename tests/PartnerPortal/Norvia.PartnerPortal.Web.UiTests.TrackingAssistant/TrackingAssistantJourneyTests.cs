@@ -21,7 +21,7 @@ public sealed class TrackingAssistantJourneyTests(TrackingAssistantUiFixture nor
         await Expect(Answers()).ToHaveCountAsync(1);
         await Expect(Answers().First).ToContainTextAsync(number);
         await Expect(Answers().First).ToContainTextAsync("Received");
-        await Expect(Answers().First).ToContainTextAsync("ETA");
+        await Expect(Answers().First).ToContainTextAsync("The ETA is an estimate");
     }
 
     [Fact]
