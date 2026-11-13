@@ -4,7 +4,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Estate;
+using Norvia.HealthCheck.Infrastructure.Cost;
 using Norvia.HealthCheck.Infrastructure.Agents;
 using Norvia.HealthCheck.Infrastructure.Estate;
 
@@ -31,12 +34,21 @@ public static class DependencyInjection
             builder.Services.TryAddSingleton(TimeProvider.System);
             builder.Services.AddSingleton<IEstateConfiguration, AzureEstateConfiguration>();
             builder.Services.AddHostedService<ManagementTokenWarmUp>();
+
+            // The cost is Cost Management's, read as the same identity (Cost Management Reader on the resource group), and the Transport Orders
+            // per day are the TMS API's, which grants that identity its volume role only.
+            builder.Services.AddOptions<TmsApiOptions>().BindConfiguration(TmsApiOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+            builder.Services.AddHttpClient<ITransportOrderVolume, TmsTransportOrderVolume>((services, http) =>
+                http.BaseAddress = services.GetRequiredService<IOptions<TmsApiOptions>>().Value.BaseAddress);
+            builder.Services.AddTransient<ICostReader, CostManagementCostReader>();
         }
         else
         {
             // Locally nothing reads a running estate: the configuration is a snapshot.
             builder.Services.AddOptions<SnapshotOptions>().BindConfiguration(SnapshotOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
             builder.Services.AddSingleton<IEstateConfiguration, SnapshotEstateConfiguration>();
+            builder.Services.AddOptions<CostSnapshotOptions>().BindConfiguration(CostSnapshotOptions.SectionName).ValidateDataAnnotations().ValidateOnStart();
+            builder.Services.AddSingleton<ICostReader, SnapshotCostReader>();
         }
 
         builder.AddAgentClient();

@@ -16,6 +16,7 @@
   <!-- The estate's configuration as JSON snapshots, which the snapshot adapter reads locally: one for the fixed estate and one as found. -->
   <ItemGroup>
     <EmbeddedResource Include="Snapshots\*.snapshot.json" LogicalName="snapshots/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Snapshots\*.cost-snapshot.json" LogicalName="snapshots/%(Filename)%(Extension)" />
   </ItemGroup>
   <!-- The subscriptions the estate leaves without an alert on purpose, which the Azure adapter leaves out of the facts as alerts.bicep does. -->
   <ItemGroup>

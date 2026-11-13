@@ -19,6 +19,7 @@ public sealed class HealthCheckAgentAzureTests
     private const string ApimClient = "00000000-0000-0000-0000-000000000002";
     private const string Presenter = "00000000-0000-0000-0000-0000000000aa";
     private const string Reader = "acdd72a7-3385-48ef-bd42-f606fba81ae7";
+    private const string CostManagementReader = "72fafb9e-0641-4937-9268-a91bfd8191a3";
 
     private static readonly JsonNode ContractFile = JsonNode.Parse(File.ReadAllText(Path.Combine(RepositoryRoot.Path, Contract)))!;
 
@@ -125,16 +126,17 @@ public sealed class HealthCheckAgentAzureTests
     }
 
     [Fact]
-    public void TheAppsIdentity_HoldsReaderOnTheEstatesResourceGroupAndNothingElse_AndTheAgentHoldsNoAzureRole()
+    public void TheAppsIdentity_HoldsReaderAndCostManagementReaderOnTheEstatesResourceGroupAndNothingElse_AndTheAgentHoldsNoAzureRole()
     {
         var resources = AppResources();
         var assignments = Of(resources, "Microsoft.Authorization/roleAssignments").Select(assignment => assignment["properties"]!).ToList();
 
-        assignments.Should().ContainSingle("Reader is the app's only Azure role").Which["roleDefinitionId"]!.GetValue<string>().Should().EndWith(Reader);
-        assignments[0]["principalType"]!.GetValue<string>().Should().Be("ServicePrincipal");
-        assignments[0].AsObject().ContainsKey("scope").Should().BeFalse("the module's scope is the estate's resource group");
+        assignments.Select(assignment => assignment["roleDefinitionId"]!.GetValue<string>()).Should().HaveCount(2, "Reader and Cost Management Reader are the app's only Azure roles")
+            .And.Satisfy(id => id.EndsWith(Reader, StringComparison.Ordinal), id => id.EndsWith(CostManagementReader, StringComparison.Ordinal));
+        assignments.Should().OnlyContain(assignment => assignment["principalType"]!.GetValue<string>() == "ServicePrincipal");
+        assignments.Should().OnlyContain(assignment => !assignment.AsObject().ContainsKey("scope"), "the module's scope is the estate's resource group");
         Of(resources, "Microsoft.ManagedIdentity/userAssignedIdentities").Single()["name"]!.GetValue<string>().Should().StartWith("id-health-check-");
-        File.ReadAllText(Path.Combine(RepositoryRoot.Path, McpModule)).Should().NotContain("roleAssignments", "the Agent's side holds no Azure role: Reader belongs to the app");
+        File.ReadAllText(Path.Combine(RepositoryRoot.Path, McpModule)).Should().NotContain("roleAssignments", "the Agent's side holds no Azure role: Reader and Cost Management Reader belong to the app");
     }
 
     [Fact]

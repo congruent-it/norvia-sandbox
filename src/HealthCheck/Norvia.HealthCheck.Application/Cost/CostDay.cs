@@ -1,0 +1,11 @@
+namespace Norvia.HealthCheck.Application.Cost;
+
+/// <summary>One whole day of the estate's bill next to that day's Transport Order volume, so a consumer pairs them without a second call.</summary>
+/// <param name="TransportOrders">The Transport Orders created that day.</param>
+/// <param name="Provisional">True while Cost Management may still change the day's spend.</param>
+/// <param name="Spend">Spend per resource in EUR. The resource name is data from the estate, a field to show or compare and never prose for a model.</param>
+public sealed record CostDay(DateOnly Date, int TransportOrders, bool Provisional, IReadOnlyList<ResourceSpend> Spend);
+
+/// <param name="Resource">The resource's name as the estate has it.</param>
+/// <param name="Eur">What the resource cost that day, in EUR.</param>
+public sealed record ResourceSpend(string Resource, decimal Eur);

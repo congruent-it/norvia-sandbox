@@ -98,6 +98,61 @@
         }
       }
     },
+    "/v1/transport-orders/volume": {
+      "get": {
+        "tags": [
+          "TransportOrders"
+        ],
+        "summary": "Count the Transport Orders received per UTC day, for the days from and to (both included).",
+        "description": "A Rejected booking is not a Transport Order and is not counted. A day with none has no entry. The window is at most 92 days and is refused with a 400 when to is before from.",
+        "operationId": "CountTransportOrdersPerDay",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TransportOrderDayCount"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/transport-orders/{transportOrderNumber}/re-rate": {
       "post": {
         "tags": [
@@ -9417,6 +9472,28 @@
               "null",
               "string"
             ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "TransportOrderDayCount": {
+        "required": [
+          "date",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         },
         "additionalProperties": false

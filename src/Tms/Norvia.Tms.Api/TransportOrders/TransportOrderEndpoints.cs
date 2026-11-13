@@ -14,6 +14,7 @@ using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shipments;
 using Norvia.Tms.Application.TransportOrders;
 using Norvia.Tms.Application.TransportOrders.Assign;
+using Norvia.Tms.Application.TransportOrders.CountPerDay;
 using Norvia.Tms.Application.TransportOrders.GetById;
 using Norvia.Tms.Application.TransportOrders.GetByNumber;
 using Norvia.Tms.Application.TransportOrders.List;
@@ -40,6 +41,15 @@ public static class TransportOrderEndpoints
     /// Customer service's re-rate and the Planner's assignment.
     /// </summary>
     public const string ManageRole = "TransportOrders.Manage";
+
+    /// <summary>
+    /// The app role only the Estate health check's managed identity holds: it reads how many Transport Orders came in each day to set
+    /// the estate's bill against. It opens that one count and no Transport Order.
+    /// </summary>
+    public const string VolumeReadRole = "TransportOrders.Volume.Read";
+
+    /// <summary>The longest window of days the volume answers for.</summary>
+    public const int MaxVolumeDays = 92;
 
     public static IEndpointRouteBuilder MapTransportOrders(this IEndpointRouteBuilder app)
     {
@@ -83,6 +93,15 @@ public static class TransportOrderEndpoints
                 "Each order shows its number, Shipper, Shipper reference, when its Shipment was delivered and its blocking reasons: NotRated, "
                 + "NoProofOfDelivery and OpenException. A reason disappears when its condition is met, and an order that becomes Billable leaves the list. "
                 + "Orders whose Shipment isn't Delivered, Billable orders and Fulfilment orders aren't listed.");
+
+        // The Estate health check reads the volume as its own identity, with a role of its own: the manage role is the TMS UI's.
+        transportOrders.MapGet("/volume", VolumeAsync)
+            .WithName("CountTransportOrdersPerDay")
+            .RequireAuthorization(policy => policy.RequireRole(VolumeReadRole))
+            .WithSummary("Count the Transport Orders received per UTC day, for the days from and to (both included).")
+            .WithDescription(
+                "A Rejected booking is not a Transport Order and is not counted. A day with none has no entry. The window is at most "
+                + $"{MaxVolumeDays} days and is refused with a 400 when to is before from.");
 
         // Customer service re-rates from the TMS UI, which calls as its own identity with the manage role.
         transportOrders.MapPost("/{transportOrderNumber}/re-rate", ReRateAsync)
@@ -195,6 +214,23 @@ public static class TransportOrderEndpoints
         IMediator mediator,
         CancellationToken cancellationToken) =>
         TypedResults.Ok(await mediator.Send(new ListTransportOrdersQuery(status), cancellationToken));
+
+    private static async Task<Results<Ok<IReadOnlyList<TransportOrderDayCount>>, ValidationProblem>> VolumeAsync(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        IMediator mediator,
+        CancellationToken cancellationToken)
+    {
+        if (to < from || to.DayNumber - from.DayNumber >= MaxVolumeDays)
+        {
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["to"] = [$"The window runs from 'from' to 'to' (not before 'from') and covers at most {MaxVolumeDays} days."],
+            });
+        }
+
+        return TypedResults.Ok(await mediator.Send(new CountTransportOrdersPerDayQuery(from, to), cancellationToken));
+    }
 
     private static async Task<Ok<IReadOnlyList<RatingExceptionSummary>>> ListRatingExceptionsAsync(
         IMediator mediator,

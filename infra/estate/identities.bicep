@@ -23,10 +23,15 @@ param simulatorRedirectUris string = ''
 @description('Easy Auth\'s sign-in callback on the ERP, empty before the ERP is first deployed.')
 param erpRedirectUris string = ''
 
+@description('The Estate health check\'s identity (health-check.bicep), which holds the TMS API\'s volume read role.')
+param healthCheckPrincipalId string
+
 var intakeRole = 'TransportOrders.Intake'
 var intakeRoleId = guid('norvia-tms-api', environmentName, intakeRole)
 var manageRole = 'TransportOrders.Manage'
 var manageRoleId = guid('norvia-tms-api', environmentName, manageRole)
+var volumeReadRole = 'TransportOrders.Volume.Read'
+var volumeReadRoleId = guid('norvia-tms-api', environmentName, volumeReadRole)
 var tmsResetRole = 'Estate.Reset'
 var tmsResetRoleId = guid('norvia-tms-api', environmentName, tmsResetRole)
 var driverAppResetRole = 'Estate.Reset'
@@ -136,6 +141,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: intakeRole
       displayName: 'Transport Order intake'
       description: 'Submit Transport Orders to the TMS. Only the intake Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: volumeReadRoleId
+      value: volumeReadRole
+      displayName: 'Read how many Transport Orders came in per day'
+      description: 'Read the count of Transport Orders received each day, which the Estate health check sets the estate\'s bill against. Only the Estate health check holds it; it opens no Transport Order.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -521,6 +536,13 @@ resource manageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: manageRoleId
   principalId: tmsUiIdentity.properties.principalId
+}
+
+// The Estate health check reads the Transport Orders per day as its own identity (#504), with a role of its own: the manage role is the TMS UI's.
+resource volumeReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: volumeReadRoleId
+  principalId: healthCheckPrincipalId
 }
 
 // The Partner portal's identity. The Persona registrations trust it, so the portal gets each Persona's token without a
