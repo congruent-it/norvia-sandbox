@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: ./infra/test-scripts.ps1
 
-  # Dead relative links and deleted pages in the Markdown, nothing else: offline, so no network and no anchors (lychee.toml).
+  # Dead relative links and deleted pages in the Markdown, nothing else (lychee.toml).
   links:
     name: Markdown links
     runs-on: ubuntu-latest
