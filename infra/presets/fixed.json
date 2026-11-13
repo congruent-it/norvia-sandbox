@@ -15,5 +15,6 @@
   "shipperTrackingCached": false,
   "noShipperRateLimit": false,
   "noReportBackToDriverApp": false,
-  "noConversationSweeper": false
+  "noConversationSweeper": false,
+  "chattyTelemetry": false
 }

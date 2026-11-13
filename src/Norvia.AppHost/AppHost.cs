@@ -220,9 +220,13 @@ if (builder.ExecutionContext.IsPublishMode)
     messaging.PublishAsExisting(estate.ServiceBusNamespace, null);
 
     var insights = builder.AddAzureApplicationInsights("insights").PublishAsExisting(estate.ApplicationInsights, null);
+    // The as-found toggle chattyTelemetry is the applications' log level. infra/as-found.ps1 also applies it to the running apps.
+    var (logLevelSetting, logLevel) = AsFound.LogLevel(builder.Configuration["ESTATE_ASFOUND"]);
     foreach (var project in new[] { tmsMigrations, tmsApi, tmsWeb, partnerPortalMigrations, partnerPortal, driverAppMigrations, driverAppApi, driverAppWeb, erpMigrations, erpWeb, erpApi, integrationConsole, healthCheck, simulatorMigrations, simulator })
     {
         project.WithReference(insights);
+
+        project.WithEnvironment(logLevelSetting, logLevel);
     }
 
     // In Azure the TMS trusts Entra only, and only the intake Logic App's managed identity may submit (ADR 0005).
