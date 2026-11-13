@@ -284,6 +284,10 @@ _Avoid_: agreement, deal
 The part of a Contract that sets what Norvia charges a Shipper for transport, by lane and weight.
 _Avoid_: tariff, price list, rate sheet
 
+**Master-data revision**:
+The number the ERP raises each time it changes a Shipper, Carrier, Rate Card, Carrier Rate Card, Vehicle or Driver. The TMS keeps the latest it applied and ignores a replacement that is not higher. Not the same as a Rate Card's dated versions.
+_Avoid_: version (a Rate Card has those), sequence number
+
 **Zone**:
 A named area in a Rate Card: a country plus a set of postcode prefixes.
 _Avoid_: region, area
