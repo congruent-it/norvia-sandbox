@@ -254,7 +254,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
         return row;
     }
 
-    private static string LifecyclePolicy(string prefix, string action) =>
+    private static string LifecyclePolicy(string prefix, params string[] actions) =>
         new JsonObject
         {
             ["properties"] = new JsonObject
@@ -267,7 +267,14 @@ public sealed class AzureEstateConfigurationTests : IDisposable
                         ["definition"] = new JsonObject
                         {
                             ["filters"] = new JsonObject { ["prefixMatch"] = new JsonArray(prefix) },
-                            ["actions"] = new JsonObject { ["baseBlob"] = new JsonObject { [action] = new JsonObject { ["daysAfterModificationGreaterThan"] = 30 } } },
+                            ["actions"] = new JsonObject
+                            {
+                                ["baseBlob"] = actions.Aggregate(new JsonObject(), (baseBlob, action) =>
+                                {
+                                    baseBlob[action] = new JsonObject { ["daysAfterModificationGreaterThan"] = 30 };
+                                    return baseBlob;
+                                }),
+                            },
                         },
                     }),
                 },
@@ -318,7 +325,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
         estate.AlertReceivers.Should().BeNull();
         estate.Retention.Should().BeNull();
         estate.ConversationSweeperRuns.Should().BeNull();
-        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(null, null, null, null));
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(null, null, null, null, ProofFilesDeleted: null));
         estate.BusinessSafetyNets.Should().Be(new Norvia.HealthCheck.Application.Estate.BusinessSafetyNetFacts(null, null, null));
         estate.ApiManagement.Should().Be(new Norvia.HealthCheck.Application.Estate.ApiManagementFacts(null, null));
         Checklist.Default.Run(estate).Should().BeEmpty("a Check gives no Finding for what it could not see");
@@ -482,13 +489,26 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     {
         _azure.Resources("microsoft.storage/storageaccounts", Row(("id", InboundId), ("name", "stinboundabc")), Row(("id", TransitId), ("name", "stdriverabc")), Row(("id", TmsStorageId), ("name", "storageabc")))
             .Raw($"{InboundId}/managementPolicies/default", LifecyclePolicy("inbound-proofs-of-delivery/", "delete"))
-            .Raw($"{TmsStorageId}/managementPolicies/default", LifecyclePolicy("proofs-of-delivery/", "tierToCool"))
+            .Raw($"{TmsStorageId}/managementPolicies/default", LifecyclePolicy("proofs-of-delivery/", "tierToCool", "delete"))
             .Raw($"{InboundId}/providers/Microsoft.Security/defenderForStorageSettings/current", """{"properties":{"isEnabled":true,"malwareScanning":{"onUpload":{"isEnabled":true}}}}""");
 
         var estate = await ReadEmptyEstateAsync();
 
-        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(true, false, true, true, "stinboundabc", "stdriverabc"));
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(true, false, true, true, "stinboundabc", "stdriverabc", true));
         Checklist.Default.Run(estate).Should().ContainSingle().Which.CheckId.Should().Be("LIFECYCLE-TRANSIT");
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenTheTmsStorageMovesFilesToCoolButNeverDeletesThem_FindsTheRetentionAbsent()
+    {
+        _azure.Resources("microsoft.storage/storageaccounts", Row(("id", TmsStorageId), ("name", "storageabc")))
+            .Raw($"{TmsStorageId}/managementPolicies/default", LifecyclePolicy("proofs-of-delivery/", "tierToCool"));
+
+        var estate = await ReadEmptyEstateAsync();
+
+        estate.Storage.ProofFilesMoveToCool.Should().BeTrue();
+        estate.Storage.ProofFilesDeleted.Should().BeFalse();
+        Checklist.Default.Run(estate).Select(item => item.CheckId).Should().Contain("PROOF-RETENTION").And.NotContain("PROOF-HOT-TIER");
     }
 
     [Fact]
@@ -498,7 +518,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
 
         var estate = await ReadEmptyEstateAsync();
 
-        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(false, null, false, false, "stinboundabc", null));
+        estate.Storage.Should().Be(new Norvia.HealthCheck.Application.Estate.StorageFacts(false, null, false, false, "stinboundabc", null, false));
         Checklist.Default.Run(estate).Select(item => item.CheckId).Should().BeEquivalentTo("LIFECYCLE-INBOUND", "PROOF-HOT-TIER", "MALWARE-SCANNING");
         Checklist.Default.Run(estate).Single(item => item.CheckId == "MALWARE-SCANNING").Evidence.Select(evidence => evidence.Subject)
             .Should().Equal("inbound storage account stinboundabc");

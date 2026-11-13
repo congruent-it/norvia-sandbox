@@ -1,0 +1,25 @@
+{
+  "id": "toggle-proof-files-never-deleted",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with proofFilesNeverDeleted on and nothing else. The known answer is F-PROOF-RETENTION, the Finding of Check PROOF-RETENTION, whose severity (Low) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "proofFilesNeverDeleted, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 proofFilesNeverDeleted=true"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-PROOF-RETENTION"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: Proof of delivery files are never deleted. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

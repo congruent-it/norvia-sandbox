@@ -57,7 +57,7 @@ public sealed class AsFoundAlertsTests
 
             toggles.Select(toggle => toggle.Key).Should().BeEquivalentTo(
                 "flowsWithoutFailedRunAlert", "entitiesWithoutDeadLetterAlert", "noAlertReceiver",
-                "noInboundLifecycleRule", "noTransitLifecycleRule", "proofFilesStayHot", "noMalwareScanning", "carrierSecretInlined",
+                "noInboundLifecycleRule", "noTransitLifecycleRule", "proofFilesStayHot", "proofFilesNeverDeleted", "noMalwareScanning", "carrierSecretInlined",
                 "appInsightsRetentionShort", "logicAppsWithoutTrackedProperties",
                 "staleThresholdsUnset", "proofMissingThresholdUnset", "lateDeliveryCheckOff", "shipperTrackingCached", "noShipperRateLimit", "noReportBackToDriverApp", "noConversationSweeper", "chattyTelemetry");
         }

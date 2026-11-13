@@ -208,7 +208,7 @@ public sealed class AppHostModelTests
     }
 
     [Fact]
-    public async Task InAzure_TheTms_HasABlobContainerForProofOfDeliveryFiles_WhoseBlobsMoveToCoolAfter30Days()
+    public async Task InAzure_TheTms_HasABlobContainerForProofOfDeliveryFiles_WhoseBlobsMoveToCoolAfter30Days_AndAreDeletedAfterSevenYears()
     {
         await using var builder = await CreateForAzureAsync();
 
@@ -219,7 +219,34 @@ public sealed class AppHostModelTests
             .And.Contain("tierToCool")
             .And.MatchRegex(@"daysAfterModificationGreaterThan: 30\b")
             .And.Contain("proofs-of-delivery/");
-        bicep.Should().NotContain("tierToArchive", "the files are kept, never archived or deleted").And.NotContain("delete:");
+        bicep.Should().NotContain("tierToArchive", "the files are never archived")
+            .And.Contain("delete:", "a file is deleted after the retention period")
+            .And.MatchRegex(@"daysAfterModificationGreaterThan: 2555\b");
+    }
+
+    [Theory]
+    [InlineData("30", 30)]
+    [InlineData("0", 2555)]
+    [InlineData("-5", 2555)]
+    [InlineData("seven", 2555)]
+    public async Task InAzure_TheProofRetentionDaysParameter_SetsWhenFilesAreDeleted_AndFallsBackToTheDefault(string configured, int expected)
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
+            ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath(), "--proofRetentionDays", configured],
+            TestContext.Current.CancellationToken);
+
+        builder.Resources.OfType<AzureStorageResource>().Single().GetBicepTemplateString()
+            .Should().MatchRegex($@"delete: \{{\s*daysAfterModificationGreaterThan: {expected}\b")
+            .And.MatchRegex(@"daysAfterModificationGreaterThan: 30\b");
+    }
+
+    [Fact]
+    public async Task InAzure_WithTheProofFilesNeverDeletedToggle_TheTmsBlobsStillMoveToCool_ButAreNeverDeleted()
+    {
+        await using var builder = await CreateForAzureAsync("{\"proofFilesNeverDeleted\":true}");
+
+        builder.Resources.OfType<AzureStorageResource>().Single().GetBicepTemplateString()
+            .Should().Contain("tierToCool").And.NotContain("delete:");
     }
 
     [Fact]
@@ -230,7 +257,7 @@ public sealed class AppHostModelTests
             TestContext.Current.CancellationToken);
 
         builder.Resources.OfType<AzureStorageResource>().Single().GetBicepTemplateString()
-            .Should().NotContain("managementPolicies").And.NotContain("tierToCool");
+            .Should().NotContain("managementPolicies").And.NotContain("tierToCool").And.NotContain("delete:");
     }
 
     [Fact]

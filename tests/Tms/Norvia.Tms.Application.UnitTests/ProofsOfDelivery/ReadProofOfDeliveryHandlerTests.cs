@@ -75,14 +75,26 @@ public sealed class ReadProofOfDeliveryHandlerTests
     }
 
     [Fact]
-    public async Task GetFile_ForAFileTheStorageHasLost_IsNotFound()
+    public async Task GetFile_ForAFileTheStorageNoLongerHolds_IsExpired_NotAnError()
     {
         HasCurrent();
         _files.OpenReadAsync(_shipment.Number, Cmr(), Arg.Any<CancellationToken>()).Returns((Stream?)null);
 
         var result = await Handler().Handle(new GetProofOfDeliveryFileQuery("SH-0000012", Cmr().Id), CancellationToken.None);
 
+        // The record stays after the retention period deletes the file, so the file is known but gone.
         result.Status.Should().Be(ResultStatus.NotFound);
+        result.IsExpired().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetFile_ForAFileTheProofOfDeliveryDoesNotHold_IsNotExpired()
+    {
+        HasCurrent();
+
+        var result = await Handler().Handle(new GetProofOfDeliveryFileQuery("SH-0000012", Guid.NewGuid()), CancellationToken.None);
+
+        result.IsExpired().Should().BeFalse();
     }
 
     [Theory]

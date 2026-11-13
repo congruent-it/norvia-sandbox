@@ -5,6 +5,7 @@
   "noInboundLifecycleRule": true,
   "noTransitLifecycleRule": false,
   "proofFilesStayHot": true,
+  "proofFilesNeverDeleted": false,
   "noMalwareScanning": true,
   "carrierSecretInlined": true,
   "appInsightsRetentionShort": true,

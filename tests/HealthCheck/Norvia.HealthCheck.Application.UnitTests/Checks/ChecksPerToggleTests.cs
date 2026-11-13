@@ -29,6 +29,7 @@ public sealed class ChecksPerToggleTests
         { "noInboundLifecycleRule", Healthy with { Storage = new StorageFacts(InboundHasLifecycleRule: false) }, "LIFECYCLE-INBOUND", "inbound Proof of delivery container" },
         { "noTransitLifecycleRule", Healthy with { Storage = new StorageFacts(TransitHasLifecycleRule: false) }, "LIFECYCLE-TRANSIT", "Driver app transit container" },
         { "proofFilesStayHot", Healthy with { Storage = new StorageFacts(ProofFilesMoveToCool: false) }, "PROOF-HOT-TIER", "TMS proofs-of-delivery container" },
+        { "proofFilesNeverDeleted", Healthy with { Storage = new StorageFacts(ProofFilesDeleted: false) }, "PROOF-RETENTION", "TMS proofs-of-delivery container" },
         { "noMalwareScanning", Healthy with { Storage = new StorageFacts(InboundMalwareScanning: false) }, "MALWARE-SCANNING", "inbound storage account" },
         { "staleThresholdsUnset", Healthy with { BusinessSafetyNets = new BusinessSafetyNetFacts(StaleThresholdsSet: false) }, "STALE-THRESHOLDS", "TMS" },
         { "proofMissingThresholdUnset", Healthy with { BusinessSafetyNets = new BusinessSafetyNetFacts(ProofMissingThresholdSet: false) }, "PROOF-MISSING-THRESHOLD", "TMS" },
@@ -114,7 +115,7 @@ public sealed class ChecksPerToggleTests
         var unknown = Healthy with
         {
             AlertReceivers = null,
-            Storage = new StorageFacts(null, null, null, null),
+            Storage = new StorageFacts(null, null, null, null, ProofFilesDeleted: null),
             InlinedCarrierSecrets = null,
             Retention = null,
             BusinessSafetyNets = new BusinessSafetyNetFacts(null, null, null),

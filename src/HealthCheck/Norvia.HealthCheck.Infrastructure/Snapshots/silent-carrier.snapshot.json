@@ -130,6 +130,7 @@
     "inboundHasLifecycleRule": true,
     "transitHasLifecycleRule": true,
     "proofFilesMoveToCool": true,
+    "proofFilesDeleted": true,
     "inboundMalwareScanning": true
   },
   "inlinedCarrierSecrets": [],

@@ -20,10 +20,15 @@ public sealed class GetProofOfDeliveryFileHandler(
             || await shipments.FirstOrDefaultAsync(new ShipmentByNumberSpec(number), cancellationToken) is not { } shipment
             || (await proofsOfDelivery.ListAsync(new ProofsOfDeliveryForShipmentSpec(shipment.Id), cancellationToken))
                 .SelectMany(proofOfDelivery => proofOfDelivery.Files)
-                .FirstOrDefault(file => file.Id == query.FileId) is not { } file
-            || await files.OpenReadAsync(shipment.Number, file, cancellationToken) is not { } content)
+                .FirstOrDefault(file => file.Id == query.FileId) is not { } file)
         {
             return Result.NotFound();
+        }
+
+        // The Proof of delivery and its file list outlive the content: the retention period deletes only the blob.
+        if (await files.OpenReadAsync(shipment.Number, file, cancellationToken) is not { } content)
+        {
+            return ProofOfDeliveryFileExpiry.Expired();
         }
 
         return new ProofOfDeliveryFileContent(file.Name, file.ContentType, content);

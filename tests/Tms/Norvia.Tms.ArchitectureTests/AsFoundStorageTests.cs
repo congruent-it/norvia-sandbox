@@ -12,7 +12,7 @@ public sealed class AsFoundStorageTests
     private static readonly string Root = RepositoryRoot.Path;
 
     private static readonly string[] BooleanToggles =
-        ["noInboundLifecycleRule", "noTransitLifecycleRule", "proofFilesStayHot", "noMalwareScanning", "carrierSecretInlined", "appInsightsRetentionShort"];
+        ["noInboundLifecycleRule", "noTransitLifecycleRule", "proofFilesStayHot", "proofFilesNeverDeleted", "noMalwareScanning", "carrierSecretInlined", "appInsightsRetentionShort"];
 
     private const string InboundStorage = "infra/estate/inbound-storage.bicep";
     private const string DriverApp = "infra/estate/driver-app.bicep";

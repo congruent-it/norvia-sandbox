@@ -22,6 +22,7 @@ public sealed class Checklist(IReadOnlyList<Check> checks)
         new InboundLifecycleRuleCheck(),
         new TransitLifecycleRuleCheck(),
         new ProofFilesHotTierCheck(),
+        new ProofFilesRetentionCheck(),
         new MalwareScanningCheck(),
         new StaleThresholdsCheck(),
         new ProofMissingThresholdCheck(),
