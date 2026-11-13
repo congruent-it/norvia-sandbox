@@ -26,6 +26,9 @@ param carrierCostIdentityName string
 @description('The E1 Billing Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param billingPrincipalId string
 
+@description('The E3 master-data sync Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param masterDataSyncPrincipalId string
+
 @description('The E1 Shipper invoice Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param shipperInvoicePrincipalId string
 
@@ -458,6 +461,59 @@ resource invoicingMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subsc
     sqlFilter: {
       sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
     }
+  }
+}
+
+// The topic for the ERP's master-data events (E3): the entity type is the event type. The ERP publishes through its outbox, as for invoicing. Monitoring
+// is the first consumer, then the master-data sync Logic App with a subscription of its own.
+resource masterDataEvents 'Microsoft.ServiceBus/namespaces/topics@2024-01-01' = {
+  parent: serviceBus
+  name: 'master-data-events'
+}
+
+resource masterDataMonitoring 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: masterDataEvents
+  name: 'monitoring'
+}
+
+resource masterDataMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: masterDataMonitoring
+  name: 'resubmit-aware'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: 'resubmitTo IS NULL OR resubmitTo = \'monitoring\''
+    }
+  }
+}
+
+// The E3 master-data sync Logic App's subscription: the entity types it replicates (the Shipper so far), as the message's eventType property says.
+// Its filter also routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same
+// subscription the same condition (ResubmitAwareFilters).
+resource masterDataSync 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: masterDataEvents
+  name: 'master-data-sync'
+}
+
+resource masterDataSyncFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: masterDataSync
+  name: 'resubmit-aware'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'Shipper\' AND resubmitTo IS NULL) OR resubmitTo = \'master-data-sync\''
+    }
+  }
+}
+
+// Scoped to the subscription, so the master-data sync Logic App reads master-data events and no other message.
+resource masterDataSyncReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(masterDataSync.id, masterDataSyncPrincipalId, serviceBusDataReceiver)
+  scope: masterDataSync
+  properties: {
+    principalId: masterDataSyncPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
   }
 }
 

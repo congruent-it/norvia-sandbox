@@ -244,6 +244,7 @@ module alerts 'estate/alerts.bicep' = {
       { name: 'driver-reports', logicAppName: driverReportsLogicApp.outputs.logicAppName, workflowName: 'driver-reports' }
       { name: 'conversation-sweeper', logicAppName: conversationSweeperLogicApp.outputs.logicAppName, workflowName: 'conversation-sweeper' }
       { name: 'billing', logicAppName: billingLogicApp.outputs.logicAppName, workflowName: 'billing' }
+      { name: 'master-data-sync', logicAppName: masterDataSyncLogicApp.outputs.logicAppName, workflowName: 'master-data-sync' }
       { name: 'carrier-cost', logicAppName: carrierCostLogicApp.outputs.logicAppName, workflowName: 'carrier-cost' }
       { name: 'shipper-invoice', logicAppName: shipperInvoiceLogicApp.outputs.logicAppName, workflowName: 'shipper-invoice' }
       { name: 'carrier-invoice-outcome', logicAppName: carrierInvoiceOutcomeLogicApp.outputs.logicAppName, workflowName: 'carrier-invoice-outcome' }
@@ -262,6 +263,7 @@ module alerts 'estate/alerts.bicep' = {
       'trip-dispatch'
       'driver-reports'
       'billing'
+      'master-data-sync'
       'shipper-invoice'
       'carrier-invoice-outcome'
     ]
@@ -279,7 +281,8 @@ module messaging 'estate/messaging.bicep' = {
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
-    billingPrincipalId: identities.outputs.billingPrincipalId
+    billingPrincipalId: identities.outputs.billing.principalId
+    masterDataSyncPrincipalId: identities.outputs.masterDataSync.principalId
     carrierCostIdentityName: identities.outputs.carrierCostIdentityName
     shipperInvoicePrincipalId: identities.outputs.shipperInvoice.principalId
     carrierInvoiceOutcomePrincipalId: identities.outputs.carrierInvoiceOutcome.principalId
@@ -510,9 +513,26 @@ module billingLogicApp 'estate/billing-logic-app.bicep' = {
     location: location
     tags: tags
     integrationRetentionDays: integrationRetentionDays
-    billingIdentityName: identities.outputs.billingIdentityName
+    billingIdentityName: identities.outputs.billing.identityName
     erpApiClientId: identities.outputs.erpApiClientId
     erpBaseUrl: erpBaseUrl
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
+module masterDataSyncLogicApp 'estate/master-data-sync-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    masterDataSyncIdentityName: identities.outputs.masterDataSync.identityName
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
     applicationInsightsName: monitoring.outputs.applicationInsightsName
     serviceBusName: messaging.outputs.namespaceName
     planName: intakeLogicApp.outputs.planName
@@ -832,7 +852,6 @@ output ESTATE_LOG_ANALYTICS_WORKSPACE_ID string = monitoring.outputs.workspaceId
 output ESTATE_INTEGRATION_RETENTION_DAYS string = string(integrationRetentionDays)
 // Where the Integration console reads the Logic Apps' run history.
 output ESTATE_RESOURCE_GROUP_ID string = resourceGroup.id
-output ESTATE_APPLICATION_INSIGHTS string = monitoring.outputs.applicationInsightsName
 output ESTATE_ENTRA_ISSUER string = identities.outputs.entraIssuer
 output ESTATE_ENTRA_TENANT_ID string = identities.outputs.entraTenantId
 output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
@@ -858,6 +877,7 @@ output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicAp
 output ESTATE_TRIP_DISPATCH_LOGIC_APP string = tripDispatchLogicApp.outputs.logicAppName
 output ESTATE_DRIVER_REPORTS_LOGIC_APP string = driverReportsLogicApp.outputs.logicAppName
 output ESTATE_BILLING_LOGIC_APP string = billingLogicApp.outputs.logicAppName
+output ESTATE_MASTER_DATA_SYNC_LOGIC_APP string = masterDataSyncLogicApp.outputs.logicAppName
 output ESTATE_CARRIER_COST_LOGIC_APP string = carrierCostLogicApp.outputs.logicAppName
 output ESTATE_SHIPPER_INVOICE_LOGIC_APP string = shipperInvoiceLogicApp.outputs.logicAppName
 output ESTATE_ANSWER_LOGIC_APP string = answerLogicApp.outputs.logicAppName
