@@ -42,7 +42,7 @@ public sealed class TrackingAssistantJourneyTests(TrackingAssistantUiFixture nor
     public async Task AFollowUpQuestion_WorksInTheSamePanel_AndAReloadStartsANewConversation()
     {
         await using var host = Norvia.StartPortal();
-        await OpenOrderAsync(host.Address);
+        var number = await OpenOrderAsync(host.Address);
         await AskAsync("Where is my order?");
         await Expect(Answers()).ToHaveCountAsync(1);
 
@@ -56,6 +56,7 @@ public sealed class TrackingAssistantJourneyTests(TrackingAssistantUiFixture nor
 
         await Expect(Portal.GetByRole(AriaRole.Heading, new() { Name = "Ask about your orders", Level = 2 })).ToBeVisibleAsync();
         await Expect(Conversation().GetByRole(AriaRole.Listitem)).ToHaveCountAsync(0);
+        await ExpectOrderStillTrackedAsync(number);
     }
 
     [Theory]
@@ -84,8 +85,7 @@ public sealed class TrackingAssistantJourneyTests(TrackingAssistantUiFixture nor
 
         await Expect(Notices()).ToHaveCountAsync(1);
         await Expect(Notices().First).ToContainTextAsync("Try again in a few minutes");
-        await Expect(Portal.GetByRole(AriaRole.Heading, new() { Name = number, Level = 1 })).ToBeVisibleAsync();
-        await Expect(Portal.GetByLabel("Transport Order", new() { Exact = true })).ToContainTextAsync("Received");
+        await ExpectOrderStillTrackedAsync(number);
     }
 
     [Fact]
@@ -98,20 +98,21 @@ public sealed class TrackingAssistantJourneyTests(TrackingAssistantUiFixture nor
 
         await Expect(Notices()).ToHaveCountAsync(1);
         await Expect(Notices().First).ToContainTextAsync("Assistant unavailable");
-        await Expect(Portal.GetByRole(AriaRole.Heading, new() { Name = number, Level = 1 })).ToBeVisibleAsync();
-        await Expect(Portal.GetByLabel("Transport Order", new() { Exact = true })).ToContainTextAsync("Received");
+        await ExpectOrderStillTrackedAsync(number);
     }
 
     /// <summary>A model that is out of reach, as when Foundry is down.</summary>
     private sealed class FailingChatClient : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-            throw new HttpRequestException("The model is out of reach.");
+            throw OutOfReach();
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
-            throw new HttpRequestException("The model is out of reach.");
+            throw OutOfReach();
 
         public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        private static HttpRequestException OutOfReach() => new("The model is out of reach.");
 
         public void Dispose()
         {

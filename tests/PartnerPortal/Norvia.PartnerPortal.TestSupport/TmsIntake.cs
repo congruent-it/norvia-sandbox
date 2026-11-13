@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Norvia.AppHost;
 
-namespace Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant;
+namespace Norvia.PartnerPortal.TestSupport;
 
 /// <summary>The TMS API as the intake Logic App calls it: a booking taken in becomes a Transport Order of its Shipper, with the Shipper's own reference.</summary>
 public sealed class TmsIntake : IDisposable
@@ -16,7 +16,7 @@ public sealed class TmsIntake : IDisposable
     private readonly HttpClient _http;
     private readonly string _signingKey;
 
-    internal TmsIntake(HttpClient http, string signingKey)
+    public TmsIntake(HttpClient http, string signingKey)
     {
         _http = http;
         _signingKey = signingKey;

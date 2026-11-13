@@ -161,6 +161,7 @@
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Infrastructure.UnitTests/Norvia.PartnerPortal.Infrastructure.UnitTests.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.IntegrationTests/Norvia.PartnerPortal.Web.IntegrationTests.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.IntegrationTests.Faults/Norvia.PartnerPortal.Web.IntegrationTests.Faults.csproj" />
+    <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.TestSupport/Norvia.PartnerPortal.TestSupport.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant/Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.UiTests.TrackingAssistant/Norvia.PartnerPortal.Web.UiTests.TrackingAssistant.csproj" />
     <Project Path="tests/PartnerPortal/Norvia.PartnerPortal.Web.UiTests/Norvia.PartnerPortal.Web.UiTests.csproj" />

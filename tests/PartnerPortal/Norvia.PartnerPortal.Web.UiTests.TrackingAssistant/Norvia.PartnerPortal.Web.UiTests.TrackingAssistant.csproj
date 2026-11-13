@@ -15,13 +15,12 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\Norvia.PartnerPortal.TestSupport\Norvia.PartnerPortal.TestSupport.csproj" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
     <ProjectReference Include="..\..\..\src\Norvia.Agents\Norvia.Agents.csproj" />
     <ProjectReference Include="..\..\..\src\PartnerPortal\Norvia.PartnerPortal.Web\Norvia.PartnerPortal.Web.csproj" Aliases="PortalWeb" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The same TMS stand-in the assistant's integration tests enter their Transport Orders with. -->
-    <Compile Include="..\Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant\TmsIntake.cs" Link="TmsIntake.cs" />
     <!-- One fixture starts the AppHost bar the UIs; each test starts a portal of its own in the tests' process and runs one at a time. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\..\seed\norvia.seed.json" Link="norvia.seed.json" CopyToOutputDirectory="PreserveNewest" />

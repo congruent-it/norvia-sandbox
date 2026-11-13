@@ -6,6 +6,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using Norvia.AppHost;
+using Norvia.PartnerPortal.TestSupport;
 
 [assembly: AssemblyFixture(typeof(Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant.TrackingAssistantFixture))]
 

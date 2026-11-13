@@ -9,7 +9,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
 using Norvia.AppHost;
-using Norvia.PartnerPortal.Web.IntegrationTests.TrackingAssistant;
+using Norvia.PartnerPortal.TestSupport;
 
 namespace Norvia.PartnerPortal.Web.UiTests.TrackingAssistant;
 
