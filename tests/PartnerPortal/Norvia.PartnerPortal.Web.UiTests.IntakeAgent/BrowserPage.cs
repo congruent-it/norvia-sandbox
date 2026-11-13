@@ -1,58 +1,13 @@
 using Microsoft.Playwright;
+using Norvia.PartnerPortal.TestSupport;
 using static Microsoft.Playwright.Assertions;
 
 namespace Norvia.PartnerPortal.Web.UiTests.IntakeAgent;
 
-/// <summary>
-/// A fresh browser context per test with the Partner portal in it, and the steps every journey shares. It records a trace and a video that are kept only when the test fails (coding guidelines §10),
-/// under TestResults/playwright.
-/// </summary>
-public abstract class BrowserPage(IntakeAgentUiFixture norvia) : IAsyncLifetime
+/// <summary>The Partner portal's page with the Intake agent's steps every journey shares; the browser context and its failure artifacts come from <see cref="RecordedBrowserPage"/>.</summary>
+public abstract class BrowserPage(IntakeAgentUiFixture norvia) : RecordedBrowserPage(norvia.Browser)
 {
-    private static readonly string ArtifactsDirectory = Path.Combine(
-        Environment.GetEnvironmentVariable("NORVIA_UI_TEST_ARTIFACTS") ?? Path.Combine(AppContext.BaseDirectory, "TestResults"),
-        "playwright");
-
-    private readonly string _videoDirectory = Path.Combine(Path.GetTempPath(), "norvia-ui-videos", Guid.NewGuid().ToString("N"));
-    private IBrowserContext? _context;
-
     protected IntakeAgentUiFixture Norvia { get; } = norvia;
-
-    protected static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    protected IPage Portal { get; private set; } = null!;
-
-    public async ValueTask InitializeAsync()
-    {
-        _context = await Norvia.Browser.NewContextAsync(new BrowserNewContextOptions { RecordVideoDir = _videoDirectory });
-        await _context.Tracing.StartAsync(new TracingStartOptions { Screenshots = true, Snapshots = true, Sources = true });
-        Portal = await _context.NewPageAsync();
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        GC.SuppressFinalize(this);
-        if (_context is null)
-        {
-            return;
-        }
-
-        var failed = TestContext.Current.TestState?.Result == TestResult.Failed;
-        var name = string.Concat((TestContext.Current.Test?.TestDisplayName ?? "test").Split(Path.GetInvalidFileNameChars()));
-        await _context.Tracing.StopAsync(failed ? new TracingStopOptions { Path = Path.Combine(ArtifactsDirectory, $"{name}.trace.zip") } : new());
-        var video = Portal.Video;
-        await _context.DisposeAsync();
-
-        if (failed && video is not null)
-        {
-            await video.SaveAsAsync(Path.Combine(ArtifactsDirectory, $"{name}.portal.webm"));
-        }
-
-        if (Directory.Exists(_videoDirectory))
-        {
-            Directory.Delete(_videoDirectory, recursive: true);
-        }
-    }
 
     /// <summary>Plays the Shipper Persona and opens "Fill from an email" from its booking form.</summary>
     protected async Task OpenFillFromEmailAsync(string persona = "Brouwer Dranken")
