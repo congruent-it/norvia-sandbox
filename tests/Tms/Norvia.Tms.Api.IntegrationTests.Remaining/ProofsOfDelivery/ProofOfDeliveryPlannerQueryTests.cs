@@ -63,6 +63,30 @@ public sealed class ProofOfDeliveryPlannerQueryTests(TmsFixture tms) : IClassFix
     }
 
     [Fact]
+    public async Task ReadingAFile_WhoseBlobTheRetentionPeriodDeleted_IsGoneWithTheExpiredCode_WhileTheRecordAndItsOtherFilesStay()
+    {
+        var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
+        var expiring = Cmr("expiring.pdf");
+        var kept = Cmr("kept.pdf");
+        await tms.RecordedProofAsync(Metadata(reference), [expiring, kept], _cancellationToken);
+        var proof = (await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!;
+        var (expiringId, keptId) = (FileIdOf(proof, expiring.Name), FileIdOf(proof, kept.Name));
+
+        // The lifecycle rule of an Azure storage account does not run on Azurite: delete the blob as the rule would.
+        var container = await tms.ProofContainerAsync(_cancellationToken);
+        (await container.DeleteBlobIfExistsAsync(BlobNameOf(shipmentNumber, expiringId), cancellationToken: _cancellationToken)).Value
+            .Should().BeTrue("the file was stored under the Shipment number and its ID");
+
+        using var gone = await tms.GetProofFileAsync(shipmentNumber, expiringId, _cancellationToken);
+        gone.StatusCode.Should().Be(HttpStatusCode.Gone);
+        (await JsonNode.ParseAsync(await gone.Content.ReadAsStreamAsync(_cancellationToken), cancellationToken: _cancellationToken))!["code"]!
+            .GetValue<string>().Should().Be("ProofOfDeliveryFileExpired");
+        using var stillThere = await tms.GetProofFileAsync(shipmentNumber, keptId, _cancellationToken);
+        stillThere.StatusCode.Should().Be(HttpStatusCode.OK);
+        FileNamesOf((await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!).Should().BeEquivalentTo(expiring.Name, kept.Name);
+    }
+
+    [Fact]
     public async Task Timeline_AShipmentWithNoProofOfDelivery_IsEmpty_AndAnUnknownShipmentIsNotFound()
     {
         var (shipmentNumber, _) = await tms.BookedShipmentAsync(_cancellationToken);
