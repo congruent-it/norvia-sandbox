@@ -15,5 +15,6 @@
   "proofFilesStayHot": false,
   "proofMissingThresholdUnset": false,
   "shipperTrackingCached": true,
-  "staleThresholdsUnset": false
+  "staleThresholdsUnset": false,
+  "chattyTelemetry": false
 }

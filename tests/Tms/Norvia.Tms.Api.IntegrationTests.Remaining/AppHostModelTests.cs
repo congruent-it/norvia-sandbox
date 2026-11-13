@@ -261,6 +261,35 @@ public sealed class AppHostModelTests
         }
     }
 
+    // Every application the estate runs, the ones Aspire deploys as Container Apps.
+    private static readonly string[] ContainerApps =
+    [
+        "tms-migrations", "tms-api", "tms-web", "partner-portal-migrations", "partner-portal-web", "driver-app-migrations", "driver-app-api",
+        "driver-app-web", "erp-migrations", "erp-web", "erp-api", "integration-console-web", "health-check-web", "simulator-migrations", "simulator-web",
+    ];
+
+    [Fact]
+    public async Task InAzure_WithoutToggles_EveryApplicationLogsAtInformation()
+    {
+        await using var builder = await CreateForAzureAsync();
+
+        foreach (var app in ContainerApps)
+        {
+            (await EnvironmentOfAsync(builder, app))["Logging__LogLevel__Default"].Should().Be("Information", app);
+        }
+    }
+
+    [Fact]
+    public async Task InAzure_WithTheChattyTelemetryToggle_EveryApplicationLogsAtDebug()
+    {
+        await using var builder = await CreateForAzureAsync("{\"chattyTelemetry\":true}");
+
+        foreach (var app in ContainerApps)
+        {
+            (await EnvironmentOfAsync(builder, app))["Logging__LogLevel__Default"].Should().Be("Debug", app);
+        }
+    }
+
     [Fact]
     public async Task InAzure_TheTmsApi_CanWriteItsBlobs_AndTheTmsUiOnlyReadThem()
     {
@@ -889,9 +918,9 @@ public sealed class AppHostModelTests
         (await create.Should().ThrowAsync<Exception>()).Which.ToString().Should().Contain("Parameters:estate-integration-retention-days");
     }
 
-    private static Task<IDistributedApplicationTestingBuilder> CreateForAzureAsync() =>
+    private static Task<IDistributedApplicationTestingBuilder> CreateForAzureAsync(string? asFound = null) =>
         DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
-            ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath()],
+            ["--operation", "publish", "--publisher", "default", "--output-path", Path.GetTempPath(), .. asFound is null ? Array.Empty<string>() : ["--ESTATE_ASFOUND", asFound]],
             TestContext.Current.CancellationToken);
 
     private static IResource Resource(IDistributedApplicationTestingBuilder builder, string name) =>

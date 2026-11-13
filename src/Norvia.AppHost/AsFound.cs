@@ -12,6 +12,14 @@ internal static class AsFound
         && value.ValueKind == JsonValueKind.True;
 
     /// <summary>
+    /// The log level every application runs at, by environment variable. <c>chattyTelemetry</c> (the spend toggle of docs/operations/as-found.md)
+    /// raises it to Debug, so what the applications log, and with it what Log Analytics ingests and bills per GB, grows with no business reason.
+    /// The healthy level is written out too, so going back to the fixed state changes the Container Apps back.
+    /// </summary>
+    public static KeyValuePair<string, string> LogLevel(string? asFound) =>
+        new("Logging__LogLevel__Default", IsSet(asFound, "chattyTelemetry") ? "Debug" : "Information");
+
+    /// <summary>
     /// The TMS settings the business safety-net toggles flow into, by environment variable. Healthy settings are written out too, so going
     /// back to the fixed state changes the Container App back.
     /// </summary>

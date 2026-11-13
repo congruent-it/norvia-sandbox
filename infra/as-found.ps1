@@ -10,7 +10,8 @@
 
     It stores the toggles in the azd environment as ESTATE_ASFOUND, runs the estate deployment alone (azd's preprovision
     hook, not the apps), deploys again the Logic Apps whose workflow a toggle changes (tracked properties, the Driver app report),
-    sets the TMS Container App's settings for the business safety-net toggles, and prints what changed. The TMS's
+    sets the TMS Container App's settings for the business safety-net toggles, sets every application's log level for chattyTelemetry,
+    and prints what changed. The TMS's
     lifecycle rule (proofFilesStayHot) is Aspire's, so it changes at the next azd provision; the script says so.
 .PARAMETER Setting A preset (the name of a file in infra/presets) or toggle=value.
 #>
@@ -115,6 +116,20 @@ if ($settings.Count -gt 0) {
     Write-Host "Setting the TMS API's business safety nets..."
     Invoke-Az containerapp update --subscription $env:AZURE_SUBSCRIPTION_ID --name tms-api --resource-group (Get-ResourceGroupName) `
         --set-env-vars @settings --output none | Out-Null
+}
+# chattyTelemetry is the applications' log level, a setting of each Container App. Aspire sets it at the next deploy from the same toggle;
+# this applies it to the running apps now, as a new revision each.
+if ((Get-Toggle $current 'chattyTelemetry') -ne (Get-Toggle $updated 'chattyTelemetry')) {
+    $logLevel = (Get-Toggle $updated 'chattyTelemetry') ? 'Debug' : 'Information'
+    # The migrations are Container App jobs that run once per deploy and log little: they take the level at the next deploy.
+    $containerApps = 'tms-api', 'tms-web', 'partner-portal-web', 'driver-app-api', 'driver-app-web', 'erp-web', 'erp-api',
+    'integration-console-web', 'health-check-web', 'simulator-web'
+    Import-AzdEnvironment
+    foreach ($app in $containerApps) {
+        Write-Host "Setting $app's log level to $logLevel..."
+        Invoke-Az containerapp update --subscription $env:AZURE_SUBSCRIPTION_ID --name $app --resource-group (Get-ResourceGroupName) `
+            --set-env-vars "Logging__LogLevel__Default=$logLevel" --output none | Out-Null
+    }
 }
 if ((Get-Toggle $current 'proofFilesStayHot') -ne (Get-Toggle $updated 'proofFilesStayHot')) {
     Write-Host "proofFilesStayHot changed: the TMS's storage account is Aspire's, so run azd provision to apply it."

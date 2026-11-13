@@ -83,7 +83,8 @@ public sealed class ChecklistAgainstSnapshotsTests
         // The presets are the toggles of #377; the Checks with a toggle outside them are the agent toggles of #369.
         var presetToggles = Preset("as-found").Select(toggle => toggle.Key).ToList();
         presetToggles.Should().NotBeEmpty();
-        checks.Select(check => check.AsFoundToggle).Should().Contain(presetToggles, "every toggle of the as-found estate has a Check that finds it");
+        // chattyTelemetry is the spend toggle of incident 2: its Check pairs rising spend with flat volume and arrives with the cost view (#509).
+        checks.Select(check => check.AsFoundToggle).Should().Contain(presetToggles.Except(["chattyTelemetry"]), "every toggle of the as-found estate has a Check that finds it");
         checks.Select(check => check.AsFoundToggle).Should().OnlyHaveUniqueItems("a Check maps to exactly one toggle");
         foreach (var name in Directory.GetFiles(PresetsDirectory, "*.json").Select(Path.GetFileNameWithoutExtension))
         {

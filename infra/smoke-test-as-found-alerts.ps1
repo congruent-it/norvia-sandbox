@@ -119,5 +119,23 @@ Invoke-AsFound shipperTrackingCached=true
 if ((Get-TrackingPolicy) -notmatch 'cache-lookup-value') { Write-Fail 'the Shipper tracking policy has no cache under shipperTrackingCached' }
 Write-Pass 'the Shipper tracking policy caches the answer'
 
+function Get-LogLevel([string] $App) {
+    (Invoke-Az containerapp show --name $App --resource-group $resourceGroup `
+            --query "properties.template.containers[0].env[?name == 'Logging__LogLevel__Default'].value | [0]" --output tsv | Out-String).Trim()
+}
+$loggingApps = 'tms-api', 'tms-web', 'partner-portal-web', 'driver-app-api', 'driver-app-web', 'erp-web', 'erp-api', 'integration-console-web', 'health-check-web', 'simulator-web'
+
+Invoke-AsFound fixed
+foreach ($app in $loggingApps) {
+    if ((Get-LogLevel $app) -ne 'Information') { Write-Fail "$app does not log at Information under the fixed preset" }
+}
+Write-Pass 'every application logs at Information'
+
+Invoke-AsFound chattyTelemetry=true
+foreach ($app in $loggingApps) {
+    if ((Get-LogLevel $app) -ne 'Debug') { Write-Fail "$app does not log at Debug under chattyTelemetry" }
+}
+Write-Pass 'every application logs at Debug'
+
 Invoke-AsFound fixed
 Write-Host 'Done: the estate is in the fixed state.'
