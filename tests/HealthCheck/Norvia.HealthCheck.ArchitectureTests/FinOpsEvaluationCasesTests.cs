@@ -11,10 +11,12 @@ public sealed class FinOpsEvaluationCasesTests
 {
     private const string FindingId = "F-" + RisingSpendCheck.CheckId;
 
-    private static Dictionary<string, JsonNode> Cases() =>
+    private static readonly Lazy<Dictionary<string, JsonNode>> AllCases = new(() =>
         Directory.GetFiles(Path.Combine(RepositoryRoot.Path, "evaluation", "cases", "finops"), "*.json")
             .Select(file => JsonNode.Parse(File.ReadAllText(file))!)
-            .ToDictionary(c => c["id"]!.GetValue<string>());
+            .ToDictionary(c => c["id"]!.GetValue<string>()));
+
+    private static Dictionary<string, JsonNode> Cases() => AllCases.Value;
 
     private static IEnumerable<string> Strings(JsonNode? list) => list?.AsArray().Select(item => item!.GetValue<string>()) ?? [];
 
@@ -53,7 +55,7 @@ public sealed class FinOpsEvaluationCasesTests
         {
             cases.Should().ContainKey(id);
             Strings(FindingIds(cases[id])["exactly"]).Should().BeEmpty(id);
-            cases[id]["expect"]!["explanation"]!["rubric"].Should().NotBeNull(id);
+            cases[id]["expect"]!["explanation"]!["rubric"]!.GetValue<string>().Should().NotBeNullOrWhiteSpace(id);
         }
     }
 
