@@ -20,6 +20,9 @@ public sealed class CostViewAgainstAzureTests
     private const string Workspace = $"{AzureHost.ResourceGroupId}/providers/Microsoft.OperationalInsights/workspaces/log-norvia";
 
     private static readonly DateOnly Yesterday = new(2026, 11, 12);
+    private static readonly DateOnly CurrentFirst = new(2026, 11, 6);
+    private static readonly DateOnly PreviousFirst = new(2026, 10, 30);
+    private static readonly DateOnly PreviousLast = new(2026, 11, 5);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -27,6 +30,14 @@ public sealed class CostViewAgainstAzureTests
     {
         using var scope = host.AppServices.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new GetCostViewQuery(), Ct);
+    }
+
+    /// <summary>The view, after checking the query succeeded, so a failure shows its errors and not a null.</summary>
+    private static async Task<CostView> SucceededAsync(AzureHost host)
+    {
+        var result = await ViewAsync(host);
+        result.IsSuccess.Should().BeTrue(string.Join("; ", result.Errors));
+        return result.Value;
     }
 
     private static CostRow[] EveryDay(DateOnly first, DateOnly last, string resource, Func<DateOnly, decimal> cost) =>
@@ -37,9 +48,8 @@ public sealed class CostViewAgainstAzureTests
     {
         await using var host = new AzureHost();
 
-        var result = await ViewAsync(host);
+        await SucceededAsync(host);
 
-        result.IsSuccess.Should().BeTrue(string.Join("; ", result.Errors));
         var cost = host.Azure.Requests.Should().ContainSingle(request => request.Uri.Contains("Microsoft.CostManagement", StringComparison.Ordinal)).Subject;
         cost.Authorization.Should().Be("Bearer app-token");
         cost.Body.Should().Contain("2026-10-30T00:00:00Z").And.Contain("2026-11-12T23:59:59Z");
@@ -52,17 +62,14 @@ public sealed class CostViewAgainstAzureTests
     public async Task CostView_ARiseWithFlatVolume_PutsTheRisingResourceFirst_AndShowsVolumeUnchanged()
     {
         await using var host = new AzureHost();
-        var previousFirst = new DateOnly(2026, 10, 30);
-        var previousLast = new DateOnly(2026, 11, 5);
-        var currentFirst = new DateOnly(2026, 11, 6);
         host.Azure.Cost([
-            .. EveryDay(previousFirst, previousLast, Sql, _ => 11m),
-            .. EveryDay(currentFirst, Yesterday, Sql, _ => 11m),
-            .. EveryDay(previousFirst, previousLast, Workspace, _ => 1m),
-            .. EveryDay(currentFirst, Yesterday, Workspace, _ => 6m)]);
-        host.Tms.Volume([.. Enumerable.Range(0, 14).Select(offset => (previousFirst.AddDays(offset), 40))]);
+            .. EveryDay(PreviousFirst, PreviousLast, Sql, _ => 11m),
+            .. EveryDay(CurrentFirst, Yesterday, Sql, _ => 11m),
+            .. EveryDay(PreviousFirst, PreviousLast, Workspace, _ => 1m),
+            .. EveryDay(CurrentFirst, Yesterday, Workspace, _ => 6m)]);
+        host.Tms.Volume([.. Enumerable.Range(0, 14).Select(offset => (PreviousFirst.AddDays(offset), 40))]);
 
-        var view = (await ViewAsync(host)).Value;
+        var view = await SucceededAsync(host);
 
         view.Resources.Select(resource => resource.Name).Should().Equal("log-norvia", "sql-norvia");
         view.Resources[0].Should().Be(new PeriodChange("log-norvia", 1m, 6m));
@@ -77,12 +84,11 @@ public sealed class CostViewAgainstAzureTests
     public async Task CostView_ShowsYesterdayProvisional_AndLeavesItOutOfTheAverages()
     {
         await using var host = new AzureHost();
-        var currentFirst = new DateOnly(2026, 11, 6);
         host.Azure.Cost([
-            .. EveryDay(new DateOnly(2026, 10, 30), new DateOnly(2026, 11, 5), Sql, _ => 10m),
-            .. EveryDay(currentFirst, Yesterday, Sql, day => day == Yesterday ? 1m : 10m)]);
+            .. EveryDay(PreviousFirst, PreviousLast, Sql, _ => 10m),
+            .. EveryDay(CurrentFirst, Yesterday, Sql, day => day == Yesterday ? 1m : 10m)]);
 
-        var view = (await ViewAsync(host)).Value;
+        var view = await SucceededAsync(host);
 
         view.Days.Should().HaveCount(14);
         view.Days.Where(day => day.Provisional).Select(day => day.Date).Should().Equal(Yesterday);
@@ -96,7 +102,7 @@ public sealed class CostViewAgainstAzureTests
     {
         await using var host = new AzureHost();
 
-        var view = (await ViewAsync(host)).Value;
+        var view = await SucceededAsync(host);
 
         view.Days.Should().HaveCount(14, "every whole day is a day, even with no spend");
         view.Resources.Should().BeEmpty();
@@ -108,9 +114,9 @@ public sealed class CostViewAgainstAzureTests
     public async Task CostView_ADayWithSpendAndNoOrders_IsComparedAsZeroVolume_NotAsMissing()
     {
         await using var host = new AzureHost();
-        host.Azure.Cost(EveryDay(new DateOnly(2026, 11, 6), Yesterday, Sql, _ => 11m));
+        host.Azure.Cost(EveryDay(CurrentFirst, Yesterday, Sql, _ => 11m));
 
-        var view = (await ViewAsync(host)).Value;
+        var view = await SucceededAsync(host);
 
         view.Volume.Should().Be(new PeriodChange("Transport Orders", 0m, 0m, ChangeKind.Volume));
         view.Total.Current.Should().Be(11m);
@@ -154,7 +160,7 @@ public sealed class CostViewAgainstAzureTests
     {
         await using var host = new AzureHost();
 
-        (await ViewAsync(host)).IsSuccess.Should().BeTrue();
+        await SucceededAsync(host);
 
         host.Azure.Requests.Should().NotBeEmpty();
         host.Azure.Requests.Should().OnlyContain(request => request.Method == HttpMethod.Post && request.Uri.Contains("Microsoft.CostManagement/query", StringComparison.Ordinal),
@@ -180,5 +186,15 @@ public sealed class CostViewAgainstAzureTests
         var response = await host.AppClient().GetAsync("/cost", Ct);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task SpendPage_ForAnOperatorWithOnlyTheCostRole_IsServed()
+    {
+        await using var host = new AzureHost(operatorRoles: ["HealthCheck.Cost"]);
+
+        var response = await host.AppClient().GetAsync("/cost", Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

@@ -24,6 +24,7 @@ internal sealed class AzureHost : IAsyncDisposable
     public const string Namespace = "sb-norvia-abc";
     public const string NamespaceId = $"{ResourceGroupId}/providers/Microsoft.ServiceBus/namespaces/{Namespace}";
     public const string Project = "https://ais-norvia.services.ai.azure.com/api/projects/norvia";
+    public static readonly string[] AllOperatorRoles = ["HealthCheck.Run", "HealthCheck.Read", "HealthCheck.Cost"];
     public const string TmsAddress = "http://tms-api";
 
     /// <summary>What the app takes as the time: 13 November 2026, ten in the morning UTC. Only the clock reading is fixed; timers run for real.</summary>
@@ -35,7 +36,7 @@ internal sealed class AzureHost : IAsyncDisposable
     /// <param name="operatorRoles">The roles the local operator holds; all three operator roles unless a test shows what one without a role is refused.</param>
     public AzureHost(int timeoutSeconds = 5, string[]? operatorRoles = null)
     {
-        _app = new AppFactory(this, timeoutSeconds, operatorRoles ?? ["HealthCheck.Run", "HealthCheck.Read", "HealthCheck.Cost"]);
+        _app = new AppFactory(this, timeoutSeconds, operatorRoles ?? AllOperatorRoles);
     }
 
     public FakeAzure Azure { get; } = new();
