@@ -184,8 +184,10 @@ public class TmsUiFixture : IAsyncLifetime
     public async Task ExpireProofOfDeliveryFileAsync(string shipmentNumber, Guid fileId, CancellationToken cancellationToken)
     {
         var container = new BlobServiceClient(await _app!.GetConnectionStringAsync("blobs", cancellationToken)).GetBlobContainerClient("proofs-of-delivery");
-        (await container.DeleteBlobIfExistsAsync($"{shipmentNumber}/{fileId:N}", cancellationToken: cancellationToken)).Value
-            .Should().BeTrue("the file was stored under the Shipment number and its ID");
+        if (!(await container.DeleteBlobIfExistsAsync($"{shipmentNumber}/{fileId:N}", cancellationToken: cancellationToken)).Value)
+        {
+            throw new InvalidOperationException($"No blob of file {fileId} of Shipment {shipmentNumber}: it is stored under the Shipment number and the file's ID.");
+        }
     }
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, JsonObject body, CancellationToken cancellationToken)

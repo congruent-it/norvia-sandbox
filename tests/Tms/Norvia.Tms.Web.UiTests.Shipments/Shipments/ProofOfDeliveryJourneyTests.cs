@@ -96,7 +96,8 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
         await Page.GotoAsync($"/shipments/{shipmentNumber}");
         var proofs = Page.GetByRole(AriaRole.Region, new() { Name = "Proofs of delivery" });
         var expiring = proofs.GetByRole(AriaRole.Link, new() { Name = "cmr-expiring.pdf", Exact = true });
-        var fileId = Guid.Parse((await expiring.GetAttributeAsync("href"))!.Split('/')[^1]);
+        var viewPath = (await expiring.GetAttributeAsync("href"))!;
+        var fileId = Guid.Parse(new Uri(viewPath, UriKind.Relative).OriginalString.Split('?')[0].Split('/')[^1]);
 
         await _tms.ExpireProofOfDeliveryFileAsync(shipmentNumber, fileId, TestContext.Current.CancellationToken);
         await Page.ReloadAsync();
@@ -113,6 +114,9 @@ public sealed class ProofOfDeliveryJourneyTests(TmsUiFixture tms) : BrowserPage(
         await Expect(opened.GetByText("The Proof of delivery itself is kept.")).ToBeVisibleAsync();
         await Expect(opened.GetByText("ProofOfDeliveryFileExpired")).ToBeVisibleAsync();
         await opened.CloseAsync();
+
+        var saved = await Page.APIRequest.GetAsync($"{viewPath}?download=true");
+        saved.Status.Should().Be((int)HttpStatusCode.Gone);
     }
 
     private async Task RecordProofAsync(string reference, string receivedBy, string fileName)
