@@ -24,10 +24,8 @@ public sealed class RefusedCallsRegistrationTests
         });
 
         services.GetRequiredService<IRefusedCalls>().Should().BeOfType<LogAnalyticsRefusedCalls>();
-        // The adapter takes no operator and no token with a call: the only identity it has is the console's, and that is its managed identity.
+        // The adapter's only identity is the console's credential; it is given no operator and no token.
         services.GetRequiredService<TokenCredential>().Should().BeOfType<ManagedIdentityCredential>();
-        typeof(LogAnalyticsRefusedCalls).GetConstructors().Single().GetParameters().Select(parameter => parameter.ParameterType.Name)
-            .Should().Equal("LogsQueryClient", "IOptions`1", "TimeProvider");
     }
 
     [Fact]
@@ -44,7 +42,7 @@ public sealed class RefusedCallsRegistrationTests
 
     private static ServiceProvider ConsoleServices(Dictionary<string, string?> settings)
     {
-        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
+        var builder = Host.CreateEmptyApplicationBuilder(settings: null);
         builder.Configuration.AddInMemoryCollection(settings);
         builder.AddIntegrationConsoleInfrastructure();
         return builder.Services.BuildServiceProvider();

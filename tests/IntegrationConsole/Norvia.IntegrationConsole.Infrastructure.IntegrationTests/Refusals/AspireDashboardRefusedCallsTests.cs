@@ -77,41 +77,21 @@ public sealed class AspireDashboardRefusedCallsTests(LocalTelemetryFixture local
         return await local.StandIn.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
-    // The dashboard takes a moment to receive what the stand-in exported.
+    // The dashboard takes a moment to receive what the stand-in exported; at the end of a minute, what it has is returned and the assertion says what is missing.
     private async Task<IReadOnlyList<RecordedRefusal>> EventuallyAsync(DateTimeOffset since, Func<IReadOnlyList<RecordedRefusal>, bool> enough)
     {
         using var http = new HttpClient { BaseAddress = local.DashboardUrl };
-        http.DefaultRequestHeaders.Add(DashboardTrailSource.ApiKeyHeader, LocalTelemetryFixture.ApiKey);
         var source = new DashboardTrailSource(http, Options.Create(new DashboardTrailSourceOptions { DashboardUrl = local.DashboardUrl, ApiKey = LocalTelemetryFixture.ApiKey }));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(60));
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(60);
         while (true)
         {
-            IReadOnlyList<RecordedRefusal> found;
-            try
-            {
-                found = await source.RefusalsAsync(since, timeout.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                var raw = await http.GetStringAsync(new Uri("api/telemetry/logs?limit=50", UriKind.Relative), TestContext.Current.CancellationToken);
-                throw new InvalidOperationException(raw[..Math.Min(raw.Length, 3000)]);
-            }
-
-            if (enough(found) || timeout.IsCancellationRequested)
+            var found = await source.RefusalsAsync(since, TestContext.Current.CancellationToken);
+            if (enough(found) || DateTimeOffset.UtcNow > deadline)
             {
                 return found;
             }
 
-            try
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(500), timeout.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                var raw = await http.GetStringAsync(new Uri("api/telemetry/logs?limit=50", UriKind.Relative), TestContext.Current.CancellationToken);
-                throw new InvalidOperationException(found.Count + " refusals; " + raw[..Math.Min(raw.Length, 3000)]);
-            }
+            await Task.Delay(TimeSpan.FromMilliseconds(500), TestContext.Current.CancellationToken);
         }
     }
 }

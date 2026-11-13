@@ -7,6 +7,7 @@ using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using Norvia.IntegrationConsole.Infrastructure.Trails;
 
 namespace Norvia.IntegrationConsole.Infrastructure.IntegrationTests.Refusals;
 
@@ -47,7 +48,7 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
         var standInPort = FreePort();
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(
             [
-                "--ASPNETCORE_URLS=http://localhost:15180",
+                $"--ASPNETCORE_URLS=http://localhost:{FreePort()}",
                 "--ASPIRE_ALLOW_UNSECURED_TRANSPORT=true",
                 $"--AppHost:DashboardApiKey={ApiKey}",
             ],
@@ -118,10 +119,10 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
         var logs = new System.Collections.Concurrent.ConcurrentQueue<string>();
         await _app.ResourceNotifications.WaitForResourceAsync(PartnerApi, KnownResourceStates.Running, startup.Token);
         _app.ResourceNotifications.TryGetCurrentState(Dashboard, out var dashboardState);
+        // The dashboard lists its OTLP/gRPC address first and its web address, which also serves the telemetry API, second.
         DashboardUrl = new Uri(dashboardState!.Snapshot.Urls[1].Url);
         _app.ResourceNotifications.TryGetCurrentState(PartnerApi, out var current);
-        var resourceId = current?.ResourceId ?? PartnerApi;
-        logs.Enqueue($"state={current?.Snapshot.State?.Text} exit={current?.Snapshot.ExitCode} id={resourceId}");
+        var resourceId = current!.ResourceId;
         _ = Task.Run(async () =>
         {
             await foreach (var batch in _app.Services.GetRequiredService<ResourceLoggerService>().WatchAsync(resourceId))
@@ -132,13 +133,12 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
                 }
             }
         });
-        await _app.ResourceNotifications.WaitForResourceAsync(PartnerApi, KnownResourceStates.Running, startup.Token);
         StandIn = new HttpClient { BaseAddress = new Uri($"http://localhost:{standInPort}") };
         try
         {
             await WaitForAsync(StandIn, new Uri("/partner/v1/transport-orders", UriKind.Relative), startup.Token);
             using var dashboard = new HttpClient { BaseAddress = DashboardUrl };
-            dashboard.DefaultRequestHeaders.Add("x-api-key", ApiKey);
+            dashboard.DefaultRequestHeaders.Add(DashboardTrailSource.ApiKeyHeader, ApiKey);
             await WaitForAsync(dashboard, new Uri("/api/telemetry/logs?limit=1", UriKind.Relative), startup.Token);
             ReadyAt = DateTimeOffset.UtcNow;
         }
@@ -150,7 +150,6 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        GC.SuppressFinalize(this);
         StandIn?.Dispose();
         if (_app is not null)
         {
