@@ -23,7 +23,7 @@ The estate (API Management, Logic Apps, Service Bus, monitoring, Entra) deploys 
 | Area | State | Issue |
 |---|---|---|
 | WMS | No application. Fulfilment Orders and Inventory exist only in the glossary and the scenario. Handoff from the WMS is deferred | [#911](https://github.com/congruent-it/norvia-sandbox/issues/911) |
-| E3 master-data sync | The ERP does not yet replicate master data to the TMS, so both load the seed file | [#907](https://github.com/congruent-it/norvia-sandbox/issues/907) |
+| E3 master-data sync, other entities | The Shipper is edited in the ERP API and replicated to the TMS. Carriers, Rate Cards, Carrier Rate Cards, Vehicles and Drivers, and the ERP UI's forms, are not built, so those still come from the seed file | [#907](https://github.com/congruent-it/norvia-sandbox/issues/907) |
 | Fuller Rate Card, re-rating | Deferred | [#908](https://github.com/congruent-it/norvia-sandbox/issues/908) |
 | Push Shipment progress to the Shipper | Deferred | [#909](https://github.com/congruent-it/norvia-sandbox/issues/909) |
 | Consignee tracking | Deferred | [#910](https://github.com/congruent-it/norvia-sandbox/issues/910) |

@@ -774,6 +774,58 @@
         }
       }
     },
+    "/v1/shippers/{id}": {
+      "put": {
+        "tags": [
+          "MasterData"
+        ],
+        "summary": "Create or edit a Shipper, and replicate it to the TMS.",
+        "description": "What Finance's Shipper form does, through the same command. Creates the Shipper (201, Master-data revision 1) or replaces its name and active flag (200, the revision raised by one) and publishes the whole Shipper as the Shipper event, in one transaction. Idempotent on content: a repeat of what the Shipper already is answers 200 with the unchanged revision and publishes nothing. A Shipper is never deleted, only made inactive. Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.",
+        "operationId": "SaveShipper",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveShipperRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveShipperResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveShipperResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}": {
       "get": {
         "tags": [
@@ -2449,6 +2501,13 @@
         },
         "additionalProperties": false
       },
+      "MasterDataSaveOutcome": {
+        "enum": [
+          "Created",
+          "Updated",
+          "Unchanged"
+        ]
+      },
       "NotDeliveredView": {
         "required": [
           "at",
@@ -2602,6 +2661,38 @@
             "items": {
               "$ref": "#/components/schemas/DeletedKind"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveShipperRequest": {
+        "required": [
+          "name",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveShipperResult": {
+        "required": [
+          "shipper",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "shipper": {
+            "$ref": "#/components/schemas/ShipperView"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MasterDataSaveOutcome"
           }
         },
         "additionalProperties": false
@@ -2805,6 +2896,35 @@
         },
         "additionalProperties": false
       },
+      "ShipperView": {
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 1
+          }
+        },
+        "additionalProperties": false
+      },
       "TransportOrderBillableRequest": {
         "required": [
           "eventId",
@@ -2890,6 +3010,9 @@
     },
     {
       "name": "CreditNotes"
+    },
+    {
+      "name": "MasterData"
     },
     {
       "name": "FinanceAgent"

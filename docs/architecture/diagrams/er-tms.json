@@ -137,6 +137,18 @@
       ]
     },
     {
+      "name": "ShipperCopies",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
       "name": "ShipperNotifications",
       "columns": [
         {

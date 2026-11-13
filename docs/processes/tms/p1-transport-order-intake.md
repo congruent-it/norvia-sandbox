@@ -190,5 +190,5 @@ These were left out on purpose while designing P1, each with its reason.
 - **Dangerous goods, temperature control, multi-leg or multi-stop Transport Orders, and customs.** They are too much for the first slice.
 - **Notifying the Shipper by email or webhook.** The Shipper sees the outcome in the call response and in the Partner portal's list of bookings.
 - **Asynchronous intake (202 Accepted).** It was dropped along with the queue between API Management and the Logic App, so the Shipper sees the TMS's decision straight away. It can come back if a demo needs it.
-- **The ERP and master-data sync.** Shippers come from the seed file for now.
+- **The ERP and master-data sync.** The TMS's Shippers are the seed file's, replaced by the ERP's edits ([E3](../erp/e3-master-data-sync.md)).
 - **As-found toggles and presenter-panel faults.** The [as-found estate](../../operations/as-found.md) is built. It lists no toggle or fault for P1 beyond the estate-wide alert toggles.
