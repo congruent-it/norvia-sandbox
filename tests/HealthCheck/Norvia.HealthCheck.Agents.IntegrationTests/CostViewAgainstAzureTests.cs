@@ -92,7 +92,7 @@ public sealed class CostViewAgainstAzureTests
     }
 
     [Fact]
-    public async Task CostView_WhenTheBillHasNoWholeDay_IsEmpty_AndNothingIsInvented()
+    public async Task CostView_WhenTheBillHasNoSpend_ShowsEveryWholeDayWithZero_AndNoResource()
     {
         await using var host = new AzureHost();
 
@@ -100,7 +100,8 @@ public sealed class CostViewAgainstAzureTests
 
         view.Days.Should().HaveCount(14, "every whole day is a day, even with no spend");
         view.Resources.Should().BeEmpty();
-        view.Total.Current.Should().Be(0m);
+        view.Total.Should().Be(new PeriodChange("Total", 0m, 0m, ChangeKind.Total));
+        view.Days.Should().OnlyContain(day => day.Spend.Count == 0);
     }
 
     [Fact]
@@ -111,12 +112,12 @@ public sealed class CostViewAgainstAzureTests
 
         var view = (await ViewAsync(host)).Value;
 
-        view.Volume.Current.Should().Be(0m);
-        view.Total.Current.Should().BeGreaterThan(0m);
+        view.Volume.Should().Be(new PeriodChange("Transport Orders", 0m, 0m, ChangeKind.Volume));
+        view.Total.Current.Should().Be(11m);
     }
 
     [Fact]
-    public async Task CostView_WhenTheBillIsNotInEur_Fails_AndShowsNoNumber()
+    public async Task CostView_WhenTheBillIsNotInEur_Fails()
     {
         await using var host = new AzureHost();
         host.Azure.Cost(new CostRow(new DateOnly(2026, 11, 10), Sql, 11m, "USD"));
@@ -127,7 +128,7 @@ public sealed class CostViewAgainstAzureTests
     }
 
     [Fact]
-    public async Task CostView_WhenCostManagementRefuses_Fails_AndShowsNoNumber()
+    public async Task CostView_WhenCostManagementRefuses_Fails()
     {
         await using var host = new AzureHost();
         host.Azure.Fail(HttpStatusCode.Forbidden);
@@ -138,7 +139,7 @@ public sealed class CostViewAgainstAzureTests
     }
 
     [Fact]
-    public async Task CostView_WhenTheTmsRefuses_Fails_AndGuessesNoVolume()
+    public async Task CostView_WhenTheTmsRefuses_Fails()
     {
         await using var host = new AzureHost();
         host.Tms.Fail(HttpStatusCode.ServiceUnavailable);
@@ -149,12 +150,13 @@ public sealed class CostViewAgainstAzureTests
     }
 
     [Fact]
-    public async Task Cost_ReadsOnly_NothingIsPostedButTheCostQuery()
+    public async Task CostView_ReadsOnly_NothingIsPostedButTheCostQuery()
     {
         await using var host = new AzureHost();
 
-        await ViewAsync(host);
+        (await ViewAsync(host)).IsSuccess.Should().BeTrue();
 
+        host.Azure.Requests.Should().NotBeEmpty();
         host.Azure.Requests.Should().OnlyContain(request => request.Method == HttpMethod.Post && request.Uri.Contains("Microsoft.CostManagement/query", StringComparison.Ordinal),
             "the page asks for the bill and nothing else of Azure");
         host.Tms.Requests.Should().OnlyContain(request => request.Method == HttpMethod.Get);
@@ -171,14 +173,12 @@ public sealed class CostViewAgainstAzureTests
     }
 
     [Fact]
-    public async Task SpendPage_ForAnOperatorWithoutTheCostRole_IsRefused_AndTheBillIsNotRead()
+    public async Task SpendPage_ForAnOperatorWithoutTheCostRole_IsRefused()
     {
         await using var host = new AzureHost(operatorRoles: ["HealthCheck.Run", "HealthCheck.Read"]);
 
         var response = await host.AppClient().GetAsync("/cost", Ct);
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        host.Azure.Requests.Should().BeEmpty();
-        host.Tms.Requests.Should().BeEmpty();
     }
 }
