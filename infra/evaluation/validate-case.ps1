@@ -34,7 +34,7 @@ end {
     $expect = $case.expect
     if (-not (Test-Object $expect)) { $problems.Add('expect must be an object of checks') }
     else {
-        $checks = 'fields', 'lists', 'mustNotContain', 'mustCite', 'toolsNotCalled', 'toolsCalled', 'explanation', 'texts', 'absent', 'grounded'
+        $checks = 'fields', 'lists', 'mustNotContain', 'mustCite', 'toolsNotCalled', 'toolsCalled', 'explanation', 'texts', 'absent', 'grounded', 'valuesInInput'
         foreach ($name in (Get-PropertyName $expect | Sort-Object -CaseSensitive)) {
             if ($name -cnotin $checks) { $problems.Add("expect.$name is not a check") }
         }
@@ -60,6 +60,7 @@ end {
         }
 
         if ($null -ne $expect.grounded -and $expect.grounded -isnot [bool]) { $problems.Add('expect.grounded must be true or false') }
+        if ($null -ne $expect.valuesInInput -and $expect.valuesInInput -isnot [bool]) { $problems.Add('expect.valuesInInput must be true or false') }
 
         if ($null -ne $expect.explanation -and (-not (Test-Object $expect.explanation) -or $expect.explanation.rubric -isnot [string])) {
             $problems.Add('expect.explanation must be an object with a rubric')
