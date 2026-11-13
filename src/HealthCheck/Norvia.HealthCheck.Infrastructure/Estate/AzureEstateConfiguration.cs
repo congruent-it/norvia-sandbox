@@ -5,7 +5,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Azure.Core;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Estate;
 
 namespace Norvia.HealthCheck.Infrastructure.Estate;
@@ -30,7 +32,9 @@ internal sealed partial class AzureEstateConfiguration(
     IHttpClientFactory clients,
     TokenCredential credential,
     IOptions<AzureEstateOptions> options,
-    TimeProvider time) : IEstateConfiguration
+    TimeProvider time,
+    ICostReader costReader,
+    ILogger<AzureEstateConfiguration> logger) : IEstateConfiguration
 {
     public const string ManagementClient = "estate-management";
 
@@ -109,6 +113,9 @@ internal sealed partial class AzureEstateConfiguration(
                 FailedRuns: await ReadFailedRunsAsync(id, cancellationToken));
         }, cancellationToken);
 
+        progress?.Report("Reading the spend and the Transport Order volume");
+        var cost = await ReadCostAsync(cancellationToken);
+
         progress?.Report("Reading the alert receivers");
         return new EstateConfiguration(EstateName, entities)
         {
@@ -134,7 +141,29 @@ internal sealed partial class AzureEstateConfiguration(
                 .Select(app => Flag(app["enabled"]))
                 .FirstOrDefault(),
             Agents = null,
+            Cost = cost,
         };
+    }
+
+    // The settled whole days of two periods of the cost Check. Null when Cost Management or the TMS API cannot be read (the app lacks the
+    // role, or the lag has left no settled day), so the Check gives no Finding for what it could not see.
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The spend and the Transport Order volume could not be read, so the cost Check gives no Finding")]
+    private static partial void CostUnreadable(ILogger logger, Exception exception);
+
+    private async Task<CostFacts?> ReadCostAsync(CancellationToken cancellationToken)
+    {
+        var yesterday = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddDays(-1);
+        try
+        {
+            var days = await costReader.ReadAsync(yesterday.AddDays(1 - 2 * CostFacts.PeriodDays), yesterday, cancellationToken);
+            return new CostFacts([.. days.Where(day => !day.Provisional)]);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Whatever the reason (no role, a timeout, a bad answer), the cost is unread and the Check says nothing; the log says why.
+            CostUnreadable(logger, exception);
+            return null;
+        }
     }
 
     // What the steps read from Resource Graph. The queries do not depend on each other or on the other reads, so they all start at once, and a step

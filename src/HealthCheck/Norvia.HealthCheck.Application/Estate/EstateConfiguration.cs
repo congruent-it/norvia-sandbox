@@ -39,6 +39,9 @@ public sealed record EstateConfiguration(string Name, IReadOnlyList<ServiceBusEn
 
     /// <summary>What guards the agents. Null when the estate has no agents or the adapter cannot read them.</summary>
     public AgentFacts? Agents { get; init; }
+
+    /// <summary>The spend and the Transport Order volume of the latest whole days. Null when the adapter cannot read Cost Management, so a Check gives no Finding for what it could not see.</summary>
+    public CostFacts? Cost { get; init; }
 }
 
 /// <summary>

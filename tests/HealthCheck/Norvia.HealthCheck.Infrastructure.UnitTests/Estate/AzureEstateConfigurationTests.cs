@@ -2,8 +2,10 @@ using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using Azure.Core;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Norvia.HealthCheck.Application.Checks;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Infrastructure.Estate;
 
 namespace Norvia.HealthCheck.Infrastructure.UnitTests.Estate;
@@ -23,6 +25,8 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     private readonly TokenCredential _credential = Substitute.For<TokenCredential>();
     private readonly IHttpClientFactory _clients = Substitute.For<IHttpClientFactory>();
     private readonly HttpClient _http;
+    private readonly FixedTime _time = new(new DateTimeOffset(2026, 11, 13, 0, 0, 5, TimeSpan.Zero));
+    private readonly ICostReader _costReader = Substitute.For<ICostReader>();
 
     public AzureEstateConfigurationTests()
     {
@@ -33,6 +37,41 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     public void Dispose() => _http.Dispose();
+
+    private sealed class FixedTime(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    [Fact]
+    public async Task ReadAsync_ForTheCost_HoldsTheSettledDaysOfTwoPeriodsEndingYesterday_AndNotTheProvisionalOne()
+    {
+        _azure.Entities(queues: [], subscriptions: []).Alerts();
+        var yesterday = new DateOnly(2026, 11, 12);
+        _costReader.ReadAsync(yesterday.AddDays(-13), yesterday, Arg.Any<CancellationToken>()).Returns(
+        [
+            new CostDay(yesterday.AddDays(-1), 40, false, [new("log-workspace", 0.5m)]),
+            new CostDay(yesterday, 40, true, [new("log-workspace", 9m)]),
+        ]);
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.Cost.Should().NotBeNull();
+        estate.Cost!.Days.Select(day => day.Date).Should().Equal(yesterday.AddDays(-1));
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenTheCostCannotBeRead_LeavesItNull_SoTheCostCheckGivesNoFinding()
+    {
+        _azure.Entities(queues: [], subscriptions: []).Alerts();
+        _costReader.ReadAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<CostDay>>>(_ => throw new HttpRequestException("403"));
+
+        var estate = await Adapter().ReadAsync(TestContext.Current.CancellationToken);
+
+        estate.Cost.Should().BeNull();
+        Checklist.Default.Run(estate).Should().BeEmpty();
+    }
 
     [Fact]
     public async Task ReadAsync_ForQueuesAndSubscriptions_SaysWhichHaveAnAlertOnTheirDeadLetterQueue()
@@ -258,6 +297,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
             "Reading how long Application Insights and its workspace keep what they trace",
             "Reading the storage accounts' lifecycle rules and malware scanning",
             "Counting the failed runs of each Logic App",
+            "Reading the spend and the Transport Order volume",
             "Reading the alert receivers");
     }
 
@@ -527,7 +567,7 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     private AzureEstateConfiguration Adapter() =>
-        new(_clients, _credential, Microsoft.Extensions.Options.Options.Create(new AzureEstateOptions { ResourceGroupId = ResourceGroupId, ServiceBusNamespace = Namespace }), TimeProvider.System);
+        new(_clients, _credential, Microsoft.Extensions.Options.Options.Create(new AzureEstateOptions { ResourceGroupId = ResourceGroupId, ServiceBusNamespace = Namespace }), _time, _costReader, NullLogger<AzureEstateConfiguration>.Instance);
 
     // Azure Monitor's answer for a metric: one time series with a point for each day's total, or none at all.
     private static string Metric(params int[] totals) =>

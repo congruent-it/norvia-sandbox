@@ -39,6 +39,7 @@ public sealed class Checklist(IReadOnlyList<Check> checks)
         new AssistantLimitsCheck(),
         new AssistantOutputCheckCheck(),
         new AssistantAccessCheck(),
+        new RisingSpendCheck(),
     ]);
 
     public IReadOnlyList<Check> Checks => checks;

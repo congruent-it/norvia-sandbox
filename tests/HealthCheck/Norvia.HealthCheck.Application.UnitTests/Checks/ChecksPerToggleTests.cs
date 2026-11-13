@@ -45,6 +45,7 @@ public sealed class ChecksPerToggleTests
         { "assistantLimitsOff", Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(LimitsOn: false)) }, "ASSISTANT-LIMITS", "shipper-tracking-assistant" },
         { "assistantOutputCheckOff", Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(OutputCheckOn: false)) }, "ASSISTANT-OUTPUT-CHECK", "shipper-tracking-assistant" },
         { "assistantIdentityHoldsRoleOrTool", Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(IdentityRoles: ["TransportOrders.CustomerServiceAgent.Read"])) }, "ASSISTANT-ACCESS", "shipper-tracking-assistant" },
+        { "chattyTelemetry", Healthy with { Cost = RisingSpendCheckTests.Facts(volume: 40, workspaceBefore: 0.55m, workspaceNow: 3.3m) }, "COST-RISING-SPEND", "log-workspace" },
         { "unlimitedModelQuota", Healthy with { Agents = new AgentFacts(Identities: [Reader], ModelQuotaUnlimited: true) }, "MODEL-QUOTA", "model deployment" },
     };
 

@@ -15,17 +15,19 @@ internal sealed class SnapshotCostReader(IOptions<CostSnapshotOptions> options) 
 
     public Task<IReadOnlyList<CostDay>> ReadAsync(DateOnly firstDay, DateOnly lastDay, CancellationToken cancellationToken)
     {
-        var snapshot = Load(options.Value.CostSnapshot);
-        IReadOnlyList<CostDay> days = [.. snapshot.Days
-            .Where(day => day.Date >= firstDay && day.Date <= lastDay)
+        IReadOnlyList<CostDay> days = [.. Days(options.Value.CostSnapshot).Where(day => day.Date >= firstDay && day.Date <= lastDay)];
+        return Task.FromResult(days);
+    }
+
+    /// <summary>Every day of a named cost snapshot, oldest first. None is provisional: locally there is no lag.</summary>
+    internal static IReadOnlyList<CostDay> Days(string name) =>
+        [.. Load(name).Days
             .OrderBy(day => day.Date)
             .Select(day => new CostDay(
                 day.Date,
                 day.TransportOrders,
                 Provisional: false,
                 [.. day.SpendByResource.Select(spend => new ResourceSpend(spend.Key, spend.Value))]))];
-        return Task.FromResult(days);
-    }
 
     private static CostSnapshot Load(string name)
     {
