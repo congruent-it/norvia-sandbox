@@ -47,4 +47,8 @@ internal static class Embedded
     public static string FinanceRejectionReasonDefinition => Read("agents/finance-rejection-reason.agent.yaml");
 
     public static string FinanceRejectionReasonTools => Read("agent-mcp/finance-rejection-reason.tools.json");
+
+    public static string FinOpsDefinition => Read("agents/finops.agent.yaml");
+
+    public static string HealthCheckCostTools => Read("agent-mcp/health-check-cost.tools.json");
 }

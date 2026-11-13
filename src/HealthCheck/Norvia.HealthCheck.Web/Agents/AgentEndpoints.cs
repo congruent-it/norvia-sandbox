@@ -1,5 +1,7 @@
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Norvia.HealthCheck.Application.Checks;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Failures;
 using Norvia.HealthCheck.Application.Run;
 
@@ -27,7 +29,28 @@ internal static class AgentEndpoints
         group.MapGet("/checks", RunChecksAsync);
         group.MapGet("/failed-runs", ListFailedRunsAsync);
         group.MapGet("/dead-letter-queues", ListDeadLetterQueuesAsync);
+
+        // The FinOps agent's two reads (#511), behind a role of their own: the health-check Agent's token opens neither.
+        var cost = endpoints.MapGroup(Prefix)
+            .RequireAuthorization(AgentApiAuthentication.CostPolicy)
+            .AddEndpointFilter<AgentCallTracking>();
+        cost.MapGet("/cost", GetCostAsync);
+        cost.MapGet("/rising-spend", ListRisingSpendAsync);
         return endpoints;
+    }
+
+    private static async Task<Results<Ok<AgentCostView>, ProblemHttpResult>> GetCostAsync(IMediator mediator, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new GetCostViewQuery(), cancellationToken);
+        return result.IsSuccess
+            ? TypedResults.Ok(AgentViewMapping.Of(result.Value))
+            : TypedResults.Problem("The estate's spend could not be read.", statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    private static async Task<Ok<AgentFindingsView>> ListRisingSpendAsync(IMediator mediator, CancellationToken cancellationToken)
+    {
+        var result = await mediator.Send(new RunHealthCheckQuery(ReuseWithin: ReportMaxAge), cancellationToken);
+        return TypedResults.Ok(AgentViewMapping.Of(result.Value, RisingSpendCheck.CheckId));
     }
 
     private static async Task<Ok<AgentFindingsView>> RunChecksAsync(IMediator mediator, CancellationToken cancellationToken)

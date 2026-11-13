@@ -16,6 +16,8 @@ internal sealed class HealthCheckRequests(IServiceScopeFactory scopes) : IHealth
 
     public Task<Result<NarratedItem>> ExplainAsync(ExplainFindingQuery query, CancellationToken cancellationToken) => SendAsync(query, cancellationToken);
 
+    public Task<Result<Narration>> NarrateSpendAsync(NarrateSpendQuery query, CancellationToken cancellationToken) => SendAsync(query, cancellationToken);
+
     public Task<Result<CostView>> CostAsync(GetCostViewQuery query, CancellationToken cancellationToken) => SendAsync(query, cancellationToken);
 
     private async Task<TResult> SendAsync<TResult>(IQuery<TResult> query, CancellationToken cancellationToken)

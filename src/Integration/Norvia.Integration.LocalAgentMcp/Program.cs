@@ -17,6 +17,9 @@ builder.Services.AddOptions<AgentMcpOptions>().BindConfiguration(AgentMcpOptions
         options => options.HealthCheck is null || (options.HealthCheck.Api is { IsAbsoluteUri: true } && options.HealthCheck.Tokens.IsComplete && options.HealthCheck.ApiTokens.IsComplete),
         "AgentMcp:HealthCheck needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
     .Validate(
+        options => options.HealthCheckCost is null || (options.HealthCheckCost.Api is { IsAbsoluteUri: true } && options.HealthCheckCost.Tokens.IsComplete && options.HealthCheckCost.ApiTokens.IsComplete),
+        "AgentMcp:HealthCheckCost needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
+    .Validate(
         options => options.CustomerService is null || (options.CustomerService.Api is { IsAbsoluteUri: true } && options.CustomerService.Tokens.IsComplete && options.CustomerService.ApiTokens.IsComplete),
         "AgentMcp:CustomerService needs an absolute Api, Tokens and ApiTokens, each with an Issuer, an Audience and a SigningKey.")
     .Validate(
@@ -40,6 +43,7 @@ builder.Services.AddSingleton<AgentRateLimit>();
 // The tool lists are the contract files the Bicep reads too (ADR 0040), so the two cannot differ.
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("integration-operations.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("health-check.tools.json")));
+builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("health-check-cost.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("customer-service-reply.tools.json")));
 builder.Services.AddSingleton(_ => ToolListContract.Parse(ReadEmbedded("planner.tools.json")));

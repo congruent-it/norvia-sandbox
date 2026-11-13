@@ -39,8 +39,8 @@ public sealed class AgentRulesTests
     public void TheAgent_HoldsOnlyTheCallRole_WhichIsNoOperatorRole()
     {
         Contract().Role.Should().Be(AgentRoles.Read).And.Be("HealthCheck.Agent.Read");
-        new[] { OperatorRoles.Run, OperatorRoles.Read }.Should().NotContain(AgentRoles.Read);
-        typeof(AgentRoles).GetFields(BindingFlags.Public | BindingFlags.Static).Should().ContainSingle("the Agent holds one role and no Azure role");
+        new[] { OperatorRoles.Run, OperatorRoles.Read, OperatorRoles.Cost }.Should().NotContain(AgentRoles.Read);
+        typeof(AgentRoles).GetFields(BindingFlags.Public | BindingFlags.Static).Select(field => field.Name).Should().Equal(["Read", "CostRead"], "one call role for each Agent and no Azure role");
     }
 
     [Fact]

@@ -6,7 +6,7 @@
 .DESCRIPTION
     No names publishes every agents/*.agent.yaml. For each Agent it
       1. points the Agent's MCP server at the application's address in Azure (the Integration operations agent's is the
-         Integration console's, the Estate health-check agent's is the Estate health check's, the Customer service agent's is
+         Integration console's, the Estate health-check agent's and the FinOps agent's are the Estate health check's, the Customer service agent's is
          the TMS API's, the Carrier invoice matching agent's is the ERP API's; the estate could not know any of them when it was deployed): the API Management backend, and
          ESTATE_INTEGRATION_CONSOLE_BASE_URL, ESTATE_HEALTH_CHECK_BASE_URL, ESTATE_TMS_BASE_URL or ESTATE_ERP_BASE_URL so deploying the estate again
          keeps it;
@@ -115,6 +115,8 @@ foreach ($server in $servers) {
     switch ($server) {
         'integration-operations' { Set-BackendAddress $server integration-console-web integration-console-agent-api ESTATE_INTEGRATION_CONSOLE_BASE_URL }
         'health-check' { Set-BackendAddress $server health-check-web health-check-agent-api ESTATE_HEALTH_CHECK_BASE_URL }
+        # The FinOps agent's server shares the health-check agent API's backend: the same app, the same address.
+        'health-check-cost' { Set-BackendAddress $server health-check-web health-check-agent-api ESTATE_HEALTH_CHECK_BASE_URL }
         'customer-service' { Set-BackendAddress $server tms-api tms-agent-api ESTATE_TMS_BASE_URL -Route '/v1/agent/customer-service' }
         'finance-matching' { Set-BackendAddress $server erp-api erp-agent-api ESTATE_ERP_BASE_URL -Route '/v1/agent/finance' }
         'finance-rejection-reason' { Set-BackendAddress $server erp-api erp-rejection-reason-agent-api ESTATE_ERP_BASE_URL -Route '/v1/agent/finance-rejection-reason' }

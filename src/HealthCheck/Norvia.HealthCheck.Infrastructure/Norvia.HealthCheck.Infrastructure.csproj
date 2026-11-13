@@ -25,6 +25,7 @@
   <!-- The Agents' definitions, which the in-process runner reads as the Foundry deployment script reads them (ADR 0040). -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\agents\estate-health-check.agent.yaml" LogicalName="agents/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\agents\finops.agent.yaml" LogicalName="agents/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.HealthCheck.Infrastructure.UnitTests" />

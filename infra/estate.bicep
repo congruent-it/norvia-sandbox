@@ -707,6 +707,19 @@ module healthCheckMcp 'estate/health-check-mcp.bicep' = {
   ]
 }
 
+// The FinOps agent's MCP server over the cost tools of the same agent API, with an agent view of its own (#511). Like the others, it has no outputs.
+module healthCheckCostMcp 'estate/health-check-cost-mcp.bicep' = {
+  scope: resourceGroup
+  params: {
+    environmentName: environmentName
+    apiManagementName: partnerApi.outputs.apiManagementName
+    apiManagementClientId: identities.outputs.apiManagementClientId
+  }
+  dependsOn: [
+    healthCheckMcp
+  ]
+}
+
 // The Customer service agent's API Management front over the TMS API's agent view, with its MCP server and the two app registrations that
 // keep it narrow (infra/smoke-test-customer-service-agent.ps1). Like the others, it has no outputs.
 module customerServiceMcp 'estate/customer-service-mcp.bicep' = {

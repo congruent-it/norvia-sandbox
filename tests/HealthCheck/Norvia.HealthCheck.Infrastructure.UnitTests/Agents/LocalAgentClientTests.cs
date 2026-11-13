@@ -156,6 +156,73 @@ public sealed class LocalAgentClientTests : IDisposable
         result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
     }
 
+    private static readonly AgentRequest FinOpsRequest = new("finops", FinOpsQuestions.Narrate, CorrelationId);
+
+    [Fact]
+    public async Task NarrateAsync_TheFinOpsAgent_ReadsTheCostServer_AndNamesTheResourceAndTheToggle()
+    {
+        var result = await Client(CostOptions()).NarrateAsync(FinOpsRequest, TestContext.Current.CancellationToken);
+
+        result.IsSuccess.Should().BeTrue();
+        var item = result.Value.Items.Should().ContainSingle().Subject;
+        (item.Id, item.ToolName, item.ResultId).Should().Be(("F-COST-RISING-SPEND", "get_rising_spend_findings", "r2"));
+        item.Impact.Should().Contain("log-norvia").And.Contain("chattyTelemetry");
+        result.Value.Run.Should().Be(new Norvia.Agents.AgentRun("finops", "run-42"));
+        _mcp.Requested.Should().OnlyContain(address => address.AbsolutePath == "/mcp/health-check-cost");
+    }
+
+    [Fact]
+    public async Task NarrateAsync_TheHealthCheckAgentsToken_IsUnchangedWhenTheCostAgentIsConfigured()
+    {
+        var options = CostOptions();
+        var withToken = new HttpClient(new BearerTokenHandler(Microsoft.Extensions.Options.Options.Create(options), TimeProvider.System) { InnerHandler = _mcp });
+
+        await Client(options, withToken).NarrateAsync(Request, TestContext.Current.CancellationToken);
+
+        var healthCheckToken = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(_mcp.Authorizations.First()["Bearer ".Length..]);
+        healthCheckToken.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal(["HealthCheck.Agent.Read"], because: "the health-check agent's token is unchanged by the cost agent");
+    }
+
+    [Fact]
+    public async Task NarrateAsync_TheFinOpsAgentsToken_IsItsOwnIdentityAndAudience()
+    {
+        var options = CostOptions();
+        var withToken = new HttpClient(new BearerTokenHandler(Microsoft.Extensions.Options.Options.Create(options), TimeProvider.System) { InnerHandler = _mcp });
+
+        await Client(options, withToken).NarrateAsync(FinOpsRequest, TestContext.Current.CancellationToken);
+
+        var token = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(_mcp.Authorizations.First()["Bearer ".Length..]);
+        token.GetClaim("azp").Value.Should().Be("norvia-local-agent-finops");
+        token.Claims.Where(claim => claim.Type == "roles").Select(claim => claim.Value).Should().Equal("HealthCheck.Cost.Read");
+        token.Audiences.Should().Equal("api://norvia-health-check-cost-agent");
+    }
+
+    [Fact]
+    public async Task NarrateAsync_TheFinOpsAgentWithoutACostServer_IsAgentUnavailable()
+    {
+        var result = await Client().NarrateAsync(FinOpsRequest, TestContext.Current.CancellationToken);
+
+        result.Errors.Should().Equal(AgentFailureCodes.AgentUnavailable);
+    }
+
+    private static AgentClientOptions CostOptions()
+    {
+        var options = SignedOptions();
+        options.Cost = new AgentEndpointOptions
+        {
+            McpAddress = new Uri("http://mcp.test/mcp/health-check-cost"),
+            Tokens = new AgentTokenOptions
+            {
+                Issuer = "https://norvia.local/tokens",
+                Audience = "api://norvia-health-check-cost-agent",
+                ClientId = "norvia-local-agent-finops",
+                Role = "HealthCheck.Cost.Read",
+                SigningKey = options.Tokens.SigningKey,
+            },
+        };
+        return options;
+    }
+
     private static AgentClientOptions SignedOptions() => new()
     {
         McpAddress = new Uri("http://mcp.test/mcp/health-check"),

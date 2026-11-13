@@ -1,3 +1,5 @@
+using System.Globalization;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Failures;
 using Norvia.HealthCheck.Application.Run;
 
@@ -25,6 +27,30 @@ internal static class AgentViewMapping
                     finding.Fix)),
             ]);
     }
+
+    /// <summary>The Findings of one Check alone, from a whole run's report.</summary>
+    public static AgentFindingsView Of(HealthCheckReport report, string checkId)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        var all = Of(report);
+        return all with { Findings = [.. all.Findings.Where(finding => finding.CheckId == checkId)] };
+    }
+
+    public static AgentCostView Of(CostView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        return new AgentCostView(view.PeriodDays, view.HasProvisionalDays, Of(view.Total), Of(view.Volume), [.. view.Resources.Select(Of)]);
+    }
+
+    private static AgentChangeView Of(PeriodChange change) => new(change.Name, change.Previous, change.Current, Percent(change.Relative));
+
+    // Text, so the agent copies it: "+80%", "-5%" or "n/a" where either period has no figure.
+    private static string Percent(decimal? relative) =>
+        relative is null
+            ? "n/a"
+            : (relative.Value > 0 ? "+" : relative.Value < 0 ? "-" : string.Empty) + (Math.Abs(relative.Value) * 100).ToString("0", CultureInfo.InvariantCulture) + "%";
 
     public static AgentFailedRunsView Of(FailedRunsReport report)
     {

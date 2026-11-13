@@ -160,13 +160,15 @@ public sealed class AgentApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public void TheAgentApi_HasOnlyReadRoutes_ThatRequireTheAgentRole()
+    public void TheAgentApi_HasOnlyReadRoutes_ThatRequireTheirAgentsRole()
     {
         var routes = _host.AgentRoutes.ToList();
 
-        routes.Select(route => route.RoutePattern.RawText).Should().BeEquivalentTo("/agent/v1/checks", "/agent/v1/failed-runs", "/agent/v1/dead-letter-queues");
+        var healthCheckRoutes = routes.Where(route => route.RoutePattern.RawText is not ("/agent/v1/cost" or "/agent/v1/rising-spend")).ToList();
+        routes.Select(route => route.RoutePattern.RawText).Should().BeEquivalentTo("/agent/v1/checks", "/agent/v1/failed-runs", "/agent/v1/dead-letter-queues", "/agent/v1/cost", "/agent/v1/rising-spend");
         routes.SelectMany(route => route.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []).Should().OnlyContain(method => method == "GET");
-        routes.Should().OnlyContain(route => route.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(data => data.Policy == "HealthCheck.Agent.Read"));
+        healthCheckRoutes.Should().OnlyContain(route => route.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(data => data.Policy == "HealthCheck.Agent.Read"));
+        routes.Except(healthCheckRoutes).Should().OnlyContain(route => route.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>().Any(data => data.Policy == "HealthCheck.Cost.Read"));
     }
 
     [Theory]

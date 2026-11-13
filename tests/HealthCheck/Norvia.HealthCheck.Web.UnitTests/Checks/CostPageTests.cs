@@ -1,6 +1,8 @@
 // NSubstitute sets up a task-returning call by calling it and configuring its result; nothing is left unawaited.
 #pragma warning disable CA2012
 using Ardalis.Result;
+using Norvia.Agents;
+using Norvia.HealthCheck.Application.Narrate;
 using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Operators;
 using Norvia.HealthCheck.Web.Checks;
@@ -121,5 +123,50 @@ public sealed class CostPageTests : HealthCheckWebContext
 
         page.WaitForAssertion(() => page.Find("section[aria-label='Change against the previous period']").TextContent.Should().Contain("<b>evil</b>"));
         page.FindAll("section[aria-label='Change against the previous period'] b").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Render_WithTheAgentsOff_HasNoExplainButton()
+    {
+        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(Rising());
+
+        var page = Render();
+
+        page.WaitForAssertion(() => page.Find("[data-testid=change][data-kind=Total]"));
+        page.FindAll("[data-testid=explain-spend]").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Explain_ShowsWhatTheFinOpsAgentSaid_AsText()
+    {
+        TurnAgentsOn();
+        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(Rising());
+        Requests.NarrateSpendAsync(Arg.Any<NarrateSpendQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new Narration("Total daily spend changed +100%.", [new NarratedItem("F-COST-RISING-SPEND", "<b>log-workspace</b> drives it; the toggle is chattyTelemetry.", "r2", "get_rising_spend_findings")]));
+        var page = Render();
+        page.WaitForAssertion(() => page.Find("[data-testid=explain-spend]"));
+
+        page.Find("[data-testid=explain-spend]").Click();
+
+        page.WaitForAssertion(() => page.Find("[data-testid=spend-narration-summary]").TextContent.Should().Be("Total daily spend changed +100%."));
+        var item = page.Find("[data-testid=spend-narration-item]");
+        item.TextContent.Should().Contain("F-COST-RISING-SPEND").And.Contain("<b>log-workspace</b> drives it").And.Contain("[r2, get_rising_spend_findings]");
+        item.QuerySelector("b").Should().BeNull("what the agent wrote is data, never markup");
+        Requests.Received(1).NarrateSpendAsync(Arg.Is<NarrateSpendQuery>(query => query.CorrelationId.Length == 32), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Explain_WhenTheAgentIsUnavailable_SaysSo_AndTheSpendStaysOnThePage()
+    {
+        TurnAgentsOn();
+        Requests.CostAsync(Arg.Any<GetCostViewQuery>(), Arg.Any<CancellationToken>()).Returns(Rising());
+        Requests.NarrateSpendAsync(Arg.Any<NarrateSpendQuery>(), Arg.Any<CancellationToken>()).Returns(Result<Narration>.Unavailable("AgentUnavailable"));
+        var page = Render();
+        page.WaitForAssertion(() => page.Find("[data-testid=explain-spend]"));
+
+        page.Find("[data-testid=explain-spend]").Click();
+
+        page.WaitForAssertion(() => page.Find("[role=alert]").TextContent.Should().Contain("Assistant unavailable"));
+        page.Find("[data-testid=change][data-kind=Total]").TextContent.Should().Be("+100%");
     }
 }

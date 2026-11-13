@@ -23,12 +23,35 @@ public sealed class AgentClientOptions
 
     public AgentTokenOptions Tokens { get; set; } = new();
 
+    /// <summary>The FinOps agent's own server and token (#511): <c>/mcp/health-check-cost</c>, its own identity and the call role <c>HealthCheck.Cost.Read</c>. Unset, the FinOps agent is unavailable locally.</summary>
+    public AgentEndpointOptions Cost { get; set; } = new();
+
+    /// <summary>The MCP server an Agent is asked through, locally: the FinOps agent's own, else the health-check server.</summary>
+    public Uri? McpAddressFor(string agentName) => agentName == FinOpsAgent ? Cost.McpAddress : McpAddress;
+
+    /// <summary>The token a request to <paramref name="requestUri"/> carries: the FinOps agent's for its own server, the health-check agent's for any other.</summary>
+    public AgentTokenOptions TokensFor(Uri? requestUri) =>
+        Cost.McpAddress is { } cost && requestUri is not null && requestUri.AbsoluteUri.StartsWith(cost.AbsoluteUri.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
+            ? Cost.Tokens
+            : Tokens;
+
+    /// <summary>The FinOps agent's definition (agents/finops.agent.yaml).</summary>
+    public const string FinOpsAgent = Application.Narrate.NarrateSpendHandler.AgentName;
+
     public AgentModelOptions Model { get; set; } = new();
 
     public FoundryOptions Foundry { get; set; } = new();
 
     /// <summary>Whether the Agent runs in Foundry, which is the case wherever the estate gave the app a project endpoint.</summary>
     public bool UsesFoundry => Foundry.ProjectEndpoint is not null;
+}
+
+/// <summary>An Agent's own MCP server and token, locally.</summary>
+public sealed class AgentEndpointOptions
+{
+    public Uri? McpAddress { get; set; }
+
+    public AgentTokenOptions Tokens { get; set; } = new();
 }
 
 /// <summary>The Foundry project the Agent is published in (ADR 0040), which the app calls as its own managed identity.</summary>

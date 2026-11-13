@@ -43,7 +43,7 @@ internal sealed partial class LocalAgentClient(
             var definition = AgentDefinitions.Load(request.AgentName);
             var runner = new AgentRunner(
                 AgentModels.For(definition, settings.Model, credential),
-                new McpToolSource(http, settings.McpAddress ?? throw new InvalidOperationException("Agents:McpAddress is not set.")),
+                new McpToolSource(http, settings.McpAddressFor(request.AgentName) ?? throw new InvalidOperationException($"There is no MCP address for the Agent '{request.AgentName}'.")),
                 new AgentRunnerOptions(TimeSpan.FromSeconds(settings.TimeoutSeconds)));
             var result = await runner.RunNarrationAsync(definition, new AgentQuestion(request.Question, request.CorrelationId, runId), cancellationToken);
 

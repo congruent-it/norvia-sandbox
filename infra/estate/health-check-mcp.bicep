@@ -28,6 +28,12 @@ var role = contract.role
 var viewRoleId = guid('norvia-agent-health-check-view', environmentName, role)
 var apiRoleId = guid('norvia-health-check-agent-api', environmentName, role)
 
+// The FinOps agent's call role (#511), a second role on the app's agent API: the app takes one audience for its agent API, and each Agent's
+// token reaches only the routes of its own role. The FinOps agent's MCP server, with its own view, is health-check-cost-mcp.bicep.
+var costContract = loadJsonContent('../../contracts/agent-mcp/health-check-cost.tools.json')
+var costRole = costContract.role
+var costApiRoleId = guid('norvia-health-check-agent-api', environmentName, costRole)
+
 // The agent view: the audience of an Agent's token. Entra issues a token for it only to an identity that holds the role.
 resource view 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-agent-${contract.server}-view-${environmentName}'
@@ -61,7 +67,7 @@ resource viewPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
 }
 
 // The app's agent API: the audience of the token API Management sends the app. The app takes this token on /agent/v1 and
-// nothing else (the operators' sign-in is another app registration), and the role is the only one on it.
+// nothing else (the operators' sign-in is another app registration). It has the two Agents' roles, one each.
 resource healthCheckAgentApi 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: 'norvia-health-check-agent-api-${environmentName}'
   // infra/provision-estate.ps1 finds it by this name.
@@ -84,6 +90,16 @@ resource healthCheckAgentApi 'Microsoft.Graph/applications@v1.0' = {
       ]
       isEnabled: true
     }
+    {
+      id: costApiRoleId
+      value: costRole
+      displayName: 'Read the Estate health check\'s cost tools'
+      description: 'Call the cost tools of /agent/v1 of the Estate health check. API Management\'s identity holds it, on behalf of the FinOps agent.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
   ]
 }
 
@@ -95,6 +111,12 @@ resource healthCheckAgentApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' =
 resource apiManagementReadsTheAgentApi 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: healthCheckAgentApiPrincipal.id
   appRoleId: apiRoleId
+  principalId: apiManagementPrincipalId
+}
+
+resource apiManagementReadsTheCostTools 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: healthCheckAgentApiPrincipal.id
+  appRoleId: costApiRoleId
   principalId: apiManagementPrincipalId
 }
 
@@ -129,5 +151,6 @@ module server 'agent-mcp-server.bicep' = {
   }
   dependsOn: [
     apiManagementReadsTheAgentApi
+    apiManagementReadsTheCostTools
   ]
 }
