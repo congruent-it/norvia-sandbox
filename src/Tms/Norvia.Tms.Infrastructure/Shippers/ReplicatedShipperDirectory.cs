@@ -35,6 +35,12 @@ internal sealed class ReplicatedShipperDirectory(SeedFileShipperDirectory seed, 
         var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
         var copies = context.Set<ShipperCopy>();
         var copy = await copies.SingleOrDefaultAsync(row => row.Id == shipper.Id.Value, cancellationToken);
+        if (copy is not null && copy.Revision >= shipper.Revision)
+        {
+            // A delivery that lost a race with a later revision must not move the copy backwards.
+            return;
+        }
+
         if (copy is null)
         {
             copy = new ShipperCopy { Id = shipper.Id.Value };
