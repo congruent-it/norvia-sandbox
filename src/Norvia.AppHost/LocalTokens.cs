@@ -33,6 +33,7 @@ public static class LocalTokens
     public const string TmsAudience = "api://norvia-tms";
     public const string ErpAudience = "api://norvia-erp";
     public const string BillingLogicAppClientId = "norvia-local-billing-logic-app";
+    public const string MasterDataSyncLogicAppClientId = "norvia-local-master-data-sync-logic-app";
     public const string CarrierCostLogicAppClientId = "norvia-local-carrier-cost-logic-app";
     public const string IntakeLogicAppClientId = "norvia-local-intake-logic-app";
     public const string BookingLogicAppClientId = "norvia-local-booking-logic-app";
