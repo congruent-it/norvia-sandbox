@@ -32,7 +32,8 @@ public static class ProofOfDeliveryFileEndpoints
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status410Gone,
-                title: $"This Proof of delivery file of Shipment {shipmentNumber} has expired: the retention period deleted it. The Proof of delivery itself is kept.");
+                title: $"This Proof of delivery file of Shipment {shipmentNumber} has expired: the retention period deleted it. The Proof of delivery itself is kept.",
+                extensions: new Dictionary<string, object?> { ["code"] = ProofOfDeliveryFileExpiry.Marker });
         }
 
         if (result.Status != ResultStatus.Ok)

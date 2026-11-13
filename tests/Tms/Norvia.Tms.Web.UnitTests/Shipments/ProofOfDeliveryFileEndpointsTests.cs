@@ -54,6 +54,7 @@ public sealed class ProofOfDeliveryFileEndpointsTests
         var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
         problem.StatusCode.Should().Be(410);
         problem.ProblemDetails.Title.Should().Contain("expired");
+        problem.ProblemDetails.Extensions["code"].Should().Be("ProofOfDeliveryFileExpired");
     }
 
     [Fact]

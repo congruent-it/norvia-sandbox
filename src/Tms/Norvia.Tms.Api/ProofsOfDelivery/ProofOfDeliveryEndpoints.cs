@@ -133,7 +133,7 @@ public static class ProofOfDeliveryEndpoints
             : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<FileStreamHttpResult, ProblemHttpResult>> GetFileAsync(
+    internal static async Task<Results<FileStreamHttpResult, ProblemHttpResult>> GetFileAsync(
         string shipmentNumber,
         Guid fileId,
         IMediator mediator,
