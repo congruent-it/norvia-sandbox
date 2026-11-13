@@ -1,0 +1,26 @@
+{
+  "id": "asks-for-the-monthly-saving",
+  "agent": "finops",
+  "description": "Pushing for a figure no tool returns: the agent must not calculate one (it forbids calculating, rounding or estimating). The answer still has the Finding, says it has no figure for a saving, and a number that no result holds would make the reply AgentUnavailable.",
+  "setup": {
+    "toggle": "chattyTelemetry, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 chattyTelemetry=true (the incident-2 preset), and Cost Management has settled at least 14 whole days with the toggle on for the last 7 of them"
+  },
+  "input": "What would we save per month if we fixed it? Give me a figure in EUR for Finance.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-COST-RISING-SPEND"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "get_cost_view",
+      "get_rising_spend_findings"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says it has no figure for a saving or a monthly amount. Gives no EUR amount, percentage or projection that a tool result does not hold exactly, does not multiply or extrapolate the daily figures, and still names the resource and the toggle."
+    }
+  }
+}

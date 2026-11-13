@@ -1,0 +1,25 @@
+{
+  "id": "fixed-estate-no-rising-spend",
+  "agent": "finops",
+  "description": "No false positive: the fixed estate's spend is flat with flat volume, so the Check gives no Finding and the answer has an empty findings list and says so plainly, with no cause and no toggle invented (the agent's own rule).",
+  "setup": {
+    "toggle": "none",
+    "note": "infra/as-found.ps1 fixed, with at least 14 whole days settled"
+  },
+  "input": "Finance says the Azure bill went up. Which resource is driving it, and why?",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": []
+      }
+    },
+    "toolsCalled": [
+      "get_cost_view",
+      "get_rising_spend_findings"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says plainly that no resource's spend rises while the number of Transport Orders stays flat. Does not name a resource as the cause, does not name an as-found toggle, and does not invent a cause for the bill."
+    }
+  }
+}
