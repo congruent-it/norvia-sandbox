@@ -265,6 +265,7 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 - A decision that is hard to reverse, surprising, or the result of a real trade-off gets an ADR in [docs/adr/](adr/).
 - A PR that adds or changes an event, a subscription, a Flow, a Logic App, an app role or a local stand-in updates the matching page in [docs/architecture/](architecture/README.md) and the process's Implementation section in the same PR.
 - A PR that adds or changes an endpoint, an OpenAPI document or the database schema (an entity, its configuration or a migration) regenerates [docs/applications/](applications/README.md) in the same PR with `dotnet run --project src/Docs/Norvia.Docs.Generator`, redraws the ER diagrams with `python3 docs/architecture/diagrams/entities.py` (see [the diagram styles](architecture/diagrams/README.md#entity-relationships)), and updates the application page's hand-written parts: the endpoint's consumers, the table and column descriptions and the logical references.
+- A PR that adds or changes an application, a process or an Agent updates its row in [docs/status.md](status.md) in the same PR.
 - Keep PRs small and focused on one issue.
 
 ## 12. Scripts

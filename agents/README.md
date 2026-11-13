@@ -15,7 +15,7 @@ Start from a reference, not from the list below: `git show --stat 01add106` is `
 | The UI that asks it | `src/Tms/Norvia.Tms.Infrastructure/Agents/` (`LocalAgentClient.cs`, `AgentClientOptions.cs`) and `src/Tms/Norvia.Tms.Web/Agents/` (`IExplainRequests.cs`, `ExplainRequests.cs`, the panel) |
 | Azure | `infra/estate/<server>-mcp.bicep`, `infra/estate.bicep`, `infra/deploy-agents.ps1`, `infra/assign-agent-roles.ps1` |
 | Tests | `tests/Integration/Norvia.Agents.UnitTests/`, `tests/Integration/Norvia.Integration.LocalAgentMcp.UnitTests/`, the Api, Application, Infrastructure and Web unit projects of the application, the Agent's `*AgentRulesTests.cs`. Integration and UI tests are separate issues |
-| Docs | `docs/architecture/identity-and-access.md`, `local-vs-azure.md`, `failure-behaviour.md`, the process page under `docs/processes/`, `docs/applications/<app>.md`, and `GLOSSARY.md` for a new term |
+| Docs | `docs/architecture/identity-and-access.md`, `local-vs-azure.md`, `failure-behaviour.md`, the process page under `docs/processes/`, `docs/applications/<app>.md`, and `GLOSSARY.md` for a new term; the Agent's row in `docs/status.md`, in the same PR |
 
 An Agent with no MCP tools, or one that the Partner Portal asks rather than the TMS (`shipper-tracking-assistant`, #878: `git show --stat 52f4e6b3`), skips the tool list, the Api view and the Azure MCP module, and keeps the rest.
 
