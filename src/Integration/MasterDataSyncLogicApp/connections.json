@@ -7,7 +7,7 @@
       },
       "authentication": {
         "type": "ManagedServiceIdentity",
-        "identity": "@appsetting('BILLING_IDENTITY_ID')"
+        "identity": "@appsetting('MASTER_DATA_SYNC_IDENTITY_ID')"
       },
       "connection": {
         "id": "@appsetting('SERVICE_BUS_CONNECTION_ID')"
@@ -16,7 +16,7 @@
         "authentication": {
           "audience": "https://servicebus.azure.net",
           "type": "ManagedServiceIdentity",
-          "identity": "@appsetting('BILLING_IDENTITY_ID')"
+          "identity": "@appsetting('MASTER_DATA_SYNC_IDENTITY_ID')"
         }
       },
       "connectionRuntimeUrl": "@appsetting('SERVICE_BUS_CONNECTION_RUNTIME_URL')"
