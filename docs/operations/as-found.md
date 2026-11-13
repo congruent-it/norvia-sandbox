@@ -93,7 +93,7 @@ The second incident is the Azure bill: Finance sees a rise with no matching chan
 
 - **One compound cause.** A verbose log level and the workspace that bills it per GB. The workspace is pay-per-GB in the fixed estate too, because the Integration console and the Container Apps environment need it, so the toggle changes only the level. Nothing else is added or removed.
 - **The AppHost sets the level.** `Norvia.AppHost` reads the toggle from `ESTATE_ASFOUND` and gives every application `Logging__LogLevel__Default`, `Information` or `Debug`; the healthy value is written out too, so going back to `fixed` changes it back. `infra/as-found.ps1` also sets it on the running Container Apps, a new revision each, so a toggle needs no deployment of the apps. The migrations are Container App jobs that run once per deploy: they take the level at the next one.
-- **Azure only.** Locally nothing bills. The toggle is in every preset, `false`, and no preset turns it on: the health check's cost Check (#509) is its Check, and until it exists the Checks of the presets would find nothing for it. Turn it on with `infra/as-found.ps1 chattyTelemetry=true`.
+- **Azure only.** Locally nothing bills. The toggle is in every preset, `false` except in `incident-2` (`fixed` plus `chattyTelemetry`), and the health check's cost Check `COST-RISING-SPEND` (#509) is its Check: it finds the workspace's rise while the volume stays flat ([estate-health-check.md](estate-health-check.md)). Turn it on with `infra/as-found.ps1 chattyTelemetry=true`.
 - **Not measured yet.** How large the effect is against a sandbox bill, and so whether `Debug` is the right level and the pollers' interval the right one, needs an Azure deployment and a few days of Cost Management data. The level is `Debug` until that measurement says otherwise; the polling intervals are unchanged. Record the measurement here, and replace the numbers of the snapshot below with it.
 
 ### The cost shape
@@ -238,8 +238,9 @@ A preset is a file in [infra/presets](../../infra/presets) holding a value of `a
 | `fixed` | Every alert, a receiver, every storage, secret and retention protection, every business safety net, no cache, the rate limit, and the report back to the Driver app. Nothing broken. What the estate is without a toggle |
 | `as-found` | A realistic partial set. Alerts: six Logic Apps (the earlier-built Carrier flows, notifications and `billing`) and seven queues and subscriptions unalerted, the rest alerted. The incident flows are among the unalerted: `carrier-tracking`, `carrier-proof-of-delivery`, `billing`. Storage: no inbound lifecycle rule, files stay hot, no malware scanning; the transit rule is kept. A Carrier credential inlined, a short Application Insights retention, and no tracked properties on `billing`, `carrier-cancellation` and `shipper-notification`. Business: the Stale and Proof of delivery missing thresholds unset, the Late delivery check kept, the Shipper tracking cached and without a rate limit, the report back to the Driver app kept |
 | `silent-carrier`, `look-alike`, `contrast` | The [scenarios'](#scenarios) presets: `fixed` plus only what the story needs (incident 1's missing alerts and Stale thresholds, the Shipper tracking cache, nothing) |
+| `incident-2` | The second incident's preset: `fixed` plus `chattyTelemetry`, so the Log Analytics workspace's spend rises with the Transport Order volume flat |
 
-Every preset sets `chattyTelemetry` to `false`: the [spend toggle](#spend) is turned on by itself, not by a preset.
+Every preset sets `chattyTelemetry` to `false` but `incident-2`, which turns the [spend toggle](#spend) on.
 
 [estate.bicepparam](../../infra/estate.bicepparam) takes the object from the `ESTATE_ASFOUND` environment variable, as JSON, and the `fixed` preset when it is unset.
 

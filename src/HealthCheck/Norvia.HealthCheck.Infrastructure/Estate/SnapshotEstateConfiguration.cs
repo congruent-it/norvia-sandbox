@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Norvia.HealthCheck.Application.Estate;
+using Norvia.HealthCheck.Infrastructure.Cost;
 
 namespace Norvia.HealthCheck.Infrastructure.Estate;
 
@@ -30,6 +31,7 @@ internal sealed class SnapshotEstateConfiguration(IOptions<SnapshotOptions> opti
             throw new InvalidOperationException($"An entity or flow of the snapshot '{name}' has no name.");
         }
 
-        return estate;
+        // The bill the preset's toggles give: the modelled cost snapshot with chattyTelemetry on for incident-2, the flat one for the rest.
+        return estate with { Cost = new CostFacts(SnapshotCostReader.Days(name == SnapshotOptions.Incident2 ? CostSnapshotOptions.ChattyTelemetry : CostSnapshotOptions.Fixed)) };
     }
 }

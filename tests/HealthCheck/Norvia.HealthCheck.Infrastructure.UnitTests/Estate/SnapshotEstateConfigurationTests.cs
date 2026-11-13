@@ -121,8 +121,7 @@ public sealed class SnapshotEstateConfigurationTests
         var checks = Checklist.Default.Checks;
         var toggleChecks = checks.Where(check => check is not UntoldFailureCheck).ToList();
 
-        // chattyTelemetry is the spend toggle of incident 2: its Check pairs rising spend with flat volume and arrives with the cost view (#509).
-        Preset("fixed").Select(toggle => toggle.Key).Except(["chattyTelemetry"]).Should().OnlyContain(toggle => toggleChecks.Count(check => check.AsFoundToggle == toggle) == 1, because: "each toggle has exactly one Check that finds it (the Checks that pair a failure with a missing alert share the alert Check's toggle)");
+        Preset("fixed").Select(toggle => toggle.Key).Should().OnlyContain(toggle => toggleChecks.Count(check => check.AsFoundToggle == toggle) == 1, because: "each toggle has exactly one Check that finds it (the Checks that pair a failure with a missing alert share the alert Check's toggle)");
         checks.Should().OnlyContain(check => !string.IsNullOrWhiteSpace(check.AsFoundToggle));
     }
 

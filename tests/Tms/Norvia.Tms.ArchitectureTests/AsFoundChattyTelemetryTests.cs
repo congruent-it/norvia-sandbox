@@ -14,12 +14,12 @@ public sealed class AsFoundChattyTelemetryTests
 
     [Theory]
     [MemberData(nameof(Presets))]
-    public void EveryPreset_HasTheToggle_AndItIsOffBecauseTheCostCheckIsNotBuiltYet(string preset)
+    public void EveryPreset_HasTheToggle_AndItIsOnInIncident2Alone(string preset)
     {
         var toggles = JsonNode.Parse(File.ReadAllText(Path.Combine(Root, "infra", "presets", $"{preset}.json")))!;
 
         toggles["chattyTelemetry"].Should().NotBeNull(preset);
-        toggles["chattyTelemetry"]!.GetValue<bool>().Should().BeFalse(preset);
+        toggles["chattyTelemetry"]!.GetValue<bool>().Should().Be(preset == "incident-2", preset);
     }
 
     [Fact]

@@ -6,6 +6,8 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Azure.Core;
 using Microsoft.Extensions.Options;
+using Norvia.HealthCheck.Application.Checks;
+using Norvia.HealthCheck.Application.Cost;
 using Norvia.HealthCheck.Application.Estate;
 
 namespace Norvia.HealthCheck.Infrastructure.Estate;
@@ -30,7 +32,8 @@ internal sealed partial class AzureEstateConfiguration(
     IHttpClientFactory clients,
     TokenCredential credential,
     IOptions<AzureEstateOptions> options,
-    TimeProvider time) : IEstateConfiguration
+    TimeProvider time,
+    ICostReader costReader) : IEstateConfiguration
 {
     public const string ManagementClient = "estate-management";
 
@@ -109,6 +112,9 @@ internal sealed partial class AzureEstateConfiguration(
                 FailedRuns: await ReadFailedRunsAsync(id, cancellationToken));
         }, cancellationToken);
 
+        progress?.Report("Reading the spend and the Transport Order volume");
+        var cost = await ReadCostAsync(cancellationToken);
+
         progress?.Report("Reading the alert receivers");
         return new EstateConfiguration(EstateName, entities)
         {
@@ -134,7 +140,24 @@ internal sealed partial class AzureEstateConfiguration(
                 .Select(app => Flag(app["enabled"]))
                 .FirstOrDefault(),
             Agents = null,
+            Cost = cost,
         };
+    }
+
+    // The settled whole days of two periods of the cost Check. Null when Cost Management or the TMS API cannot be read (the app lacks the
+    // role, or the lag has left no settled day), so the Check gives no Finding for what it could not see.
+    private async Task<CostFacts?> ReadCostAsync(CancellationToken cancellationToken)
+    {
+        var yesterday = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime).AddDays(-1);
+        try
+        {
+            var days = await costReader.ReadAsync(yesterday.AddDays(1 - 2 * RisingSpendCheck.PeriodDays), yesterday, cancellationToken);
+            return new CostFacts([.. days.Where(day => !day.Provisional)]);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or Azure.RequestFailedException or JsonException)
+        {
+            return null;
+        }
     }
 
     // What the steps read from Resource Graph. The queries do not depend on each other or on the other reads, so they all start at once, and a step

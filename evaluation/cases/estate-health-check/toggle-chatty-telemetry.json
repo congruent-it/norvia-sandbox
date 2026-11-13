@@ -1,0 +1,25 @@
+{
+  "id": "toggle-chatty-telemetry",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with chattyTelemetry on and nothing else. The known answer is F-COST-RISING-SPEND, the Finding of Check COST-RISING-SPEND, whose severity (Medium) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "chattyTelemetry, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 chattyTelemetry=true (the incident-2 preset)"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-COST-RISING-SPEND"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: A resource's spend rises with no more Transport Orders. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

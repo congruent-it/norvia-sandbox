@@ -1,0 +1,20 @@
+{
+  "flowsWithoutFailedRunAlert": [],
+  "entitiesWithoutDeadLetterAlert": [],
+  "noAlertReceiver": false,
+  "noInboundLifecycleRule": false,
+  "noTransitLifecycleRule": false,
+  "proofFilesStayHot": false,
+  "noMalwareScanning": false,
+  "carrierSecretInlined": false,
+  "appInsightsRetentionShort": false,
+  "logicAppsWithoutTrackedProperties": [],
+  "staleThresholdsUnset": false,
+  "proofMissingThresholdUnset": false,
+  "lateDeliveryCheckOff": false,
+  "shipperTrackingCached": false,
+  "noShipperRateLimit": false,
+  "noReportBackToDriverApp": false,
+  "noConversationSweeper": false,
+  "chattyTelemetry": true
+}
