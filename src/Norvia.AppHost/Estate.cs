@@ -143,6 +143,19 @@ public sealed class Estate(IDistributedApplicationBuilder builder)
     /// <summary>Whether the Agents do anything (<c>Agents:Enabled</c>): the estate decides, and off by default.</summary>
     public IResourceBuilder<ParameterResource> AgentsEnabled { get; } = builder.AddParameter("estate-agents-enabled");
 
+    /// <summary>The Shipper tracking assistant's limits (ADR 0049, <c>Agents:Limits</c>), estate parameters whose values provision-estate.ps1 sets: the per-Persona rate and size limits and the daily token budgets.</summary>
+    public IReadOnlyDictionary<string, IResourceBuilder<ParameterResource>> AssistantLimits { get; } = new Dictionary<string, IResourceBuilder<ParameterResource>>
+    {
+        ["QuestionsPerMinute"] = builder.AddParameter("estate-assistant-questions-per-minute"),
+        ["QuestionsPerHour"] = builder.AddParameter("estate-assistant-questions-per-hour"),
+        ["MaxQuestionCharacters"] = builder.AddParameter("estate-assistant-max-question-characters"),
+        ["MaxOrders"] = builder.AddParameter("estate-assistant-max-orders"),
+        ["MaxEventsPerOrder"] = builder.AddParameter("estate-assistant-max-events-per-order"),
+        ["MaxOutputTokens"] = builder.AddParameter("estate-assistant-max-output-tokens"),
+        ["DailyTokensPerPersona"] = builder.AddParameter("estate-assistant-daily-tokens-per-persona"),
+        ["DailyTokensEstate"] = builder.AddParameter("estate-assistant-daily-tokens-estate"),
+    };
+
     /// <summary>The Foundry project's endpoint, which the Agents' host and the deploy scripts call.</summary>
     public IResourceBuilder<ParameterResource> FoundryProjectEndpoint { get; } = builder.AddParameter("estate-foundry-project-endpoint");
 

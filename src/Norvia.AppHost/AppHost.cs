@@ -349,7 +349,23 @@ if (builder.ExecutionContext.IsPublishMode)
         // The panel disables the Driver reports Logic App as the portal's identity, which holds the narrow Logic App switch role on that one Logic App.
         .WithEnvironment("Faults__LogicApp__ResourceGroupId", estate.ResourceGroupId)
         .WithEnvironment("Faults__LogicApp__Name", estate.DriverReportsLogicApp)
-        .WithEnvironment("Faults__Entra__ManagedIdentityClientId", estate.PartnerPortalClientId);
+        .WithEnvironment("Faults__Entra__ManagedIdentityClientId", estate.PartnerPortalClientId)
+        // The Shipper tracking assistant (ADR 0049) is on only where the estate says so. The portal asks the Agent published in the Intake project (a Shipper's
+        // question is not traced server-side there) as its own identity. The Agent has no tool and its own identity holds no role.
+        .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
+        .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryIntakeProjectEndpoint)
+        .WithEnvironment("Agents__ManagedIdentityClientId", estate.PartnerPortalClientId);
+    foreach (var (limit, parameter) in estate.AssistantLimits)
+    {
+        partnerPortal.WithEnvironment($"Agents__Limits__{limit}", parameter);
+    }
+
+    // The assistant's counters (rate, size, cost) are in the portal's memory, so the portal runs one replica (ADR 0049). Going to several needs a shared counter.
+    partnerPortal.PublishAsAzureContainerApp((_, app) =>
+    {
+        app.Template.Scale.MinReplicas = 1;
+        app.Template.Scale.MaxReplicas = 1;
+    });
     foreach (var persona in personas)
     {
         partnerPortal.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));

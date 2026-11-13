@@ -131,7 +131,7 @@ public sealed class SnapshotEstateConfigurationTests
         var presetToggles = Preset("fixed").Select(toggle => toggle.Key).ToList();
 
         Checklist.Default.Checks.Where(check => check is not UntoldFailureCheck).Where(check => !presetToggles.Contains(check.AsFoundToggle)).Select(check => check.Id).Should().BeEquivalentTo(
-            "AGENT-CONTENT-FILTER", "AGENT-ROLE", "AGENT-CAP", "AGENT-COST-TAG", "AGENTS-PUBLIC", "MODEL-QUOTA");
+            "AGENT-CONTENT-FILTER", "AGENT-ROLE", "AGENT-CAP", "AGENT-COST-TAG", "AGENTS-PUBLIC", "MODEL-QUOTA", "ASSISTANT-LIMITS", "ASSISTANT-OUTPUT-CHECK", "ASSISTANT-ACCESS");
     }
 
     [Theory]

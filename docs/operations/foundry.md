@@ -26,7 +26,7 @@ Every Foundry resource carries the cost tags `workload=foundry-agents` and `cost
 | Intake | `norvia-intake` | No |
 | Every other Agent | `norvia` | Yes |
 
-An Agent that reads a Shipper's text goes in `norvia-intake`; one that reads only the estate's own data through narrow views goes in `norvia`. The Intake agent publishes into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`), and its host, the Booking draft host, holds Foundry User on that project only.
+An Agent that reads a Shipper's text (the Intake agent's booking email, the Shipper tracking assistant's question) goes in `norvia-intake`; one that reads only the estate's own data through narrow views goes in `norvia`. The Intake agent publishes into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`), and its host, the Booking draft host, holds Foundry User on that project only.
 
 ## Settings
 
@@ -148,6 +148,8 @@ What it does not do: it does not turn the stateful Agent Service into a stateles
 5. runs [assign-agent-roles.ps1](../../infra/assign-agent-roles.ps1) with that file, which gives each identity its one read role.
 
 The Intake agent (`booking-intake`) is the exception to the project: the script publishes it into `norvia-intake` (`FOUNDRY_INTAKE_PROJECT_ENDPOINT`), as a prompt agent with no tool, and points the API Management backend `booking-draft-host` at the Booking draft host (`ESTATE_BOOKING_DRAFT_BASE_URL`). Its smoke run is [infra/smoke-test-booking-draft.ps1](../../infra/smoke-test-booking-draft.ps1) ([p1-transport-order-intake.md](../processes/tms/p1-transport-order-intake.md#booking-draft-from-pasted-text)). The host's identity (`id-booking-draft-<token>`) holds Foundry User on `norvia-intake` and nothing else; the Intake agent's own identity holds no role.
+
+The Shipper tracking assistant (`shipper-tracking-assistant`, #879, [ADR 0049](../adr/0049-the-shipper-tracking-assistant-has-no-tools-and-only-restates-what-the-portal-fetched-with-the-personas-token.md)) is published into `norvia-intake` the same way, as a prompt agent with no tool, so it has no server, connection or role. The Partner portal's identity holds Foundry User on `norvia-intake` (and not on `norvia`) and asks it with `store: false` and no conversation, so there is nothing to sweep or delete. Its smoke run is [infra/smoke-test-tracking-assistant.ps1](../../infra/smoke-test-tracking-assistant.ps1).
 
 Publishing the same file again is a new version of the same Agent. The response limits (`max_output_tokens`, `max_tool_calls`) are the definition's and travel with each response, not in the version. The smoke runs are [infra/smoke-test-integration-operations-agent.ps1](../../infra/smoke-test-integration-operations-agent.ps1) ([integration-console.md](integration-console.md#explain-and-the-agent-api)) and [infra/smoke-test-estate-health-check.ps1](../../infra/smoke-test-estate-health-check.ps1) ([estate-health-check.md](estate-health-check.md#smoke-run)). The Planner agent's (#441) is [infra/smoke-test-planner-agent.ps1](../../infra/smoke-test-planner-agent.ps1), on a Transport Order waiting for planning on the Over capacity demo day; it checks the answer names the warning and compares a Carrier's cost, and that no street address or Consignee field appears in the tool calls.
 

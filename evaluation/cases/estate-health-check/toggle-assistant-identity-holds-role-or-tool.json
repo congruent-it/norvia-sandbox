@@ -1,0 +1,26 @@
+{
+  "id": "toggle-assistant-identity-holds-role-or-tool",
+  "agent": "estate-health-check",
+  "description": "One case per toggle: the estate with assistantIdentityHoldsRoleOrTool on and nothing else. The known answer is F-ASSISTANT-ACCESS, the Finding of Check ASSISTANT-ACCESS, whose severity (High) and fix are the Check's. The narration must name that problem and no other.",
+  "setup": {
+    "toggle": "assistantIdentityHoldsRoleOrTool, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 assistantIdentityHoldsRoleOrTool=true",
+    "note": "the as-found script does not offer this toggle yet; until it does, the known answer is checked only against the local snapshot"
+  },
+  "input": "Run an Estate health check and tell me what you found.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-ASSISTANT-ACCESS"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "run_checks"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says the health check found a problem matching: The tracking assistant can read the estate. Does not report any other problem, and does not say the estate is healthy."
+    }
+  }
+}

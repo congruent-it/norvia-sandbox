@@ -42,8 +42,21 @@ public sealed class ChecksPerToggleTests
         { "noAgentCapOrRateLimit", Healthy with { Agents = new AgentFacts(Identities: [Reader with { HasRateLimit = false }]) }, "AGENT-CAP", "estate-health-check" },
         { "noAgentCostTag", Healthy with { Agents = new AgentFacts(Identities: [Reader with { HasCostTag = false }]) }, "AGENT-COST-TAG", "estate-health-check" },
         { "agentsEnabledInPublicDemoUi", Healthy with { Agents = new AgentFacts(Identities: [Reader], EnabledInPublicDemoUi: true) }, "AGENTS-PUBLIC", "Demo UI" },
+        { "assistantLimitsOff", Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(LimitsOn: false)) }, "ASSISTANT-LIMITS", "shipper-tracking-assistant" },
+        { "assistantOutputCheckOff", Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(OutputCheckOn: false)) }, "ASSISTANT-OUTPUT-CHECK", "shipper-tracking-assistant" },
+        { "assistantIdentityHoldsRoleOrTool", Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(IdentityRoles: ["TransportOrders.CustomerServiceAgent.Read"])) }, "ASSISTANT-ACCESS", "shipper-tracking-assistant" },
         { "unlimitedModelQuota", Healthy with { Agents = new AgentFacts(Identities: [Reader], ModelQuotaUnlimited: true) }, "MODEL-QUOTA", "model deployment" },
     };
+
+    [Fact]
+    public void TheAssistantsAccess_NamesTheRoleAndTheToolItHolds()
+    {
+        var estate = Healthy with { Agents = new AgentFacts(Identities: [Reader], TrackingAssistant: new TrackingAssistantFacts(IdentityRoles: ["Contributor"], Tools: ["get_orders"])) };
+
+        var evidence = Checklist.Default.Run(estate).Should().ContainSingle().Subject.Evidence;
+
+        evidence.Select(item => item.Detail).Should().Contain(detail => detail.Contains("Contributor", StringComparison.Ordinal)).And.Contain(detail => detail.Contains("get_orders", StringComparison.Ordinal));
+    }
 
     [Fact]
     public void TheHealthyEstate_GivesNoFinding() =>
