@@ -242,7 +242,7 @@ These were left out on purpose while designing P8, each with its reason.
 - **A tracking read model or response caching.** Reading the TMS directly keeps the Shipper's view equal to the TMS's. Caching comes back only as an as-found toggle.
 - **The Freight Charge.** As in P2.
 - **Fulfilment Transport Orders.** They appear once the WMS handoff exists (P1), with no change to P8.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P7. P8 needs no fault of its own to re-enact the headline incident: P5's mapping fault already leaves the Shipper's screen on In transit. The candidates:
+- **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). P8 needs no fault of its own to re-enact the headline incident: P5's mapping fault already leaves the Shipper's screen on In transit. The candidates:
   - Toggle: API Management response caching with a long lifetime. The TMS is right but the Shipper still sees an old Tracking status, which is a look-alike of the headline incident with a different root cause. Built: `shipperTrackingCached` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)).
   - Presenter-panel fault: the TMS Shipper tracking API fails for a few minutes. The Shipper sees the error straight away, which contrasts with P5's silent failure. Built: `tms-shipper-tracking-api-failing` ([as-found](../../operations/as-found.md#faults-of-the-tms-and-the-driver-app)).
   - Toggle: no rate limit on the Shipper product, so polling Personas can load the TMS. Built: `noShipperRateLimit`.

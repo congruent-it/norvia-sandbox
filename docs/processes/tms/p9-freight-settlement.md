@@ -298,7 +298,7 @@ These were left out on purpose while designing P9, each with its reason.
 - **Choosing a Carrier on cost in P3.** The Carrier costs exist now, but planning stays manual.
 - **Carrier costs for Own fleet** (fuel, Driver hours). Own fleet has no Carrier invoice to match.
 - **Holding billing on other conditions,** such as a Shipper credit block. Credit management belongs to the ERP and is deferred with payments.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P8. The candidates on the TMS side:
+- **As-found toggles and presenter-panel faults.** The [as-found estate](../../operations/as-found.md) is built. Of the candidates on the TMS side, the toggle is built (`entitiesWithoutDeadLetterAlert`) and the fault is not:
   - Toggle: no alert on the dead-letter queue of the `TransportOrderBillable` subscription. Together with the fault below, this replays the headline incident for revenue: the order is delivered, and it is never invoiced.
   - Presenter-panel fault: the ERP billing API is down, so the Billing and Carrier cost Logic Apps dead-letter their messages.
   - The ERP side has its own candidates, in [E1](../erp/e1-invoicing.md#deferred) and [E2](../erp/e2-carrier-invoice-matching.md#deferred).

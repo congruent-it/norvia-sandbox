@@ -261,7 +261,7 @@ These were left out on purpose while designing E2, each with its reason.
 - **Cancellation fees, waiting time and other surcharges.** The TMS hands over only the Carrier cost of the booking that carried the Shipment (P9).
 - **A percentage tolerance, and a tolerance per Carrier.** One fixed amount is enough for the demo.
 - **EDI invoices (INVOIC).** All Carriers use the one JSON format, as for bookings in P4.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built. The candidates:
+- **As-found toggles and presenter-panel faults.** The [as-found estate](../../operations/as-found.md) is built. Of the candidates, the toggle is built (`entitiesWithoutDeadLetterAlert`) and the two faults are not:
   - Presenter-panel fault: a Carrier sends its invoice with the Carrier booking reference in a format the Carrier invoice Logic App mangles (for example with a prefix stripped), so every line lands as Unknown booking.
   - Toggle: no alert on the dead-letter queue of the `CarrierCostIncurred` subscription, so Carrier invoices wait on Unknown booking with no one told why.
   - Presenter-panel fault: a Carrier's invoice outcome endpoint is down, so the invoice is flagged Carrier not told.

@@ -306,7 +306,7 @@ These were left out on purpose while designing P5, each with its reason.
 - **What to do about an exception.** P5 records Collection failed, Delivery failed and Damaged. Re-planning or notifying the Shipper is [P7](p7-exception-handling.md).
 - **Showing the Shipper its progress.** That is [P8](p8-shipper-visibility.md), which also defers pushing progress and Consignee tracking.
 - **Driver and vehicle details from the Carrier.** Tracking doesn't need them either.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P4. The candidates:
+- **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built (the alert toggles as `flowsWithoutFailedRunAlert` and `entitiesWithoutDeadLetterAlert`):
   - Presenter-panel fault: a Carrier sends a status code outside the mapping table (for example `DLV` instead of `POD`), so the Carrier-tracking Logic App run fails. Built: `carrier-tracking-unmapped-code` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).
   - Toggle: no alert on failed Carrier-tracking Logic App runs. Together with the fault above, this re-enacts the headline incident: the Carrier posts "delivered", gets `202 Accepted`, and the Shipment stays In transit with no one told.
   - Toggle: no alert on the dead-letter queue of the tracking queue.

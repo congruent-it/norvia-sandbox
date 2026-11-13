@@ -327,4 +327,4 @@ These were left out on purpose while designing P11, each with its reason.
 - **Depots**, and collection and delivery runs through them. The Own fleet is one pool (P10).
 - **A separate dispatcher role.** The Planner does P11. The role can be added without changing the model.
 - **Real sign-in for the Driver app.** Built in [P12](p12-trip-execution.md#sign-in).
-- **As-found toggles** in the Bicep, for example no alert on the Trip dispatch Logic App's failed runs. They are added after the fixed state is built, as for P1 and P2.
+- **As-found toggles** in the Bicep, for example no alert on the Trip dispatch Logic App's failed runs. Built in the [as-found estate](../../operations/as-found.md): `flowsWithoutFailedRunAlert=trip-dispatch`.

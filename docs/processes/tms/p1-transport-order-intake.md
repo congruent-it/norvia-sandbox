@@ -191,4 +191,4 @@ These were left out on purpose while designing P1, each with its reason.
 - **Notifying the Shipper by email or webhook.** The Shipper sees the outcome in the call response and in the Partner portal's list of bookings.
 - **Asynchronous intake (202 Accepted).** It was dropped along with the queue between API Management and the Logic App, so the Shipper sees the TMS's decision straight away. It can come back if a demo needs it.
 - **The ERP and master-data sync.** Shippers come from the seed file for now.
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built.
+- **As-found toggles and presenter-panel faults.** The [as-found estate](../../operations/as-found.md) is built. It lists no toggle or fault for P1 beyond the estate-wide alert toggles.

@@ -450,10 +450,10 @@ These were left out on purpose while designing P12, each with its reason.
 - **The TMS seeing a refused Driver report**, for example a Collected for a Shipment taken off. The Driver sees it and calls the Planner.
 - **Actual driving hours read back from Trips.** P10 plans with planned hours, and tachograph data is deferred there.
 - **Handing a Trip over to another Driver mid-run.** Deferred in P11 (ADR 0015).
-- **As-found toggles and presenter-panel faults.** They are added after the fixed state is built, as for P1 to P11. The candidates:
-  - Presenter-panel fault: the Driver reports Logic App is disabled. The Driver's reports stay Sending, the Planner's Trip never goes In progress, and Stale flags its Shipments.
+- **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built (the alert toggles as `flowsWithoutFailedRunAlert` and `entitiesWithoutDeadLetterAlert`):
+  - Presenter-panel fault: the Driver reports Logic App is disabled. The Driver's reports stay Sending, the Planner's Trip never goes In progress, and Stale flags its Shipments. Built: `driver-reports-logic-app-disabled`.
   - Presenter-panel fault: the TMS is unavailable for a few minutes. The reports wait in their sessions and are processed in order afterwards, so nothing is lost. Built: `tms-unavailable` ([as-found](../../operations/as-found.md#faults-of-the-tms-and-the-driver-app)); a fault that outlasts the Logic App's retries dead-letters the report as `TmsUnavailable`.
   - Toggle: no report back to the Driver app. The Driver is as blind as a Carrier. Built: `noReportBackToDriverApp` ([as-found](../../operations/as-found.md#business-safety-nets-and-api-management)).
   - Toggle: no alert on failed Driver reports Logic App runs, or on the dead-letter queue of its subscription.
-  - Toggle: no lifecycle rule on the Driver app's transit container, and processed files aren't deleted.
+  - Toggle: no lifecycle rule on the Driver app's transit container, and processed files aren't deleted. Built: `noTransitLifecycleRule`.
   - Presenter-panel fault: the Driver app sends a photo as HEIC. The TMS refuses the Proof of delivery with `FileNotAccepted`, and the Driver sees it Refused. Built: `driver-app-heic-photo` ([as-found](../../operations/as-found.md#faults-of-the-tms-and-the-driver-app)).

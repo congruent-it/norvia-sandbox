@@ -217,12 +217,12 @@ The TMS is started again even if the run fails. If a step doesn't show, the flow
 These were left out on purpose while designing the console, each with its reason.
 
 - **Alerts.** They stay in Azure Monitor, where the as-found toggles switch them off. The console doesn't raise alerts, though its panels make a missing one obvious.
-- **Costs and the Azure bill.** The scenario's second incident is about cost, not messages, and needs its own view.
+- **Costs and the Azure bill.** The scenario's second incident is about cost, not messages, so the view is not part of the console. It is built as the Spend view of the [Estate health check](estate-health-check.md).
 - **A panel for failures that never reach a Logic App**, such as API Management's 401, 403 and 429. They're findable in search, but there's no panel for them.
 - **A long-term message archive.** It would put Consignee personal data in a second store. Norvia's lasting record is the TMS and the ERP.
 - **Editing a message before resubmitting.** A fault is fixed in the map, not in the message.
 - **Resubmitting a Logic App run.** See [Resubmit and discard](#resubmit-and-discard).
-- **As-found toggles.** They are added after the fixed state is built, as for P1 to P12. The candidates:
+- **As-found toggles.** They are built in the [as-found estate](as-found.md). The candidates, both built:
   - Toggle: Logic Apps without tracked properties, so a trail can be found by correlation ID but not by Shipment number. Built: `logicAppsWithoutTrackedProperties` ([as-found](as-found.md#storage-secrets-and-retention)).
   - Toggle: Application Insights retention shorter than run history, so run bodies outlive the index that finds them. Built: `appInsightsRetentionShort`.
   - Together with P5's presenter-panel fault (an unmappable Carrier code) and missing alerts, the console re-enacts the headline incident's discovery: the message was visible on the dead-letter queue the whole time, and no one was looking.
