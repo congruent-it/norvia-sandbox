@@ -1,10 +1,10 @@
 # TMS business processes
 
-The catalogue of business processes the TMS supports. It is documented in full so we can plan and build each one later; the first build is a single thin end-to-end slice. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
+The catalogue of business processes the TMS supports. What is built today is in [status.md](../../status.md). Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
 Norvia runs a **mixed** operation: its own fleet handles regional and Benelux transport, and subcontracted Carriers handle long-haul, parcel and peak volume. Some processes apply to only one side of that split. The "Applies to" column says which.
 
-| # | Process | Trigger → outcome | Applies to | Main integrations | Status |
+| # | Process | Trigger → outcome | Applies to | Main integrations | Design |
 |---|---|---|---|---|---|
 | P1 | [Transport Order intake](p1-transport-order-intake.md) | Transport Order received (Shipper API, WMS handoff) → accepted or rejected | Both | APIM, WMS | Adopted |
 | P2 | [Rating](p2-rating.md) | Transport Order accepted → Freight Charge calculated from the Shipper's Rate Card | Both | ERP (Rate Cards) | Adopted |

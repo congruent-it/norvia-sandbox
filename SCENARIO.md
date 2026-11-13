@@ -23,7 +23,7 @@ Norvia runs a **mixed fleet**. Its own **Vehicles** and **Drivers** handle regio
 |---|---|---|
 | **TMS** | Transport Orders, Shipments, Trips, Carrier bookings | Hosted in Azure. The first application built. |
 | **WMS** | Fulfilment Orders, Inventory | Receives marketplace orders; requests a Transport Order when goods are ready to ship. |
-| **ERP** | Shipper and Carrier master data, contracts, invoicing | Its first slice is invoicing ([E1](docs/processes/erp/e1-invoicing.md), [E2](docs/processes/erp/e2-carrier-invoice-matching.md)). Master data still comes from the sandbox's seed file, loaded by both the ERP and the TMS. |
+| **ERP** | Shipper and Carrier master data, contracts, invoicing | It invoices ([E1](docs/processes/erp/e1-invoicing.md), [E2](docs/processes/erp/e2-carrier-invoice-matching.md)). Master data still comes from the sandbox's seed file, loaded by both the ERP and the TMS. |
 | **Driver app** | Nothing | Used by Norvia's **Drivers** on the road to receive a dispatched **Trip** and report each **Stop**. Reaches the TMS only through Azure Integration Services. |
 | **Partner portal** | Nothing at Norvia | Plays every outside party (Shippers and Carriers) as **Personas**. It reaches Norvia only through API Management. |
 | **Integration console** | Nothing | Used by Norvia's **Integration operator** to find Message trails and resolve failed runs and dead-lettered messages. It reads the estate's telemetry and keeps nothing of its own ([design](docs/operations/integration-console.md)). |
@@ -58,7 +58,7 @@ Two events in the same quarter made Norvia's integration estate a management pro
 1. A Carrier integration silently dropped shipment status updates for four days. Nobody noticed until a Consignee called to ask why their tracking hadn't changed.
 2. Finance flagged a 30% quarter-over-quarter increase in the Azure bill with no matching change in shipment volume, and nobody in IT could explain which resource was driving it.
 
-The first slice of the sandbox can re-enact the first incident end to end: the Carrier posts "delivered" in the Partner portal, the update fails inside the integration layer without raising an alert, and the Shipper's tracking screen stays on "in transit". The way to re-enact it is the [silent Carrier scenario](docs/operations/as-found.md#incident-1-the-silent-carrier).
+The sandbox can re-enact the first incident end to end: the Carrier posts "delivered" in the Partner portal, the update fails inside the integration layer without raising an alert, and the Shipper's tracking screen stays on "in transit". The way to re-enact it is the [silent Carrier scenario](docs/operations/as-found.md#incident-1-the-silent-carrier).
 
 ## Differences from the health-check copy
 
