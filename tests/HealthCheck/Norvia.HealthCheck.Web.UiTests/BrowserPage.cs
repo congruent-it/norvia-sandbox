@@ -24,9 +24,15 @@ public abstract class BrowserPage(HealthCheckUiFixture fixture) : IAsyncLifetime
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
     /// <summary>Starts an app reading this snapshot, with the local operator holding these app roles, and opens a page on it.</summary>
-    protected async Task StartAsync(string snapshot, params string[] roles)
+    protected Task StartAsync(string snapshot, params string[] roles) => StartAsync(new HealthCheckWebHost(snapshot, roles));
+
+    /// <summary>Starts an app reading this modelled spend, with the local operator holding these app roles, and opens a page on it.</summary>
+    protected Task StartWithSpendAsync(string costSnapshot, params string[] roles) =>
+        StartAsync(new HealthCheckWebHost("fixed", costSnapshot, roles));
+
+    private async Task StartAsync(HealthCheckWebHost app)
     {
-        _app = new HealthCheckWebHost(snapshot, roles);
+        _app = app;
         _context = await fixture.Browser.NewContextAsync(new BrowserNewContextOptions
         {
             BaseURL = _app.Address.ToString(),
