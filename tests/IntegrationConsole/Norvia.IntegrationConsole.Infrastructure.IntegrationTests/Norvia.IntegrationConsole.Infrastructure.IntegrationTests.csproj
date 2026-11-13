@@ -6,6 +6,7 @@
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Azure.Messaging.ServiceBus" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="xunit.v3.mtp-off" />
@@ -15,5 +16,9 @@
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
     <ProjectReference Include="..\..\..\src\IntegrationConsole\Norvia.IntegrationConsole.Infrastructure\Norvia.IntegrationConsole.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Service Bus emulator's AppHost and the dashboard's each cost about 6 GB, so one test collection runs at a time (coding guidelines §10). -->
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
