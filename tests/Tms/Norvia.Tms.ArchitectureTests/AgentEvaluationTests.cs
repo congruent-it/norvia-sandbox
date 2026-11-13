@@ -377,15 +377,21 @@ public sealed class AgentEvaluationTests
           "claims": [ { "field": "detail.eta" }, { "field": "detail.lastUpdate" }, { "field": "detail.progress[0].time" } ], "noInformation": false }
         """;
 
-    [Fact]
-    public void ValuesInInput_PassesWhenEveryDateTimeAndNumberOfTheAnswerIsInTheDataOrTheTime()
-    {
-        var results = Check(Case("""{ "valuesInInput": true }""", TrackingInput), RestatedAnswer);
+    private static Result ValuesInInput(string answer, string input = TrackingInput, bool structured = true) =>
+        Check(Case("""{ "valuesInInput": true }""", input), answer, structured).Single();
 
-        results.Should().ContainSingle().Which.Should().Match<Result>(r => r.Pass && r.Check == "values in input");
-        Check(Case("""{ "valuesInInput": true }""", TrackingInput), RestatedAnswer.Replace("(last update", "(it is 02-07-2030 08:00 now, last update"))
-            .Single().Pass.Should().BeTrue();
+    [Fact]
+    public void ValuesInInput_PassesWhenEveryDateTimeAndNumberOfTheAnswerIsInTheData()
+    {
+        var result = ValuesInInput(RestatedAnswer);
+
+        result.Pass.Should().BeTrue();
+        result.Check.Should().Be("values in input");
     }
+
+    [Fact]
+    public void ValuesInInput_PassesAValueOfTheCurrentTime() =>
+        ValuesInInput(RestatedAnswer.Replace("(last update", "(it is 02-07-2030 08:00 now, last update")).Pass.Should().BeTrue();
 
     [Theory]
     [InlineData("It is estimated to arrive on 02-07-2030 11:30.", "11:30")]
@@ -394,37 +400,35 @@ public sealed class AgentEvaluationTests
     [InlineData("Order TO-0000042 arrives tomorrow.", "TO-0000042")]
     public void ValuesInInput_FailsOnAValueTheInputDoesNotHold_NamingIt(string answer, string value)
     {
-        var made = $$"""{ "answer": "{{answer}}", "claims": [ { "field": "detail.eta" } ], "noInformation": false }""";
-
-        var result = Check(Case("""{ "valuesInInput": true }""", TrackingInput), made).Single();
+        var result = ValuesInInput($$"""{ "answer": "{{answer}}", "claims": [ { "field": "detail.eta" } ], "noInformation": false }""");
 
         result.Pass.Should().BeFalse();
         result.Reason.Should().Contain(value);
     }
 
     [Fact]
-    public void ValuesInInput_TakesAValueOfTheQuestionAsOutsideTheInput_ButAnAnswerThatHasNoInformationPasses()
-    {
-        // The question names TO-0000042; only a refusal may repeat it.
-        var refusal = """{ "answer": "I have no information about TO-0000042.", "claims": [], "noInformation": true }""";
-
-        Check(Case("""{ "valuesInInput": true }""", TrackingInput), refusal).Single().Pass.Should().BeTrue();
-    }
+    public void ValuesInInput_PassesARefusalThatRepeatsTheOrderNumberOfTheQuestion() =>
+        // The question names TO-0000042, which is not in the data; only a refusal may repeat it.
+        ValuesInInput("""{ "answer": "I have no information about TO-0000042.", "claims": [], "noInformation": true }""").Pass.Should().BeTrue();
 
     [Theory]
     [InlineData("""{ "answer": "In transit.", "claims": [], "noInformation": false }""", "no claim")]
     [InlineData("""{ "answer": "In transit.", "claims": [ { "field": "detail.price" } ], "noInformation": false }""", "detail.price")]
     [InlineData("""{ "answer": "In transit.", "claims": [ { "field": "orders[3].eta" } ], "noInformation": false }""", "orders[3].eta")]
     public void ValuesInInput_FailsOnAnAnswerWhoseClaimsDoNotResolveInTheData(string answer, string reason) =>
-        Check(Case("""{ "valuesInInput": true }""", TrackingInput), answer).Single().Reason.Should().Contain(reason);
+        ValuesInInput(answer).Reason.Should().Contain(reason);
 
     [Fact]
-    public void ValuesInInput_FailsWhenTheAnswerIsNotAReplyOrTheInputHasNoData()
-    {
-        Check(Case("""{ "valuesInInput": true }""", TrackingInput), "prose", structured: false).Single().Reason.Should().Contain("not a structured result");
-        Check(Case("""{ "valuesInInput": true }""", TrackingInput), """{ "claims": [], "noInformation": false }""").Single().Reason.Should().Contain("no answer text");
-        Check(Case("""{ "valuesInInput": true }""", "A question without data."), RestatedAnswer).Single().Reason.Should().Contain("tracking_data");
-    }
+    public void ValuesInInput_FailsWhenTheAnswerIsNotStructured() =>
+        ValuesInInput("prose", structured: false).Reason.Should().Contain("not a structured result");
+
+    [Fact]
+    public void ValuesInInput_FailsWhenTheReplyHasNoAnswerText() =>
+        ValuesInInput("""{ "claims": [], "noInformation": false }""").Reason.Should().Contain("no answer text");
+
+    [Fact]
+    public void ValuesInInput_FailsWhenTheInputHasNoTrackingData() =>
+        ValuesInInput(RestatedAnswer, "A question without data.").Reason.Should().Contain("tracking_data");
 
     [Fact]
     public void TheValidator_KnowsValuesInInput_AndNamesAMalformedOne()
