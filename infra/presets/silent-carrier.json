@@ -17,6 +17,7 @@
   "noShipperRateLimit": false,
   "noTransitLifecycleRule": false,
   "proofFilesStayHot": false,
+  "proofFilesNeverDeleted": false,
   "proofMissingThresholdUnset": false,
   "shipperTrackingCached": false,
   "staleThresholdsUnset": true,

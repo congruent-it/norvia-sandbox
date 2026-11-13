@@ -128,8 +128,10 @@ if ((Get-Toggle $current 'chattyTelemetry') -ne (Get-Toggle $updated 'chattyTele
             --set-env-vars "Logging__LogLevel__Default=$logLevel" --output none | Out-Null
     }
 }
-if ((Get-Toggle $current 'proofFilesStayHot') -ne (Get-Toggle $updated 'proofFilesStayHot')) {
-    Write-Host "proofFilesStayHot changed: the TMS's storage account is Aspire's, so run azd provision to apply it."
+foreach ($toggle in 'proofFilesStayHot', 'proofFilesNeverDeleted') {
+    if ((Get-Toggle $current $toggle) -ne (Get-Toggle $updated $toggle)) {
+        Write-Host "$toggle changed: the TMS's storage account is Aspire's, so run azd provision to apply it."
+    }
 }
 
 Write-Host 'Changed:'

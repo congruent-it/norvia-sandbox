@@ -45,6 +45,18 @@ public sealed class ProofOfDeliveryFileEndpointsTests
     }
 
     [Fact]
+    public async Task Get_AFileTheRetentionPeriodDeleted_IsGoneWithAnExpiredMessage_NotAnError()
+    {
+        _mediator.Send(new GetProofOfDeliveryFileQuery("SH-0000012", FileId), Arg.Any<CancellationToken>()).Returns(ProofOfDeliveryFileExpiry.Expired());
+
+        var result = await ProofOfDeliveryFileEndpoints.GetAsync("SH-0000012", FileId, null, _mediator, Xunit.TestContext.Current.CancellationToken);
+
+        var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
+        problem.StatusCode.Should().Be(410);
+        problem.ProblemDetails.Title.Should().Contain("expired");
+    }
+
+    [Fact]
     public void PathOf_NamesTheFileOfAShipmentAndWhetherToDownloadIt()
     {
         ProofOfDeliveryFileEndpoints.PathOf("SH-0000012", FileId).Should().Be($"/shipments/SH-0000012/proof-of-delivery/files/{FileId}");

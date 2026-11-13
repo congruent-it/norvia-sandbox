@@ -28,6 +28,13 @@ public static class ProofOfDeliveryFileEndpoints
     {
         ArgumentNullException.ThrowIfNull(mediator);
         var result = await mediator.Send(new GetProofOfDeliveryFileQuery(shipmentNumber, fileId), cancellationToken);
+        if (result.IsExpired())
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status410Gone,
+                title: $"This Proof of delivery file of Shipment {shipmentNumber} has expired: the retention period deleted it. The Proof of delivery itself is kept.");
+        }
+
         if (result.Status != ResultStatus.Ok)
         {
             // With a body, so the status code pages don't turn it into the Not Found page.

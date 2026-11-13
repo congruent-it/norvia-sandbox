@@ -124,10 +124,11 @@ internal sealed partial class AzureEstateConfiguration(
             Storage = new StorageFacts(
                 inbound.HasLifecycleRule,
                 transit.HasLifecycleRule,
-                proofs,
+                proofs.MovesToCool,
                 inbound.MalwareScanning,
                 inbound.Account,
-                transit.Account),
+                transit.Account,
+                proofs.Deletes),
             InlinedCarrierSecrets = null,
             Retention = retention,
             BusinessSafetyNets = new BusinessSafetyNetFacts(
@@ -276,7 +277,7 @@ internal sealed partial class AzureEstateConfiguration(
 
     // The inbound and the transit storage accounts' lifecycle rules, the inbound account's malware scanning, and whether the TMS storage's
     // Proof of delivery files move to cool. A protection is null where the account that should hold it is not there.
-    private async Task<(Protections Inbound, Protections Transit, bool? ProofsMoveToCool)> ReadStorageAsync(List<JsonObject> storageAccounts, CancellationToken cancellationToken)
+    private async Task<(Protections Inbound, Protections Transit, ProofRules Proofs)> ReadStorageAsync(List<JsonObject> storageAccounts, CancellationToken cancellationToken)
     {
         var accounts = storageAccounts
             .Select(row => (Id: row["id"]?.GetValue<string>() ?? string.Empty, Name: row["name"]?.GetValue<string>() ?? string.Empty))
@@ -286,7 +287,7 @@ internal sealed partial class AzureEstateConfiguration(
         var transit = accounts.Find(account => account.Name.StartsWith(TransitStoragePrefix, StringComparison.Ordinal));
         var tms = accounts.Where(account => account != inbound && account != transit).ToList();
 
-        var proofs = ProofsMoveToCoolAsync(tms, cancellationToken);
+        var proofs = ProofRulesAsync(tms, cancellationToken);
         var inboundProtections = inbound.Id is null ? Task.FromResult(default(Protections)) : InboundProtectionsAsync(inbound, cancellationToken);
         var transitProtections = transit.Id is null ? Task.FromResult(default(Protections)) : TransitProtectionsAsync(transit, cancellationToken);
         await Task.WhenAll(proofs, inboundProtections, transitProtections);
@@ -294,11 +295,18 @@ internal sealed partial class AzureEstateConfiguration(
         return (await inboundProtections, await transitProtections, await proofs);
     }
 
-    private async Task<bool?> ProofsMoveToCoolAsync(List<(string Id, string Name)> accounts, CancellationToken cancellationToken) =>
-        accounts.Count == 0
-            ? null
-            : (await ReadAllAsync(accounts, account => ReadRulesAsync(account.Id, cancellationToken), cancellationToken))
-                .Any(rules => rules.Exists(rule => rule.Prefixes.Exists(prefix => prefix.StartsWith(ProofsContainer, StringComparison.Ordinal)) && rule.MovesToCool));
+    private async Task<ProofRules> ProofRulesAsync(List<(string Id, string Name)> accounts, CancellationToken cancellationToken)
+    {
+        if (accounts.Count == 0)
+        {
+            return default;
+        }
+
+        var rules = (await ReadAllAsync(accounts, account => ReadRulesAsync(account.Id, cancellationToken), cancellationToken))
+            .SelectMany(accountRules => accountRules.Where(rule => rule.Prefixes.Exists(prefix => prefix.StartsWith(ProofsContainer, StringComparison.Ordinal))))
+            .ToList();
+        return new ProofRules(rules.Exists(rule => rule.MovesToCool), rules.Exists(rule => rule.Deletes));
+    }
 
     private async Task<Protections> InboundProtectionsAsync((string Id, string Name) account, CancellationToken cancellationToken)
     {
@@ -500,6 +508,8 @@ internal sealed partial class AzureEstateConfiguration(
         // A setting the app runs with, or null where the app does not carry it.
         public bool? Setting(string name) => Env.TryGetValue(name, out var value) && bool.TryParse(value, out var parsed) ? parsed : null;
     }
+
+    private readonly record struct ProofRules(bool? MovesToCool, bool? Deletes);
 
     private readonly record struct Protections(bool? HasLifecycleRule, bool? MalwareScanning, string? Account = null);
 

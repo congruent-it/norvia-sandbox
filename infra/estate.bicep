@@ -33,6 +33,7 @@ param asFound object = {
   noInboundLifecycleRule: false
   noTransitLifecycleRule: false
   proofFilesStayHot: false
+  proofFilesNeverDeleted: false
   noMalwareScanning: false
   carrierSecretInlined: false
   appInsightsRetentionShort: false

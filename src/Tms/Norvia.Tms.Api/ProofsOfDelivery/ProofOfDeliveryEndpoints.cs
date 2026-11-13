@@ -63,7 +63,7 @@ public static class ProofOfDeliveryEndpoints
         proofsOfDelivery.MapGet("/shipments/{shipmentNumber}/proof-of-delivery/files/{fileId:guid}", GetFileAsync)
             .RequireAuthorization()
             .WithName("GetShipmentProofOfDeliveryFile")
-            .WithSummary("Read one file of a Shipment's Proofs of delivery, current or superseded, with the content type it was sent with.");
+            .WithSummary("Read one file of a Shipment's Proofs of delivery, current or superseded, with the content type it was sent with. A file the retention period has deleted is a 410 with the code ProofOfDeliveryFileExpired: the Proof of delivery and its file list stay.");
 
         return app;
     }
@@ -140,6 +140,15 @@ public static class ProofOfDeliveryEndpoints
         CancellationToken cancellationToken)
     {
         var result = await mediator.Send(new GetProofOfDeliveryFileQuery(shipmentNumber, fileId), cancellationToken);
+        if (result.IsExpired())
+        {
+            // The Proof of delivery is still on record: only the file is gone, after the retention period. Not an error of the caller's or the TMS's.
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status410Gone,
+                title: $"The file has expired: the retention period deleted it from Shipment {shipmentNumber}'s Proof of delivery.",
+                extensions: new Dictionary<string, object?> { ["code"] = ProofOfDeliveryFileExpiry.Marker });
+        }
+
         return result.Status == ResultStatus.NotFound
             ? TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: $"Shipment {shipmentNumber} has no such Proof of delivery file.")
             : TypedResults.File(result.Value.Content, result.Value.ContentType, result.Value.Name);
