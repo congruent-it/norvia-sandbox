@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Time.Testing;
 using Norvia.HealthCheck.Application.Agents;
 
 namespace Norvia.HealthCheck.Web.UiTests;
@@ -17,13 +18,29 @@ namespace Norvia.HealthCheck.Web.UiTests;
 public sealed class HealthCheckWebHost : WebApplicationFactory<Program>
 {
     private readonly string _snapshot;
+    private readonly string _costSnapshot;
     private readonly string[] _roles;
+
+    /// <summary>
+    /// The day the spend page reads as today. The cost snapshots hold 1 to 14 November 2026, so with this day the two compared weeks are
+    /// 1 to 7 and 8 to 14 November, however long after that the test runs.
+    /// </summary>
+    public static readonly DateTimeOffset Today = new(2026, 11, 15, 9, 0, 0, TimeSpan.Zero);
 
     /// <param name="snapshot">The estate the app reads: <c>as-found</c> or <c>fixed</c>.</param>
     /// <param name="roles">The app roles the local operator holds.</param>
     public HealthCheckWebHost(string snapshot, params string[] roles)
+        : this(snapshot, "fixed", roles)
+    {
+    }
+
+    /// <param name="snapshot">The estate the app reads: <c>as-found</c> or <c>fixed</c>.</param>
+    /// <param name="costSnapshot">The modelled spend the app reads: <c>fixed</c> or <c>chatty-telemetry</c>.</param>
+    /// <param name="roles">The app roles the local operator holds.</param>
+    public HealthCheckWebHost(string snapshot, string costSnapshot, params string[] roles)
     {
         _snapshot = snapshot;
+        _costSnapshot = costSnapshot;
         _roles = roles;
         UseKestrel(0);
     }
@@ -42,6 +59,7 @@ public sealed class HealthCheckWebHost : WebApplicationFactory<Program>
         // The local operator signs in only in Development, and Development is where the host reads the build's static web assets.
         builder.UseEnvironment("Development");
         builder.UseSetting("Estate:Snapshot", _snapshot);
+        builder.UseSetting("Estate:CostSnapshot", _costSnapshot);
         builder.UseSetting("LocalOperator:Name", "Iris Operator");
         for (var index = 0; index < _roles.Length; index++)
         {
@@ -54,6 +72,8 @@ public sealed class HealthCheckWebHost : WebApplicationFactory<Program>
             services.Configure<AgentsOptions>(options => options.Enabled = true);
             services.RemoveAll<IAgentClient>();
             services.AddSingleton(Agent);
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new FakeTimeProvider(Today));
         });
     }
 }
