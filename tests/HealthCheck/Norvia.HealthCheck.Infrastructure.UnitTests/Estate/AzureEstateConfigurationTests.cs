@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Norvia.HealthCheck.Application.Checks;
 using Norvia.HealthCheck.Application.Cost;
+using Norvia.HealthCheck.Application.Estate;
 using Norvia.HealthCheck.Infrastructure.Estate;
 
 namespace Norvia.HealthCheck.Infrastructure.UnitTests.Estate;
@@ -44,11 +45,11 @@ public sealed class AzureEstateConfigurationTests : IDisposable
     }
 
     [Fact]
-    public async Task ReadAsync_ForTheCost_HoldsTheSettledDaysOfTwoPeriodsEndingYesterday_AndNotTheProvisionalOne()
+    public async Task ReadAsync_ForTheCost_ReadsOneDayMoreThanTwoPeriods_SoTwoPeriodsOfSettledDaysRemainWithoutTheProvisionalOne()
     {
         _azure.Entities(queues: [], subscriptions: []).Alerts();
         var yesterday = new DateOnly(2026, 11, 12);
-        _costReader.ReadAsync(yesterday.AddDays(-13), yesterday, Arg.Any<CancellationToken>()).Returns(
+        _costReader.ReadAsync(yesterday.AddDays(-2 * CostFacts.PeriodDays), yesterday, Arg.Any<CancellationToken>()).Returns(
         [
             new CostDay(yesterday.AddDays(-1), 40, false, [new("log-workspace", 0.5m)]),
             new CostDay(yesterday, 40, true, [new("log-workspace", 9m)]),
