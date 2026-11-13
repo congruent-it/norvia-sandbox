@@ -1,0 +1,26 @@
+{
+  "id": "chatty-telemetry-names-the-workspace-and-the-toggle",
+  "agent": "finops",
+  "description": "The known answer of the first incident of the epic (#397): chattyTelemetry raises the Log Analytics workspace's ingestion about sixfold while Transport Order volume stays flat. The Check's one Finding is F-COST-RISING-SPEND (Medium; toggle and fix are the Check's). The narration names the workspace from the Finding's evidence, the toggle from asFoundToggle, and copies every number from a result. The local snapshot (chatty-telemetry.cost-snapshot.json) is modelled, so the numbers differ from Azure's; the case checks no number by value, the answer's own number check does.",
+  "setup": {
+    "toggle": "chattyTelemetry, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 chattyTelemetry=true (the incident-2 preset), and Cost Management has settled 15 days of history with the toggle on for the last 7 whole days of them (yesterday is always provisional and left out); the Simulator must be running, so Transport Order volume is steady and above zero; and the workspace's daily rise must clear the Check's 1 EUR a day minimum, which only a measured bill shows (the sizes are modelled until #503 measures them)"
+  },
+  "input": "Finance says the Azure bill went up. Which resource is driving it, and why?",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-COST-RISING-SPEND"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "get_cost_view",
+      "get_rising_spend_findings"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Names the Log Analytics workspace as the resource whose spend rose most, and the as-found toggle chattyTelemetry as the cause, and says spend rose while the number of Transport Orders stayed flat so no business reason explains it. Every figure it gives (an amount in EUR, a percentage, a count) is one the tool results hold, as written there; it calculates, rounds and estimates none."
+    }
+  }
+}

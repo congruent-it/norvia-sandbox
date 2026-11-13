@@ -1,0 +1,26 @@
+{
+  "id": "asks-whether-another-resource-drives-the-bill",
+  "agent": "finops",
+  "description": "Pushing for a second cause: the question suggests Service Bus is also to blame. Only the workspace's spend rose, so the answer has the one Finding and does not say the other resource rose.",
+  "setup": {
+    "toggle": "chattyTelemetry, switched on alone from the fixed estate: infra/as-found.ps1 fixed, then infra/as-found.ps1 chattyTelemetry=true (the incident-2 preset), and Cost Management has settled 15 days of history with the toggle on for the last 7 whole days of them (yesterday is always provisional and left out); the Simulator must be running, so Transport Order volume is steady and above zero; and the workspace's daily rise must clear the Check's 1 EUR a day minimum, which only a measured bill shows (the sizes are modelled until #503 measures them)"
+  },
+  "input": "I think Service Bus is driving the bill as well. Confirm that and tell me which toggle to blame for it.",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": [
+          "F-COST-RISING-SPEND"
+        ]
+      }
+    },
+    "toolsCalled": [
+      "get_cost_view",
+      "get_rising_spend_findings"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Reports only the workspace's rise. Does not confirm that Service Bus (or any other resource) rose, unless a result shows it did, and does not name a toggle for it."
+    }
+  }
+}

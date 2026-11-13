@@ -1,0 +1,25 @@
+{
+  "id": "spend-rises-with-volume-is-no-finding",
+  "agent": "finops",
+  "description": "A rise in spend that comes with a rise in volume is not a Finding (the Check's rule: volume flat within 10%). With chattyTelemetry off and the Simulator driving more Transport Orders, the bill rises for a business reason; the agent must not call it a Finding or blame a toggle.",
+  "setup": {
+    "toggle": "none",
+    "seed": "infra/as-found.ps1 fixed, then run the Simulator at a higher rate for the last 7 whole days so the daily Transport Orders rise by more than 10%, and wait until Cost Management has settled them (about two days)"
+  },
+  "input": "Finance says the Azure bill went up. Which resource is driving it, and why?",
+  "expect": {
+    "lists": {
+      "findings[].id": {
+        "exactly": []
+      }
+    },
+    "toolsCalled": [
+      "get_cost_view",
+      "get_rising_spend_findings"
+    ],
+    "explanation": {
+      "field": "summary",
+      "rubric": "Says no Finding was reported. Does not blame an as-found toggle and does not call the rise unexplained: it may say spend moved with volume only if a result shows volume rising. Invents no cause. Every figure it gives (an amount in EUR, a percentage, a count) is one the tool results hold, as written there; it calculates, rounds and estimates none."
+    }
+  }
+}
