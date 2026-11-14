@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Norvia.Tms.Api.MasterData;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Shippers.Replace;
@@ -9,9 +10,6 @@ namespace Norvia.Tms.Api.Shippers;
 
 public static class ShipperEndpoints
 {
-    /// <summary>The app role only the E3 master-data sync Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
-    public const string ReplaceRole = "MasterData.Replace";
-
     public static IEndpointRouteBuilder MapShippers(this IEndpointRouteBuilder app)
     {
         var shippers = app.NewVersionedApi("Shippers")
@@ -20,7 +18,7 @@ public static class ShipperEndpoints
 
         shippers.MapPut("/{id}", ReplaceAsync)
             .WithName("ReplaceShipper")
-            .RequireAuthorization(policy => policy.RequireRole(ReplaceRole))
+            .RequireAuthorization(policy => policy.RequireRole(MasterDataRoles.Replace))
             .WithMetadata(new TrackedFlow(Flows.MasterData))
             .WithSummary("Replace the TMS's copy of a Shipper with the ERP's record.")
             .WithDescription(
@@ -49,6 +47,3 @@ public static class ShipperEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
     }
 }
-
-/// <summary>The body of <c>PUT /v1/shippers/{id}</c>: the ERP's Shipper whole, with its Master-data revision.</summary>
-public sealed record ReplaceShipperRequest(string Name, bool Active, int Revision);

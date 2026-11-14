@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/carrier.v1.schema.json",
+  "title": "Carrier",
+  "description": "The ERP created or edited a Carrier (Canonical Model event, version 1, E3). Published on the master-data events topic through the ERP's transactional outbox, in the transaction that saved the change, under a correlation ID created for the change. It carries the whole Carrier and its Master-data revision, so the TMS replaces its copy and needs nothing more.",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrier"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": { "type": "string", "description": "The event's own ID, a UUID." },
+    "eventType": { "const": "Carrier" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "carrier": {
+      "type": "object",
+      "required": ["id", "name", "active", "revision"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 50, "description": "The Carrier ID both applications use, such as CAR-0001." },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "active": { "type": "boolean", "description": "A Carrier is never deleted, only made inactive." },
+        "revision": { "type": "integer", "minimum": 1, "description": "The Master-data revision: 1 as loaded from the seed file, raised by every edit. The TMS applies only a revision higher than the one it holds." }
+      }
+    }
+  }
+}

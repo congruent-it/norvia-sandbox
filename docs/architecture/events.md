@@ -46,7 +46,8 @@ Published by the ERP.
 
 | Event | Subscriptions | Subscribers | Process |
 |---|---|---|---|
-| [`Shipper`](../../contracts/canonical-model/shipper.v1.schema.json) | `monitoring` (every message)<br/>`master-data-sync` (`Shipper` only) | Monitoring<br/>Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) | [E3](../processes/erp/e3-master-data-sync.md). Finance created or edited a Shipper. The event carries the whole Shipper and its Master-data revision, and the Logic App replaces the TMS's copy with it. The other master-data entities follow with their own event types |
+| [`Shipper`](../../contracts/canonical-model/shipper.v1.schema.json) | `monitoring` (every message)<br/>`master-data-sync` (`Shipper` and `Carrier` only) | Monitoring<br/>Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) | [E3](../processes/erp/e3-master-data-sync.md). Finance created or edited a Shipper. The event carries the whole Shipper and its Master-data revision, and the Logic App replaces the TMS's copy with it. The Carrier has an event of its own; the other master-data entities follow with theirs |
+| [`Carrier`](../../contracts/canonical-model/carrier.v1.schema.json) | `monitoring` (every message)<br/>`master-data-sync` (`Shipper` and `Carrier` only) | Monitoring<br/>Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) | [E3](../processes/erp/e3-master-data-sync.md). Finance created or edited a Carrier. The event carries the whole Carrier and its Master-data revision, and the Logic App replaces the TMS's copy with it. The remaining entities follow with their own event types |
 
 ### `shipment-events`
 

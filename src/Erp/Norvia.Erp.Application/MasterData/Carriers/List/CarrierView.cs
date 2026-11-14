@@ -1,3 +1,4 @@
 namespace Norvia.Erp.Application.MasterData.Carriers.List;
 
-public sealed record CarrierView(string Id, string Name, bool Active);
+/// <param name="Revision">The Master-data revision: 1 as loaded from the seed file, raised by every edit.</param>
+public sealed record CarrierView(string Id, string Name, bool Active, int Revision = 1);

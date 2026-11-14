@@ -71,12 +71,19 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
             return null;
         }
 
-        if (parsed is null || Text(parsed, "eventType") != "Shipper" || Text(parsed, "correlationId") is not { } correlationId
-            || parsed["shipper"] is not JsonObject shipper
-            || Text(shipper, "id") is not { } id
-            || Text(shipper, "name") is not { } name
-            || shipper["active"] is not JsonValue active || !active.TryGetValue<bool>(out var isActive)
-            || shipper["revision"] is not JsonValue revision || !revision.TryGetValue<int>(out var revisionNumber))
+        // The entity type is the event type; the record sits under the type's own name, and the TMS has a collection for each.
+        var (recordName, collection) = Text(parsed ?? [], "eventType") switch
+        {
+            "Shipper" => ("shipper", "shippers"),
+            "Carrier" => ("carrier", "carriers"),
+            _ => (null, null),
+        };
+        if (parsed is null || recordName is null || Text(parsed, "correlationId") is not { } correlationId
+            || parsed[recordName] is not JsonObject record
+            || Text(record, "id") is not { } id
+            || Text(record, "name") is not { } name
+            || record["active"] is not JsonValue active || !active.TryGetValue<bool>(out var isActive)
+            || record["revision"] is not JsonValue revision || !revision.TryGetValue<int>(out var revisionNumber))
         {
             return null;
         }
@@ -93,7 +100,7 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
         }
 
         var body = new JsonObject { ["name"] = name, ["active"] = isActive, ["revision"] = revisionNumber }.ToJsonString();
-        return new TmsCall($"/v1/shippers/{Uri.EscapeDataString(id)}", body, correlationId, keys);
+        return new TmsCall($"/v1/{collection}/{Uri.EscapeDataString(id)}", body, correlationId, keys);
     }
 
     private static string? Text(JsonObject node, string name) =>
