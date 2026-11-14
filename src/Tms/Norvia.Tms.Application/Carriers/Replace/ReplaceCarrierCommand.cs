@@ -8,7 +8,3 @@ namespace Norvia.Tms.Application.Carriers.Replace;
 /// a revision that is not higher than the copy's changes nothing.
 /// </summary>
 public sealed record ReplaceCarrierCommand(string Id, string Name, bool Active, int Revision) : ICommand<Result<ReplaceCarrierResult>>;
-
-/// <param name="Applied">False when the copy already had this revision or a later one.</param>
-/// <param name="Revision">The revision the copy holds now.</param>
-public sealed record ReplaceCarrierResult(bool Applied, int Revision);

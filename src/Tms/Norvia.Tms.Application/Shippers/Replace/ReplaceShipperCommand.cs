@@ -8,7 +8,3 @@ namespace Norvia.Tms.Application.Shippers.Replace;
 /// a revision that is not higher than the copy's changes nothing.
 /// </summary>
 public sealed record ReplaceShipperCommand(string Id, string Name, bool Active, int Revision) : ICommand<Result<ReplaceShipperResult>>;
-
-/// <param name="Applied">False when the copy already had this revision or a later one.</param>
-/// <param name="Revision">The revision the copy holds now.</param>
-public sealed record ReplaceShipperResult(bool Applied, int Revision);

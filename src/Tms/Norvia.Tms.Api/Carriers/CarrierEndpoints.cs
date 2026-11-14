@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Norvia.Tms.Api.MasterData;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Carriers.Replace;
@@ -9,9 +10,6 @@ namespace Norvia.Tms.Api.Carriers;
 
 public static class CarrierEndpoints
 {
-    /// <summary>The app role only the E3 master-data sync Logic App's managed identity holds, so nothing bypasses the integration layer.</summary>
-    public const string ReplaceRole = Shippers.ShipperEndpoints.ReplaceRole;
-
     public static IEndpointRouteBuilder MapCarriers(this IEndpointRouteBuilder app)
     {
         var carriers = app.NewVersionedApi("Carriers")
@@ -20,7 +18,7 @@ public static class CarrierEndpoints
 
         carriers.MapPut("/{id}", ReplaceAsync)
             .WithName("ReplaceCarrier")
-            .RequireAuthorization(policy => policy.RequireRole(ReplaceRole))
+            .RequireAuthorization(policy => policy.RequireRole(MasterDataRoles.Replace))
             .WithMetadata(new TrackedFlow(Flows.MasterData))
             .WithSummary("Replace the TMS's copy of a Carrier with the ERP's record.")
             .WithDescription(
@@ -49,6 +47,3 @@ public static class CarrierEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
     }
 }
-
-/// <summary>The body of <c>PUT /v1/carriers/{id}</c>: the ERP's Carrier whole, with its Master-data revision.</summary>
-public sealed record ReplaceCarrierRequest(string Name, bool Active, int Revision);
