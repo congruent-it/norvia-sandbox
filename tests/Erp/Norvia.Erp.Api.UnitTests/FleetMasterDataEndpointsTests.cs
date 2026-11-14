@@ -46,9 +46,9 @@ public sealed class FleetMasterDataEndpointsTests
     {
         Answer(new SaveVehicleResult(new VehicleView("VEH-9", "VN-1", "Van", 1200, 4, true, 1), MasterDataSaveOutcome.Created));
 
-        var result = await MasterDataEndpoints.SaveVehicleAsync("VEH-9", VehicleRequest, _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveVehicleAsync("VEH-9", VehicleRequest, null, _retrier, CancellationToken.None);
 
-        result.Result.Should().BeOfType<Created<SaveVehicleResult>>().Which.Location.Should().Be("/v1/vehicles/VEH-9");
+        result.Result.Should().BeOfType<CreatedAtRoute<SaveVehicleResult>>().Which.Should().Match<CreatedAtRoute<SaveVehicleResult>>(created => created.RouteName == "SaveVehicle" && (string?)created.RouteValues["id"] == "VEH-9");
         await _mediator.Received().Send(new SaveVehicleCommand("VEH-9", "VN-1", "Van", 1200, 4, true), Arg.Any<CancellationToken>());
     }
 
@@ -59,7 +59,7 @@ public sealed class FleetMasterDataEndpointsTests
     {
         Answer(new SaveVehicleResult(new VehicleView("VEH-9", "VN-1", "Van", 1200, 4, true, 2), outcome));
 
-        var result = await MasterDataEndpoints.SaveVehicleAsync("VEH-9", VehicleRequest, _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveVehicleAsync("VEH-9", VehicleRequest, null, _retrier, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<SaveVehicleResult>>();
     }
@@ -69,7 +69,7 @@ public sealed class FleetMasterDataEndpointsTests
     {
         Answer(Result<SaveVehicleResult>.Invalid(new ValidationError("Vehicle", "bad type", "MasterDataFieldInvalid", ValidationSeverity.Error)));
 
-        var result = await MasterDataEndpoints.SaveVehicleAsync("VEH-9", VehicleRequest, _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveVehicleAsync("VEH-9", VehicleRequest, null, _retrier, CancellationToken.None);
 
         var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
         problem.StatusCode.Should().Be(400);
@@ -81,9 +81,9 @@ public sealed class FleetMasterDataEndpointsTests
     {
         Answer(new SaveDriverResult(new DriverView("DRV-9", "Anouk", ["B"], true, 1), MasterDataSaveOutcome.Created));
 
-        var result = await MasterDataEndpoints.SaveDriverAsync("DRV-9", DriverRequest, _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveDriverAsync("DRV-9", DriverRequest, null, _retrier, CancellationToken.None);
 
-        result.Result.Should().BeOfType<Created<SaveDriverResult>>().Which.Location.Should().Be("/v1/drivers/DRV-9");
+        result.Result.Should().BeOfType<CreatedAtRoute<SaveDriverResult>>().Which.Should().Match<CreatedAtRoute<SaveDriverResult>>(created => created.RouteName == "SaveDriver" && (string?)created.RouteValues["id"] == "DRV-9");
     }
 
     [Theory]
@@ -93,7 +93,7 @@ public sealed class FleetMasterDataEndpointsTests
     {
         Answer(new SaveDriverResult(new DriverView("DRV-9", "Anouk", ["B"], true, 2), outcome));
 
-        var result = await MasterDataEndpoints.SaveDriverAsync("DRV-9", DriverRequest, _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveDriverAsync("DRV-9", DriverRequest, null, _retrier, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<SaveDriverResult>>();
     }
@@ -103,7 +103,7 @@ public sealed class FleetMasterDataEndpointsTests
     {
         Answer(Result<SaveDriverResult>.Invalid(new ValidationError("Driver", "needs a name", "MasterDataFieldRequired", ValidationSeverity.Error)));
 
-        var result = await MasterDataEndpoints.SaveDriverAsync("DRV-9", DriverRequest, _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveDriverAsync("DRV-9", DriverRequest, null, _retrier, CancellationToken.None);
 
         var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
         problem.StatusCode.Should().Be(400);

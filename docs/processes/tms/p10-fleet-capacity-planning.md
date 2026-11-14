@@ -8,7 +8,7 @@ Fleet capacity planning keeps track, day by day, of which Vehicles and Drivers N
 | **Outcome** | For each day in the Planning horizon: the available Vehicles and Drivers with their Shifts, each Driver's Driving-hour budget, and the day's capacity against its Own fleet demand |
 | **Owning system** | TMS for availability: Rosters, Shifts, Absences, Off the road days and Driving-hour budgets. The ERP owns Vehicle and Driver master data (ADR 0014) |
 | **Applies to** | Own fleet only |
-| **Integrations touched** | None at runtime. ERP, through the seed file for now (Vehicles and Drivers) |
+| **Integrations touched** | None at runtime. ERP, through the master-data sync ([E3](../erp/e3-master-data-sync.md)) over the seed file (Vehicles and Drivers) |
 
 ## Process model
 
@@ -31,7 +31,7 @@ The load check is a rough figure for the Planner, not a plan. It doesn't know wh
 
 ## Vehicles and Drivers in the TMS
 
-The ERP owns Vehicle and Driver master data (ADR 0014). The TMS holds a read copy. Until the ERP exists, it loads that copy from the seed file at startup, the same way it loads Carriers.
+The ERP owns Vehicle and Driver master data (ADR 0014). The TMS holds a read copy. It loads that copy from the seed file at startup, the same way it loads Carriers, and the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces a Vehicle or Driver whenever Finance edits it.
 
 | Master data (ERP) | Fields |
 |---|---|
@@ -207,7 +207,7 @@ Links go to files, not lines, so they stay true as the code moves.
 
 ### Locally
 
-Nothing plays an Azure piece, because P10 touches no integration at runtime: no API Management, no Logic App, no Service Bus and no ERP. The horizon job and the seeder are hosted services of the TMS API, so they run the same code in Azure and under Aspire. The only stand-in is the seed file, which supplies the Vehicles, Drivers and Rosters in both places until the ERP's master-data sync exists. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+Nothing plays an Azure piece, because P10 touches no integration at runtime: no API Management, no Logic App, no Service Bus and no ERP. The horizon job and the seeder are hosted services of the TMS API, so they run the same code in Azure and under Aspire. The only stand-in is the seed file, which supplies the Rosters in both places, and the Vehicles and Drivers at first, before the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces them. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
 
 ### Gaps
 
@@ -217,7 +217,6 @@ Designed in this document and not built yet:
 |---|---|
 | Trips, and so everything that draws on availability | P11 is not built. P11 applies `TripAvailabilityRules` to Draft Trips, and [TripPlannedDrivingHours.cs](../../../src/Tms/Norvia.Tms.Infrastructure/Fleet/TripPlannedDrivingHours.cs) reports their planned driving, so a Draft uses up Driving hours. Dispatched Trips, Shipments and the load come with later P11 slices |
 | Part-day Absences, tachograph data, breaks and rest periods, estimating driving hours, more than one Trip per Vehicle per day | Left out on purpose ([Deferred](#deferred)) |
-| The ERP and master-data sync | Vehicles and Drivers come from the seed file for now |
 | As-found toggles and presenter-panel faults for P10 | None added. No Bicep parameter switches anything broken in capacity planning, and [Failure behaviour](../../architecture/failure-behaviour.md#planned-processes) names none yet |
 | Alerts on P10 | None built, for example on a failed horizon job run. The job logs each run and retries on its next cycle ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule for it) |
 
@@ -233,5 +232,4 @@ These were left out on purpose while designing P10, each with its reason.
 - **Depots.** The Own fleet is one pool. Rotterdam and Antwerp would each need their own capacity once depots exist.
 - **Suggesting what to move to a Carrier**, or rostering automatically. Planning stays manual, as in P3.
 - **Loading metres and volume.** Goods lines don't carry them.
-- **The ERP and the Vehicle and Driver master-data sync.** They come from the seed file for now.
 - **As-found toggles.** The [as-found estate](../../operations/as-found.md) is built. P10 has no toggle of its own.

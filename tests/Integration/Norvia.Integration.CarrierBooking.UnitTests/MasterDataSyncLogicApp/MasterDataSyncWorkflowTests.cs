@@ -10,7 +10,7 @@ public sealed class MasterDataSyncWorkflowTests
 {
     // The record sits under the entity type's own name: `carrier` for a Carrier event, `vehicle` for a Vehicle one, `shipper` for a Shipper one.
     private const string EventType = "json(base64ToString(triggerBody()?['ContentData']))?['eventType']";
-    private const string RecordKey = "?[if(equals(" + EventType + ", 'Carrier'), 'carrier', if(equals(" + EventType + ", 'RateCard'), 'rateCard', if(equals(" + EventType + ", 'CarrierRateCard'), 'carrierRateCard', if(equals(" + EventType + ", 'Vehicle'), 'vehicle', if(equals(" + EventType + ", 'Driver'), 'driver', 'shipper')))))]";
+    private const string RecordKey = "?[if(equals(" + EventType + ", 'CarrierChanged'), 'carrier', if(equals(" + EventType + ", 'RateCardChanged'), 'rateCard', if(equals(" + EventType + ", 'CarrierRateCardChanged'), 'carrierRateCard', if(equals(" + EventType + ", 'VehicleChanged'), 'vehicle', if(equals(" + EventType + ", 'DriverChanged'), 'driver', 'shipper')))))]";
     private const string CorrelationId = "@{outputs('Track_the_master_data_record')?['correlationId']}";
 
     private static string[] Statuses(JsonObject action, string after) =>
@@ -120,7 +120,7 @@ public sealed class MasterDataSyncWorkflowTests
         var inputs = replace["inputs"]!;
 
         inputs["method"]!.GetValue<string>().Should().Be("PUT");
-        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Carrier'), 'carriers', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'RateCard'), 'rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'CarrierRateCard'), 'carrier-rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Vehicle'), 'vehicles', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Driver'), 'drivers', 'shippers')))))}/@{encodeUriComponent(outputs('Track_the_master_data_record')?['partyId'])}");
+        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_master_data_record')?['eventType'], 'CarrierChanged'), 'carriers', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'RateCardChanged'), 'rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'CarrierRateCardChanged'), 'carrier-rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'VehicleChanged'), 'vehicles', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'DriverChanged'), 'drivers', 'shippers')))))}/@{encodeUriComponent(outputs('Track_the_master_data_record')?['partyId'])}");
         // The body is the event's record but for its ID, which the route carries: every entity's record is what its TMS command takes.
         inputs["body"]!.GetValue<string>().Should().Be("@removeProperty(json(base64ToString(triggerBody()?['ContentData']))" + RecordKey + ", 'id')");
         inputs["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
@@ -274,7 +274,7 @@ public sealed class MasterDataSyncWorkflowTests
         var filter = messaging[messaging.IndexOf("resource masterDataSyncFilter", StringComparison.Ordinal)..];
         filter = filter[..filter.IndexOf("\n}\n", StringComparison.Ordinal)];
 
-        filter.Should().Contain("(eventType IN (\\'Shipper\\', \\'Carrier\\', \\'RateCard\\', \\'CarrierRateCard\\', \\'Vehicle\\', \\'Driver\\') AND resubmitTo IS NULL) OR resubmitTo = \\'master-data-sync\\'");
+        filter.Should().Contain("(eventType IN (\\'ShipperChanged\\', \\'CarrierChanged\\', \\'RateCardChanged\\', \\'CarrierRateCardChanged\\', \\'VehicleChanged\\', \\'DriverChanged\\') AND resubmitTo IS NULL) OR resubmitTo = \\'master-data-sync\\'");
     }
 
     [Fact]

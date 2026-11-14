@@ -42,7 +42,7 @@ Cross-cutting behaviour is a mediator pipeline behaviour, not code in each handl
 | `IConflictRetrier` | `EfConflictRetrier` | Azure SQL: retries a command that lost a race |
 | `ITransportOrderNumbers`, `IShipmentNumbers`, `ICarrierBookingNumbers`, `ITripNumbers`, `IExceptionNumbers` | `Sql…Numbers`, one per concept | Azure SQL sequences |
 | `IOutbox` | `OutboxBuffer` saves the message with the change, `OutboxPublisher` sends it every second, oldest first | Service Bus |
-| `IShipperDirectory`, `ICarrierDirectory`, `IRateCardDirectory`, `ICarrierRateCardDirectory`, `IDriverDirectory`, `IVehicleDirectory`, `IRosterDirectory` | `SeedFile…Directory`, loaded by `LoadSeedOnStart` | The seed file, which plays the ERP until the sync exists |
+| `IShipperDirectory`, `ICarrierDirectory`, `IRateCardDirectory`, `ICarrierRateCardDirectory`, `IDriverDirectory`, `IVehicleDirectory`, `IRosterDirectory` | `SeedFile…Directory`, loaded by `LoadSeedOnStart` | The seed file, the first load; the master-data sync (E3) lays the ERP's edits over it |
 | `IProofOfDeliveryFiles` | `AzureBlobProofOfDeliveryFiles` | Blob storage |
 | `IRatingTrigger`, `IResetSwitch`, `IQuietCheck`, `IPlannedDrivingHours`, `TimeProvider` | `RatingSignal`, `ConfiguredResetSwitch`, `ServiceBusQuietCheck`, `TripPlannedDrivingHours`, `FileControlledTimeProvider` or the system clock | The clock, and Service Bus management |
 

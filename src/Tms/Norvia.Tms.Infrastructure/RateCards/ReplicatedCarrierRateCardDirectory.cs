@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using Ardalis.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.RateCards;
 using Norvia.Tms.Domain.Carriers;
@@ -16,23 +16,21 @@ internal sealed class ReplicatedCarrierRateCardDirectory(SeedFileCarrierRateCard
     public CarrierRateCard? FindFor(CarrierId carrierId)
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<CarrierRateCardCopy>().AsNoTracking();
-        if (copies.Where(row => row.CarrierId == carrierId.Value).OrderByDescending(row => row.Revision).ThenBy(row => row.Id).FirstOrDefault() is { } copy)
+        var copies = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<CarrierRateCardCopy>>();
+        if (copies.FirstOrDefault(new CarrierRateCardCopyOfCarrierSpec(carrierId.Value)) is { } copy)
         {
             return Of(copy);
         }
 
         // A seed card the ERP has since moved to another Carrier no longer belongs to this one.
         var seeded = seed.FindFor(carrierId);
-        return seeded is not null && !copies.Any(row => row.Id == seeded.Id.Value) ? seeded : null;
+        return seeded is not null && copies.FirstOrDefault(new CarrierRateCardCopyByIdSpec(seeded.Id.Value)) is null ? seeded : null;
     }
 
     public CarrierRateCard? Find(RateCardId id)
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copy = context.Set<CarrierRateCardCopy>().AsNoTracking().SingleOrDefault(row => row.Id == id.Value);
+        var copy = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<CarrierRateCardCopy>>().FirstOrDefault(new CarrierRateCardCopyByIdSpec(id.Value));
         return copy is null ? seed.Find(id) : Of(copy);
     }
 
@@ -41,25 +39,33 @@ internal sealed class ReplicatedCarrierRateCardDirectory(SeedFileCarrierRateCard
         ArgumentNullException.ThrowIfNull(carrierRateCard);
         ArgumentNullException.ThrowIfNull(versions);
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<CarrierRateCardCopy>();
-        var copy = await copies.SingleOrDefaultAsync(row => row.Id == carrierRateCard.Id.Value, cancellationToken);
+        var copies = scope.ServiceProvider.GetRequiredService<IRepository<CarrierRateCardCopy>>();
+        var copy = await copies.FirstOrDefaultAsync(new CarrierRateCardCopyForReplaceSpec(carrierRateCard.Id.Value), cancellationToken);
         if (copy is not null && copy.Revision >= carrierRateCard.Revision)
         {
             // A delivery that lost a race with a later revision must not move the copy backwards.
             return;
         }
 
-        if (copy is null)
-        {
-            copy = new CarrierRateCardCopy { Id = carrierRateCard.Id.Value };
-            copies.Add(copy);
-        }
+        var isNew = copy is null;
+        copy ??= new CarrierRateCardCopy { Id = carrierRateCard.Id.Value };
 
         copy.CarrierId = carrierRateCard.CarrierId.Value;
         copy.Revision = carrierRateCard.Revision;
         copy.VersionsJson = RateCardVersionsJson.Serialize(versions);
-        await context.SaveChangesAsync(cancellationToken);
+        await SaveAsync(copies, copy, isNew, cancellationToken);
+    }
+
+    private static async Task SaveAsync(IRepository<CarrierRateCardCopy> copies, CarrierRateCardCopy copy, bool isNew, CancellationToken cancellationToken)
+    {
+        if (isNew)
+        {
+            await copies.AddAsync(copy, cancellationToken);
+        }
+        else
+        {
+            await copies.UpdateAsync(copy, cancellationToken);
+        }
     }
 
     private static CarrierRateCard Of(CarrierRateCardCopy copy) =>

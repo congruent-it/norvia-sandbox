@@ -1,7 +1,9 @@
-namespace Norvia.Tms.Infrastructure.RateCards;
+using Ardalis.SharedKernel;
+
+namespace Norvia.Tms.Domain.RateCards;
 
 /// <summary>A Carrier Rate Card the ERP replicated to the TMS, kept whole with its list of versions as JSON. It overrides the seed file's card with the same ID (E3).</summary>
-internal sealed class CarrierRateCardCopy
+public sealed class CarrierRateCardCopy : IAggregateRoot
 {
     public string Id { get; set; } = string.Empty;
 

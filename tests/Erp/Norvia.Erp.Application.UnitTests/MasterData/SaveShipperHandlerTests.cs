@@ -33,7 +33,7 @@ public sealed class SaveShipperHandlerTests
         result.Value.Shipper.Should().Be(new ShipperView("SHP-0100", "Nieuwe Shipper", true, 1));
         await _shippers.Received().AddAsync(Arg.Is<Shipper>(shipper => shipper.Id.Value == "SHP-0100"), Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e =>
-            e is ShipperV1 && e.EventType == "Shipper" && e.Topic == Topics.MasterDataEvents && ((ShipperV1)e).Shipper.Revision == 1));
+            e is ShipperChangedV1 && e.EventType == "ShipperChanged" && e.Topic == Topics.MasterDataEvents && ((ShipperChangedV1)e).Shipper.Revision == 1));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class SaveShipperHandlerTests
         result.Value.Shipper.Should().Be(new ShipperView("SHP-0001", "New", false, 2));
         shipper.Revision.Should().Be(2);
         await _shippers.Received().UpdateAsync(shipper, Arg.Any<CancellationToken>());
-        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((ShipperV1)e).Shipper.Revision == 2 && !((ShipperV1)e).Shipper.Active));
+        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((ShipperChangedV1)e).Shipper.Revision == 2 && !((ShipperChangedV1)e).Shipper.Active));
     }
 
     [Fact]
@@ -75,5 +75,44 @@ public sealed class SaveShipperHandlerTests
         result.Status.Should().Be(ResultStatus.Invalid);
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataFieldRequired");
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var shipper = new Shipper(new ShipperId("SHP-0001"), "Old", true);
+        Have(shipper);
+        await Handler.Handle(new SaveShipperCommand("SHP-0001", "Mine", true, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+        _shippers.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveShipperCommand("SHP-0001", "Mine", true, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        result.Value.Shipper.Should().Be(new ShipperView("SHP-0001", "Mine", true, 2));
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+        await _shippers.DidNotReceive().UpdateAsync(Arg.Any<Shipper>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ForANewKey_EditsAgain()
+    {
+        var shipper = new Shipper(new ShipperId("SHP-0001"), "Old", true);
+        Have(shipper);
+        await Handler.Handle(new SaveShipperCommand("SHP-0001", "First", true, "key-1"), CancellationToken.None);
+
+        var result = await Handler.Handle(new SaveShipperCommand("SHP-0001", "Second", true, "key-2"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Updated);
+        result.Value.Shipper.Revision.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Handle_ForAKeyOver100Characters_IsRefusedWithAStableCode()
+    {
+        var result = await Handler.Handle(new SaveShipperCommand("SHP-0001", "Name", true, new string('k', 101)), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataKeyTooLong");
     }
 }

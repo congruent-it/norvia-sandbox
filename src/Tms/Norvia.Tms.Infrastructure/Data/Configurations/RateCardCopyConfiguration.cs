@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Norvia.Tms.Infrastructure.RateCards;
+using Norvia.Tms.Domain.RateCards;
 
 namespace Norvia.Tms.Infrastructure.Data.Configurations;
 

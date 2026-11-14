@@ -13,8 +13,8 @@ using Norvia.Erp.Web.ShipperInvoices;
 namespace Norvia.Erp.Web.ErpApi;
 
 /// <summary>
-/// Sends Finance's master-data saves to the ERP API as the ERP UI's own identity. A save is a <c>PUT</c> of the whole record, so a
-/// repeat of it, a retry included, changes nothing. Each save goes in a span of its own, which is the UI's hop on the trail.
+/// Sends Finance's master-data saves to the ERP API as the ERP UI's own identity. A save is a <c>PUT</c> of the whole record under an <c>Idempotency-Key</c>
+/// of its own, so a repeat of it, a retry included, changes nothing. Each save goes in a span of its own, which is the UI's hop on the trail.
 /// </summary>
 internal sealed partial class MasterDataApiClient(HttpClient http, IErpApiTokens tokens, ErpActivities activities, ILogger<MasterDataApiClient> logger)
     : IMasterDataCommands
@@ -48,6 +48,8 @@ internal sealed partial class MasterDataApiClient(HttpClient http, IErpApiTokens
         {
             Content = JsonContent.Create(body, body.GetType(), options: Json),
         };
+        // One key per save, so a resend of this very message (a transport retry) carries the same key.
+        request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(cancellationToken));
 
         using var response = await http.SendAsync(request, cancellationToken);

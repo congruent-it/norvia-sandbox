@@ -1,7 +1,9 @@
-namespace Norvia.Tms.Infrastructure.Carriers;
+using Ardalis.SharedKernel;
+
+namespace Norvia.Tms.Domain.Carriers;
 
 /// <summary>A Carrier the ERP replicated to the TMS, kept whole. It overrides the seed file's Carrier with the same ID (E3).</summary>
-internal sealed class CarrierCopy
+public sealed class CarrierCopy : IAggregateRoot
 {
     public string Id { get; set; } = string.Empty;
 

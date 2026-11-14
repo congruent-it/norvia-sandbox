@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Erp.Application.MasterData;
 using Norvia.Erp.Domain.Vehicles;
 
 namespace Norvia.Erp.Infrastructure.Data.Configurations;
@@ -16,6 +17,7 @@ internal sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.Property(vehicle => vehicle.Type).HasConversion<string>().HasMaxLength(30);
         builder.Property(vehicle => vehicle.Revision).HasDefaultValue(1);
         builder.Property(vehicle => vehicle.FinanceOwned).HasDefaultValue(false);
+        builder.Property(vehicle => vehicle.LastSaveKey).HasMaxLength(MasterDataSaveKey.MaxLength);
         // Two edits at once conflict instead of both winning; the loser is run again and sees the new revision.
         builder.Property<byte[]>("RowVersion").IsRowVersion();
     }

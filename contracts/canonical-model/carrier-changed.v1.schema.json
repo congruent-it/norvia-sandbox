@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://norvia.example/canonical-model/carrier.v1.schema.json",
-  "title": "Carrier",
+  "$id": "https://norvia.example/canonical-model/carrier-changed.v1.schema.json",
+  "title": "CarrierChanged",
   "description": "The ERP created or edited a Carrier (Canonical Model event, version 1, E3). Published on the master-data events topic through the ERP's transactional outbox, in the transaction that saved the change, under a correlation ID created for the change. It carries the whole Carrier and its Master-data revision, so the TMS replaces its copy and needs nothing more.",
   "type": "object",
   "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "carrier"],
   "additionalProperties": false,
   "properties": {
     "eventId": { "type": "string", "description": "The event's own ID, a UUID." },
-    "eventType": { "const": "Carrier" },
+    "eventType": { "const": "CarrierChanged" },
     "eventVersion": { "const": 1 },
     "occurredAt": { "type": "string", "format": "date-time" },
     "correlationId": { "type": "string", "minLength": 1 },

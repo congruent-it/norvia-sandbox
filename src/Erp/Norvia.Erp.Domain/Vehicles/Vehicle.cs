@@ -37,12 +37,18 @@ public sealed class Vehicle : EntityBase<VehicleId>, IAggregateRoot
     /// <summary>The Master-data revision: 1 as loaded from the seed file, raised by every edit.</summary>
     public int Revision { get; private set; } = 1;
 
+    /// <summary>The sender's Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.</summary>
+    public string? LastSaveKey { get; private set; }
+
+    /// <summary>True when <paramref name="key"/> is the key of the save that last changed the record.</summary>
+    public bool IsRepeat(string? key) => key is not null && key == LastSaveKey;
+
     /// <summary>True once Finance created or edited the Vehicle, so the seed file no longer speaks for it.</summary>
     public bool FinanceOwned { get; private set; }
 
     /// <summary>A Vehicle Finance creates: revision 1, and the seed file never reloads it.</summary>
-    public static Vehicle CreateByFinance(VehicleId id, string registration, VehicleType type, int payloadKg, int palletPlaces, bool active) =>
-        new(id, registration, type, payloadKg, palletPlaces, active) { FinanceOwned = true };
+    public static Vehicle CreateByFinance(VehicleId id, string registration, VehicleType type, int payloadKg, int palletPlaces, bool active, string? saveKey = null) =>
+        new(id, registration, type, payloadKg, palletPlaces, active) { FinanceOwned = true, LastSaveKey = saveKey };
 
     /// <summary>Takes over what the seed file says now, silently, and only while Finance has not created or edited the Vehicle.</summary>
     public void Reload(string registration, VehicleType type, int payloadKg, int palletPlaces, bool active)
@@ -61,7 +67,7 @@ public sealed class Vehicle : EntityBase<VehicleId>, IAggregateRoot
     /// raises no revision and leaves the seed file in charge; it answers false so nothing is published.
     /// </summary>
     /// <returns>True when the edit changed the record.</returns>
-    public bool Edit(string registration, VehicleType type, int payloadKg, int palletPlaces, bool active)
+    public bool Edit(string registration, VehicleType type, int payloadKg, int palletPlaces, bool active, string? saveKey = null)
     {
         Check(registration, payloadKg, palletPlaces);
         if (Registration == registration && Type == type && PayloadKg == payloadKg && PalletPlaces == palletPlaces && Active == active)
@@ -71,6 +77,7 @@ public sealed class Vehicle : EntityBase<VehicleId>, IAggregateRoot
 
         Set(registration, type, payloadKg, palletPlaces, active);
         FinanceOwned = true;
+        LastSaveKey = saveKey;
         Revision++;
         return true;
     }

@@ -75,12 +75,12 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
         // The body is the record but for its ID, which the route carries, so each entity's record is what its TMS command takes.
         var (recordName, collection) = Text(parsed ?? [], "eventType") switch
         {
-            "Shipper" => ("shipper", "shippers"),
-            "Carrier" => ("carrier", "carriers"),
-            "RateCard" => ("rateCard", "rate-cards"),
-            "CarrierRateCard" => ("carrierRateCard", "carrier-rate-cards"),
-            "Vehicle" => ("vehicle", "vehicles"),
-            "Driver" => ("driver", "drivers"),
+            "ShipperChanged" => ("shipper", "shippers"),
+            "CarrierChanged" => ("carrier", "carriers"),
+            "RateCardChanged" => ("rateCard", "rate-cards"),
+            "CarrierRateCardChanged" => ("carrierRateCard", "carrier-rate-cards"),
+            "VehicleChanged" => ("vehicle", "vehicles"),
+            "DriverChanged" => ("driver", "drivers"),
             _ => (null, null),
         };
         if (parsed is null || recordName is null || Text(parsed, "correlationId") is not { } correlationId

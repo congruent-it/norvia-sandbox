@@ -33,7 +33,7 @@ public sealed class SaveDriverHandlerTests
         result.Value.Driver.Should().BeEquivalentTo(new DriverView("DRV-0100", "Nieuw", ["B", "CE"], true, 1));
         await _drivers.Received().AddAsync(Arg.Is<Driver>(driver => driver.Id.Value == "DRV-0100" && driver.FinanceOwned), Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e =>
-            e is DriverV1 && e.EventType == "Driver" && e.Topic == Topics.MasterDataEvents && ((DriverV1)e).Driver.Revision == 1));
+            e is DriverChangedV1 && e.EventType == "DriverChanged" && e.Topic == Topics.MasterDataEvents && ((DriverChangedV1)e).Driver.Revision == 1));
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public sealed class SaveDriverHandlerTests
         result.Value.Driver.Active.Should().BeFalse();
         driver.Licences.Should().Equal(LicenceCategory.B, LicenceCategory.C);
         await _drivers.Received().UpdateAsync(driver, Arg.Any<CancellationToken>());
-        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => !((DriverV1)e).Driver.Active));
+        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => !((DriverChangedV1)e).Driver.Active));
     }
 
     [Fact]
@@ -102,5 +102,22 @@ public sealed class SaveDriverHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.Driver.Licences.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var record = Anouk();
+        Have(record);
+        await Handler.Handle(new SaveDriverCommand("DRV-0001", "Anouk de Vries", ["B", "C"], false, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+        _drivers.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveDriverCommand("DRV-0001", "Anouk de Vries", ["B", "C"], false, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        record.Revision.Should().Be(2);
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+        await _drivers.DidNotReceive().UpdateAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>());
     }
 }

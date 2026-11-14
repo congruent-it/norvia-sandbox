@@ -1,7 +1,9 @@
-namespace Norvia.Tms.Infrastructure.Fleet;
+using Ardalis.SharedKernel;
+
+namespace Norvia.Tms.Domain.Fleet;
 
 /// <summary>A Driver the ERP replicated to the TMS, kept whole. It overrides the seed file's Driver with the same ID (E3).</summary>
-internal sealed class DriverCopy
+public sealed class DriverCopy : IAggregateRoot
 {
     public string Id { get; set; } = string.Empty;
 

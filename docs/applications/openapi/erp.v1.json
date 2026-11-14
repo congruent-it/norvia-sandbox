@@ -780,13 +780,20 @@
           "MasterData"
         ],
         "summary": "Create or edit a Shipper, and replicate it to the TMS.",
-        "description": "What Finance's Shipper form does, through the same command. Creates the Shipper (201, Master-data revision 1) or replaces its name and active flag (200, the revision raised by one) and publishes the whole Shipper as the Shipper event, in one transaction. Idempotent on content: a repeat of what the Shipper already is answers 200 with the unchanged revision and publishes nothing. A Shipper is never deleted, only made inactive. Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.",
+        "description": "What Finance's Shipper form does, through the same command. Creates the Shipper (201, Master-data revision 1) or replaces its name and active flag (200, the revision raised by one) and publishes the whole Shipper as the ShipperChanged event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the Shipper already is answers 200 with the unchanged revision and publishes nothing, and so does a save sent again under its key (outcome Repeat). A Shipper is never deleted, only made inactive. Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.",
         "operationId": "SaveShipper",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -832,13 +839,20 @@
           "MasterData"
         ],
         "summary": "Create or edit a Carrier, and replicate it to the TMS.",
-        "description": "What Finance's Carrier form does, through the same command. Creates the Carrier (201, Master-data revision 1) or replaces its name and active flag (200, the revision raised by one) and publishes the whole Carrier as the Carrier event, in one transaction. Idempotent on content: a repeat of what the Carrier already is answers 200 with the unchanged revision and publishes nothing. A Carrier is never deleted, only made inactive. Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.",
+        "description": "What Finance's Carrier form does, through the same command. Creates the Carrier (201, Master-data revision 1) or replaces its name and active flag (200, the revision raised by one) and publishes the whole Carrier as the CarrierChanged event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the Carrier already is answers 200 with the unchanged revision and publishes nothing, and so does a save sent again under its key (outcome Repeat). A Carrier is never deleted, only made inactive. Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.",
         "operationId": "SaveCarrier",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -884,13 +898,20 @@
           "MasterData"
         ],
         "summary": "Create or edit a Vehicle of the Own fleet, and replicate it to the TMS.",
-        "description": "What Finance's Vehicle form does, through the same command. Creates the Vehicle (201, Master-data revision 1) or replaces its registration, type, payload, pallet places and active flag (200, the revision raised by one) and publishes the whole Vehicle as the Vehicle event, in one transaction. Idempotent on content: a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing. A Vehicle is never deleted, only made inactive, which stores Active false and nothing else: it opens or closes no day. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.",
+        "description": "What Finance's Vehicle form does, through the same command. Creates the Vehicle (201, Master-data revision 1) or replaces its registration, type, payload, pallet places and active flag (200, the revision raised by one) and publishes the whole Vehicle as the VehicleChanged event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing, and so does a save sent again under its key (outcome Repeat). A Vehicle is never deleted, only made inactive, which stores Active false and nothing else: it opens or closes no day. A registration belongs to one Vehicle. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, MasterDataFieldInvalid and VehicleRegistrationTaken.",
         "operationId": "SaveVehicle",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -936,13 +957,20 @@
           "MasterData"
         ],
         "summary": "Create or edit a Driver of the Own fleet, and replicate it to the TMS.",
-        "description": "What Finance's Driver form does, through the same command. Creates the Driver (201, Master-data revision 1) or replaces its name, licence categories and active flag (200, the revision raised by one) and publishes the whole Driver as the Driver event, in one transaction. Idempotent on content: a repeat of what the Driver already is, the licences in any order, answers 200 with the unchanged revision and publishes nothing. A Driver is never deleted, only made inactive, which stores Active false and nothing else: it edits no Roster. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.",
+        "description": "What Finance's Driver form does, through the same command. Creates the Driver (201, Master-data revision 1) or replaces its name, licence categories and active flag (200, the revision raised by one) and publishes the whole Driver as the DriverChanged event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the Driver already is, the licences in any order, answers 200 with the unchanged revision and publishes nothing. A Driver is never deleted, only made inactive, which stores Active false and nothing else: it edits no Roster. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.",
         "operationId": "SaveDriver",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -988,13 +1016,20 @@
           "MasterData"
         ],
         "summary": "Create or edit a Shipper's Rate Card, and replicate it to the TMS.",
-        "description": "Creates the Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes the whole Rate Card as the RateCard event, in one transaction. Idempotent on content: a repeat of what the card already is answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time, and a Shipper has one Rate Card. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardShipperHasCard.",
+        "description": "Creates the Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes the whole Rate Card as the RateCardChanged event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the card already is answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time, and a Shipper has one Rate Card. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardShipperHasCard.",
         "operationId": "SaveRateCard",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -1040,13 +1075,20 @@
           "MasterData"
         ],
         "summary": "Create or edit a Carrier's Carrier Rate Card, and replicate it to the TMS.",
-        "description": "Creates the Carrier Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes the whole card as the CarrierRateCard event, in one transaction. Idempotent on content: a repeat of what the card already is answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time, and a Carrier has one Carrier Rate Card. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardCarrierHasCard.",
+        "description": "Creates the Carrier Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes the whole card as the CarrierRateCardChanged event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the card already is answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time, and a Carrier has one Carrier Rate Card. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardCarrierHasCard.",
         "operationId": "SaveCarrierRateCard",
         "parameters": [
           {
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -2894,7 +2936,8 @@
         "enum": [
           "Created",
           "Updated",
-          "Unchanged"
+          "Unchanged",
+          "Repeat"
         ]
       },
       "NotDeliveredView": {

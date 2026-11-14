@@ -24,6 +24,11 @@ public sealed partial class SaveShipperHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Name))
         {
             return Refuse("The Shipper needs an ID and a name.", "MasterDataFieldRequired");
@@ -40,14 +45,20 @@ public sealed partial class SaveShipperHandler(
         Shipper shipper;
         if (existing is null)
         {
-            shipper = Shipper.CreateByFinance(id, command.Name, command.Active);
+            shipper = Shipper.CreateByFinance(id, command.Name, command.Active, command.IdempotencyKey);
             await shippers.AddAsync(shipper, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             shipper = existing;
-            if (!shipper.Edit(command.Name, command.Active))
+            if (shipper.IsRepeat(command.IdempotencyKey))
+            {
+                LogRepeat(logger, command.Id);
+                return new SaveShipperResult(ViewOf(shipper), MasterDataSaveOutcome.Repeat);
+            }
+
+            if (!shipper.Edit(command.Name, command.Active, command.IdempotencyKey))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveShipperResult(ViewOf(shipper), MasterDataSaveOutcome.Unchanged);
@@ -65,7 +76,7 @@ public sealed partial class SaveShipperHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.Id,
         });
-        outbox.Add(new ShipperV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+        outbox.Add(new ShipperChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveShipperResult(view, outcome);
     }
@@ -77,6 +88,9 @@ public sealed partial class SaveShipperHandler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Shipper {ShipperId} {Outcome} at Master-data revision {Revision}")]
     private static partial void LogSaved(ILogger logger, string shipperId, MasterDataSaveOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Shipper {ShipperId}: this save was applied before under its Idempotency-Key; nothing changed or published")]
+    private static partial void LogRepeat(ILogger logger, string shipperId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Shipper {ShipperId} already has this content; nothing changed or published")]
     private static partial void LogUnchanged(ILogger logger, string shipperId);

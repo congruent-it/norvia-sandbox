@@ -1,3 +1,4 @@
+using Ardalis.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Fleet;
@@ -16,16 +17,14 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
     public Vehicle? Find(VehicleId id)
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copy = context.Set<VehicleCopy>().AsNoTracking().SingleOrDefault(row => row.Id == id.Value);
+        var copy = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<VehicleCopy>>().FirstOrDefault(new VehicleCopyByIdSpec(id.Value));
         return copy is null ? seed.Find(id) : Of(copy);
     }
 
     public IReadOnlyList<Vehicle> ListActive()
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<VehicleCopy>().AsNoTracking().ToList().Select(Of).ToDictionary(vehicle => vehicle.Id);
+        var copies = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<VehicleCopy>>().List(new VehicleCopiesSpec()).Select(Of).ToDictionary(vehicle => vehicle.Id);
         return
         [
             .. seed.ListActive().Where(vehicle => !copies.ContainsKey(vehicle.Id)).Concat(copies.Values.Where(vehicle => vehicle.Active))
@@ -39,9 +38,8 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
     {
         ArgumentNullException.ThrowIfNull(vehicle);
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<VehicleCopy>();
-        var copy = await copies.SingleOrDefaultAsync(row => row.Id == vehicle.Id.Value, cancellationToken);
+        var copies = scope.ServiceProvider.GetRequiredService<IRepository<VehicleCopy>>();
+        var copy = await copies.FirstOrDefaultAsync(new VehicleCopyForReplaceSpec(vehicle.Id.Value), cancellationToken);
         if (copy is not null && copy.Revision >= vehicle.Revision)
         {
             // A delivery that lost a race with a later revision must not move the copy backwards.
@@ -49,11 +47,7 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
         }
 
         var isNew = copy is null;
-        if (copy is null)
-        {
-            copy = new VehicleCopy { Id = vehicle.Id.Value };
-            copies.Add(copy);
-        }
+        copy ??= new VehicleCopy { Id = vehicle.Id.Value };
 
         copy.Registration = vehicle.Registration;
         copy.Type = vehicle.Type.ToString();
@@ -63,13 +57,25 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
         copy.Revision = vehicle.Revision;
         try
         {
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(copies, copy, isNew, cancellationToken);
             return true;
         }
         catch (DbUpdateException) when (isNew && !retried)
         {
             // Another delivery inserted the same ID first: look again, and keep the higher revision.
             return await ReplaceAsync(vehicle, retried: true, cancellationToken);
+        }
+    }
+
+    private static async Task SaveAsync(IRepository<VehicleCopy> copies, VehicleCopy copy, bool isNew, CancellationToken cancellationToken)
+    {
+        if (isNew)
+        {
+            await copies.AddAsync(copy, cancellationToken);
+        }
+        else
+        {
+            await copies.UpdateAsync(copy, cancellationToken);
         }
     }
 

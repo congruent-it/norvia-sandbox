@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://norvia.example/canonical-model/carrier-rate-card.v1.schema.json",
-  "title": "CarrierRateCard",
+  "$id": "https://norvia.example/canonical-model/carrier-rate-card-changed.v1.schema.json",
+  "title": "CarrierRateCardChanged",
   "description": "The ERP created or edited a Carrier's Carrier Rate Card (Canonical Model event, version 1, E3). Published on the master-data events topic through the ERP's transactional outbox, in the transaction that saved the change, under a correlation ID created for the change. It carries the whole Carrier Rate Card with its full list of dated versions and its Master-data revision, so the TMS replaces its list and needs nothing more.",
   "type": "object",
   "required": [

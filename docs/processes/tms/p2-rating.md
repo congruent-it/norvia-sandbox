@@ -8,7 +8,7 @@ Rating calculates the Freight Charge for an accepted Transport Order from the Sh
 | **Outcome** | The Transport Order is Rated with a frozen Freight Charge, or Rating failed with a reason |
 | **Owning system** | TMS (ADR 0006). The ERP owns Contracts and Rate Cards |
 | **Applies to** | Own fleet and Carriers alike. Rating happens before P3 decides who carries the goods |
-| **Integrations touched** | Service Bus (outcome events). ERP, through the seed file for now |
+| **Integrations touched** | Service Bus (outcome events). ERP, through the master-data sync ([E3](../erp/e3-master-data-sync.md)) over the seed file |
 
 ## Process model
 
@@ -64,7 +64,7 @@ In a real operation a pricing desk would work these exceptions. The sandbox give
 
 ## Rate Cards in the TMS
 
-The TMS holds a read copy of each Shipper's Rate Card and never edits it (ADR 0006). Until the ERP exists, the TMS loads Rate Cards from the seed file at startup, the same way it loads Shippers. A Rate Card has versions, and each version has a validity period and its own Zones and Lanes, each Lane with its Weight Breaks and minimum charge.
+The TMS holds a read copy of each Shipper's Rate Card and never edits it (ADR 0006). The TMS loads Rate Cards from the seed file at startup, the same way it loads Shippers, and the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces a card whenever Finance edits it. A Rate Card has versions, and each version has a validity period and its own Zones and Lanes, each Lane with its Weight Breaks and minimum charge.
 
 Zones may nest, a narrower prefix inside a wider one, because the most specific prefix decides. Two Zones of one version overlap when they claim the same prefix in the same country, as then neither is more specific. A Rate Card whose Zones overlap is rejected when the seed loads, and the TMS doesn't start.
 
@@ -149,7 +149,7 @@ Links go to files, not lines, so they stay true as the code moves.
 
 ### Locally
 
-Nothing plays an Azure piece for Rating itself: the rating worker is part of the TMS API, which is the same application in both, and the Rate Cards come from the seed file in both. What differs is around it. The Service Bus emulator plays Service Bus for the outcome events, and the Aspire dashboard plays Application Insights, so the rating Hops are searched through the dashboard's telemetry ([local-vs-azure.md](../../architecture/local-vs-azure.md) has no row for Rating, as nothing plays a piece of it). The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+Nothing plays an Azure piece for Rating itself: the rating worker is part of the TMS API, which is the same application in both, and the Rate Cards come from the seed file at first and from the E3 master-data sync after, in both. What differs is around it. The Service Bus emulator plays Service Bus for the outcome events, and the Aspire dashboard plays Application Insights, so the rating Hops are searched through the dashboard's telemetry ([local-vs-azure.md](../../architecture/local-vs-azure.md) has no row for Rating, as nothing plays a piece of it). The full map, and the places where the two can differ, are in [local-vs-azure.md](../../architecture/local-vs-azure.md).
 
 To see a rating locally, book from the Partner portal and watch the order's Rating section in the TMS UI. The Antwerp and Düsseldorf bookings of the [presenter smoke run](#presenter-smoke-run) work the same way, apart from the script, which needs a deployed estate.
 
@@ -159,7 +159,7 @@ Designed in this document and not built yet:
 
 | Gap | Where it stands |
 |---|---|
-| The ERP to TMS Rate Card sync, and with it the live "fix the Rate Card, then re-rate" demo | Rate Cards come from the seed file ([Rate Cards in the TMS](#rate-cards-in-the-tms)). Tests cover the fix-and-re-rate path |
+| The live "fix the Rate Card, then re-rate" demo | The sync is built ([E3](../erp/e3-master-data-sync.md)); re-rating the Orders already Rated is [#908](https://github.com/congruent-it/norvia-sandbox/issues/908). Tests cover the fix-and-re-rate path |
 | A fuller Rate Card, automatic re-rating, Quotes, Carrier cost, a pricing desk role | Left out on purpose ([Deferred](#deferred)) |
 | As-found toggles and presenter-panel faults for P2 | None added. No Bicep parameter switches anything broken in Rating. [Failure behaviour](../../architecture/failure-behaviour.md#p2-rating) lists the row each would worsen |
 | Alerts on P2 | None built: there is no alert on `TransportOrderRatingFailed` ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
@@ -170,7 +170,6 @@ Designed in this document and not built yet:
 These were left out on purpose while designing P2, each with its reason.
 
 - **A fuller Rate Card**: fuel surcharge, per-pallet pricing, volumetric weight, tail-lift and time-window surcharges, volume discounts. The minimal Rate Card is enough for a believable demo. Add the fuel surcharge first, together with the ERP sync.
-- **ERP → TMS Rate Card sync.** The ERP publishes Rate Cards and a Logic App calls a command on the TMS to replace the Rate Card. This is the live "fix the Rate Card, then re-rate" demo. It waits until the ERP is built.
 - **Automatic re-rating when a new Rate Card arrives.** It needs the sync first.
 - **Correcting the charge on a Rated order.** Handled as a Credit note in the ERP ([E1](../erp/e1-invoicing.md#credit-notes)).
 - **Showing the Freight Charge to Shippers, and Quotes before booking.** Out of scope because a displayed price reads as a commitment.

@@ -33,7 +33,7 @@ public sealed class SaveCarrierHandlerTests
         result.Value.Carrier.Should().Be(new CarrierView("CAR-0100", "Nieuwe Carrier", true, 1));
         await _shippers.Received().AddAsync(Arg.Is<Carrier>(shipper => shipper.Id.Value == "CAR-0100"), Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e =>
-            e is CarrierV1 && e.EventType == "Carrier" && e.Topic == Topics.MasterDataEvents && ((CarrierV1)e).Carrier.Revision == 1));
+            e is CarrierChangedV1 && e.EventType == "CarrierChanged" && e.Topic == Topics.MasterDataEvents && ((CarrierChangedV1)e).Carrier.Revision == 1));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class SaveCarrierHandlerTests
         result.Value.Carrier.Should().Be(new CarrierView("CAR-0001", "New", false, 2));
         shipper.Revision.Should().Be(2);
         await _shippers.Received().UpdateAsync(shipper, Arg.Any<CancellationToken>());
-        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((CarrierV1)e).Carrier.Revision == 2 && !((CarrierV1)e).Carrier.Active));
+        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((CarrierChangedV1)e).Carrier.Revision == 2 && !((CarrierChangedV1)e).Carrier.Active));
     }
 
     [Fact]
@@ -74,6 +74,21 @@ public sealed class SaveCarrierHandlerTests
 
         result.Status.Should().Be(ResultStatus.Invalid);
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataFieldRequired");
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var carrier = new Carrier(new CarrierId("CAR-0001"), "Old", true);
+        Have(carrier);
+        await Handler.Handle(new SaveCarrierCommand("CAR-0001", "New", true, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveCarrierCommand("CAR-0001", "New", true, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        carrier.Revision.Should().Be(2);
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
     }
 }
