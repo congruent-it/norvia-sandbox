@@ -42,7 +42,7 @@ A dead-lettered message is resubmitted from the Integration console to the `mast
 
 ## Deferred
 
-- **The other four entities.** Rate Cards, Carrier Rate Cards, Vehicles and Drivers still come from the seed file in both applications. They follow the Shipper's and the Carrier's event, filter and command. The ERP has no Vehicle or Driver aggregate yet. A Rate Card replacement carries its full list of dated versions and replaces the TMS's list; a replaced Rate Card changes only what is rated after it arrives.
+- **The other four entities.** Rate Cards, Carrier Rate Cards, Vehicles and Drivers still come from the seed file in both applications. They follow the Shipper's and the Carrier's event, filter and command, and the aggregate's `Edit` says whether an edit changed anything ([ADR 0050](../../adr/0050-the-erp-replicates-each-master-data-change-to-the-tms-as-one-whole-record-event-with-a-revision.md)). The ERP has no Vehicle or Driver aggregate yet. A Rate Card replacement carries its full list of dated versions and replaces the TMS's list; a replaced Rate Card changes only what is rated after it arrives.
 - **The ERP UI's create and edit forms.** Today only the ERP API edits a Shipper. The UI will change records through the API as its own identity holding `MasterData.Manage` (ADR 0028's split); that role is not yet defined on the ERP API's registration in `infra/estate/identities.bicep`.
 - **Bulk import, an audit trail and an approval step.**
 - **Flagging a Trip that uses a Vehicle or Driver made inactive** (P11).

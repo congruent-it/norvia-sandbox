@@ -22,3 +22,4 @@ The ERP owns Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles and Dr
 - A Shipper, Vehicle or Driver made inactive only stores `Active = false`. Nothing else in the TMS is edited because of it.
 - The TMS reads its replicas from its database on every call, so every instance sees a replacement at once.
 - Built so far: the Shipper and the Carrier. The other four entities follow the same event, topic, filter and command (see the E3 process page's Deferred section).
+- Whether an edit changed the record is the aggregate's decision, not the handler's: each master-data aggregate's `Edit` returns false, and changes nothing, when the content is already the record's, and the save handler publishes only when it returned true. The Shipper and the Carrier work this way and each further entity does too. A Rate Card compares its whole list of dated versions.

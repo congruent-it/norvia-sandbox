@@ -47,13 +47,23 @@ public sealed class Shipper : EntityBase<ShipperId>, IAggregateRoot
         Active = active;
     }
 
-    /// <summary>Finance's edit: replaces the fields and raises the Master-data revision.</summary>
-    public void Edit(string name, bool active)
+    /// <summary>
+    /// Finance's edit: replaces the fields and raises the Master-data revision. A repeat of what the record already is changes nothing,
+    /// raises no revision and leaves the seed file in charge; it answers false so nothing is published.
+    /// </summary>
+    /// <returns>True when the edit changed the record.</returns>
+    public bool Edit(string name, bool active)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (Name == name && Active == active)
+        {
+            return false;
+        }
+
         Name = name;
         Active = active;
         FinanceOwned = true;
         Revision++;
+        return true;
     }
 }

@@ -61,6 +61,26 @@ public sealed class CarrierTests
     }
 
     [Fact]
+    public void Edit_WithDifferentContent_SaysItChangedTheRecord()
+    {
+        var carrier = new Carrier(Id, "Van Dijk Transport", active: true);
+
+        carrier.Edit("Van Dijk Transport BV", active: true).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Edit_WithTheContentItAlreadyHas_SaysNothingChangedAndKeepsTheRevisionAndTheSeedFileInCharge()
+    {
+        var carrier = new Carrier(Id, "Van Dijk Transport", active: true);
+
+        var changed = carrier.Edit("Van Dijk Transport", active: true);
+
+        changed.Should().BeFalse();
+        carrier.Revision.Should().Be(1);
+        carrier.FinanceOwned.Should().BeFalse();
+    }
+
+    [Fact]
     public void Edit_WithoutAName_ThrowsAndChangesNothing()
     {
         var carrier = new Carrier(Id, "Van Dijk Transport", active: true);

@@ -66,6 +66,26 @@ public sealed class ShipperTests
     }
 
     [Fact]
+    public void Edit_WithDifferentContent_SaysItChangedTheRecord()
+    {
+        var shipper = new Shipper(Id, "Brouwer Dranken", active: true);
+
+        shipper.Edit("Brouwer Dranken BV", active: true).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Edit_WithTheContentItAlreadyHas_SaysNothingChangedAndKeepsTheRevisionAndTheSeedFileInCharge()
+    {
+        var shipper = new Shipper(Id, "Brouwer Dranken", active: true);
+
+        var changed = shipper.Edit("Brouwer Dranken", active: true);
+
+        changed.Should().BeFalse();
+        shipper.Revision.Should().Be(1);
+        shipper.FinanceOwned.Should().BeFalse();
+    }
+
+    [Fact]
     public void Edit_WithoutAName_ThrowsAndChangesNothing()
     {
         var shipper = new Shipper(Id, "Brouwer Dranken", active: true);

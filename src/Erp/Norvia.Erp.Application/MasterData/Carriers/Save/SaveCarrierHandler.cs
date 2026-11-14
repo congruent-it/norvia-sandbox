@@ -44,15 +44,15 @@ public sealed partial class SaveCarrierHandler(
             await carriers.AddAsync(carrier, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
-        else if (existing.Name == command.Name && existing.Active == command.Active)
-        {
-            LogUnchanged(logger, command.Id);
-            return new SaveCarrierResult(ViewOf(existing), MasterDataSaveOutcome.Unchanged);
-        }
         else
         {
             carrier = existing;
-            carrier.Edit(command.Name, command.Active);
+            if (!carrier.Edit(command.Name, command.Active))
+            {
+                LogUnchanged(logger, command.Id);
+                return new SaveCarrierResult(ViewOf(carrier), MasterDataSaveOutcome.Unchanged);
+            }
+
             await carriers.UpdateAsync(carrier, cancellationToken);
             outcome = MasterDataSaveOutcome.Updated;
         }

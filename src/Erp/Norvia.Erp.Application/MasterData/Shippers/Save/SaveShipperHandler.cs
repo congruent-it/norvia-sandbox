@@ -44,15 +44,15 @@ public sealed partial class SaveShipperHandler(
             await shippers.AddAsync(shipper, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
-        else if (existing.Name == command.Name && existing.Active == command.Active)
-        {
-            LogUnchanged(logger, command.Id);
-            return new SaveShipperResult(ViewOf(existing), MasterDataSaveOutcome.Unchanged);
-        }
         else
         {
             shipper = existing;
-            shipper.Edit(command.Name, command.Active);
+            if (!shipper.Edit(command.Name, command.Active))
+            {
+                LogUnchanged(logger, command.Id);
+                return new SaveShipperResult(ViewOf(shipper), MasterDataSaveOutcome.Unchanged);
+            }
+
             await shippers.UpdateAsync(shipper, cancellationToken);
             outcome = MasterDataSaveOutcome.Updated;
         }
