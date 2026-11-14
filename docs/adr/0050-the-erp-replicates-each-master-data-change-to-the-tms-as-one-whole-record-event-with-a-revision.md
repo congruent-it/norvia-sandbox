@@ -21,4 +21,4 @@ The ERP owns Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles and Dr
 - A replaced Rate Card changes only what is rated after it arrives; Orders already Rated keep their Freight Charge. Re-rating them is a separate issue.
 - A Shipper, Vehicle or Driver made inactive only stores `Active = false`. Nothing else in the TMS is edited because of it.
 - The TMS reads its replicas from its database on every call, so every instance sees a replacement at once.
-- Built so far: the Shipper. The other five entities follow the same event, topic, filter and command (see the E3 process page's Deferred section).
+- Built so far: the Shipper and the Carrier. The other four entities follow the same event, topic, filter and command (see the E3 process page's Deferred section).

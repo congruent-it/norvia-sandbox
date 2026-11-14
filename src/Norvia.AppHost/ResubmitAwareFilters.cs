@@ -21,7 +21,7 @@ internal static class ResubmitAwareFilters
         ["shipper-invoice"] = "eventType IN ('ShipperInvoiceIssued', 'CreditNoteIssued')",
         ["carrier-cost"] = "eventType = 'CarrierCostIncurred'",
         ["billing"] = "eventType = 'TransportOrderBillable'",
-        ["master-data-sync"] = "eventType = 'Shipper'",
+        ["master-data-sync"] = "eventType IN ('Shipper', 'Carrier')",
         ["trip-dispatch"] = "eventType = 'TripDispatched'",
         ["driver-reports"] = "eventType = 'TripStartReported' OR eventType = 'TripEndReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'",
     };

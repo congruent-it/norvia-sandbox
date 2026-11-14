@@ -10,6 +10,6 @@ public sealed class ListCarriersHandler(IReadRepository<Carrier> carriers) : IQu
     {
         ArgumentNullException.ThrowIfNull(query);
         var all = await carriers.ListAsync(new CarriersSpec(), cancellationToken);
-        return [.. all.Select(carrier => new CarrierView(carrier.Id.Value, carrier.Name, carrier.Active))];
+        return [.. all.Select(carrier => new CarrierView(carrier.Id.Value, carrier.Name, carrier.Active, carrier.Revision))];
     }
 }

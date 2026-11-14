@@ -123,7 +123,10 @@ public static class DependencyInjection
         builder.Services.AddSingleton<IShipperReplicas>(services => services.GetRequiredService<ReplicatedShipperDirectory>());
         builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
         builder.Services.AddSingleton<ICarrierRateCardDirectory, SeedFileCarrierRateCardDirectory>();
-        builder.Services.AddSingleton<ICarrierDirectory, SeedFileCarrierDirectory>();
+        builder.Services.AddSingleton<SeedFileCarrierDirectory>();
+        builder.Services.AddSingleton<ReplicatedCarrierDirectory>();
+        builder.Services.AddSingleton<ICarrierDirectory>(services => services.GetRequiredService<ReplicatedCarrierDirectory>());
+        builder.Services.AddSingleton<ICarrierReplicas>(services => services.GetRequiredService<ReplicatedCarrierDirectory>());
         builder.Services.AddSingleton<IVehicleDirectory, SeedFileVehicleDirectory>();
         builder.Services.AddSingleton<IDriverDirectory, SeedFileDriverDirectory>();
         builder.Services.AddSingleton<IRosterDirectory, SeedFileRosterDirectory>();

@@ -44,6 +44,7 @@ The Carrier invoice matching agent calls the ERP through the one read endpoint u
 | `POST /v1/shipper-invoices/{invoiceNumber}/report-sent` | Report that the Shipper's invoice endpoint acknowledged a Shipper invoice: Issued becomes Sent. Publishes nothing. `ShipperInvoiceNotFound` (404). | `ShipperInvoices.Report` | `X-Correlation-ID` → `ShipperInvoiceReportResult` | Shipper invoice Logic App (E1) |
 | `POST /v1/shipper-invoices/{invoiceNumber}/report-not-delivered` | Report that a Shipper invoice never reached the Shipper, with its technical cause: Issued becomes Not delivered and `ShipperInvoiceNotDelivered` is published. | `ShipperInvoices.Report` | `ShipperInvoiceNotDeliveredRequest` (`X-Correlation-ID`) → `ShipperInvoiceReportResult` | Shipper invoice Logic App (E1) |
 | `PUT /v1/shippers/{id}` | Create or edit a Shipper and publish the whole Shipper as the `Shipper` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. `MasterDataFieldRequired` and `MasterDataFieldTooLong` (400). | `MasterData.Manage` | `SaveShipperRequest` → `SaveShipperResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/carriers/{id}` | Create or edit a Carrier and publish the whole Carrier as the `Carrier` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. `MasterDataFieldRequired` and `MasterDataFieldTooLong` (400). | `MasterData.Manage` | `SaveCarrierRequest` → `SaveCarrierResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `POST /v1/credit-notes/{creditNoteNumber}/report-sent` | Report that the Shipper's invoice endpoint acknowledged a Credit note. `CreditNoteNotFound` (404). | `ShipperInvoices.Report` | `X-Correlation-ID` → `CreditNoteReportResult` | Shipper invoice Logic App (E1) |
 | `POST /v1/credit-notes/{creditNoteNumber}/report-not-delivered` | Report that a Credit note never reached the Shipper, with its technical cause; publishes `ShipperInvoiceNotDelivered` with document type `CREDIT_NOTE`. | `ShipperInvoices.Report` | `ShipperInvoiceNotDeliveredRequest` (`X-Correlation-ID`) → `CreditNoteReportResult` | Shipper invoice Logic App (E1) |
 
@@ -218,7 +219,10 @@ A transport company Norvia subcontracts to (a Carrier), as the ERP knows it. The
 |---|---|---|---|---|---|
 | `Id` | `nvarchar(50)` | no |  | PK | The Carrier ID (`CAR-0001`), which the other applications store. |
 | `Active` | `bit` | no |  |  | Whether Norvia still uses the Carrier. An inactive Carrier keeps its history. |
+| `FinanceOwned` | `bit` | no | False |  |  |
 | `Name` | `nvarchar(200)` | no |  |  | The Carrier's name. |
+| `Revision` | `int` | no | 1 |  |  |
+| `RowVersion` | `rowversion` | yes |  |  |  |
 
 Primary key `PK_Carriers`: `Id`.
 

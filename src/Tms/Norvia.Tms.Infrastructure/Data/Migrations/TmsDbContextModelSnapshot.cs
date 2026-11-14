@@ -987,6 +987,28 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.ToTable("Trips", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Tms.Infrastructure.Carriers.CarrierCopy", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CarrierCopies", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Tms.Infrastructure.Outbox.OutboxMessage", b =>
                 {
                     b.Property<long>("Id")

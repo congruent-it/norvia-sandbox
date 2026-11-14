@@ -32,6 +32,18 @@
       ]
     },
     {
+      "name": "CarrierCopies",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
       "name": "Exceptions",
       "columns": [
         {

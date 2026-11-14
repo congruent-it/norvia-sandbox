@@ -8,6 +8,8 @@ namespace Norvia.Integration.CarrierBooking.UnitTests.MasterDataSyncLogicApp;
 /// </summary>
 public sealed class MasterDataSyncWorkflowTests
 {
+    // The record sits under the entity type's own name: `carrier` for a Carrier event, `shipper` for a Shipper one.
+    private const string RecordKey = "?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Carrier'), 'carrier', 'shipper')]";
     private const string CorrelationId = "@{outputs('Track_the_master_data_record')?['correlationId']}";
 
     private static string[] Statuses(JsonObject action, string after) =>
@@ -52,8 +54,8 @@ public sealed class MasterDataSyncWorkflowTests
 
         inputs.Select(input => input.Key).Should().BeEquivalentTo("correlationId", "partyId", "eventType", "sourceMessageId");
         inputs.Select(input => input.Value!.GetValue<string>()).Should().OnlyContain(
-            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?['", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
-        inputs["partyId"]!.GetValue<string>().Should().EndWith("?['shipper']?['id']");
+            expression => expression.StartsWith("@json(base64ToString(triggerBody()?['ContentData']))?[", StringComparison.Ordinal) && !expression.Contains("@{", StringComparison.Ordinal));
+        inputs["partyId"]!.GetValue<string>().Should().EndWith(RecordKey + "?['id']");
         inputs["sourceMessageId"]!.GetValue<string>().Should().EndWith("?['eventId']");
     }
 
@@ -89,7 +91,7 @@ public sealed class MasterDataSyncWorkflowTests
 
         Statuses(check, MasterDataSyncWorkflow.Tracking).Should().BeEquivalentTo("Succeeded", "Failed");
         var expression = check["expression"]!.ToJsonString();
-        expression.Should().Contain("Shipper").And.Contain("correlationId").And.Contain("partyId");
+        expression.Should().Contain("Shipper").And.Contain("Carrier").And.Contain("correlationId").And.Contain("partyId");
         expression.Should().NotContain("triggerBody", "a message that isn't JSON would fail the check instead of being dead-lettered");
     }
 
@@ -111,13 +113,14 @@ public sealed class MasterDataSyncWorkflowTests
     }
 
     [Fact]
-    public void Replace_PutsTheWholeShipper_ToTheTmsApisShipperEndpoint_WithTheCorrelationId()
+    public void Replace_PutsTheWholeRecord_ToTheTmsApisEndpointOfItsEntityType_WithTheCorrelationId()
     {
         var replace = MasterDataSyncWorkflow.Action(MasterDataSyncWorkflow.Replace);
         var inputs = replace["inputs"]!;
 
         inputs["method"]!.GetValue<string>().Should().Be("PUT");
-        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('tmsBaseUrl')}/v1/shippers/@{encodeUriComponent(outputs('Track_the_master_data_record')?['partyId'])}");
+        inputs["uri"]!.GetValue<string>().Should().Be("@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Carrier'), 'carriers', 'shippers')}/@{encodeUriComponent(outputs('Track_the_master_data_record')?['partyId'])}");
+        inputs["body"]!.AsObject().Select(field => field.Value!.GetValue<string>()).Should().OnlyContain(expression => expression.Contains(RecordKey, StringComparison.Ordinal));
         inputs["headers"]!["X-Correlation-ID"]!.GetValue<string>().Should().Be(CorrelationId);
         inputs["body"]!.AsObject().Select(field => field.Key).Should().BeEquivalentTo("name", "active", "revision");
         replace["runAfter"]!.AsObject().Should().BeEmpty("it is the first step of the check's branch for a readable event");
@@ -264,13 +267,13 @@ public sealed class MasterDataSyncWorkflowTests
     }
 
     [Fact]
-    public void TheSubscription_AdmitsOnlyTheShipperEvent_AndAResubmitToItself()
+    public void TheSubscription_AdmitsOnlyTheShipperAndCarrierEvents_AndAResubmitToItself()
     {
         var messaging = Contracts.Read("Estate/messaging.bicep");
         var filter = messaging[messaging.IndexOf("resource masterDataSyncFilter", StringComparison.Ordinal)..];
         filter = filter[..filter.IndexOf("\n}\n", StringComparison.Ordinal)];
 
-        filter.Should().Contain("(eventType = \\'Shipper\\' AND resubmitTo IS NULL) OR resubmitTo = \\'master-data-sync\\'");
+        filter.Should().Contain("(eventType IN (\\'Shipper\\', \\'Carrier\\') AND resubmitTo IS NULL) OR resubmitTo = \\'master-data-sync\\'");
     }
 
     [Fact]

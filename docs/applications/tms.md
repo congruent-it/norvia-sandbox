@@ -41,6 +41,7 @@ No Agent calls the TMS today, so no endpoint below lists one. [c4.md](../archite
 | `POST /v1/transport-orders` | Submit a Transport Order on behalf of the Shipper it names. A repeat of the same booking gets the original back (200); a booking that breaks the rules is kept as a Rejected booking (422). | `TransportOrders.Intake` | `CanonicalTransportOrder` (`X-Correlation-ID`) → `AcceptedTransportOrder` (201, or 200 for a repeat) | Intake Logic App (P1); upstream of it a Shipper Persona through API Management |
 | `GET /v1/transport-orders` | List Transport Orders by `status`. | any valid token | → `[TransportOrderSummary]` | None over HTTP: the TMS UI reads in process |
 | `PUT /v1/shippers/{id}` | Replace the TMS's copy of a Shipper with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceShipperRequest` → `ReplaceShipperResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/carriers/{id}` | Replace the TMS's copy of a Carrier with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceCarrierRequest` → `ReplaceCarrierResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `GET /v1/agent/customer-service/rejected-bookings/{id}` | The Customer service agent's view of a Rejected booking (ADR 0040): when it was received, the Shipper's business name, every rejection reason with its code, message and the submitted field that failed, and the submitted content with the Consignee fields removed (an allowlist: a new field stays out until someone adds it; no Consignee name, delivery address or contact, no instructions, no file contents). Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentRejectedBookingView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (audience the TMS agent API, Entra's keys; the gateway names the Agent in `X-Agent-ID`) |
 | `GET /v1/agent/customer-service/transport-orders/{transportOrderNumber}` | The Customer service agent's view of a Transport Order (ADR 0040, tool `get_transport_order`): status, the Shipper's business name and reference, rating result with the failure code and message, the Shipment's number and status, and the billing state with the reasons that block it (`NotRated`, `NoProofOfDelivery`, `OpenException`). Same allowlist: no Consignee, address, contact, instructions or file contents. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentTransportOrderView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
 | `GET /v1/agent/customer-service/shipments/{shipmentNumber}/tracking-events` | A Shipment's Tracking events in event-time order with their source (a Carrier ID, or Own fleet), place, ETA and whether each moved the status (tool `get_shipment_timeline`). No remark a Carrier or Driver typed, no postcode. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentShipmentTimelineView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
@@ -253,6 +254,17 @@ Primary key `PK_CarrierBookings`: `Id`.
 |---|---|---|---|
 | `IX_CarrierBookings_Number` | `Number` | yes |  |
 | `IX_CarrierBookings_ShipmentId` | `ShipmentId` | no |  |
+
+#### `CarrierCopies`
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK |  |
+| `Active` | `bit` | no |  |  |  |
+| `Name` | `nvarchar(200)` | no |  |  |  |
+| `Revision` | `int` | no |  |  |  |
+
+Primary key `PK_CarrierCopies`: `Id`.
 
 #### `Exceptions`
 

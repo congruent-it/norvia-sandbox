@@ -826,6 +826,58 @@
         }
       }
     },
+    "/v1/carriers/{id}": {
+      "put": {
+        "tags": [
+          "MasterData"
+        ],
+        "summary": "Create or edit a Carrier, and replicate it to the TMS.",
+        "description": "What Finance's Carrier form does, through the same command. Creates the Carrier (201, Master-data revision 1) or replaces its name and active flag (200, the revision raised by one) and publishes the whole Carrier as the Carrier event, in one transaction. Idempotent on content: a repeat of what the Carrier already is answers 200 with the unchanged revision and publishes nothing. A Carrier is never deleted, only made inactive. Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.",
+        "operationId": "SaveCarrier",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCarrierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveCarrierResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveCarrierResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}": {
       "get": {
         "tags": [
@@ -2028,6 +2080,35 @@
         },
         "additionalProperties": false
       },
+      "CarrierView": {
+        "required": [
+          "id",
+          "name",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 1
+          }
+        },
+        "additionalProperties": false
+      },
       "CarrierVisibleLineFactsView": {
         "required": [
           "carrierId",
@@ -2661,6 +2742,38 @@
             "items": {
               "$ref": "#/components/schemas/DeletedKind"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveCarrierRequest": {
+        "required": [
+          "name",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveCarrierResult": {
+        "required": [
+          "carrier",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "carrier": {
+            "$ref": "#/components/schemas/CarrierView"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MasterDataSaveOutcome"
           }
         },
         "additionalProperties": false

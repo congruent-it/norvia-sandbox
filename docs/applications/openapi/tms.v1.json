@@ -3386,6 +3386,48 @@
         }
       }
     },
+    "/v1/carriers/{id}": {
+      "put": {
+        "tags": [
+          "Carriers"
+        ],
+        "summary": "Replace the TMS's copy of a Carrier with the ERP's record.",
+        "description": "Upserts the whole Carrier, so a new Carrier appears. Idempotent on the Master-data revision: a revision that is not higher than the copy's answers 200 with applied false and changes nothing. The TMS never edits a Carrier itself. A record the TMS can't read (no name, a revision below 1) is refused with 400 and the code MasterDataUnreadable.",
+        "operationId": "ReplaceCarrier",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceCarrierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceCarrierResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -7948,6 +7990,52 @@
         },
         "additionalProperties": false
       },
+      "ReplaceCarrierRequest": {
+        "required": [
+          "name",
+          "active",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceCarrierResult": {
+        "required": [
+          "applied",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReplaceShipperRequest": {
         "required": [
           "name",
@@ -10234,6 +10322,9 @@
     },
     {
       "name": "Shippers"
+    },
+    {
+      "name": "Carriers"
     },
     {
       "name": "Reset"

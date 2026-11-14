@@ -122,7 +122,10 @@ public class MasterDataSyncFlowTests
     [Theory]
     [InlineData("not json")]
     [InlineData("[]")]
+    [InlineData("""{"eventType":"Vehicle","correlationId":"c","vehicle":{"id":"V","name":"N","active":true,"revision":1}}""")]
     [InlineData("""{"eventType":"Carrier","correlationId":"c","shipper":{"id":"S","name":"N","active":true,"revision":1}}""")]
+    [InlineData("""{"eventType":"Carrier","correlationId":"c","carrier":{"id":"C","name":"N","active":true}}""")]
+    [InlineData("""{"eventType":"Shipper","correlationId":"c","carrier":{"id":"C","name":"N","active":true,"revision":1}}""")]
     [InlineData("""{"eventType":"Shipper","shipper":{"id":"S","name":"N","active":true,"revision":1}}""")]
     [InlineData("""{"eventType":"Shipper","correlationId":"c"}""")]
     [InlineData("""{"eventType":"Shipper","correlationId":"c","shipper":{"name":"N","active":true,"revision":1}}""")]
@@ -138,6 +141,32 @@ public class MasterDataSyncFlowTests
         run.Reason.Should().Be("MasterDataUnreadable");
         run.Description.Should().Contain("nothing was sent to the TMS");
         world.Tms.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task RunAsync_ACarrierEvent_PutsTheWholeCarrierToTheTmsCarrierEndpoint()
+    {
+        var world = new MasterDataSyncWorld();
+
+        var run = await world.RunAsync(MasterDataSyncWorld.Carrier());
+
+        run.Replaced.Should().BeTrue();
+        var sent = world.Tms.Requests.Single();
+        sent.Method.Should().Be(HttpMethod.Put);
+        sent.Uri.Should().Be(new Uri("http://tms.test/v1/carriers/CAR-0001"));
+        JsonNode.Parse(sent.Body)!.ToJsonString().Should().Be("""{"name":"Van Dijk Transport BV","active":true,"revision":2}""");
+        sent.Headers["X-Correlation-ID"].Should().Be("master-data-2");
+    }
+
+    [Fact]
+    public async Task RunAsync_ACarrierRefusedByTheTms_IsDeadLetteredAsRefused()
+    {
+        var world = new MasterDataSyncWorld();
+        world.Tms.Otherwise(HttpStatusCode.BadRequest, """{"detail":"Unreadable."}""");
+
+        var run = await world.RunAsync(MasterDataSyncWorld.Carrier());
+
+        run.Reason.Should().Be("TmsCallRefused");
     }
 
     [Fact]
