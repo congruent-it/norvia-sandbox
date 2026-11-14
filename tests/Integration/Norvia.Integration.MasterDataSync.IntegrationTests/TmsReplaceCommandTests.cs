@@ -122,6 +122,7 @@ public sealed class TmsReplaceCommandTests(MasterDataSyncFixture fixture)
         // A Vehicle of the estate, as the ERP's seed has it: the TMS opened its days from the seed, and the ERP now makes it inactive.
         var seed = SeedRecord("vehicles", "VEH-0006");
         var before = await AvailabilityAsync();
+        (await fixture.TmsRowsAsync("SELECT COUNT(*) AS Days FROM PlanningDays", Ct)).Single()["Days"].Should().NotBe(0, "the TMS has opened days for the replacement to leave alone");
         seed["active"] = false;
 
         (await fixture.SaveAsync(Kinds.Vehicle, "VEH-0006", seed, ct: Ct)).Status.Should().Be(HttpStatusCode.OK);
@@ -136,6 +137,7 @@ public sealed class TmsReplaceCommandTests(MasterDataSyncFixture fixture)
     {
         var seed = SeedRecord("drivers", "DRV-0007");
         var before = await AvailabilityAsync();
+        (await fixture.TmsRowsAsync("SELECT COUNT(*) AS Days FROM PlanningDays", Ct)).Single()["Days"].Should().NotBe(0, "the TMS has opened days for the replacement to leave alone");
         seed["active"] = false;
 
         (await fixture.SaveAsync(Kinds.Driver, "DRV-0007", seed, ct: Ct)).Status.Should().Be(HttpStatusCode.OK);
