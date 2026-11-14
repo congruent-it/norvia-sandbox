@@ -59,16 +59,18 @@
     "CarrierRateCards": {
       "description": "What Norvia pays one Carrier for transport, by Lane and weight (a Carrier Rate Card). The ERP owns it; the TMS keeps a read copy to calculate a Carrier cost at release (ADR 0013). Master data, loaded from the seed file until the sync exists (ADR 0002).",
       "columns": {
-        "Id": "The Carrier Rate Card's ID.",
         "CarrierId": "The Carrier it belongs to.",
+        "Id": "The Carrier Rate Card's ID.",
+        "LastSaveKey": "The Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.",
         "Versions": "Every version of the card as JSON: its validity period, Zones, Lanes, Weight Breaks and minimum charges."
       }
     },
     "Carriers": {
       "description": "A transport company Norvia subcontracts to (a Carrier), as the ERP knows it. The ERP owns the Carrier; the TMS keeps a read copy (ADR 0002). Master data, loaded from the seed file.",
       "columns": {
-        "Id": "The Carrier ID (`CAR-0001`), which the other applications store.",
         "Active": "Whether Norvia still uses the Carrier. An inactive Carrier keeps its history.",
+        "Id": "The Carrier ID (`CAR-0001`), which the other applications store.",
+        "LastSaveKey": "The Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.",
         "Name": "The Carrier's name."
       }
     },
@@ -107,9 +109,10 @@
     "Drivers": {
       "description": "A Driver of the Own fleet, as the ERP knows it. The ERP owns the Driver; the TMS keeps a read copy and owns Rosters, Shifts and Absences (ADR 0014). Master data, loaded from the seed file and edited by Finance.",
       "columns": {
-        "Id": "The Driver ID (`DRV-0001`), which the TMS stores too.",
         "Active": "Whether Norvia still uses the Driver. Making them inactive stores only this flag.",
         "FinanceOwned": "True once Finance created or edited the Driver, so the seed file no longer reloads them.",
+        "Id": "The Driver ID (`DRV-0001`), which the TMS stores too.",
+        "LastSaveKey": "The Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.",
         "Licences": "The licence categories held (B, C, CE) as comma-separated text, lowest first.",
         "Name": "The Driver's name.",
         "Revision": "The Master-data revision: 1 as loaded from the seed file, raised by every edit.",
@@ -143,6 +146,7 @@
       "description": "What Norvia charges one Shipper for transport, by Lane and weight (a Rate Card), part of the Shipper's Contract. The ERP owns it; the TMS keeps a read copy to rate from and never changes it (ADR 0006). Master data, loaded from the seed file until the sync exists (ADR 0002).",
       "columns": {
         "Id": "The Rate Card's ID.",
+        "LastSaveKey": "The Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.",
         "ShipperId": "The Shipper it belongs to.",
         "Versions": "Every version of the card as JSON: its validity period, Zones, Lanes, Weight Breaks and minimum charges."
       }
@@ -170,17 +174,19 @@
     "Shippers": {
       "description": "An organization that pays Norvia to store, move or deliver its goods (a Shipper), as the ERP knows it. The ERP owns the Shipper and its Contract; the TMS keeps a read copy (ADR 0002). Master data, loaded from the seed file.",
       "columns": {
-        "Id": "The Shipper ID (`SHP-0001`), which the other applications store. It is the Shipper's identity in its token (ADR 0005).",
         "Active": "Whether the Shipper is active. An inactive Shipper keeps its history.",
+        "Id": "The Shipper ID (`SHP-0001`), which the other applications store. It is the Shipper's identity in its token (ADR 0005).",
+        "LastSaveKey": "The Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.",
         "Name": "The Shipper's name."
       }
     },
     "Vehicles": {
       "description": "A Vehicle of the Own fleet, as the ERP knows it. The ERP owns the Vehicle; the TMS keeps a read copy and owns its availability (ADR 0014). Master data, loaded from the seed file and edited by Finance.",
       "columns": {
-        "Id": "The Vehicle ID (`VEH-0001`), which the TMS stores too.",
         "Active": "Whether Norvia still uses the Vehicle. Making it inactive stores only this flag.",
         "FinanceOwned": "True once Finance created or edited the Vehicle, so the seed file no longer reloads it.",
+        "Id": "The Vehicle ID (`VEH-0001`), which the TMS stores too.",
+        "LastSaveKey": "The Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.",
         "PalletPlaces": "How many pallets the Vehicle holds.",
         "PayloadKg": "The most it can carry, in kilograms.",
         "Registration": "The registration plate.",

@@ -30,9 +30,15 @@ public sealed class Shipper : EntityBase<ShipperId>, IAggregateRoot
     /// <summary>True once Finance created or edited the Shipper, so the seed file no longer speaks for it.</summary>
     public bool FinanceOwned { get; private set; }
 
+    /// <summary>The sender's Idempotency-Key of the save that last changed the Shipper, so that save sent again is a repeat; null until a save with a key did.</summary>
+    public string? LastSaveKey { get; private set; }
+
+    /// <summary>True when <paramref name="key"/> is the key of the save that last changed the Shipper.</summary>
+    public bool IsRepeat(string? key) => key is not null && key == LastSaveKey;
+
     /// <summary>A Shipper Finance creates: revision 1, and the seed file never reloads it.</summary>
-    public static Shipper CreateByFinance(ShipperId id, string name, bool active) =>
-        new(id, name, active) { FinanceOwned = true };
+    public static Shipper CreateByFinance(ShipperId id, string name, bool active, string? saveKey = null) =>
+        new(id, name, active) { FinanceOwned = true, LastSaveKey = saveKey };
 
     /// <summary>Takes over what the seed file says now, silently, and only while Finance has not created or edited the Shipper.</summary>
     public void Reload(string name, bool active)
@@ -52,7 +58,7 @@ public sealed class Shipper : EntityBase<ShipperId>, IAggregateRoot
     /// raises no revision and leaves the seed file in charge; it answers false so nothing is published.
     /// </summary>
     /// <returns>True when the edit changed the record.</returns>
-    public bool Edit(string name, bool active)
+    public bool Edit(string name, bool active, string? saveKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (Name == name && Active == active)
@@ -63,6 +69,7 @@ public sealed class Shipper : EntityBase<ShipperId>, IAggregateRoot
         Name = name;
         Active = active;
         FinanceOwned = true;
+        LastSaveKey = saveKey;
         Revision++;
         return true;
     }

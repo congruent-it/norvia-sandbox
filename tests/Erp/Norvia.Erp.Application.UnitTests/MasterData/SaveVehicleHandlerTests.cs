@@ -109,4 +109,21 @@ public sealed class SaveVehicleHandlerTests
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataFieldInvalid");
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
     }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var record = Van();
+        Have(record);
+        await Handler.Handle(new SaveVehicleCommand("VEH-0001", "VN-101-A", "Van", 1200, 4, false, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+        _vehicles.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveVehicleCommand("VEH-0001", "VN-101-A", "Van", 1200, 4, false, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        record.Revision.Should().Be(2);
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+        await _vehicles.DidNotReceive().UpdateAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
+    }
 }

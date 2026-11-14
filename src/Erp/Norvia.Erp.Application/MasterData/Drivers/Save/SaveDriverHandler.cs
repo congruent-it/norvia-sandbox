@@ -25,6 +25,11 @@ public sealed partial class SaveDriverHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Name))
         {
             return Refuse("The Driver needs an ID and a name.", "MasterDataFieldRequired");
@@ -52,14 +57,20 @@ public sealed partial class SaveDriverHandler(
         Driver driver;
         if (existing is null)
         {
-            driver = Driver.CreateByFinance(id, command.Name, licences, command.Active);
+            driver = Driver.CreateByFinance(id, command.Name, licences, command.Active, command.IdempotencyKey);
             await drivers.AddAsync(driver, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             driver = existing;
-            if (!driver.Edit(command.Name, licences, command.Active))
+            if (driver.IsRepeat(command.IdempotencyKey))
+            {
+                LogRepeat(logger, command.Id);
+                return new SaveDriverResult(ViewOf(driver), MasterDataSaveOutcome.Repeat);
+            }
+
+            if (!driver.Edit(command.Name, licences, command.Active, command.IdempotencyKey))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveDriverResult(ViewOf(driver), MasterDataSaveOutcome.Unchanged);
@@ -90,6 +101,9 @@ public sealed partial class SaveDriverHandler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Driver {DriverId} {Outcome} at Master-data revision {Revision}")]
     private static partial void LogSaved(ILogger logger, string driverId, MasterDataSaveOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Driver {DriverId}: this save was applied before under its Idempotency-Key; nothing changed or published")]
+    private static partial void LogRepeat(ILogger logger, string driverId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Driver {DriverId} already has this content; nothing changed or published")]
     private static partial void LogUnchanged(ILogger logger, string driverId);

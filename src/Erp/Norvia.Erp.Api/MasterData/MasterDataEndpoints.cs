@@ -1,4 +1,6 @@
 using Mediator;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application;
@@ -19,6 +21,9 @@ public static class MasterDataEndpoints
     /// <summary>The app role of the ERP UI's own identity, which is how Finance's edits reach the ERP API (ADR 0028's split, for the ERP).</summary>
     public const string ManageRole = "MasterData.Manage";
 
+    /// <summary>The header a sender puts the same value in on each retry of one save.</summary>
+    public const string IdempotencyKeyHeader = "Idempotency-Key";
+
     public static IEndpointRouteBuilder MapMasterData(this IEndpointRouteBuilder app)
     {
         var shippers = app.NewVersionedApi("MasterData")
@@ -32,8 +37,8 @@ public static class MasterDataEndpoints
             .WithSummary("Create or edit a Shipper, and replicate it to the TMS.")
             .WithDescription(
                 "What Finance's Shipper form does, through the same command. Creates the Shipper (201, Master-data revision 1) or replaces its name and "
-                + "active flag (200, the revision raised by one) and publishes the whole Shipper as the Shipper event, in one transaction. Idempotent on content: "
-                + "a repeat of what the Shipper already is answers 200 with the unchanged revision and publishes nothing. A Shipper is never deleted, only made inactive. "
+                + "active flag (200, the revision raised by one) and publishes the whole Shipper as the Shipper event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): "
+                + "a repeat of what the Shipper already is answers 200 with the unchanged revision and publishes nothing, and so does a save sent again under its key (outcome Repeat). A Shipper is never deleted, only made inactive. "
                 + "Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.");
 
         var carriers = app.NewVersionedApi("MasterData")
@@ -47,8 +52,8 @@ public static class MasterDataEndpoints
             .WithSummary("Create or edit a Carrier, and replicate it to the TMS.")
             .WithDescription(
                 "What Finance's Carrier form does, through the same command. Creates the Carrier (201, Master-data revision 1) or replaces its name and "
-                + "active flag (200, the revision raised by one) and publishes the whole Carrier as the Carrier event, in one transaction. Idempotent on content: "
-                + "a repeat of what the Carrier already is answers 200 with the unchanged revision and publishes nothing. A Carrier is never deleted, only made inactive. "
+                + "active flag (200, the revision raised by one) and publishes the whole Carrier as the Carrier event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): "
+                + "a repeat of what the Carrier already is answers 200 with the unchanged revision and publishes nothing, and so does a save sent again under its key (outcome Repeat). A Carrier is never deleted, only made inactive. "
                 + "Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.");
 
         var vehicles = app.NewVersionedApi("MasterData")
@@ -63,7 +68,7 @@ public static class MasterDataEndpoints
             .WithDescription(
                 "What Finance's Vehicle form does, through the same command. Creates the Vehicle (201, Master-data revision 1) or replaces its registration, "
                 + "type, payload, pallet places and active flag (200, the revision raised by one) and publishes the whole Vehicle as the Vehicle event, in one "
-                + "transaction. Idempotent on content: a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing. "
+                + "transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing, and so does a save sent again under its key (outcome Repeat). "
                 + "A Vehicle is never deleted, only made inactive, which stores Active false and nothing else: it opens or closes no day. "
                 + "A registration belongs to one Vehicle. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, MasterDataFieldInvalid and VehicleRegistrationTaken.");
 
@@ -79,7 +84,7 @@ public static class MasterDataEndpoints
             .WithDescription(
                 "What Finance's Driver form does, through the same command. Creates the Driver (201, Master-data revision 1) or replaces its name, "
                 + "licence categories and active flag (200, the revision raised by one) and publishes the whole Driver as the Driver event, in one "
-                + "transaction. Idempotent on content: a repeat of what the Driver already is, the licences in any order, answers 200 with the unchanged "
+                + "transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the Driver already is, the licences in any order, answers 200 with the unchanged "
                 + "revision and publishes nothing. A Driver is never deleted, only made inactive, which stores Active false and nothing else: it edits no "
                 + "Roster. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.");
 
@@ -94,7 +99,7 @@ public static class MasterDataEndpoints
             .WithSummary("Create or edit a Shipper's Rate Card, and replicate it to the TMS.")
             .WithDescription(
                 "Creates the Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes "
-                + "the whole Rate Card as the RateCard event, in one transaction. Idempotent on content: a repeat of what the card already is answers 200 with the "
+                + "the whole Rate Card as the RateCard event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the card already is answers 200 with the "
                 + "unchanged revision and publishes nothing. Versions must not overlap in time, and a Shipper has one Rate Card. Refusals carry a stable code (400): "
                 + "MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardShipperHasCard.");
 
@@ -109,21 +114,22 @@ public static class MasterDataEndpoints
             .WithSummary("Create or edit a Carrier's Carrier Rate Card, and replicate it to the TMS.")
             .WithDescription(
                 "Creates the Carrier Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes "
-                + "the whole card as the CarrierRateCard event, in one transaction. Idempotent on content: a repeat of what the card already is answers 200 with the "
+                + "the whole card as the CarrierRateCard event, in one transaction. Idempotent on content, and on the sender's Idempotency-Key header when it sends one (at most 100 characters; the same value on each retry): a repeat of what the card already is answers 200 with the "
                 + "unchanged revision and publishes nothing. Versions must not overlap in time, and a Carrier has one Carrier Rate Card. Refusals carry a stable code (400): "
                 + "MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardCarrierHasCard.");
 
         return app;
     }
 
-    internal static async Task<Results<Ok<SaveShipperResult>, Created<SaveShipperResult>, ProblemHttpResult>> SaveShipperAsync(
+    internal static async Task<Results<Ok<SaveShipperResult>, CreatedAtRoute<SaveShipperResult>, ProblemHttpResult>> SaveShipperAsync(
         string id,
         SaveShipperRequest request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveShipperCommand(id, request.Name, request.Active), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveShipperCommand(id, request.Name, request.Active, idempotencyKey), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -135,18 +141,19 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.Created($"/v1/shippers/{id}", result.Value)
+            ? TypedResults.CreatedAtRoute(result.Value, "SaveShipper", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
             : TypedResults.Ok(result.Value);
     }
 
-    internal static async Task<Results<Ok<SaveCarrierResult>, Created<SaveCarrierResult>, ProblemHttpResult>> SaveCarrierAsync(
+    internal static async Task<Results<Ok<SaveCarrierResult>, CreatedAtRoute<SaveCarrierResult>, ProblemHttpResult>> SaveCarrierAsync(
         string id,
         SaveCarrierRequest request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierCommand(id, request.Name, request.Active), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierCommand(id, request.Name, request.Active, idempotencyKey), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -158,19 +165,20 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.Created($"/v1/carriers/{id}", result.Value)
+            ? TypedResults.CreatedAtRoute(result.Value, "SaveCarrier", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
             : TypedResults.Ok(result.Value);
     }
 
-    internal static async Task<Results<Ok<SaveVehicleResult>, Created<SaveVehicleResult>, ProblemHttpResult>> SaveVehicleAsync(
+    internal static async Task<Results<Ok<SaveVehicleResult>, CreatedAtRoute<SaveVehicleResult>, ProblemHttpResult>> SaveVehicleAsync(
         string id,
         SaveVehicleRequest request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var result = await retrier.RunAsync(mediator => mediator
-            .Send(new SaveVehicleCommand(id, request.Registration, request.Type, request.PayloadKg, request.PalletPlaces, request.Active), cancellationToken).AsTask());
+            .Send(new SaveVehicleCommand(id, request.Registration, request.Type, request.PayloadKg, request.PalletPlaces, request.Active, idempotencyKey), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -182,18 +190,19 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.Created($"/v1/vehicles/{id}", result.Value)
+            ? TypedResults.CreatedAtRoute(result.Value, "SaveVehicle", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
             : TypedResults.Ok(result.Value);
     }
 
-    internal static async Task<Results<Ok<SaveDriverResult>, Created<SaveDriverResult>, ProblemHttpResult>> SaveDriverAsync(
+    internal static async Task<Results<Ok<SaveDriverResult>, CreatedAtRoute<SaveDriverResult>, ProblemHttpResult>> SaveDriverAsync(
         string id,
         SaveDriverRequest request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveDriverCommand(id, request.Name, request.Licences, request.Active), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveDriverCommand(id, request.Name, request.Licences, request.Active, idempotencyKey), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -205,18 +214,19 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.Created($"/v1/drivers/{id}", result.Value)
+            ? TypedResults.CreatedAtRoute(result.Value, "SaveDriver", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
             : TypedResults.Ok(result.Value);
     }
 
-    internal static async Task<Results<Ok<SaveRateCardResult>, Created<SaveRateCardResult>, ProblemHttpResult>> SaveRateCardAsync(
+    internal static async Task<Results<Ok<SaveRateCardResult>, CreatedAtRoute<SaveRateCardResult>, ProblemHttpResult>> SaveRateCardAsync(
         string id,
         SaveRateCardRequest request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveRateCardCommand(id, request.ShipperId, request.Versions), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveRateCardCommand(id, request.ShipperId, request.Versions, idempotencyKey), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -228,18 +238,19 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.Created($"/v1/rate-cards/{id}", result.Value)
+            ? TypedResults.CreatedAtRoute(result.Value, "SaveRateCard", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
             : TypedResults.Ok(result.Value);
     }
 
-    internal static async Task<Results<Ok<SaveCarrierRateCardResult>, Created<SaveCarrierRateCardResult>, ProblemHttpResult>> SaveCarrierRateCardAsync(
+    internal static async Task<Results<Ok<SaveCarrierRateCardResult>, CreatedAtRoute<SaveCarrierRateCardResult>, ProblemHttpResult>> SaveCarrierRateCardAsync(
         string id,
         SaveCarrierRateCardRequest request,
+        [FromHeader(Name = IdempotencyKeyHeader)] string? idempotencyKey,
         IConflictRetrier retrier,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierRateCardCommand(id, request.CarrierId, request.Versions), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierRateCardCommand(id, request.CarrierId, request.Versions, idempotencyKey), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -251,7 +262,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.Created($"/v1/carrier-rate-cards/{id}", result.Value)
+            ? TypedResults.CreatedAtRoute(result.Value, "SaveCarrierRateCard", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
             : TypedResults.Ok(result.Value);
     }
 }

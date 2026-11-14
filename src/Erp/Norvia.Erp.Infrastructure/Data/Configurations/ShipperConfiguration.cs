@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Erp.Application.MasterData;
 using Norvia.Erp.Domain.Shippers;
 
 namespace Norvia.Erp.Infrastructure.Data.Configurations;
@@ -15,6 +16,7 @@ internal sealed class ShipperConfiguration : IEntityTypeConfiguration<Shipper>
         builder.Property(shipper => shipper.Name).HasMaxLength(200).IsRequired();
         builder.Property(shipper => shipper.Revision).HasDefaultValue(1);
         builder.Property(shipper => shipper.FinanceOwned).HasDefaultValue(false);
+        builder.Property(shipper => shipper.LastSaveKey).HasMaxLength(MasterDataSaveKey.MaxLength);
         // Two edits at once conflict instead of both winning; the loser is run again and sees the new revision.
         builder.Property<byte[]>("RowVersion").IsRowVersion();
     }

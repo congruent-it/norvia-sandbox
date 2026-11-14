@@ -29,14 +29,20 @@ public sealed class CarrierRateCard : EntityBase<RateCardId>, IAggregateRoot
     /// <summary>The Master-data revision: 1 as loaded from the seed file, raised by every edit.</summary>
     public int Revision { get; private set; } = 1;
 
+    /// <summary>The sender's Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.</summary>
+    public string? LastSaveKey { get; private set; }
+
+    /// <summary>True when <paramref name="key"/> is the key of the save that last changed the record.</summary>
+    public bool IsRepeat(string? key) => key is not null && key == LastSaveKey;
+
     /// <summary>True once Finance created or edited the card, so the seed file no longer speaks for it.</summary>
     public bool FinanceOwned { get; private set; }
 
     /// <summary>A card Finance creates: revision 1, and the seed file never reloads it. Its versions must satisfy <see cref="RateCardVersionRules"/>.</summary>
-    public static CarrierRateCard CreateByFinance(RateCardId id, CarrierId carrierId, IReadOnlyList<RateCardVersion> versions)
+    public static CarrierRateCard CreateByFinance(RateCardId id, CarrierId carrierId, IReadOnlyList<RateCardVersion> versions, string? saveKey = null)
     {
         Check(versions);
-        return new(id, carrierId, RateCardVersionRules.Ordered(versions)) { FinanceOwned = true };
+        return new(id, carrierId, RateCardVersionRules.Ordered(versions)) { FinanceOwned = true, LastSaveKey = saveKey };
     }
 
     /// <summary>Takes over what the seed file says now, silently, and only while Finance has not created or edited the card.</summary>
@@ -58,7 +64,7 @@ public sealed class CarrierRateCard : EntityBase<RateCardId>, IAggregateRoot
     /// </summary>
     /// <returns>True when the edit changed the card.</returns>
     /// <exception cref="ArgumentException">The versions break <see cref="RateCardVersionRules"/>; nothing changed.</exception>
-    public bool Edit(CarrierId carrierId, IReadOnlyList<RateCardVersion> versions)
+    public bool Edit(CarrierId carrierId, IReadOnlyList<RateCardVersion> versions, string? saveKey = null)
     {
         Check(versions);
         if (CarrierId == carrierId && RateCardVersionRules.Same(Versions, versions))
@@ -69,6 +75,7 @@ public sealed class CarrierRateCard : EntityBase<RateCardId>, IAggregateRoot
         CarrierId = carrierId;
         Versions = RateCardVersionRules.Ordered(versions);
         FinanceOwned = true;
+        LastSaveKey = saveKey;
         Revision++;
         return true;
     }

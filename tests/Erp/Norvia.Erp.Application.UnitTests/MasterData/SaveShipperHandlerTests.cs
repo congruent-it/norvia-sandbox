@@ -76,4 +76,43 @@ public sealed class SaveShipperHandlerTests
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataFieldRequired");
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
     }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var shipper = new Shipper(new ShipperId("SHP-0001"), "Old", true);
+        Have(shipper);
+        await Handler.Handle(new SaveShipperCommand("SHP-0001", "Mine", true, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+        _shippers.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveShipperCommand("SHP-0001", "Mine", true, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        result.Value.Shipper.Should().Be(new ShipperView("SHP-0001", "Mine", true, 2));
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+        await _shippers.DidNotReceive().UpdateAsync(Arg.Any<Shipper>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_ForANewKey_EditsAgain()
+    {
+        var shipper = new Shipper(new ShipperId("SHP-0001"), "Old", true);
+        Have(shipper);
+        await Handler.Handle(new SaveShipperCommand("SHP-0001", "First", true, "key-1"), CancellationToken.None);
+
+        var result = await Handler.Handle(new SaveShipperCommand("SHP-0001", "Second", true, "key-2"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Updated);
+        result.Value.Shipper.Revision.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Handle_ForAKeyOver100Characters_IsRefusedWithAStableCode()
+    {
+        var result = await Handler.Handle(new SaveShipperCommand("SHP-0001", "Name", true, new string('k', 101)), CancellationToken.None);
+
+        result.Status.Should().Be(ResultStatus.Invalid);
+        result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataKeyTooLong");
+    }
 }

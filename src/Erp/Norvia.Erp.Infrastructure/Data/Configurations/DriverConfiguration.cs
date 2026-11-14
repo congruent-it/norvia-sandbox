@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Erp.Application.MasterData;
 using Norvia.Erp.Domain.Drivers;
 
 namespace Norvia.Erp.Infrastructure.Data.Configurations;
@@ -30,6 +31,7 @@ internal sealed class DriverConfiguration : IEntityTypeConfiguration<Driver>
             .IsRequired();
         builder.Property(driver => driver.Revision).HasDefaultValue(1);
         builder.Property(driver => driver.FinanceOwned).HasDefaultValue(false);
+        builder.Property(driver => driver.LastSaveKey).HasMaxLength(MasterDataSaveKey.MaxLength);
         builder.Property<byte[]>("RowVersion").IsRowVersion();
     }
 }

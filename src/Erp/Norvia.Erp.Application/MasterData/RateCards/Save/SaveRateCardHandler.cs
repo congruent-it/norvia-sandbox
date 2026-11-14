@@ -24,6 +24,11 @@ public sealed partial class SaveRateCardHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.ShipperId))
         {
             return Refuse("The Rate Card needs an ID and a Shipper.", "MasterDataFieldRequired");
@@ -58,14 +63,20 @@ public sealed partial class SaveRateCardHandler(
         RateCard card;
         if (existing is null)
         {
-            card = RateCard.CreateByFinance(id, shipperId, versions);
+            card = RateCard.CreateByFinance(id, shipperId, versions, command.IdempotencyKey);
             await rateCards.AddAsync(card, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             card = existing;
-            if (!card.Edit(shipperId, versions))
+            if (card.IsRepeat(command.IdempotencyKey))
+            {
+                LogRepeat(logger, command.Id);
+                return new SaveRateCardResult(RecordOf(card), MasterDataSaveOutcome.Repeat);
+            }
+
+            if (!card.Edit(shipperId, versions, command.IdempotencyKey))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveRateCardResult(RecordOf(card), MasterDataSaveOutcome.Unchanged);
@@ -96,6 +107,9 @@ public sealed partial class SaveRateCardHandler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Rate Card {RateCardId} {Outcome} at Master-data revision {Revision}")]
     private static partial void LogSaved(ILogger logger, string rateCardId, MasterDataSaveOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Rate Card {RateCardId}: this save was applied before under its Idempotency-Key; nothing changed or published")]
+    private static partial void LogRepeat(ILogger logger, string rateCardId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Rate Card {RateCardId} already has this content; nothing changed or published")]
     private static partial void LogUnchanged(ILogger logger, string rateCardId);

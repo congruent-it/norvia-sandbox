@@ -8,7 +8,7 @@ Freight settlement makes sure Norvia is paid for each Transport Order it deliver
 | **Outcome** | A Billable Transport Order handed to the ERP with its Freight Charge. For a Carrier Shipment, a frozen Carrier cost on its Carrier booking, handed to the ERP once Delivered |
 | **Owning system** | TMS for Billable and the Carrier cost (ADR 0012, ADR 0013). The ERP owns invoicing, Carrier Rate Cards and Carrier invoices (ADR 0002) |
 | **Applies to** | Both for the Shipper side. The Carrier cost is Carriers only. Own fleet has no Carrier cost |
-| **Integrations touched** | Service Bus (Transport Order and Shipment events), Billing Logic App, Carrier cost Logic App, ERP billing API. Partner portal (Carrier Personas) through P4. ERP, through the seed file for now (Carrier Rate Cards) |
+| **Integrations touched** | Service Bus (Transport Order and Shipment events), Billing Logic App, Carrier cost Logic App, ERP billing API. Partner portal (Carrier Personas) through P4. ERP, through the master-data sync ([E3](../erp/e3-master-data-sync.md)) over the seed file (Carrier Rate Cards) |
 
 ## Process model
 
@@ -291,7 +291,6 @@ These were left out on purpose while designing P9, each with its reason.
 
 - **Invoicing Fulfilment orders.** They are billed through the Fulfilment Contract, which needs WMS data and a warehouse tariff.
 - **Sending invoice numbers back to the TMS.** Nothing in the TMS needs them (ADR 0012).
-- **The ERP → TMS sync of Rate Cards and Carrier Rate Cards.** Both come from the seed file for now, as in P2.
 - **Cancellation fees, waiting time and other Carrier surcharges.** Only the Confirmed Carrier booking that carried the Shipment has a Carrier cost.
 - **Price negotiation with a Carrier.** A Carrier that doesn't accept the price rejects the booking with `PriceNotAccepted`.
 - **A Spot price that overrides a Carrier Rate Card,** for example in peak weeks. It weakens the baseline for Matching. It can be added with its own permission.

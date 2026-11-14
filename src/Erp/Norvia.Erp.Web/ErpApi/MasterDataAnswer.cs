@@ -8,6 +8,9 @@ public enum MasterDataOutcome
 
     /// <summary>The record already was what Finance saved: nothing changed and nothing was published.</summary>
     Unchanged,
+
+    /// <summary>The ERP API had applied this very save, under its Idempotency-Key, already: nothing changed and nothing was published.</summary>
+    Repeat,
 }
 
 /// <summary>The ERP API's answer to a Finance save.</summary>

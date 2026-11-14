@@ -24,6 +24,11 @@ public sealed partial class SaveCarrierHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Name))
         {
             return Refuse("The Carrier needs an ID and a name.", "MasterDataFieldRequired");
@@ -40,14 +45,20 @@ public sealed partial class SaveCarrierHandler(
         Carrier carrier;
         if (existing is null)
         {
-            carrier = Carrier.CreateByFinance(id, command.Name, command.Active);
+            carrier = Carrier.CreateByFinance(id, command.Name, command.Active, command.IdempotencyKey);
             await carriers.AddAsync(carrier, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             carrier = existing;
-            if (!carrier.Edit(command.Name, command.Active))
+            if (carrier.IsRepeat(command.IdempotencyKey))
+            {
+                LogRepeat(logger, command.Id);
+                return new SaveCarrierResult(ViewOf(carrier), MasterDataSaveOutcome.Repeat);
+            }
+
+            if (!carrier.Edit(command.Name, command.Active, command.IdempotencyKey))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveCarrierResult(ViewOf(carrier), MasterDataSaveOutcome.Unchanged);
@@ -77,6 +88,9 @@ public sealed partial class SaveCarrierHandler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier {CarrierId} {Outcome} at Master-data revision {Revision}")]
     private static partial void LogSaved(ILogger logger, string carrierId, MasterDataSaveOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Carrier {CarrierId}: this save was applied before under its Idempotency-Key; nothing changed or published")]
+    private static partial void LogRepeat(ILogger logger, string carrierId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier {CarrierId} already has this content; nothing changed or published")]
     private static partial void LogUnchanged(ILogger logger, string carrierId);

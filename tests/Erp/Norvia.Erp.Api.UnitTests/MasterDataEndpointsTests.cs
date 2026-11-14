@@ -43,9 +43,9 @@ public sealed class MasterDataEndpointsTests
     {
         Answer(new SaveShipperResult(new ShipperView("SHP-9", "New", true, 1), MasterDataSaveOutcome.Created));
 
-        var result = await MasterDataEndpoints.SaveShipperAsync("SHP-9", new SaveShipperRequest("New", true), _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveShipperAsync("SHP-9", new SaveShipperRequest("New", true), null, _retrier, CancellationToken.None);
 
-        result.Result.Should().BeOfType<Created<SaveShipperResult>>().Which.Location.Should().Be("/v1/shippers/SHP-9");
+        result.Result.Should().BeOfType<CreatedAtRoute<SaveShipperResult>>().Which.Should().Match<CreatedAtRoute<SaveShipperResult>>(created => created.RouteName == "SaveShipper" && (string?)created.RouteValues["id"] == "SHP-9");
     }
 
     [Theory]
@@ -55,7 +55,7 @@ public sealed class MasterDataEndpointsTests
     {
         Answer(new SaveShipperResult(new ShipperView("SHP-9", "New", true, 2), outcome));
 
-        var result = await MasterDataEndpoints.SaveShipperAsync("SHP-9", new SaveShipperRequest("New", true), _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveShipperAsync("SHP-9", new SaveShipperRequest("New", true), null, _retrier, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<SaveShipperResult>>();
     }
@@ -65,7 +65,7 @@ public sealed class MasterDataEndpointsTests
     {
         Answer(Result<SaveShipperResult>.Invalid(new ValidationError("Shipper", "needs a name", "MasterDataFieldRequired", ValidationSeverity.Error)));
 
-        var result = await MasterDataEndpoints.SaveShipperAsync("SHP-9", new SaveShipperRequest("", true), _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveShipperAsync("SHP-9", new SaveShipperRequest("", true), null, _retrier, CancellationToken.None);
 
         var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
         problem.StatusCode.Should().Be(400);
@@ -77,9 +77,9 @@ public sealed class MasterDataEndpointsTests
     {
         Answer(new SaveCarrierResult(new CarrierView("CAR-9", "New", true, 1), MasterDataSaveOutcome.Created));
 
-        var result = await MasterDataEndpoints.SaveCarrierAsync("CAR-9", new SaveCarrierRequest("New", true), _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveCarrierAsync("CAR-9", new SaveCarrierRequest("New", true), null, _retrier, CancellationToken.None);
 
-        result.Result.Should().BeOfType<Created<SaveCarrierResult>>().Which.Location.Should().Be("/v1/carriers/CAR-9");
+        result.Result.Should().BeOfType<CreatedAtRoute<SaveCarrierResult>>().Which.Should().Match<CreatedAtRoute<SaveCarrierResult>>(created => created.RouteName == "SaveCarrier" && (string?)created.RouteValues["id"] == "CAR-9");
     }
 
     [Theory]
@@ -89,7 +89,7 @@ public sealed class MasterDataEndpointsTests
     {
         Answer(new SaveCarrierResult(new CarrierView("CAR-9", "New", true, 2), outcome));
 
-        var result = await MasterDataEndpoints.SaveCarrierAsync("CAR-9", new SaveCarrierRequest("New", true), _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveCarrierAsync("CAR-9", new SaveCarrierRequest("New", true), null, _retrier, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<SaveCarrierResult>>();
     }
@@ -99,7 +99,7 @@ public sealed class MasterDataEndpointsTests
     {
         Answer(Result<SaveCarrierResult>.Invalid(new ValidationError("Carrier", "needs a name", "MasterDataFieldRequired", ValidationSeverity.Error)));
 
-        var result = await MasterDataEndpoints.SaveCarrierAsync("CAR-9", new SaveCarrierRequest("", true), _retrier, CancellationToken.None);
+        var result = await MasterDataEndpoints.SaveCarrierAsync("CAR-9", new SaveCarrierRequest("", true), null, _retrier, CancellationToken.None);
 
         var problem = result.Result.Should().BeOfType<ProblemHttpResult>().Subject;
         problem.StatusCode.Should().Be(400);

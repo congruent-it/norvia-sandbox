@@ -103,4 +103,21 @@ public sealed class SaveDriverHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Driver.Licences.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var record = Anouk();
+        Have(record);
+        await Handler.Handle(new SaveDriverCommand("DRV-0001", "Anouk de Vries", ["B", "C"], false, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+        _drivers.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveDriverCommand("DRV-0001", "Anouk de Vries", ["B", "C"], false, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        record.Revision.Should().Be(2);
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+        await _drivers.DidNotReceive().UpdateAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>());
+    }
 }

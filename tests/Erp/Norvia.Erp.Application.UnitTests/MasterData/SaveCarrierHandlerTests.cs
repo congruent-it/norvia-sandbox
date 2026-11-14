@@ -76,4 +76,19 @@ public sealed class SaveCarrierHandlerTests
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataFieldRequired");
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
     }
+
+    [Fact]
+    public async Task Handle_ForASaveSentAgainUnderTheSameKey_AnswersAsRepeatAndPublishesNothing()
+    {
+        var carrier = new Carrier(new CarrierId("CAR-0001"), "Old", true);
+        Have(carrier);
+        await Handler.Handle(new SaveCarrierCommand("CAR-0001", "New", true, "key-1"), CancellationToken.None);
+        _outbox.ClearReceivedCalls();
+
+        var result = await Handler.Handle(new SaveCarrierCommand("CAR-0001", "New", true, "key-1"), CancellationToken.None);
+
+        result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
+        carrier.Revision.Should().Be(2);
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+    }
 }

@@ -27,12 +27,18 @@ public sealed class Carrier : EntityBase<CarrierId>, IAggregateRoot
     /// <summary>The Master-data revision: 1 as loaded from the seed file, raised by every edit.</summary>
     public int Revision { get; private set; } = 1;
 
+    /// <summary>The sender's Idempotency-Key of the save that last changed the record, so that save sent again is a repeat; null until a save with a key did.</summary>
+    public string? LastSaveKey { get; private set; }
+
+    /// <summary>True when <paramref name="key"/> is the key of the save that last changed the record.</summary>
+    public bool IsRepeat(string? key) => key is not null && key == LastSaveKey;
+
     /// <summary>True once Finance created or edited the Carrier, so the seed file no longer speaks for it.</summary>
     public bool FinanceOwned { get; private set; }
 
     /// <summary>A Carrier Finance creates: revision 1, and the seed file never reloads it.</summary>
-    public static Carrier CreateByFinance(CarrierId id, string name, bool active) =>
-        new(id, name, active) { FinanceOwned = true };
+    public static Carrier CreateByFinance(CarrierId id, string name, bool active, string? saveKey = null) =>
+        new(id, name, active) { FinanceOwned = true, LastSaveKey = saveKey };
 
     /// <summary>Takes over what the seed file says now, silently, and only while Finance has not created or edited the Carrier.</summary>
     public void Reload(string name, bool active)
@@ -52,7 +58,7 @@ public sealed class Carrier : EntityBase<CarrierId>, IAggregateRoot
     /// raises no revision and leaves the seed file in charge; it answers false so nothing is published.
     /// </summary>
     /// <returns>True when the edit changed the record.</returns>
-    public bool Edit(string name, bool active)
+    public bool Edit(string name, bool active, string? saveKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (Name == name && Active == active)
@@ -63,6 +69,7 @@ public sealed class Carrier : EntityBase<CarrierId>, IAggregateRoot
         Name = name;
         Active = active;
         FinanceOwned = true;
+        LastSaveKey = saveKey;
         Revision++;
         return true;
     }

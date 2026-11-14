@@ -8,7 +8,7 @@ Rating calculates the Freight Charge for an accepted Transport Order from the Sh
 | **Outcome** | The Transport Order is Rated with a frozen Freight Charge, or Rating failed with a reason |
 | **Owning system** | TMS (ADR 0006). The ERP owns Contracts and Rate Cards |
 | **Applies to** | Own fleet and Carriers alike. Rating happens before P3 decides who carries the goods |
-| **Integrations touched** | Service Bus (outcome events). ERP, through the seed file for now |
+| **Integrations touched** | Service Bus (outcome events). ERP, through the master-data sync ([E3](../erp/e3-master-data-sync.md)) over the seed file |
 
 ## Process model
 

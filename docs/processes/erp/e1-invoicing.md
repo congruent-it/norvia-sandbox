@@ -100,7 +100,7 @@ The charge lines use the codes `FREIGHT` and `MINIMUM_CHARGE_ADJUSTMENT`.
 |---|---|---|
 | Waiting billable lines | Per Shipper: the number of Waiting lines and their total, and each line on opening. A line released without a Proof of delivery is marked | Invoice now, per Shipper |
 | Shipper invoices | Issued invoices and Credit notes, newest first: number, Shipper, date, totals, sent time or "Not delivered" | Open. Issue a Credit note (on an invoice line). Send again (when Not delivered) |
-| Master data | Shippers, Carriers, Rate Cards and Carrier Rate Cards from the seed file | View only |
+| Master data | Shippers, Carriers, Rate Cards and Carrier Rate Cards, from the seed file at first and edited by Finance since ([E3](e3-master-data-sync.md)) | View here; edited in E3's forms |
 
 The lists update without a page refresh, as the TMS's do. Finance uses them with Finance permissions.
 

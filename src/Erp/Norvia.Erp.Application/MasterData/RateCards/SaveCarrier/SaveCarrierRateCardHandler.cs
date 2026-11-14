@@ -24,6 +24,11 @@ public sealed partial class SaveCarrierRateCardHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.CarrierId))
         {
             return Refuse("The Carrier Rate Card needs an ID and a Carrier.", "MasterDataFieldRequired");
@@ -58,14 +63,20 @@ public sealed partial class SaveCarrierRateCardHandler(
         CarrierRateCard card;
         if (existing is null)
         {
-            card = CarrierRateCard.CreateByFinance(id, carrierId, versions);
+            card = CarrierRateCard.CreateByFinance(id, carrierId, versions, command.IdempotencyKey);
             await rateCards.AddAsync(card, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             card = existing;
-            if (!card.Edit(carrierId, versions))
+            if (card.IsRepeat(command.IdempotencyKey))
+            {
+                LogRepeat(logger, command.Id);
+                return new SaveCarrierRateCardResult(RecordOf(card), MasterDataSaveOutcome.Repeat);
+            }
+
+            if (!card.Edit(carrierId, versions, command.IdempotencyKey))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveCarrierRateCardResult(RecordOf(card), MasterDataSaveOutcome.Unchanged);
@@ -96,6 +107,9 @@ public sealed partial class SaveCarrierRateCardHandler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier Rate Card {RateCardId} {Outcome} at Master-data revision {Revision}")]
     private static partial void LogSaved(ILogger logger, string rateCardId, MasterDataSaveOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Carrier Rate Card {RateCardId}: this save was applied before under its Idempotency-Key; nothing changed or published")]
+    private static partial void LogRepeat(ILogger logger, string rateCardId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Carrier Rate Card {RateCardId} already has this content; nothing changed or published")]
     private static partial void LogUnchanged(ILogger logger, string rateCardId);

@@ -6,4 +6,7 @@ public enum MasterDataSaveOutcome
     Created,
     Updated,
     Unchanged,
+
+    /// <summary>The same save, under the same Idempotency-Key, was applied before; this one changed and published nothing.</summary>
+    Repeat,
 }

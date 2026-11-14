@@ -25,6 +25,11 @@ public sealed partial class SaveVehicleHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Registration))
         {
             return Refuse("The Vehicle needs an ID and a registration.", "MasterDataFieldRequired");
@@ -57,14 +62,20 @@ public sealed partial class SaveVehicleHandler(
         Vehicle vehicle;
         if (existing is null)
         {
-            vehicle = Vehicle.CreateByFinance(id, registration, type, command.PayloadKg, command.PalletPlaces, command.Active);
+            vehicle = Vehicle.CreateByFinance(id, registration, type, command.PayloadKg, command.PalletPlaces, command.Active, command.IdempotencyKey);
             await vehicles.AddAsync(vehicle, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             vehicle = existing;
-            if (!vehicle.Edit(registration, type, command.PayloadKg, command.PalletPlaces, command.Active))
+            if (vehicle.IsRepeat(command.IdempotencyKey))
+            {
+                LogRepeat(logger, command.Id);
+                return new SaveVehicleResult(ViewOf(vehicle), MasterDataSaveOutcome.Repeat);
+            }
+
+            if (!vehicle.Edit(registration, type, command.PayloadKg, command.PalletPlaces, command.Active, command.IdempotencyKey))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveVehicleResult(ViewOf(vehicle), MasterDataSaveOutcome.Unchanged);
@@ -95,6 +106,9 @@ public sealed partial class SaveVehicleHandler(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Vehicle {VehicleId} {Outcome} at Master-data revision {Revision}")]
     private static partial void LogSaved(ILogger logger, string vehicleId, MasterDataSaveOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Vehicle {VehicleId}: this save was applied before under its Idempotency-Key; nothing changed or published")]
+    private static partial void LogRepeat(ILogger logger, string vehicleId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Vehicle {VehicleId} already has this content; nothing changed or published")]
     private static partial void LogUnchanged(ILogger logger, string vehicleId);

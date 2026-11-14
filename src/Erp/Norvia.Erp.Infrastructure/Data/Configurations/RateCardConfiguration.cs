@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Norvia.Erp.Application.MasterData;
 using Norvia.Erp.Domain.RateCards;
 using Norvia.Erp.Domain.Shippers;
 
@@ -18,6 +19,7 @@ internal sealed class RateCardConfiguration : IEntityTypeConfiguration<RateCard>
         builder.Property(card => card.Versions).AsJsonDocument();
         builder.Property(card => card.Revision).HasDefaultValue(1);
         builder.Property(card => card.FinanceOwned).HasDefaultValue(false);
+        builder.Property(card => card.LastSaveKey).HasMaxLength(MasterDataSaveKey.MaxLength);
         // Two edits at once conflict instead of both winning; the loser is run again and sees the new revision.
         builder.Property<byte[]>("RowVersion").IsRowVersion();
     }

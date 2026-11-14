@@ -13,6 +13,9 @@
             case MasterDataAnswer.Saved { Outcome: MasterDataOutcome.Unchanged } saved:
                 <span>Nothing changed: the @Kind already was like this, at Master-data revision @saved.Revision.</span>
                 break;
+            case MasterDataAnswer.Saved { Outcome: MasterDataOutcome.Repeat } saved:
+                <span>Already saved: this save went through before, at Master-data revision @saved.Revision.</span>
+                break;
             case MasterDataAnswer.Saved saved:
                 <span>Saved at Master-data revision @saved.Revision. It is replicated to the TMS.</span>
                 break;

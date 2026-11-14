@@ -8,7 +8,7 @@ Transport planning turns an accepted Transport Order into a Shipment and decides
 | **Outcome** | A Shipment assigned to Own fleet or to a named Carrier, and then Released |
 | **Owning system** | TMS. It owns Transport Orders and Shipments (ADR 0002). The ERP owns Carrier master data |
 | **Applies to** | Own fleet and Carriers alike. P3 makes the choice between them |
-| **Integrations touched** | Service Bus (Shipment events). ERP, through the seed file for now (Carriers) |
+| **Integrations touched** | Service Bus (Shipment events). ERP, through the master-data sync ([E3](../erp/e3-master-data-sync.md)) over the seed file (Carriers) |
 
 ## Process model
 
@@ -219,5 +219,4 @@ These were left out on purpose while designing P3, each with its reason.
 - **Groupage, and splitting a Transport Order over several Shipments.** The one-Shipment-per-Transport-Order rule stands (ADR 0007).
 - **Un-planning, and changes after release.** Reassigning covers mistakes before release. After release, changes go through P4 (withdrawing) and P7 (cancelling from an Exception). Cancelling a Transport Order is already deferred in P1.
 - **A separate dispatcher role for Trips.** The Planner does P11 too (see [P11](p11-trip-dispatch.md)).
-- **The ERP and the Carrier master-data sync.** Carriers come from the seed file for now.
 - **As-found toggles**, for example a `ShipmentReleased` subscription with no alert on its dead-letter queue. Built in the [as-found estate](../../operations/as-found.md): it is one case of `entitiesWithoutDeadLetterAlert`.
