@@ -33,7 +33,9 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
         ];
     }
 
-    public async Task ReplaceAsync(Driver driver, CancellationToken cancellationToken)
+    public Task<bool> ReplaceAsync(Driver driver, CancellationToken cancellationToken) => ReplaceAsync(driver, retried: false, cancellationToken);
+
+    private async Task<bool> ReplaceAsync(Driver driver, bool retried, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(driver);
         using var scope = scopes.CreateScope();
@@ -43,9 +45,10 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
         if (copy is not null && copy.Revision >= driver.Revision)
         {
             // A delivery that lost a race with a later revision must not move the copy backwards.
-            return;
+            return false;
         }
 
+        var isNew = copy is null;
         if (copy is null)
         {
             copy = new DriverCopy { Id = driver.Id.Value };
@@ -56,7 +59,16 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
         copy.Licences = string.Join(',', driver.Licences.Order());
         copy.Active = driver.Active;
         copy.Revision = driver.Revision;
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException) when (isNew && !retried)
+        {
+            // Another delivery inserted the same ID first: look again, and keep the higher revision.
+            return await ReplaceAsync(driver, retried: true, cancellationToken);
+        }
     }
 
     private static Driver Of(DriverCopy copy) =>

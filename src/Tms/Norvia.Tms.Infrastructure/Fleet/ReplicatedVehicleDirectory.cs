@@ -33,7 +33,9 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
         ];
     }
 
-    public async Task ReplaceAsync(Vehicle vehicle, CancellationToken cancellationToken)
+    public Task<bool> ReplaceAsync(Vehicle vehicle, CancellationToken cancellationToken) => ReplaceAsync(vehicle, retried: false, cancellationToken);
+
+    private async Task<bool> ReplaceAsync(Vehicle vehicle, bool retried, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(vehicle);
         using var scope = scopes.CreateScope();
@@ -43,9 +45,10 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
         if (copy is not null && copy.Revision >= vehicle.Revision)
         {
             // A delivery that lost a race with a later revision must not move the copy backwards.
-            return;
+            return false;
         }
 
+        var isNew = copy is null;
         if (copy is null)
         {
             copy = new VehicleCopy { Id = vehicle.Id.Value };
@@ -58,7 +61,16 @@ internal sealed class ReplicatedVehicleDirectory(SeedFileVehicleDirectory seed, 
         copy.PalletPlaces = vehicle.PalletPlaces;
         copy.Active = vehicle.Active;
         copy.Revision = vehicle.Revision;
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException) when (isNew && !retried)
+        {
+            // Another delivery inserted the same ID first: look again, and keep the higher revision.
+            return await ReplaceAsync(vehicle, retried: true, cancellationToken);
+        }
     }
 
     private static Vehicle Of(VehicleCopy copy) =>

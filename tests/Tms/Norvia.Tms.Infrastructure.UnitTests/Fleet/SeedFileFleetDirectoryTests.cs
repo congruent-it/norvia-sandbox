@@ -45,6 +45,37 @@ public sealed class SeedFileFleetDirectoryTests : IDisposable
     }
 
     [Fact]
+    public void Find_Vehicle_AnswersInactiveOnesToo_AtRevisionOne()
+    {
+        var vehicles = new SeedFileVehicleDirectory(Seed("""
+            { "vehicles": [
+              { "id": "VEH-0009", "registration": "ZZ-999-Z", "type": "Van", "payloadKg": 1200, "palletPlaces": 4, "active": false }
+            ] }
+            """));
+
+        vehicles.Find(new VehicleId("VEH-0009")).Should().Be(new Vehicle(new VehicleId("VEH-0009"), "ZZ-999-Z", VehicleType.Van, 1200, 4, false, 1));
+        vehicles.Find(new VehicleId("VEH-0001")).Should().BeNull();
+    }
+
+    [Fact]
+    public void Find_Driver_AnswersInactiveOnesToo_AtRevisionOne()
+    {
+        var drivers = new SeedFileDriverDirectory(Seed("""
+            { "drivers": [
+              { "id": "DRV-0009", "name": "Former Driver", "licences": ["B"], "active": false }
+            ] }
+            """));
+
+        var driver = drivers.Find(new DriverId("DRV-0009"))!;
+
+        driver.Name.Should().Be("Former Driver");
+        driver.Active.Should().BeFalse();
+        driver.Revision.Should().Be(1);
+        driver.Licences.Should().Equal(LicenceCategory.B);
+        drivers.Find(new DriverId("DRV-0001")).Should().BeNull();
+    }
+
+    [Fact]
     public void List_Rosters_AreTheWeekdaysEachDriverWorks()
     {
         var rosters = new SeedFileRosterDirectory(Seed("""

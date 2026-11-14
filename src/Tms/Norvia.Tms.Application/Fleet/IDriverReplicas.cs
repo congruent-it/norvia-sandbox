@@ -6,5 +6,6 @@ namespace Norvia.Tms.Application.Fleet;
 public interface IDriverReplicas
 {
     /// <summary>Keeps <paramref name="driver"/> as the copy of its ID, whole, replacing what was there.</summary>
-    Task ReplaceAsync(Driver driver, CancellationToken cancellationToken);
+    /// <returns>False when the copy already held this revision or a later one, which a delivery that lost a race with a later one finds, and nothing was changed.</returns>
+    Task<bool> ReplaceAsync(Driver driver, CancellationToken cancellationToken);
 }

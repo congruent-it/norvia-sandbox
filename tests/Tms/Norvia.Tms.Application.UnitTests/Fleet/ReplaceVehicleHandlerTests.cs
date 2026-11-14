@@ -13,6 +13,8 @@ public sealed class ReplaceVehicleHandlerTests
     private readonly IVehicleDirectory _directory = Substitute.For<IVehicleDirectory>();
     private readonly IVehicleReplicas _replicas = Substitute.For<IVehicleReplicas>();
 
+    public ReplaceVehicleHandlerTests() => _replicas.ReplaceAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>()).Returns(true);
+
     private ReplaceVehicleHandler Handler => new(_directory, _replicas, NullLogger<ReplaceVehicleHandler>.Instance);
 
     [Fact]
@@ -65,5 +67,16 @@ public sealed class ReplaceVehicleHandlerTests
         result.Status.Should().Be(ResultStatus.Invalid);
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataUnreadable");
         await _replicas.DidNotReceive().ReplaceAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenALaterRevisionGotInFirst_ReportsNothingAppliedAndTheRevisionHeld()
+    {
+        _replicas.ReplaceAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>()).Returns(false);
+        _directory.Find(Id).Returns(null, new Vehicle(Id, "Held", VehicleType.Van, 1, 0, true, 5));
+
+        var result = await Handler.Handle(new ReplaceVehicleCommand("VEH-0001", "VN-101-A", "Van", 1200, 4, false, 3), CancellationToken.None);
+
+        result.Value.Should().Be(new ReplaceVehicleResult(Applied: false, 5));
     }
 }

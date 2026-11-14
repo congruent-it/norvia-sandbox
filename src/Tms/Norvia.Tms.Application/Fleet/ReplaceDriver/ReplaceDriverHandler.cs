@@ -46,7 +46,16 @@ public sealed partial class ReplaceDriverHandler(IDriverDirectory directory, IDr
             return new ReplaceDriverResult(Applied: false, current);
         }
 
-        await replicas.ReplaceAsync(new Driver(id, command.Name, licences, command.Active, command.Revision), cancellationToken);
+        var applied = await replicas.ReplaceAsync(new Driver(id, command.Name, licences, command.Active, command.Revision), cancellationToken);
+        if (!applied)
+        {
+            // A later revision got in between the check and the write.
+            using var lost = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Succeeded });
+            var now = directory.Find(id)?.Revision ?? command.Revision;
+            LogStale(logger, command.Id, command.Revision, now);
+            return new ReplaceDriverResult(Applied: false, now);
+        }
+
         using var replaced = logger.Track(new() { [TrackingKeys.Outcome] = TrackingKeys.Succeeded });
         LogReplaced(logger, command.Id, command.Revision);
         return new ReplaceDriverResult(Applied: true, command.Revision);

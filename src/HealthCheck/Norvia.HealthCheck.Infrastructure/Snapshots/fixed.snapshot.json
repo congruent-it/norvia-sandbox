@@ -38,6 +38,10 @@
       "hasDeadLetterAlert": true
     },
     {
+      "name": "master-data-sync",
+      "hasDeadLetterAlert": true
+    },
+    {
       "name": "shipper-invoice",
       "hasDeadLetterAlert": true
     },
@@ -94,6 +98,11 @@
     },
     {
       "name": "billing",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "master-data-sync",
       "hasFailedRunAlert": true,
       "recordsTrackedProperties": true
     },

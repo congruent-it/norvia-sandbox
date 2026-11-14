@@ -13,6 +13,8 @@ public sealed class ReplaceDriverHandlerTests
     private readonly IDriverDirectory _directory = Substitute.For<IDriverDirectory>();
     private readonly IDriverReplicas _replicas = Substitute.For<IDriverReplicas>();
 
+    public ReplaceDriverHandlerTests() => _replicas.ReplaceAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>()).Returns(true);
+
     private ReplaceDriverHandler Handler => new(_directory, _replicas, NullLogger<ReplaceDriverHandler>.Instance);
 
     private static Driver Held(int revision = 1) => new(Id, "Anouk", new HashSet<LicenceCategory> { LicenceCategory.B }, true, revision);
@@ -75,5 +77,16 @@ public sealed class ReplaceDriverHandlerTests
         result.Status.Should().Be(ResultStatus.Invalid);
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataUnreadable");
         await _replicas.DidNotReceive().ReplaceAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Handle_WhenALaterRevisionGotInFirst_ReportsNothingAppliedAndTheRevisionHeld()
+    {
+        _replicas.ReplaceAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>()).Returns(false);
+        _directory.Find(Id).Returns(null, new Driver(Id, "Held", new HashSet<LicenceCategory>(), true, 5));
+
+        var result = await Handler.Handle(new ReplaceDriverCommand("DRV-0001", "Anouk", ["B"], false, 3), CancellationToken.None);
+
+        result.Value.Should().Be(new ReplaceDriverResult(Applied: false, 5));
     }
 }
