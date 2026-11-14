@@ -1,6 +1,6 @@
 # The TMS rates, the ERP owns Rate Cards
 
-Rating runs in the TMS, against a replicated read copy of each Shipper's Rate Card. The ERP stays the owner of Contracts and Rate Cards (ADR 0002) and is the only place they are changed. Rating needs the Transport Order's lanes, weights and goods lines, which the TMS owns. Keeping the calculation next to that data means a Transport Order can be rated without an asynchronous round trip, and without the ERP being available. Until the ERP is built, the seed file plays the ERP as the source of Rate Cards, the same way it does for Shipper data.
+Rating runs in the TMS, against a replicated read copy of each Shipper's Rate Card. The ERP stays the owner of Contracts and Rate Cards (ADR 0002) and is the only place they are changed. Rating needs the Transport Order's lanes, weights and goods lines, which the TMS owns. Keeping the calculation next to that data means a Transport Order can be rated without an asynchronous round trip, and without the ERP being available. The seed file is the first load of Rate Cards, the same way it is for Shipper data. (Since then the master-data sync of E3, [ADR 0050](0050-the-erp-replicates-each-master-data-change-to-the-tms-as-one-whole-record-event-with-a-revision.md), makes the seed file only the first load.)
 
 ## Considered Options
 

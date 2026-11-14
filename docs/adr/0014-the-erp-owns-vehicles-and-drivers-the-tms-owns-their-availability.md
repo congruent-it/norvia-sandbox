@@ -1,6 +1,6 @@
 # The ERP owns Vehicles and Drivers, the TMS owns their availability
 
-ADR 0002 gives every core concept one owner but names none for Norvia's Own fleet. The ERP owns Vehicle and Driver master data: identity, Vehicle type, payload and pallet places, licence categories and the active flag. The TMS holds a replicated read copy, as it does for Carriers. Until the ERP sync exists, both load it from the seed file. The TMS owns everything about availability: Rosters, Shifts, Absences, Off the road days and Driving-hour budgets. Only the TMS knows the Trips that use Vehicles and Drivers up, and availability changes daily as part of planning work, not as master-data maintenance.
+ADR 0002 gives every core concept one owner but names none for Norvia's Own fleet. The ERP owns Vehicle and Driver master data: identity, Vehicle type, payload and pallet places, licence categories and the active flag. The TMS holds a replicated read copy, as it does for Carriers. Until the ERP sync exists, both load it from the seed file. (The master-data sync of E3, [ADR 0050](0050-the-erp-replicates-each-master-data-change-to-the-tms-as-one-whole-record-event-with-a-revision.md), has since made the seed file only the first load.) The TMS owns everything about availability: Rosters, Shifts, Absences, Off the road days and Driving-hour budgets. Only the TMS knows the Trips that use Vehicles and Drivers up, and availability changes daily as part of planning work, not as master-data maintenance.
 
 ## Considered Options
 

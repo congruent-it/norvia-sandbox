@@ -207,7 +207,7 @@ Links go to files, not lines, so they stay true as the code moves.
 
 ### Locally
 
-Nothing plays an Azure piece, because P10 touches no integration at runtime: no API Management, no Logic App, no Service Bus and no ERP. The horizon job and the seeder are hosted services of the TMS API, so they run the same code in Azure and under Aspire. The only stand-in is the seed file, which supplies the Vehicles, Drivers and Rosters in both places until the ERP's master-data sync exists. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
+Nothing plays an Azure piece, because P10 touches no integration at runtime: no API Management, no Logic App, no Service Bus and no ERP. The horizon job and the seeder are hosted services of the TMS API, so they run the same code in Azure and under Aspire. The only stand-in is the seed file, which supplies the Rosters in both places, and the Vehicles and Drivers at first, before the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces them. The full map is in [local-vs-azure.md](../../architecture/local-vs-azure.md).
 
 ### Gaps
 
