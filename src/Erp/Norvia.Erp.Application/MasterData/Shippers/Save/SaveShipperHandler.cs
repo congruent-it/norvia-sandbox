@@ -24,6 +24,11 @@ public sealed partial class SaveShipperHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
+        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
+        {
+            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
+        }
+
         if (string.IsNullOrWhiteSpace(command.Id) || string.IsNullOrWhiteSpace(command.Name))
         {
             return Refuse("The Shipper needs an ID and a name.", "MasterDataFieldRequired");
@@ -32,11 +37,6 @@ public sealed partial class SaveShipperHandler(
         if (command.Id.Length > MaxIdLength || command.Name.Length > MaxNameLength)
         {
             return Refuse($"The Shipper's ID is at most {MaxIdLength} characters and its name {MaxNameLength}.", "MasterDataFieldTooLong");
-        }
-
-        if (MasterDataSaveKey.IsTooLong(command.IdempotencyKey))
-        {
-            return Refuse(MasterDataSaveKey.TooLongMessage, MasterDataSaveKey.TooLongCode);
         }
 
         var id = new ShipperId(command.Id);

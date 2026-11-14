@@ -48,7 +48,7 @@ internal sealed partial class MasterDataApiClient(HttpClient http, IErpApiTokens
         {
             Content = JsonContent.Create(body, body.GetType(), options: Json),
         };
-        // One key per save, set once on the message, so a retry of the same request carries the same key.
+        // One key per save, so a resend of this very message (a transport retry) carries the same key.
         request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetTokenAsync(cancellationToken));
 
