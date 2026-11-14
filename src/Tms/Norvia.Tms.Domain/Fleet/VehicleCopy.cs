@@ -1,7 +1,9 @@
-namespace Norvia.Tms.Infrastructure.Fleet;
+using Ardalis.SharedKernel;
+
+namespace Norvia.Tms.Domain.Fleet;
 
 /// <summary>A Vehicle the ERP replicated to the TMS, kept whole. It overrides the seed file's Vehicle with the same ID (E3).</summary>
-internal sealed class VehicleCopy
+public sealed class VehicleCopy : IAggregateRoot
 {
     public string Id { get; set; } = string.Empty;
 

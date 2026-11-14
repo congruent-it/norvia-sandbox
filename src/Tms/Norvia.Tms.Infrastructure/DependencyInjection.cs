@@ -99,6 +99,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton(services => LateDeliveryRulesFor(services.GetRequiredService<IOptions<LateDeliveryOptions>>().Value));
         builder.Services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped(typeof(IReadRepository<>), typeof(EfRepository<>));
+        builder.Services.AddScoped(typeof(ISyncReadRepository<>), typeof(EfRepository<>));
         builder.Services.AddScoped<IConflictRetrier, EfConflictRetrier>();
         builder.Services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
         builder.Services.AddScoped<IOutbox>(services => services.GetRequiredService<OutboxBuffer>());

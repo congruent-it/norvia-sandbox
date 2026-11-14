@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Norvia.Tms.Infrastructure.Carriers;
+using Norvia.Tms.Domain.Carriers;
 
 namespace Norvia.Tms.Infrastructure.Data.Configurations;
 

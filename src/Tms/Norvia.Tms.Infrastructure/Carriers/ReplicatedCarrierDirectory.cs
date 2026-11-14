@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using Ardalis.SharedKernel;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Carriers;
 using Norvia.Tms.Domain.Carriers;
@@ -15,16 +15,14 @@ internal sealed class ReplicatedCarrierDirectory(SeedFileCarrierDirectory seed, 
     public Carrier? Find(CarrierId id)
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copy = context.Set<CarrierCopy>().AsNoTracking().SingleOrDefault(row => row.Id == id.Value);
+        var copy = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<CarrierCopy>>().FirstOrDefault(new CarrierCopyByIdSpec(id.Value));
         return copy is null ? seed.Find(id) : Of(copy);
     }
 
     public IReadOnlyList<Carrier> ListActive()
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<CarrierCopy>().AsNoTracking().ToList().Select(Of).ToDictionary(carrier => carrier.Id);
+        var copies = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<CarrierCopy>>().List(new CarrierCopiesSpec()).Select(Of).ToDictionary(carrier => carrier.Id);
         return
         [
             .. seed.ListActive().Where(carrier => !copies.ContainsKey(carrier.Id)).Concat(copies.Values.Where(carrier => carrier.Active))
@@ -36,25 +34,33 @@ internal sealed class ReplicatedCarrierDirectory(SeedFileCarrierDirectory seed, 
     {
         ArgumentNullException.ThrowIfNull(carrier);
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<CarrierCopy>();
-        var copy = await copies.SingleOrDefaultAsync(row => row.Id == carrier.Id.Value, cancellationToken);
+        var copies = scope.ServiceProvider.GetRequiredService<IRepository<CarrierCopy>>();
+        var copy = await copies.FirstOrDefaultAsync(new CarrierCopyForReplaceSpec(carrier.Id.Value), cancellationToken);
         if (copy is not null && copy.Revision >= carrier.Revision)
         {
             // A delivery that lost a race with a later revision must not move the copy backwards.
             return;
         }
 
-        if (copy is null)
-        {
-            copy = new CarrierCopy { Id = carrier.Id.Value };
-            copies.Add(copy);
-        }
+        var isNew = copy is null;
+        copy ??= new CarrierCopy { Id = carrier.Id.Value };
 
         copy.Name = carrier.Name;
         copy.Active = carrier.Active;
         copy.Revision = carrier.Revision;
-        await context.SaveChangesAsync(cancellationToken);
+        await SaveAsync(copies, copy, isNew, cancellationToken);
+    }
+
+    private static async Task SaveAsync(IRepository<CarrierCopy> copies, CarrierCopy copy, bool isNew, CancellationToken cancellationToken)
+    {
+        if (isNew)
+        {
+            await copies.AddAsync(copy, cancellationToken);
+        }
+        else
+        {
+            await copies.UpdateAsync(copy, cancellationToken);
+        }
     }
 
     private static Carrier Of(CarrierCopy copy) => new(new CarrierId(copy.Id), copy.Name, copy.Active, copy.Revision);

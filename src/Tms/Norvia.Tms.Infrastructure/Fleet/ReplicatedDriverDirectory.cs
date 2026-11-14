@@ -1,3 +1,4 @@
+using Ardalis.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Application.Fleet;
@@ -16,16 +17,14 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
     public Driver? Find(DriverId id)
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copy = context.Set<DriverCopy>().AsNoTracking().SingleOrDefault(row => row.Id == id.Value);
+        var copy = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<DriverCopy>>().FirstOrDefault(new DriverCopyByIdSpec(id.Value));
         return copy is null ? seed.Find(id) : Of(copy);
     }
 
     public IReadOnlyList<Driver> ListActive()
     {
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<DriverCopy>().AsNoTracking().ToList().Select(Of).ToDictionary(driver => driver.Id);
+        var copies = scope.ServiceProvider.GetRequiredService<ISyncReadRepository<DriverCopy>>().List(new DriverCopiesSpec()).Select(Of).ToDictionary(driver => driver.Id);
         return
         [
             .. seed.ListActive().Where(driver => !copies.ContainsKey(driver.Id)).Concat(copies.Values.Where(driver => driver.Active))
@@ -39,9 +38,8 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
     {
         ArgumentNullException.ThrowIfNull(driver);
         using var scope = scopes.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TmsDbContext>();
-        var copies = context.Set<DriverCopy>();
-        var copy = await copies.SingleOrDefaultAsync(row => row.Id == driver.Id.Value, cancellationToken);
+        var copies = scope.ServiceProvider.GetRequiredService<IRepository<DriverCopy>>();
+        var copy = await copies.FirstOrDefaultAsync(new DriverCopyForReplaceSpec(driver.Id.Value), cancellationToken);
         if (copy is not null && copy.Revision >= driver.Revision)
         {
             // A delivery that lost a race with a later revision must not move the copy backwards.
@@ -49,11 +47,7 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
         }
 
         var isNew = copy is null;
-        if (copy is null)
-        {
-            copy = new DriverCopy { Id = driver.Id.Value };
-            copies.Add(copy);
-        }
+        copy ??= new DriverCopy { Id = driver.Id.Value };
 
         copy.Name = driver.Name;
         copy.Licences = string.Join(',', driver.Licences.Order());
@@ -61,13 +55,25 @@ internal sealed class ReplicatedDriverDirectory(SeedFileDriverDirectory seed, IS
         copy.Revision = driver.Revision;
         try
         {
-            await context.SaveChangesAsync(cancellationToken);
+            await SaveAsync(copies, copy, isNew, cancellationToken);
             return true;
         }
         catch (DbUpdateException) when (isNew && !retried)
         {
             // Another delivery inserted the same ID first: look again, and keep the higher revision.
             return await ReplaceAsync(driver, retried: true, cancellationToken);
+        }
+    }
+
+    private static async Task SaveAsync(IRepository<DriverCopy> copies, DriverCopy copy, bool isNew, CancellationToken cancellationToken)
+    {
+        if (isNew)
+        {
+            await copies.AddAsync(copy, cancellationToken);
+        }
+        else
+        {
+            await copies.UpdateAsync(copy, cancellationToken);
         }
     }
 
