@@ -64,7 +64,6 @@ public sealed partial class SaveCarrierRateCardHandler(
         if (existing is null)
         {
             card = CarrierRateCard.CreateByFinance(id, carrierId, versions, command.IdempotencyKey);
-            await rateCards.AddAsync(card, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
@@ -82,7 +81,6 @@ public sealed partial class SaveCarrierRateCardHandler(
                 return new SaveCarrierRateCardResult(RecordOf(card), MasterDataSaveOutcome.Unchanged);
             }
 
-            await rateCards.UpdateAsync(card, cancellationToken);
             outcome = MasterDataSaveOutcome.Updated;
         }
 
@@ -95,6 +93,17 @@ public sealed partial class SaveCarrierRateCardHandler(
             [TrackingKeys.PartyId] = command.CarrierId,
         });
         outbox.Add(new CarrierRateCardChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, record));
+
+        // The save writes the change and the event the outbox holds in one transaction, so the event is added before it.
+        if (outcome == MasterDataSaveOutcome.Created)
+        {
+            await rateCards.AddAsync(card, cancellationToken);
+        }
+        else
+        {
+            await rateCards.UpdateAsync(card, cancellationToken);
+        }
+
         LogSaved(logger, command.Id, outcome, record.Revision);
         return new SaveCarrierRateCardResult(record, outcome);
     }

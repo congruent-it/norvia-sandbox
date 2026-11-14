@@ -126,4 +126,31 @@ public sealed class SaveVehicleHandlerTests
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
         await _vehicles.DidNotReceive().UpdateAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_ForANewRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        await Handler.Handle(new SaveVehicleCommand("VEH-0100", "VN-900-Z", "RigidTruck", 9000, 14, true), CancellationToken.None);
+
+        // The outbox is written by the save, so an event added after it would never be stored (nor published).
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _vehicles.AddAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task Handle_ForAnEditedRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        Have(Van());
+
+        await Handler.Handle(new SaveVehicleCommand("VEH-0001", "VN-101-A", "Van", 1200, 4, false), CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _vehicles.UpdateAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

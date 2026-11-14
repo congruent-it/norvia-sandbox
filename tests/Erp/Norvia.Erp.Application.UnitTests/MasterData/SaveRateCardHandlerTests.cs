@@ -68,4 +68,31 @@ public sealed class SaveRateCardHandlerTests
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataKeyTooLong");
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
     }
+
+    [Fact]
+    public async Task Handle_ForANewRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        await Handler.Handle(new SaveRateCardCommand("RC-1", "P-1", [Version1], "key-1"), CancellationToken.None);
+
+        // The outbox is written by the save, so an event added after it would never be stored (nor published).
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _cards.AddAsync(Arg.Any<RateCard>(), Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task Handle_ForAnEditedRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        _cards.FirstOrDefaultAsync(Arg.Any<ISpecification<RateCard>>(), Arg.Any<CancellationToken>()).Returns(RateCard.CreateByFinance(new RateCardId("RC-1"), new ShipperId("P-1"), [new RateCardVersion(1, new DateOnly(2026, 1, 1), null, [], [])]));
+
+        await Handler.Handle(new SaveRateCardCommand("RC-1", "P-1", [Version1Until], "key-1"), CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _cards.UpdateAsync(Arg.Any<RateCard>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

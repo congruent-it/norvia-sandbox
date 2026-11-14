@@ -63,7 +63,6 @@ public sealed partial class SaveVehicleHandler(
         if (existing is null)
         {
             vehicle = Vehicle.CreateByFinance(id, registration, type, command.PayloadKg, command.PalletPlaces, command.Active, command.IdempotencyKey);
-            await vehicles.AddAsync(vehicle, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
@@ -81,7 +80,6 @@ public sealed partial class SaveVehicleHandler(
                 return new SaveVehicleResult(ViewOf(vehicle), MasterDataSaveOutcome.Unchanged);
             }
 
-            await vehicles.UpdateAsync(vehicle, cancellationToken);
             outcome = MasterDataSaveOutcome.Updated;
         }
 
@@ -94,6 +92,17 @@ public sealed partial class SaveVehicleHandler(
             [TrackingKeys.PartyId] = command.Id,
         });
         outbox.Add(new VehicleChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+
+        // The save writes the change and the event the outbox holds in one transaction, so the event is added before it.
+        if (outcome == MasterDataSaveOutcome.Created)
+        {
+            await vehicles.AddAsync(vehicle, cancellationToken);
+        }
+        else
+        {
+            await vehicles.UpdateAsync(vehicle, cancellationToken);
+        }
+
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveVehicleResult(view, outcome);
     }

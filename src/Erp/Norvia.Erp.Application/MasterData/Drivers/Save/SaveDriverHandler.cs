@@ -58,7 +58,6 @@ public sealed partial class SaveDriverHandler(
         if (existing is null)
         {
             driver = Driver.CreateByFinance(id, command.Name, licences, command.Active, command.IdempotencyKey);
-            await drivers.AddAsync(driver, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
@@ -76,7 +75,6 @@ public sealed partial class SaveDriverHandler(
                 return new SaveDriverResult(ViewOf(driver), MasterDataSaveOutcome.Unchanged);
             }
 
-            await drivers.UpdateAsync(driver, cancellationToken);
             outcome = MasterDataSaveOutcome.Updated;
         }
 
@@ -89,6 +87,17 @@ public sealed partial class SaveDriverHandler(
             [TrackingKeys.PartyId] = command.Id,
         });
         outbox.Add(new DriverChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+
+        // The save writes the change and the event the outbox holds in one transaction, so the event is added before it.
+        if (outcome == MasterDataSaveOutcome.Created)
+        {
+            await drivers.AddAsync(driver, cancellationToken);
+        }
+        else
+        {
+            await drivers.UpdateAsync(driver, cancellationToken);
+        }
+
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveDriverResult(view, outcome);
     }

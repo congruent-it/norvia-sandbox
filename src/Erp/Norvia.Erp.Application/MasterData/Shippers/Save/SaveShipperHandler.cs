@@ -46,7 +46,6 @@ public sealed partial class SaveShipperHandler(
         if (existing is null)
         {
             shipper = Shipper.CreateByFinance(id, command.Name, command.Active, command.IdempotencyKey);
-            await shippers.AddAsync(shipper, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
@@ -64,7 +63,6 @@ public sealed partial class SaveShipperHandler(
                 return new SaveShipperResult(ViewOf(shipper), MasterDataSaveOutcome.Unchanged);
             }
 
-            await shippers.UpdateAsync(shipper, cancellationToken);
             outcome = MasterDataSaveOutcome.Updated;
         }
 
@@ -77,6 +75,17 @@ public sealed partial class SaveShipperHandler(
             [TrackingKeys.PartyId] = command.Id,
         });
         outbox.Add(new ShipperChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+
+        // The save writes the change and the event the outbox holds in one transaction, so the event is added before it.
+        if (outcome == MasterDataSaveOutcome.Created)
+        {
+            await shippers.AddAsync(shipper, cancellationToken);
+        }
+        else
+        {
+            await shippers.UpdateAsync(shipper, cancellationToken);
+        }
+
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveShipperResult(view, outcome);
     }

@@ -15,13 +15,13 @@ namespace Norvia.Erp.Application.UnitTests.MasterData;
 public sealed class SaveCarrierHandlerTests
 {
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 11, 13, 9, 0, 0, TimeSpan.Zero));
-    private readonly IRepository<Carrier> _shippers = Substitute.For<IRepository<Carrier>>();
+    private readonly IRepository<Carrier> _carriers = Substitute.For<IRepository<Carrier>>();
     private readonly IOutbox _outbox = Substitute.For<IOutbox>();
 
-    private SaveCarrierHandler Handler => new(_shippers, _outbox, _time, NullLogger<SaveCarrierHandler>.Instance);
+    private SaveCarrierHandler Handler => new(_carriers, _outbox, _time, NullLogger<SaveCarrierHandler>.Instance);
 
     private void Have(Carrier shipper) =>
-        _shippers.FirstOrDefaultAsync(Arg.Any<ISpecification<Carrier>>(), Arg.Any<CancellationToken>()).Returns(shipper);
+        _carriers.FirstOrDefaultAsync(Arg.Any<ISpecification<Carrier>>(), Arg.Any<CancellationToken>()).Returns(shipper);
 
     [Fact]
     public async Task Handle_ForANewCarrier_AddsItAtRevisionOneAndPublishesTheWholeRecord()
@@ -31,7 +31,7 @@ public sealed class SaveCarrierHandlerTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Created);
         result.Value.Carrier.Should().Be(new CarrierView("CAR-0100", "Nieuwe Carrier", true, 1));
-        await _shippers.Received().AddAsync(Arg.Is<Carrier>(shipper => shipper.Id.Value == "CAR-0100"), Arg.Any<CancellationToken>());
+        await _carriers.Received().AddAsync(Arg.Is<Carrier>(shipper => shipper.Id.Value == "CAR-0100"), Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e =>
             e is CarrierChangedV1 && e.EventType == "CarrierChanged" && e.Topic == Topics.MasterDataEvents && ((CarrierChangedV1)e).Carrier.Revision == 1));
     }
@@ -47,7 +47,7 @@ public sealed class SaveCarrierHandlerTests
         result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Updated);
         result.Value.Carrier.Should().Be(new CarrierView("CAR-0001", "New", false, 2));
         shipper.Revision.Should().Be(2);
-        await _shippers.Received().UpdateAsync(shipper, Arg.Any<CancellationToken>());
+        await _carriers.Received().UpdateAsync(shipper, Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((CarrierChangedV1)e).Carrier.Revision == 2 && !((CarrierChangedV1)e).Carrier.Active));
     }
 
@@ -61,7 +61,7 @@ public sealed class SaveCarrierHandlerTests
         result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Unchanged);
         result.Value.Carrier.Revision.Should().Be(1);
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
-        await _shippers.DidNotReceive().UpdateAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
+        await _carriers.DidNotReceive().UpdateAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -90,5 +90,33 @@ public sealed class SaveCarrierHandlerTests
         result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Repeat);
         carrier.Revision.Should().Be(2);
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task Handle_ForANewRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        await Handler.Handle(new SaveCarrierCommand("CAR-0100", "Nieuwe Carrier", true), CancellationToken.None);
+
+        // The outbox is written by the save, so an event added after it would never be stored (nor published).
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _carriers.AddAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
+        });
+    }
+
+    [Fact]
+    public async Task Handle_ForAnEditedRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        var carrier = new Carrier(new CarrierId("CAR-0001"), "Old", true);
+        Have(carrier);
+
+        await Handler.Handle(new SaveCarrierCommand("CAR-0001", "New", false), CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _carriers.UpdateAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
+        });
     }
 }
