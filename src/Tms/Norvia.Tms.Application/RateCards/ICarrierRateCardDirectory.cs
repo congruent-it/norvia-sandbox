@@ -8,4 +8,7 @@ public interface ICarrierRateCardDirectory
 {
     /// <summary>The Carrier's Carrier Rate Card, or null when it has none.</summary>
     CarrierRateCard? FindFor(CarrierId carrierId);
+
+    /// <summary>The Carrier Rate Card with this ID, or null when there is none. Its revision is the one a replacement must beat.</summary>
+    CarrierRateCard? Find(RateCardId id);
 }

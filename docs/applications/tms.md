@@ -42,6 +42,8 @@ No Agent calls the TMS today, so no endpoint below lists one. [c4.md](../archite
 | `GET /v1/transport-orders` | List Transport Orders by `status`. | any valid token | → `[TransportOrderSummary]` | None over HTTP: the TMS UI reads in process |
 | `PUT /v1/shippers/{id}` | Replace the TMS's copy of a Shipper with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceShipperRequest` → `ReplaceShipperResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `PUT /v1/carriers/{id}` | Replace the TMS's copy of a Carrier with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceCarrierRequest` → `ReplaceCarrierResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/rate-cards/{id}` | Replace the TMS's copy of a Shipper's Rate Card with the ERP's record, whole, its list of dated versions included. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. A replaced Rate Card changes only what is rated after it arrives. `MasterDataUnreadable` and `RateCardVersionsOverlap` (400). | `MasterData.Replace` | `ReplaceRateCardRequest` → `ReplaceRateCardResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/carrier-rate-cards/{id}` | Replace the TMS's copy of a Carrier Rate Card with the ERP's record, whole, as the Rate Card is. `MasterDataUnreadable` and `RateCardVersionsOverlap` (400). | `MasterData.Replace` | `ReplaceCarrierRateCardRequest` → `ReplaceCarrierRateCardResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `GET /v1/agent/customer-service/rejected-bookings/{id}` | The Customer service agent's view of a Rejected booking (ADR 0040): when it was received, the Shipper's business name, every rejection reason with its code, message and the submitted field that failed, and the submitted content with the Consignee fields removed (an allowlist: a new field stays out until someone adds it; no Consignee name, delivery address or contact, no instructions, no file contents). Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentRejectedBookingView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (audience the TMS agent API, Entra's keys; the gateway names the Agent in `X-Agent-ID`) |
 | `GET /v1/agent/customer-service/transport-orders/{transportOrderNumber}` | The Customer service agent's view of a Transport Order (ADR 0040, tool `get_transport_order`): status, the Shipper's business name and reference, rating result with the failure code and message, the Shipment's number and status, and the billing state with the reasons that block it (`NotRated`, `NoProofOfDelivery`, `OpenException`). Same allowlist: no Consignee, address, contact, instructions or file contents. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentTransportOrderView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
 | `GET /v1/agent/customer-service/shipments/{shipmentNumber}/tracking-events` | A Shipment's Tracking events in event-time order with their source (a Carrier ID, or Own fleet), place, ETA and whether each moved the status (tool `get_shipment_timeline`). No remark a Carrier or Driver typed, no postcode. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentShipmentTimelineView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
@@ -266,6 +268,21 @@ Primary key `PK_CarrierBookings`: `Id`.
 
 Primary key `PK_CarrierCopies`: `Id`.
 
+#### `CarrierRateCardCopies`
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK |  |
+| `CarrierId` | `nvarchar(50)` | no |  |  |  |
+| `Revision` | `int` | no |  |  |  |
+| `VersionsJson` | `nvarchar(max)` | no |  |  |  |
+
+Primary key `PK_CarrierRateCardCopies`: `Id`.
+
+| Index | Columns | Unique | Filter |
+|---|---|---|---|
+| `IX_CarrierRateCardCopies_CarrierId` | `CarrierId` | no |  |
+
 #### `Exceptions`
 
 An Exception: something that went wrong with one Shipment on its way and needs the Planner's decision (P7). A Shipment has many over its life, but at most one open of each type. The TMS opens it; only the Planner resolves it. Not to be confused with a rating exception, which is a Transport Order whose Rating failed.
@@ -400,6 +417,21 @@ Primary key `PK_ProofsOfDelivery`: `Id`.
 |---|---|---|---|
 | `IX_ProofsOfDelivery_ShipmentId` | `ShipmentId` | no |  |
 | `IX_ProofsOfDelivery_SourceId_DocumentId` | `SourceId`, `DocumentId` | yes |  |
+
+#### `RateCardCopies`
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK |  |
+| `Revision` | `int` | no |  |  |  |
+| `ShipperId` | `nvarchar(50)` | no |  |  |  |
+| `VersionsJson` | `nvarchar(max)` | no |  |  |  |
+
+Primary key `PK_RateCardCopies`: `Id`.
+
+| Index | Columns | Unique | Filter |
+|---|---|---|---|
+| `IX_RateCardCopies_ShipperId` | `ShipperId` | no |  |
 
 #### `Rosters`
 

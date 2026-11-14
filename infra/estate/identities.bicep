@@ -162,7 +162,7 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       id: masterDataReplaceRoleId
       value: masterDataReplaceRole
       displayName: 'Replace master data'
-      description: 'Replace the TMS\'s read copy of a Shipper or Carrier, with the ERP\'s record (E3). Only the master-data sync Logic App holds it.'
+      description: 'Replace the TMS\'s read copy of a Shipper, Carrier, Rate Card or Carrier Rate Card, with the ERP\'s record (E3). Only the master-data sync Logic App holds it.'
       allowedMemberTypes: [
         'Application'
       ]

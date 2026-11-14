@@ -45,6 +45,8 @@ The Carrier invoice matching agent calls the ERP through the one read endpoint u
 | `POST /v1/shipper-invoices/{invoiceNumber}/report-not-delivered` | Report that a Shipper invoice never reached the Shipper, with its technical cause: Issued becomes Not delivered and `ShipperInvoiceNotDelivered` is published. | `ShipperInvoices.Report` | `ShipperInvoiceNotDeliveredRequest` (`X-Correlation-ID`) → `ShipperInvoiceReportResult` | Shipper invoice Logic App (E1) |
 | `PUT /v1/shippers/{id}` | Create or edit a Shipper and publish the whole Shipper as the `Shipper` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. `MasterDataFieldRequired` and `MasterDataFieldTooLong` (400). | `MasterData.Manage` | `SaveShipperRequest` → `SaveShipperResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `PUT /v1/carriers/{id}` | Create or edit a Carrier and publish the whole Carrier as the `Carrier` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. `MasterDataFieldRequired` and `MasterDataFieldTooLong` (400). | `MasterData.Manage` | `SaveCarrierRequest` → `SaveCarrierResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/rate-cards/{id}` | Create or edit a Shipper's Rate Card with its whole list of dated versions and publish the whole card as the `RateCard` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time and a Shipper has one Rate Card. `MasterDataFieldRequired`, `MasterDataFieldTooLong`, `RateCardVersionInvalid`, `RateCardVersionsOverlap`, `RateCardPartyUnknown` and `RateCardShipperHasCard` (400). | `MasterData.Manage` | `SaveRateCardRequest` → `SaveRateCardResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/carrier-rate-cards/{id}` | Create or edit a Carrier's Carrier Rate Card with its whole list of dated versions and publish the whole card as the `CarrierRateCard` event, with its Master-data revision. Idempotent on content, as the Rate Card is. Versions must not overlap in time and a Carrier has one Carrier Rate Card. `MasterDataFieldRequired`, `MasterDataFieldTooLong`, `RateCardVersionInvalid`, `RateCardVersionsOverlap`, `RateCardPartyUnknown` and `RateCardCarrierHasCard` (400). | `MasterData.Manage` | `SaveCarrierRateCardRequest` → `SaveCarrierRateCardResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `POST /v1/credit-notes/{creditNoteNumber}/report-sent` | Report that the Shipper's invoice endpoint acknowledged a Credit note. `CreditNoteNotFound` (404). | `ShipperInvoices.Report` | `X-Correlation-ID` → `CreditNoteReportResult` | Shipper invoice Logic App (E1) |
 | `POST /v1/credit-notes/{creditNoteNumber}/report-not-delivered` | Report that a Credit note never reached the Shipper, with its technical cause; publishes `ShipperInvoiceNotDelivered` with document type `CREDIT_NOTE`. | `ShipperInvoices.Report` | `ShipperInvoiceNotDeliveredRequest` (`X-Correlation-ID`) → `CreditNoteReportResult` | Shipper invoice Logic App (E1) |
 
@@ -199,6 +201,9 @@ What Norvia pays one Carrier for transport, by Lane and weight (a Carrier Rate C
 |---|---|---|---|---|---|
 | `Id` | `nvarchar(50)` | no |  | PK | The Carrier Rate Card's ID. |
 | `CarrierId` | `nvarchar(50)` | no |  | FK | The Carrier it belongs to. |
+| `FinanceOwned` | `bit` | no | False |  |  |
+| `Revision` | `int` | no | 1 |  |  |
+| `RowVersion` | `rowversion` | yes |  |  |  |
 | `Versions` | `nvarchar(max)` | no |  |  | Every version of the card as JSON: its validity period, Zones, Lanes, Weight Breaks and minimum charges. |
 
 Primary key `PK_CarrierRateCards`: `Id`.
@@ -320,6 +325,9 @@ What Norvia charges one Shipper for transport, by Lane and weight (a Rate Card),
 | Column | Type | Nullable | Default | Key | Description |
 |---|---|---|---|---|---|
 | `Id` | `nvarchar(50)` | no |  | PK | The Rate Card's ID. |
+| `FinanceOwned` | `bit` | no | False |  |  |
+| `Revision` | `int` | no | 1 |  |  |
+| `RowVersion` | `rowversion` | yes |  |  |  |
 | `ShipperId` | `nvarchar(50)` | no |  | FK | The Shipper it belongs to. |
 | `Versions` | `nvarchar(max)` | no |  |  | Every version of the card as JSON: its validity period, Zones, Lanes, Weight Breaks and minimum charges. |
 

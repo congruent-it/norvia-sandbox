@@ -27,6 +27,8 @@ internal sealed class SeedFileRateCardDirectory : IRateCardDirectory
 
     public RateCard? FindFor(ShipperId shipperId) => _rateCards.GetValueOrDefault(shipperId);
 
+    public RateCard? Find(RateCardId id) => _rateCards.Values.FirstOrDefault(rateCard => rateCard.Id == id);
+
     private static RateCard ToRateCard(SeedRateCard rateCard, string path) => new(
         new RateCardId(rateCard.Id),
         new ShipperId(rateCard.ShipperId),

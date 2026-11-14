@@ -9,14 +9,15 @@ using Norvia.ServiceDefaults.Faults;
 using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Api.Capacity;
 using Norvia.Tms.Api.CarrierBookings;
+using Norvia.Tms.Api.Carriers;
 using Norvia.Tms.Api.Exceptions;
 using Norvia.Tms.Api.Faults;
 using Norvia.Tms.Api.ProofsOfDelivery;
+using Norvia.Tms.Api.RateCards;
 using Norvia.Tms.Api.Reset;
-using Norvia.Tms.Api.Carriers;
-using Norvia.Tms.Api.Shippers;
 using Norvia.Tms.Api.Shipments;
 using Norvia.Tms.Api.ShipperNotifications;
+using Norvia.Tms.Api.Shippers;
 using Norvia.Tms.Api.ShipperTracking;
 using Norvia.Tms.Api.Tracking;
 using Norvia.Tms.Api.TrackingEvents;
@@ -209,6 +210,7 @@ app.MapPlannerAgent();
 app.MapPlannerNotificationAgent();
 app.MapShippers();
 app.MapCarriers();
+app.MapRateCards();
 app.MapReset();
 // The presenter panel's fault switches, guarded by the Demo.Fault role: MapFaults has no unguarded way to map them.
 app.NewVersionedApi("Faults")
