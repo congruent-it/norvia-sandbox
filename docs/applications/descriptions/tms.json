@@ -47,6 +47,16 @@
         "WithdrawnAt": "When the Planner withdrew the booking before the Carrier answered; null unless Withdrawn."
       }
     },
+    "DriverCopies": {
+      "description": "A Driver the ERP replicated to the TMS, kept whole (E3). It overrides the seed file's Driver with the same ID; the TMS never edits it. Rosters and Absences are kept apart.",
+      "columns": {
+        "Id": "The Driver ID.",
+        "Active": "False once the ERP made the Driver inactive.",
+        "Licences": "The licence categories held (B, C, CE) as comma-separated text; empty for a Driver without one.",
+        "Name": "The Driver's name.",
+        "Revision": "The Master-data revision of the ERP record this copy was made from."
+      }
+    },
     "Exceptions": {
       "description": "An Exception: something that went wrong with one Shipment on its way and needs the Planner's decision (P7). A Shipment has many over its life, but at most one open of each type. The TMS opens it; only the Planner resolves it. Not to be confused with a rating exception, which is a Transport Order whose Rating failed.",
       "columns": {
@@ -282,6 +292,18 @@
         "Status": "`Draft`, `Dispatched`, `InProgress` or `Completed`.",
         "VehicleId": "The Vehicle, owned by the ERP (ADR 0014); null while a Draft has none.",
         "Version": "The version of the Trip last sent to the Driver. Each Amend sends a new whole version."
+      }
+    },
+    "VehicleCopies": {
+      "description": "A Vehicle the ERP replicated to the TMS, kept whole (E3). It overrides the seed file's Vehicle with the same ID; the TMS never edits it.",
+      "columns": {
+        "Id": "The Vehicle ID.",
+        "Active": "False once the ERP made the Vehicle inactive.",
+        "PalletPlaces": "How many pallets it holds.",
+        "PayloadKg": "The most it can carry, in kilograms.",
+        "Registration": "The registration plate.",
+        "Revision": "The Master-data revision of the ERP record this copy was made from.",
+        "Type": "Van, RigidTruck or TractorWithTrailer."
       }
     }
   }

@@ -12,7 +12,7 @@ namespace Norvia.Erp.Infrastructure.Reset;
 
 /// <summary>
 /// Deletes the ERP's transactional records in one transaction: Credit notes before the Shipper invoices they credit, the invoice and Credit note number
-/// sequences (so numbers begin again), and the outbox. The Shippers, Carriers and Rate Cards are master data from the seed file and stay.
+/// sequences (so numbers begin again), and the outbox. The Shippers, Carriers, Rate Cards, Vehicles and Drivers are master data from the seed file and stay.
 /// </summary>
 internal sealed class SqlTransactionalData(ErpDbContext dbContext) : ITransactionalData
 {

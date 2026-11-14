@@ -5,10 +5,12 @@ using Norvia.Erp.Application;
 using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Application.MasterData;
 using Norvia.Erp.Application.MasterData.Carriers.Save;
+using Norvia.Erp.Application.MasterData.Drivers.Save;
 using Norvia.Erp.Application.MasterData.RateCards;
 using Norvia.Erp.Application.MasterData.RateCards.Save;
 using Norvia.Erp.Application.MasterData.RateCards.SaveCarrier;
 using Norvia.Erp.Application.MasterData.Shippers.Save;
+using Norvia.Erp.Application.MasterData.Vehicles.Save;
 
 namespace Norvia.Erp.Api.MasterData;
 
@@ -48,6 +50,38 @@ public static class MasterDataEndpoints
                 + "active flag (200, the revision raised by one) and publishes the whole Carrier as the Carrier event, in one transaction. Idempotent on content: "
                 + "a repeat of what the Carrier already is answers 200 with the unchanged revision and publishes nothing. A Carrier is never deleted, only made inactive. "
                 + "Refusals carry a stable code (400): MasterDataFieldRequired and MasterDataFieldTooLong.");
+
+        var vehicles = app.NewVersionedApi("MasterData")
+            .MapGroup("/v{version:apiVersion}/vehicles")
+            .HasApiVersion(1);
+
+        vehicles.MapPut("/{id}", SaveVehicleAsync)
+            .WithName("SaveVehicle")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.MasterData))
+            .WithSummary("Create or edit a Vehicle of the Own fleet, and replicate it to the TMS.")
+            .WithDescription(
+                "What Finance's Vehicle form does, through the same command. Creates the Vehicle (201, Master-data revision 1) or replaces its registration, "
+                + "type, payload, pallet places and active flag (200, the revision raised by one) and publishes the whole Vehicle as the Vehicle event, in one "
+                + "transaction. Idempotent on content: a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing. "
+                + "A Vehicle is never deleted, only made inactive, which stores Active false and nothing else: it opens or closes no day. "
+                + "Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.");
+
+        var drivers = app.NewVersionedApi("MasterData")
+            .MapGroup("/v{version:apiVersion}/drivers")
+            .HasApiVersion(1);
+
+        drivers.MapPut("/{id}", SaveDriverAsync)
+            .WithName("SaveDriver")
+            .RequireAuthorization(policy => policy.RequireRole(ManageRole))
+            .WithMetadata(new TrackedFlow(Flows.MasterData))
+            .WithSummary("Create or edit a Driver of the Own fleet, and replicate it to the TMS.")
+            .WithDescription(
+                "What Finance's Driver form does, through the same command. Creates the Driver (201, Master-data revision 1) or replaces its name, "
+                + "licence categories and active flag (200, the revision raised by one) and publishes the whole Driver as the Driver event, in one "
+                + "transaction. Idempotent on content: a repeat of what the Driver already is, the licences in any order, answers 200 with the unchanged "
+                + "revision and publishes nothing. A Driver is never deleted, only made inactive, which stores Active false and nothing else: it edits no "
+                + "Roster. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.");
 
         var rateCards = app.NewVersionedApi("MasterData")
             .MapGroup("/v{version:apiVersion}/rate-cards")
@@ -125,6 +159,53 @@ public static class MasterDataEndpoints
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
             ? TypedResults.Created($"/v1/carriers/{id}", result.Value)
+            : TypedResults.Ok(result.Value);
+    }
+
+    internal static async Task<Results<Ok<SaveVehicleResult>, Created<SaveVehicleResult>, ProblemHttpResult>> SaveVehicleAsync(
+        string id,
+        SaveVehicleRequest request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await retrier.RunAsync(mediator => mediator
+            .Send(new SaveVehicleCommand(id, request.Registration, request.Type, request.PayloadKg, request.PalletPlaces, request.Active), cancellationToken).AsTask());
+        if (!result.IsSuccess)
+        {
+            var refusal = result.ValidationErrors.First();
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The Vehicle can't be saved.",
+                detail: refusal.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
+        }
+
+        return result.Value.Outcome == MasterDataSaveOutcome.Created
+            ? TypedResults.Created($"/v1/vehicles/{id}", result.Value)
+            : TypedResults.Ok(result.Value);
+    }
+
+    internal static async Task<Results<Ok<SaveDriverResult>, Created<SaveDriverResult>, ProblemHttpResult>> SaveDriverAsync(
+        string id,
+        SaveDriverRequest request,
+        IConflictRetrier retrier,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveDriverCommand(id, request.Name, request.Licences, request.Active), cancellationToken).AsTask());
+        if (!result.IsSuccess)
+        {
+            var refusal = result.ValidationErrors.First();
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The Driver can't be saved.",
+                detail: refusal.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = refusal.ErrorCode });
+        }
+
+        return result.Value.Outcome == MasterDataSaveOutcome.Created
+            ? TypedResults.Created($"/v1/drivers/{id}", result.Value)
             : TypedResults.Ok(result.Value);
     }
 

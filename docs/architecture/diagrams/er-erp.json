@@ -127,6 +127,18 @@
       ]
     },
     {
+      "name": "Drivers",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
       "name": "InvoiceNumberSequences",
       "columns": [
         {
@@ -190,6 +202,18 @@
     },
     {
       "name": "Shippers",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
       "columns": [
         {
           "name": "Id",

@@ -7,4 +7,7 @@ public interface IVehicleDirectory
 {
     /// <summary>The active Vehicles, by registration.</summary>
     IReadOnlyList<Vehicle> ListActive();
+
+    /// <summary>The copy of a Vehicle, active or not, or null when the TMS has never heard of it.</summary>
+    Vehicle? Find(VehicleId id);
 }

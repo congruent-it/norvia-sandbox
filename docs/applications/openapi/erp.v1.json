@@ -878,6 +878,110 @@
         }
       }
     },
+    "/v1/vehicles/{id}": {
+      "put": {
+        "tags": [
+          "MasterData"
+        ],
+        "summary": "Create or edit a Vehicle of the Own fleet, and replicate it to the TMS.",
+        "description": "What Finance's Vehicle form does, through the same command. Creates the Vehicle (201, Master-data revision 1) or replaces its registration, type, payload, pallet places and active flag (200, the revision raised by one) and publishes the whole Vehicle as the Vehicle event, in one transaction. Idempotent on content: a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing. A Vehicle is never deleted, only made inactive, which stores Active false and nothing else: it opens or closes no day. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.",
+        "operationId": "SaveVehicle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveVehicleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveVehicleResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveVehicleResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/drivers/{id}": {
+      "put": {
+        "tags": [
+          "MasterData"
+        ],
+        "summary": "Create or edit a Driver of the Own fleet, and replicate it to the TMS.",
+        "description": "What Finance's Driver form does, through the same command. Creates the Driver (201, Master-data revision 1) or replaces its name, licence categories and active flag (200, the revision raised by one) and publishes the whole Driver as the Driver event, in one transaction. Idempotent on content: a repeat of what the Driver already is, the licences in any order, answers 200 with the unchanged revision and publishes nothing. A Driver is never deleted, only made inactive, which stores Active false and nothing else: it edits no Roster. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.",
+        "operationId": "SaveDriver",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDriverRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveDriverResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveDriverResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/rate-cards/{id}": {
       "put": {
         "tags": [
@@ -2510,6 +2614,42 @@
         },
         "additionalProperties": false
       },
+      "DriverView": {
+        "required": [
+          "id",
+          "name",
+          "licences",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "licences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 1
+          }
+        },
+        "additionalProperties": false
+      },
       "FreightChargeRequest": {
         "required": [
           "currency",
@@ -3057,6 +3197,45 @@
         },
         "additionalProperties": false
       },
+      "SaveDriverRequest": {
+        "required": [
+          "name",
+          "licences",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "licences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveDriverResult": {
+        "required": [
+          "driver",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "driver": {
+            "$ref": "#/components/schemas/DriverView"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MasterDataSaveOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveRateCardRequest": {
         "required": [
           "shipperId",
@@ -3117,6 +3296,60 @@
         "properties": {
           "shipper": {
             "$ref": "#/components/schemas/ShipperView"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MasterDataSaveOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveVehicleRequest": {
+        "required": [
+          "registration",
+          "type",
+          "payloadKg",
+          "palletPlaces",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "registration": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "payloadKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "palletPlaces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveVehicleResult": {
+        "required": [
+          "vehicle",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "vehicle": {
+            "$ref": "#/components/schemas/VehicleView"
           },
           "outcome": {
             "$ref": "#/components/schemas/MasterDataSaveOutcome"
@@ -3416,6 +3649,57 @@
           },
           "releasedWithoutProofOfDelivery": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "VehicleView": {
+        "required": [
+          "id",
+          "registration",
+          "type",
+          "payloadKg",
+          "palletPlaces",
+          "active"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "registration": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "payloadKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "palletPlaces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 1
           }
         },
         "additionalProperties": false

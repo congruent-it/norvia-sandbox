@@ -133,8 +133,14 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ReplicatedCarrierDirectory>();
         builder.Services.AddSingleton<ICarrierDirectory>(services => services.GetRequiredService<ReplicatedCarrierDirectory>());
         builder.Services.AddSingleton<ICarrierReplicas>(services => services.GetRequiredService<ReplicatedCarrierDirectory>());
-        builder.Services.AddSingleton<IVehicleDirectory, SeedFileVehicleDirectory>();
-        builder.Services.AddSingleton<IDriverDirectory, SeedFileDriverDirectory>();
+        builder.Services.AddSingleton<SeedFileVehicleDirectory>();
+        builder.Services.AddSingleton<ReplicatedVehicleDirectory>();
+        builder.Services.AddSingleton<IVehicleDirectory>(services => services.GetRequiredService<ReplicatedVehicleDirectory>());
+        builder.Services.AddSingleton<IVehicleReplicas>(services => services.GetRequiredService<ReplicatedVehicleDirectory>());
+        builder.Services.AddSingleton<SeedFileDriverDirectory>();
+        builder.Services.AddSingleton<ReplicatedDriverDirectory>();
+        builder.Services.AddSingleton<IDriverDirectory>(services => services.GetRequiredService<ReplicatedDriverDirectory>());
+        builder.Services.AddSingleton<IDriverReplicas>(services => services.GetRequiredService<ReplicatedDriverDirectory>());
         builder.Services.AddSingleton<IRosterDirectory, SeedFileRosterDirectory>();
         builder.Services.AddScoped<EffectiveRosters>();
         builder.Services.AddScoped<DayLoads>();

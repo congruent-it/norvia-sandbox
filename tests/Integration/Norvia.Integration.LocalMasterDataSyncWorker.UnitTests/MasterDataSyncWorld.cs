@@ -54,6 +54,28 @@ internal sealed class MasterDataSyncWorld
         }
         """;
 
+    public static string Vehicle(string id = "VEH-0001", int revision = 2, bool active = false) => $$"""
+        {
+          "eventId": "0198e7c0-0000-7000-8000-0000000000e5",
+          "eventType": "Vehicle",
+          "eventVersion": 1,
+          "occurredAt": "2030-10-02T09:05:00+00:00",
+          "correlationId": "master-data-3",
+          "vehicle": { "id": "{{id}}", "registration": "VN-101-A", "type": "Van", "payloadKg": 1200, "palletPlaces": 4, "active": {{active.ToString().ToLowerInvariant()}}, "revision": {{revision}} }
+        }
+        """;
+
+    public static string Driver(string id = "DRV-0001", int revision = 2) => $$"""
+        {
+          "eventId": "0198e7c0-0000-7000-8000-0000000000e6",
+          "eventType": "Driver",
+          "eventVersion": 1,
+          "occurredAt": "2030-10-02T09:05:00+00:00",
+          "correlationId": "master-data-4",
+          "driver": { "id": "{{id}}", "name": "Anouk de Vries", "licences": ["B", "C"], "active": false, "revision": {{revision}} }
+        }
+        """;
+
     /// <summary>Runs the flow, moving the clock on whenever it waits to retry.</summary>
     public async Task<MasterDataSyncRun> RunAsync(string message)
     {

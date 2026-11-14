@@ -3428,6 +3428,90 @@
         }
       }
     },
+    "/v1/vehicles/{id}": {
+      "put": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Replace the TMS's copy of a Vehicle with the ERP's record.",
+        "description": "Upserts the whole Vehicle, so a new Vehicle appears. Idempotent on the Master-data revision: a revision that is not higher than the copy's answers 200 with applied false and changes nothing. The TMS never edits a Vehicle itself, and replacing one touches no Off the road day or Trip: a Vehicle made inactive drops out of the days opened after that, and a Trip already using it is flagged Needs a Vehicle. A record the TMS can't read (no registration, an unknown type, no payload, a revision below 1) is refused with 400 and the code MasterDataUnreadable.",
+        "operationId": "ReplaceVehicle",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceVehicleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceVehicleResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/drivers/{id}": {
+      "put": {
+        "tags": [
+          "Drivers"
+        ],
+        "summary": "Replace the TMS's copy of a Driver with the ERP's record.",
+        "description": "Upserts the whole Driver, so a new Driver appears. Idempotent on the Master-data revision: a revision that is not higher than the copy's answers 200 with applied false and changes nothing. The TMS never edits a Driver itself, and replacing one touches no Roster, Absence or Trip: a Driver made inactive drops out of the days opened after that, and a Trip already using them is flagged Needs a Driver. A record the TMS can't read (no name, a licence other than B, C or CE, a revision below 1) is refused with 400 and the code MasterDataUnreadable.",
+        "operationId": "ReplaceDriver",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceDriverRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceDriverResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/rate-cards/{id}": {
       "put": {
         "tags": [
@@ -8245,6 +8329,59 @@
         },
         "additionalProperties": false
       },
+      "ReplaceDriverRequest": {
+        "required": [
+          "name",
+          "licences",
+          "active",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "licences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceDriverResult": {
+        "required": [
+          "applied",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReplaceRateCardRequest": {
         "required": [
           "shipperId",
@@ -8320,6 +8457,74 @@
         "additionalProperties": false
       },
       "ReplaceShipperResult": {
+        "required": [
+          "applied",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceVehicleRequest": {
+        "required": [
+          "registration",
+          "type",
+          "payloadKg",
+          "palletPlaces",
+          "active",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "registration": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "payloadKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "palletPlaces": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceVehicleResult": {
         "required": [
           "applied",
           "revision"
@@ -10632,6 +10837,12 @@
     },
     {
       "name": "Carriers"
+    },
+    {
+      "name": "Vehicles"
+    },
+    {
+      "name": "Drivers"
     },
     {
       "name": "RateCards"

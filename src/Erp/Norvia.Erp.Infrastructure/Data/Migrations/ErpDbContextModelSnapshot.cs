@@ -369,6 +369,45 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.ToTable("CreditNoteNumberSequences", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Erp.Domain.Drivers.Driver", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("FinanceOwned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Licences")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Revision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Drivers", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Erp.Domain.RateCards.CarrierRateCard", b =>
                 {
                     b.Property<string>("Id")
@@ -564,6 +603,51 @@ namespace Norvia.Erp.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Shippers", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Erp.Domain.Vehicles.Vehicle", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("FinanceOwned")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("PalletPlaces")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PayloadKg")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Registration")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Revision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Vehicles", (string)null);
                 });
 
             modelBuilder.Entity("Norvia.Erp.Infrastructure.Outbox.OutboxMessage", b =>

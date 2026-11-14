@@ -2,7 +2,7 @@
 
 The catalogue of business processes the ERP supports. The ERP is Norvia's system of record for Shipper and Carrier master data, Contracts, Rate Cards, Carrier Rate Cards and invoicing (ADR 0002). It is built as a realistic application with its own domain model, persistence and UI (ADR 0001), and it talks to the TMS only through Azure Integration Services. Terms are defined in [GLOSSARY.md](../../../GLOSSARY.md).
 
-The ERP's invoicing is what the TMS's [P9 Freight settlement](../tms/p9-freight-settlement.md) needs. The ERP loads Shippers, Carriers, Rate Cards and Carrier Rate Cards from the seed file, with the same IDs as the TMS, and shows them read-only, but for the Shipper, the Carrier, the Rate Card and the Carrier Rate Card, which Finance can edit through the ERP API and which is replicated to the TMS ([E3](e3-master-data-sync.md)). Vehicles and Drivers are not yet synced.
+The ERP's invoicing is what the TMS's [P9 Freight settlement](../tms/p9-freight-settlement.md) needs. The ERP loads Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles and Drivers from the seed file, with the same IDs as the TMS, and shows them read-only, but for the Shipper, the Carrier, the Rate Card, the Carrier Rate Card, the Vehicle and the Driver, which Finance can edit through the ERP API and which is replicated to the TMS ([E3](e3-master-data-sync.md)).
 
 The *Design* column says whether the process is designed; what is built today is in [status.md](../../status.md).
 
@@ -10,7 +10,7 @@ The *Design* column says whether the process is designed; what is built today is
 |---|---|---|---|---|
 | E1 | [Invoicing](e1-invoicing.md) | Billable Transport Order received from the TMS → Shipper invoice issued in an Invoice run and sent to the Shipper. Credit notes | TMS via Service Bus and the Billing Logic App. Partner portal (Shipper Personas) via the Shipper invoice Logic App | Adopted |
 | E2 | [Carrier invoice matching](e2-carrier-invoice-matching.md) | Carrier invoice received → each line matched against its Carrier cost, decided by Finance where needed, and the Carrier told | TMS via Service Bus and the Carrier cost Logic App. Partner portal (Carrier Personas) via APIM and the Carrier invoice Logic Apps | Adopted |
-| E3 | [Master-data sync](e3-master-data-sync.md) | Shipper, Carrier, Rate Card and Carrier Rate Card (so far), Vehicle or Driver changed in the ERP → replicated to the TMS | TMS via Service Bus and the master-data sync Logic App | Adopted for the Shipper, the Carrier, the Rate Card and the Carrier Rate Card; the rest deferred |
+| E3 | [Master-data sync](e3-master-data-sync.md) | Shipper, Carrier, Rate Card, Carrier Rate Card, Vehicle or Driver changed in the ERP → replicated to the TMS | TMS via Service Bus and the master-data sync Logic App | Adopted for all six entities |
 
 ## Roles
 

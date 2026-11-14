@@ -104,6 +104,18 @@
         "Vat": "The VAT on the credited amount, in EUR."
       }
     },
+    "Drivers": {
+      "description": "A Driver of the Own fleet, as the ERP knows it. The ERP owns the Driver; the TMS keeps a read copy and owns Rosters, Shifts and Absences (ADR 0014). Master data, loaded from the seed file and edited by Finance.",
+      "columns": {
+        "Id": "The Driver ID (`DRV-0001`), which the TMS stores too.",
+        "Active": "Whether Norvia still uses the Driver. Making them inactive stores only this flag.",
+        "FinanceOwned": "True once Finance created or edited the Driver, so the seed file no longer reloads them.",
+        "Licences": "The licence categories held (B, C, CE) as comma-separated text, lowest first.",
+        "Name": "The Driver's name.",
+        "Revision": "The Master-data revision: 1 as loaded from the seed file, raised by every edit.",
+        "RowVersion": "Makes two edits at once conflict instead of both winning."
+      }
+    },
     "InvoiceNumberSequences": {
       "description": "The last Shipper invoice number taken in each calendar year, so numbers (`INV-2026-000001`) run without gaps.",
       "columns": {
@@ -161,6 +173,20 @@
         "Id": "The Shipper ID (`SHP-0001`), which the other applications store. It is the Shipper's identity in its token (ADR 0005).",
         "Active": "Whether the Shipper is active. An inactive Shipper keeps its history.",
         "Name": "The Shipper's name."
+      }
+    },
+    "Vehicles": {
+      "description": "A Vehicle of the Own fleet, as the ERP knows it. The ERP owns the Vehicle; the TMS keeps a read copy and owns its availability (ADR 0014). Master data, loaded from the seed file and edited by Finance.",
+      "columns": {
+        "Id": "The Vehicle ID (`VEH-0001`), which the TMS stores too.",
+        "Active": "Whether Norvia still uses the Vehicle. Making it inactive stores only this flag.",
+        "FinanceOwned": "True once Finance created or edited the Vehicle, so the seed file no longer reloads it.",
+        "PalletPlaces": "How many pallets the Vehicle holds.",
+        "PayloadKg": "The most it can carry, in kilograms.",
+        "Registration": "The registration plate.",
+        "Revision": "The Master-data revision: 1 as loaded from the seed file, raised by every edit.",
+        "RowVersion": "Makes two edits at once conflict instead of both winning.",
+        "Type": "Van, RigidTruck or TractorWithTrailer."
       }
     }
   }

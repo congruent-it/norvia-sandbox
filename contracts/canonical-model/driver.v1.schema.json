@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/driver.v1.schema.json",
+  "title": "Driver",
+  "description": "The ERP created or edited a Driver of the Own fleet (Canonical Model event, version 1, E3). Published on the master-data events topic through the ERP's transactional outbox, in the transaction that saved the change, under a correlation ID created for the change. It carries the whole Driver and its Master-data revision, so the TMS replaces its copy and needs nothing more. Making a Driver inactive changes only its active flag; Rosters, Shifts and Absences stay the TMS's (ADR 0014).",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "driver"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": { "type": "string", "description": "The event's own ID, a UUID." },
+    "eventType": { "const": "Driver" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "driver": {
+      "type": "object",
+      "required": ["id", "name", "licences", "active", "revision"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 50, "description": "The Driver ID both applications use, such as DRV-0001." },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "licences": { "type": "array", "uniqueItems": true, "items": { "enum": ["B", "C", "CE"] }, "description": "The licence categories held, lowest first. A Driver without one drives nothing." },
+        "active": { "type": "boolean", "description": "A Driver is never deleted, only made inactive." },
+        "revision": { "type": "integer", "minimum": 1, "description": "The Master-data revision: 1 as loaded from the seed file, raised by every edit. The TMS applies only a revision higher than the one it holds." }
+      }
+    }
+  }
+}
