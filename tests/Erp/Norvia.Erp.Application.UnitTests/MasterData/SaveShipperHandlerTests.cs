@@ -128,4 +128,19 @@ public sealed class SaveShipperHandlerTests
             _shippers.AddAsync(Arg.Any<Shipper>(), Arg.Any<CancellationToken>());
         });
     }
+
+    [Fact]
+    public async Task Handle_ForAnEditedRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        var shipper = new Shipper(new ShipperId("SHP-0001"), "Old", true);
+        Have(shipper);
+
+        await Handler.Handle(new SaveShipperCommand("SHP-0001", "New", false), CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _shippers.UpdateAsync(Arg.Any<Shipper>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

@@ -73,13 +73,13 @@ public sealed class LocalWorkerFailureTests(MasterDataSyncFixture fixture)
     public async Task AMessageTheTmsCannotReplaceARecordFrom_IsDeadLetteredAsMasterDataUnreadable_AndNothingIsSent(string eventType, string body)
     {
         var id = Guid.NewGuid().ToString();
-        var before = fixture.Proxy.CallsTo("/v1/shippers/").Count;
+        var before = fixture.Proxy.CallCount;
 
         await fixture.SendToTopicAsync(eventType, body, id, id, Ct);
 
         var dead = await fixture.DeadLetteredAsync(MasterDataSyncFixture.SyncSubscription, id, Ct);
         dead.DeadLetterReason.Should().Be("MasterDataUnreadable");
-        fixture.Proxy.CallsTo("/v1/shippers/").Count.Should().Be(before);
+        fixture.Proxy.CallCount.Should().Be(before, "nothing was sent to the TMS");
     }
 
     private static Fault Failure(string failure) => failure == "none" ? Fault.NoAnswer : Fault.Answer(int.Parse(failure, System.Globalization.CultureInfo.InvariantCulture));

@@ -139,4 +139,18 @@ public sealed class SaveVehicleHandlerTests
             _vehicles.AddAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
         });
     }
+
+    [Fact]
+    public async Task Handle_ForAnEditedRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        Have(Van());
+
+        await Handler.Handle(new SaveVehicleCommand("VEH-0001", "VN-101-A", "Van", 1200, 4, false), CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _vehicles.UpdateAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

@@ -16,13 +16,14 @@ public sealed record Kind(
     string ReplicaTable,
     Func<MasterDataSyncFixture, string, CancellationToken, Task<JsonObject>> NewBody,
     Action<JsonObject> Change,
-    Func<IReadOnlyDictionary<string, object?>, JsonObject, bool> ReplicaMatches)
+    Func<IReadOnlyDictionary<string, object?>, JsonObject, bool> ReplicaMatches,
+    string PartyField = "id")
 {
     /// <summary>The ID of a record the test makes, unlike any other, short enough for the TMS's columns.</summary>
     public string NewId() => $"{IdPrefix}-T{Guid.NewGuid():N}"[..(IdPrefix.Length + 10)];
 
     /// <summary>The party the event is about: the Shipper or Carrier of a card, else the record itself.</summary>
-    public string PartyOf(JsonNode record) => record[Name switch { "rate-cards" => "shipperId", "carrier-rate-cards" => "carrierId", _ => "id" }]!.GetValue<string>();
+    public string PartyOf(JsonNode record) => record[PartyField]!.GetValue<string>();
 
     public override string ToString() => Name;
 }
@@ -72,7 +73,8 @@ public static class Kinds
             return new JsonObject { ["shipperId"] = shipperId, ["versions"] = new JsonArray(Cards.Version(1, "2026-01-01", null, 65m)) };
         },
         body => body["versions"] = new JsonArray(Cards.Version(1, "2026-01-01", "2026-12-31", 65m), Cards.Version(2, "2027-01-01", null, 75m)),
-        Cards.ReplicaHoldsVersionsOf);
+        Cards.ReplicaHoldsVersionsOf,
+        PartyField: "shipperId");
 
     public static readonly Kind CarrierRateCard = new(
         "carrier-rate-cards", "/v1/carrier-rate-cards", "CRC", "CarrierRateCardChanged", "carrierRateCard", "CarrierRateCardCopies",
@@ -83,7 +85,8 @@ public static class Kinds
             return new JsonObject { ["carrierId"] = carrierId, ["versions"] = new JsonArray(Cards.Version(1, "2026-01-01", null, 50m)) };
         },
         body => body["versions"] = new JsonArray(Cards.Version(1, "2026-01-01", "2026-12-31", 50m), Cards.Version(2, "2027-01-01", null, 60m)),
-        Cards.ReplicaHoldsVersionsOf);
+        Cards.ReplicaHoldsVersionsOf,
+        PartyField: "carrierId");
 
     public static IReadOnlyList<Kind> All { get; } = [Shipper, Carrier, RateCard, CarrierRateCard, Vehicle, Driver];
 

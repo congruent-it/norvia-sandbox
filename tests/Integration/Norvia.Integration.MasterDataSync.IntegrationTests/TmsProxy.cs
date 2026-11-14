@@ -68,6 +68,9 @@ public sealed class TmsProxy : IAsyncDisposable
         }
     }
 
+    /// <summary>How many calls the worker has made to the TMS in all; the tests run one at a time, so a test can tell whether the worker called it at all.</summary>
+    public int CallCount => _calls.Count;
+
     /// <summary>The calls the worker made to the path.</summary>
     public IReadOnlyList<TmsCall> CallsTo(string path) => [.. _calls.Where(call => call.Path == path)];
 

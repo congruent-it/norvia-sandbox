@@ -104,4 +104,19 @@ public sealed class SaveCarrierHandlerTests
             _carriers.AddAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
         });
     }
+
+    [Fact]
+    public async Task Handle_ForAnEditedRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        var carrier = new Carrier(new CarrierId("CAR-0001"), "Old", true);
+        Have(carrier);
+
+        await Handler.Handle(new SaveCarrierCommand("CAR-0001", "New", false), CancellationToken.None);
+
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _carriers.UpdateAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
+        });
+    }
 }
