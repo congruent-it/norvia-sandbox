@@ -6,6 +6,24 @@ namespace Norvia.Tms.Application.RateCards;
 /// <summary>Maps the plain values to the domain's versions, and back for the replica store.</summary>
 public static class RateCardVersionMapper
 {
+    /// <summary>
+    /// Maps the plain values, or says why a version can't be read: a blank name, or two Zones of a version that claim the same postcode prefix,
+    /// which the domain's types refuse.
+    /// </summary>
+    public static RateCardVersionProblem? TryToDomain(IReadOnlyList<RateCardVersionData> versions, out IReadOnlyList<RateCardVersion> mapped)
+    {
+        try
+        {
+            mapped = ToDomain(versions);
+            return null;
+        }
+        catch (ArgumentException exception)
+        {
+            mapped = [];
+            return new RateCardVersionProblem($"A version can't be read: {exception.Message}");
+        }
+    }
+
     /// <exception cref="ArgumentException">A name is blank or two Zones claim the same postcode prefix.</exception>
     public static IReadOnlyList<RateCardVersion> ToDomain(IReadOnlyList<RateCardVersionData> versions)
     {

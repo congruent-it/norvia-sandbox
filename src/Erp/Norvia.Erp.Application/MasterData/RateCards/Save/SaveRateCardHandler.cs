@@ -38,7 +38,7 @@ public sealed partial class SaveRateCardHandler(
 
         if (RateCardVersionRules.Problem(versions) is { } problem)
         {
-            return Refuse(problem, problem.Contains("overlap", StringComparison.Ordinal) ? "RateCardVersionsOverlap" : "RateCardVersionInvalid");
+            return Refuse(problem.Message, problem.IsOverlap ? "RateCardVersionsOverlap" : "RateCardVersionInvalid");
         }
 
         var shipperId = new ShipperId(command.ShipperId);

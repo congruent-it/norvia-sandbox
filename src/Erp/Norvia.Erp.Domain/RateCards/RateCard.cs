@@ -76,7 +76,7 @@ public sealed class RateCard : EntityBase<RateCardId>, IAggregateRoot
     {
         if (RateCardVersionRules.Problem(versions) is { } problem)
         {
-            throw new ArgumentException(problem, nameof(versions));
+            throw new ArgumentException(problem.Message, nameof(versions));
         }
     }
 }

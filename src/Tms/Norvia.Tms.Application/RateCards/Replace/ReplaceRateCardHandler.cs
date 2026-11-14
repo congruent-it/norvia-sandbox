@@ -18,19 +18,14 @@ public sealed partial class ReplaceRateCardHandler(IRateCardDirectory directory,
             return Refuse("A Rate Card needs an ID, a Shipper and a Master-data revision of at least 1.", "MasterDataUnreadable");
         }
 
-        IReadOnlyList<RateCardVersion> versions;
-        try
+        if (RateCardVersionMapper.TryToDomain(command.Versions ?? [], out var versions) is { } unreadable)
         {
-            versions = RateCardVersionMapper.ToDomain(command.Versions ?? []);
-        }
-        catch (ArgumentException exception)
-        {
-            return Refuse($"A version of the Rate Card can't be read: {exception.Message}", "MasterDataUnreadable");
+            return Refuse(unreadable.Message, "MasterDataUnreadable");
         }
 
         if (RateCardVersionRules.Problem(versions) is { } problem)
         {
-            return Refuse(problem, problem.Contains("overlap", StringComparison.Ordinal) ? "RateCardVersionsOverlap" : "MasterDataUnreadable");
+            return Refuse(problem.Message, problem.IsOverlap ? "RateCardVersionsOverlap" : "MasterDataUnreadable");
         }
 
         var id = new RateCardId(command.Id);

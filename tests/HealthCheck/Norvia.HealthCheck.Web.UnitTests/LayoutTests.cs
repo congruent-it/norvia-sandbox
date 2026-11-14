@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
 using Norvia.HealthCheck.Application.Operators;
 using Norvia.HealthCheck.Web.Components.Layout;
-using Norvia.HealthCheck.Web.Operators;
 using Norvia.HealthCheck.Web.Components.Pages;
+using Norvia.HealthCheck.Web.Operators;
 
 namespace Norvia.HealthCheck.Web.UnitTests;
 

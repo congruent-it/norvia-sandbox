@@ -3,8 +3,8 @@ using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Tms.Api.MasterData;
 using Norvia.Tms.Api.Tracking;
-using Norvia.Tms.Application.IntegrationEvents;
 using Norvia.Tms.Application.Carriers.Replace;
+using Norvia.Tms.Application.IntegrationEvents;
 
 namespace Norvia.Tms.Api.Carriers;
 
