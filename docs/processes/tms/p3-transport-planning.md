@@ -100,7 +100,7 @@ A Shipment is never deleted, and a Transport Order never goes back from Planned 
 
 ## Carriers in the TMS
 
-The ERP owns Carrier master data (ADR 0002). The TMS holds a read copy: an ID, a name and an active flag for now. Until the ERP exists, it loads that copy from the seed file at startup, the same way it loads Shippers.
+The ERP owns Carrier master data (ADR 0002). The TMS holds a read copy: an ID, a name and an active flag for now. It loads that copy from the seed file at startup, the same way it loads Shippers, and the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces a Carrier whenever Finance edits it.
 
 The demo seed has:
 

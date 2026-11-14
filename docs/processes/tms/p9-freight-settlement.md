@@ -77,7 +77,7 @@ The release is allowed only for a Transport Order that is Not yet billable and w
 
 ### Carrier Rate Cards in the TMS
 
-The ERP owns Carrier Rate Cards (ADR 0013). The TMS holds a read copy of each Carrier's Carrier Rate Card and never edits it. Until the ERP sync exists, the TMS loads them from the seed file at startup, the same way it loads Rate Cards (P2). A Carrier Rate Card has the same shape as a Rate Card: Zones, Lanes, Weight Breaks with a price per 100 kg, a minimum charge per Lane, and versions with validity periods. Overlapping Zones are rejected when the seed loads, as in P2.
+The ERP owns Carrier Rate Cards (ADR 0013). The TMS holds a read copy of each Carrier's Carrier Rate Card and never edits it. The TMS loads them from the seed file at startup, the same way it loads Rate Cards (P2), and the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces a card whenever Finance edits it. A Carrier Rate Card has the same shape as a Rate Card: Zones, Lanes, Weight Breaks with a price per 100 kg, a minimum charge per Lane, and versions with validity periods. Overlapping Zones are rejected when the seed loads, as in P2.
 
 ### Pricing a Carrier booking at release
 

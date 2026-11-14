@@ -64,7 +64,7 @@ In a real operation a pricing desk would work these exceptions. The sandbox give
 
 ## Rate Cards in the TMS
 
-The TMS holds a read copy of each Shipper's Rate Card and never edits it (ADR 0006). Until the ERP exists, the TMS loads Rate Cards from the seed file at startup, the same way it loads Shippers. A Rate Card has versions, and each version has a validity period and its own Zones and Lanes, each Lane with its Weight Breaks and minimum charge.
+The TMS holds a read copy of each Shipper's Rate Card and never edits it (ADR 0006). The TMS loads Rate Cards from the seed file at startup, the same way it loads Shippers, and the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces a card whenever Finance edits it. A Rate Card has versions, and each version has a validity period and its own Zones and Lanes, each Lane with its Weight Breaks and minimum charge.
 
 Zones may nest, a narrower prefix inside a wider one, because the most specific prefix decides. Two Zones of one version overlap when they claim the same prefix in the same country, as then neither is more specific. A Rate Card whose Zones overlap is rejected when the seed loads, and the TMS doesn't start.
 

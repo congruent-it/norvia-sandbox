@@ -31,7 +31,7 @@ The load check is a rough figure for the Planner, not a plan. It doesn't know wh
 
 ## Vehicles and Drivers in the TMS
 
-The ERP owns Vehicle and Driver master data (ADR 0014). The TMS holds a read copy. Until the ERP exists, it loads that copy from the seed file at startup, the same way it loads Carriers.
+The ERP owns Vehicle and Driver master data (ADR 0014). The TMS holds a read copy. It loads that copy from the seed file at startup, the same way it loads Carriers, and the ERP's master-data sync ([E3](../erp/e3-master-data-sync.md)) replaces a Vehicle or Driver whenever Finance edits it.
 
 | Master data (ERP) | Fields |
 |---|---|

@@ -121,6 +121,9 @@ public static class MasterDataEndpoints
         return app;
     }
 
+    /// <summary>An empty header is no key: two blank keys must not look like one save sent twice.</summary>
+    private static string? KeyOf(string? header) => string.IsNullOrWhiteSpace(header) ? null : header;
+
     internal static async Task<Results<Ok<SaveShipperResult>, CreatedAtRoute<SaveShipperResult>, ProblemHttpResult>> SaveShipperAsync(
         string id,
         SaveShipperRequest request,
@@ -129,7 +132,7 @@ public static class MasterDataEndpoints
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveShipperCommand(id, request.Name, request.Active, idempotencyKey), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveShipperCommand(id, request.Name, request.Active, KeyOf(idempotencyKey)), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -153,7 +156,7 @@ public static class MasterDataEndpoints
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierCommand(id, request.Name, request.Active, idempotencyKey), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierCommand(id, request.Name, request.Active, KeyOf(idempotencyKey)), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -178,7 +181,7 @@ public static class MasterDataEndpoints
     {
         ArgumentNullException.ThrowIfNull(request);
         var result = await retrier.RunAsync(mediator => mediator
-            .Send(new SaveVehicleCommand(id, request.Registration, request.Type, request.PayloadKg, request.PalletPlaces, request.Active, idempotencyKey), cancellationToken).AsTask());
+            .Send(new SaveVehicleCommand(id, request.Registration, request.Type, request.PayloadKg, request.PalletPlaces, request.Active, KeyOf(idempotencyKey)), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -202,7 +205,7 @@ public static class MasterDataEndpoints
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveDriverCommand(id, request.Name, request.Licences, request.Active, idempotencyKey), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveDriverCommand(id, request.Name, request.Licences, request.Active, KeyOf(idempotencyKey)), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -226,7 +229,7 @@ public static class MasterDataEndpoints
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveRateCardCommand(id, request.ShipperId, request.Versions, idempotencyKey), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveRateCardCommand(id, request.ShipperId, request.Versions, KeyOf(idempotencyKey)), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
@@ -250,7 +253,7 @@ public static class MasterDataEndpoints
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierRateCardCommand(id, request.CarrierId, request.Versions, idempotencyKey), cancellationToken).AsTask());
+        var result = await retrier.RunAsync(mediator => mediator.Send(new SaveCarrierRateCardCommand(id, request.CarrierId, request.Versions, KeyOf(idempotencyKey)), cancellationToken).AsTask());
         if (!result.IsSuccess)
         {
             var refusal = result.ValidationErrors.First();
