@@ -47,6 +47,8 @@ The Carrier invoice matching agent calls the ERP through the one read endpoint u
 | `PUT /v1/carriers/{id}` | Create or edit a Carrier and publish the whole Carrier as the `Carrier` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. `MasterDataFieldRequired` and `MasterDataFieldTooLong` (400). | `MasterData.Manage` | `SaveCarrierRequest` → `SaveCarrierResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `PUT /v1/rate-cards/{id}` | Create or edit a Shipper's Rate Card with its whole list of dated versions and publish the whole card as the `RateCard` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time and a Shipper has one Rate Card. `MasterDataFieldRequired`, `MasterDataFieldTooLong`, `RateCardVersionInvalid`, `RateCardVersionsOverlap`, `RateCardPartyUnknown` and `RateCardShipperHasCard` (400). | `MasterData.Manage` | `SaveRateCardRequest` → `SaveRateCardResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `PUT /v1/carrier-rate-cards/{id}` | Create or edit a Carrier's Carrier Rate Card with its whole list of dated versions and publish the whole card as the `CarrierRateCard` event, with its Master-data revision. Idempotent on content, as the Rate Card is. Versions must not overlap in time and a Carrier has one Carrier Rate Card. `MasterDataFieldRequired`, `MasterDataFieldTooLong`, `RateCardVersionInvalid`, `RateCardVersionsOverlap`, `RateCardPartyUnknown` and `RateCardCarrierHasCard` (400). | `MasterData.Manage` | `SaveCarrierRateCardRequest` → `SaveCarrierRateCardResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/vehicles/{id}` | Create or edit a Vehicle of the Own fleet and publish the whole Vehicle as the `Vehicle` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content: a repeat answers 200 with the unchanged revision and publishes nothing. Making it inactive stores `Active = false` and nothing else. `MasterDataFieldRequired`, `MasterDataFieldTooLong` and `MasterDataFieldInvalid` (400). | `MasterData.Manage` | `SaveVehicleRequest` → `SaveVehicleResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/drivers/{id}` | Create or edit a Driver of the Own fleet and publish the whole Driver as the `Driver` event, with its Master-data revision (1 when created, raised by one per edit). Idempotent on content, the licences in any order: a repeat answers 200 with the unchanged revision and publishes nothing. Making it inactive stores `Active = false` and nothing else. `MasterDataFieldRequired`, `MasterDataFieldTooLong` and `MasterDataFieldInvalid` (400). | `MasterData.Manage` | `SaveDriverRequest` → `SaveDriverResult` (201 created, else 200) | The ERP UI's own identity once its forms are built; none yet ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `POST /v1/credit-notes/{creditNoteNumber}/report-sent` | Report that the Shipper's invoice endpoint acknowledged a Credit note. `CreditNoteNotFound` (404). | `ShipperInvoices.Report` | `X-Correlation-ID` → `CreditNoteReportResult` | Shipper invoice Logic App (E1) |
 | `POST /v1/credit-notes/{creditNoteNumber}/report-not-delivered` | Report that a Credit note never reached the Shipper, with its technical cause; publishes `ShipperInvoiceNotDelivered` with document type `CREDIT_NOTE`. | `ShipperInvoices.Report` | `ShipperInvoiceNotDeliveredRequest` (`X-Correlation-ID`) → `CreditNoteReportResult` | Shipper invoice Logic App (E1) |
 
@@ -282,6 +284,22 @@ Primary key `PK_CreditNotes`: `Id`.
 | `IX_CreditNotes_IssuedAt` | `IssuedAt` | no |  |
 | `IX_CreditNotes_ShipperId` | `ShipperId` | no |  |
 
+#### `Drivers`
+
+A Driver of the Own fleet, as the ERP knows it. The ERP owns the Driver; the TMS keeps a read copy and owns Rosters, Shifts and Absences (ADR 0014). Master data, loaded from the seed file and edited by Finance.
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK | The Driver ID (`DRV-0001`), which the TMS stores too. |
+| `Active` | `bit` | no |  |  | Whether Norvia still uses the Driver. Making them inactive stores only this flag. |
+| `FinanceOwned` | `bit` | no | False |  | True once Finance created or edited the Driver, so the seed file no longer reloads them. |
+| `Licences` | `nvarchar(20)` | no |  |  | The licence categories held (B, C, CE) as comma-separated text, lowest first. |
+| `Name` | `nvarchar(200)` | no |  |  | The Driver's name. |
+| `Revision` | `int` | no | 1 |  | The Master-data revision: 1 as loaded from the seed file, raised by every edit. |
+| `RowVersion` | `rowversion` | yes |  |  | Makes two edits at once conflict instead of both winning. |
+
+Primary key `PK_Drivers`: `Id`.
+
 #### `InvoiceNumberSequences`
 
 The last Shipper invoice number taken in each calendar year, so numbers (`INV-2026-000001`) run without gaps.
@@ -388,6 +406,24 @@ An organization that pays Norvia to store, move or deliver its goods (a Shipper)
 | `RowVersion` | `rowversion` | yes |  |  |  |
 
 Primary key `PK_Shippers`: `Id`.
+
+#### `Vehicles`
+
+A Vehicle of the Own fleet, as the ERP knows it. The ERP owns the Vehicle; the TMS keeps a read copy and owns its availability (ADR 0014). Master data, loaded from the seed file and edited by Finance.
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK | The Vehicle ID (`VEH-0001`), which the TMS stores too. |
+| `Active` | `bit` | no |  |  | Whether Norvia still uses the Vehicle. Making it inactive stores only this flag. |
+| `FinanceOwned` | `bit` | no | False |  | True once Finance created or edited the Vehicle, so the seed file no longer reloads it. |
+| `PalletPlaces` | `int` | no |  |  | How many pallets the Vehicle holds. |
+| `PayloadKg` | `int` | no |  |  | The most it can carry, in kilograms. |
+| `Registration` | `nvarchar(50)` | no |  |  | The registration plate. |
+| `Revision` | `int` | no | 1 |  | The Master-data revision: 1 as loaded from the seed file, raised by every edit. |
+| `RowVersion` | `rowversion` | yes |  |  | Makes two edits at once conflict instead of both winning. |
+| `Type` | `nvarchar(30)` | no |  |  | Van, RigidTruck or TractorWithTrailer. |
+
+Primary key `PK_Vehicles`: `Id`.
 
 <!-- /generated:database -->
 

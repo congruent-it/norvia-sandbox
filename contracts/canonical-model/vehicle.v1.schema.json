@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/vehicle.v1.schema.json",
+  "title": "Vehicle",
+  "description": "The ERP created or edited a Vehicle of the Own fleet (Canonical Model event, version 1, E3). Published on the master-data events topic through the ERP's transactional outbox, in the transaction that saved the change, under a correlation ID created for the change. It carries the whole Vehicle and its Master-data revision, so the TMS replaces its copy and needs nothing more. Making a Vehicle inactive changes only its active flag; the TMS keeps its own availability apart from the copy (ADR 0014).",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "vehicle"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId": { "type": "string", "description": "The event's own ID, a UUID." },
+    "eventType": { "const": "Vehicle" },
+    "eventVersion": { "const": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "vehicle": {
+      "type": "object",
+      "required": ["id", "registration", "type", "payloadKg", "palletPlaces", "active", "revision"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 50, "description": "The Vehicle ID both applications use, such as VEH-0001." },
+        "registration": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "type": { "enum": ["Van", "RigidTruck", "TractorWithTrailer"] },
+        "payloadKg": { "type": "integer", "minimum": 1 },
+        "palletPlaces": { "type": "integer", "minimum": 0 },
+        "active": { "type": "boolean", "description": "A Vehicle is never deleted, only made inactive." },
+        "revision": { "type": "integer", "minimum": 1, "description": "The Master-data revision: 1 as loaded from the seed file, raised by every edit. The TMS applies only a revision higher than the one it holds." }
+      }
+    }
+  }
+}

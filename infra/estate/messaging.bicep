@@ -487,7 +487,7 @@ resource masterDataMonitoringFilter 'Microsoft.ServiceBus/namespaces/topics/subs
   }
 }
 
-// The E3 master-data sync Logic App's subscription: the entity types it replicates (the Shipper, the Carrier, the Rate Card and the Carrier Rate Card so far), as the message's eventType property says.
+// The E3 master-data sync Logic App's subscription: the entity types it replicates (the Shipper, the Carrier, the Rate Card, the Carrier Rate Card, the Vehicle and the Driver so far), as the message's eventType property says.
 // Its filter also routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's emulator gives the same
 // subscription the same condition (ResubmitAwareFilters).
 resource masterDataSync 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
@@ -501,7 +501,7 @@ resource masterDataSyncFilter 'Microsoft.ServiceBus/namespaces/topics/subscripti
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
-      sqlExpression: '(eventType IN (\'Shipper\', \'Carrier\', \'RateCard\', \'CarrierRateCard\') AND resubmitTo IS NULL) OR resubmitTo = \'master-data-sync\''
+      sqlExpression: '(eventType IN (\'Shipper\', \'Carrier\', \'RateCard\', \'CarrierRateCard\', \'Vehicle\', \'Driver\') AND resubmitTo IS NULL) OR resubmitTo = \'master-data-sync\''
     }
   }
 }

@@ -7,4 +7,7 @@ public interface IDriverDirectory
 {
     /// <summary>The active Drivers, by name.</summary>
     IReadOnlyList<Driver> ListActive();
+
+    /// <summary>The copy of a Driver, active or not, or null when the TMS has never heard of it.</summary>
+    Driver? Find(DriverId id);
 }

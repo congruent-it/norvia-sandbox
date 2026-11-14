@@ -44,6 +44,8 @@ No Agent calls the TMS today, so no endpoint below lists one. [c4.md](../archite
 | `PUT /v1/carriers/{id}` | Replace the TMS's copy of a Carrier with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceCarrierRequest` → `ReplaceCarrierResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `PUT /v1/rate-cards/{id}` | Replace the TMS's copy of a Shipper's Rate Card with the ERP's record, whole, its list of dated versions included. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. A replaced Rate Card changes only what is rated after it arrives. `MasterDataUnreadable` and `RateCardVersionsOverlap` (400). | `MasterData.Replace` | `ReplaceRateCardRequest` → `ReplaceRateCardResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `PUT /v1/carrier-rate-cards/{id}` | Replace the TMS's copy of a Carrier Rate Card with the ERP's record, whole, as the Rate Card is. `MasterDataUnreadable` and `RateCardVersionsOverlap` (400). | `MasterData.Replace` | `ReplaceCarrierRateCardRequest` → `ReplaceCarrierRateCardResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/vehicles/{id}` | Replace the TMS's copy of a Vehicle with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. It touches no Off the road day or Trip. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceVehicleRequest` → `ReplaceVehicleResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
+| `PUT /v1/drivers/{id}` | Replace the TMS's copy of a Driver with the ERP's record, whole. Upserts; idempotent on the Master-data revision: a revision that is not higher answers 200 with `applied: false` and changes nothing. It touches no Roster, Absence or Trip. `MasterDataUnreadable` (400). | `MasterData.Replace` | `ReplaceDriverRequest` → `ReplaceDriverResult` | Master-data sync Logic App ([E3](../processes/erp/e3-master-data-sync.md)) |
 | `GET /v1/agent/customer-service/rejected-bookings/{id}` | The Customer service agent's view of a Rejected booking (ADR 0040): when it was received, the Shipper's business name, every rejection reason with its code, message and the submitted field that failed, and the submitted content with the Consignee fields removed (an allowlist: a new field stays out until someone adds it; no Consignee name, delivery address or contact, no instructions, no file contents). Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentRejectedBookingView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (audience the TMS agent API, Entra's keys; the gateway names the Agent in `X-Agent-ID`) |
 | `GET /v1/agent/customer-service/transport-orders/{transportOrderNumber}` | The Customer service agent's view of a Transport Order (ADR 0040, tool `get_transport_order`): status, the Shipper's business name and reference, rating result with the failure code and message, the Shipment's number and status, and the billing state with the reasons that block it (`NotRated`, `NoProofOfDelivery`, `OpenException`). Same allowlist: no Consignee, address, contact, instructions or file contents. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentTransportOrderView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
 | `GET /v1/agent/customer-service/shipments/{shipmentNumber}/tracking-events` | A Shipment's Tracking events in event-time order with their source (a Carrier ID, or Own fleet), place, ETA and whether each moved the status (tool `get_shipment_timeline`). No remark a Carrier or Driver typed, no postcode. Read only. | `TransportOrders.CustomerServiceAgent.Read` | → `AgentShipmentTimelineView` (`X-Correlation-ID`, `X-Tool-Name`) | The Customer service agent, through the MCP stand-in locally and through API Management's `customer-service` MCP server in Azure, with a token of the `AgentToken` scheme (as above) |
@@ -282,6 +284,20 @@ Primary key `PK_CarrierRateCardCopies`: `Id`.
 | Index | Columns | Unique | Filter |
 |---|---|---|---|
 | `IX_CarrierRateCardCopies_CarrierId` | `CarrierId` | no |  |
+
+#### `DriverCopies`
+
+A Driver the ERP replicated to the TMS, kept whole (E3). It overrides the seed file's Driver with the same ID; the TMS never edits it. Rosters and Absences are kept apart.
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK | The Driver ID. |
+| `Active` | `bit` | no |  |  | False once the ERP made the Driver inactive. |
+| `Licences` | `nvarchar(20)` | no |  |  | The licence categories held (B, C, CE) as comma-separated text; empty for a Driver without one. |
+| `Name` | `nvarchar(200)` | no |  |  | The Driver's name. |
+| `Revision` | `int` | no |  |  | The Master-data revision of the ERP record this copy was made from. |
+
+Primary key `PK_DriverCopies`: `Id`.
 
 #### `Exceptions`
 
@@ -686,6 +702,22 @@ Primary key `PK_Trips`: `Id`.
 | `IX_Trips_Day_VehicleId` | `Day`, `VehicleId` | yes | `[VehicleId] IS NOT NULL` |
 | `IX_Trips_IdempotencyKey` | `IdempotencyKey` | yes |  |
 | `IX_Trips_Number` | `Number` | yes |  |
+
+#### `VehicleCopies`
+
+A Vehicle the ERP replicated to the TMS, kept whole (E3). It overrides the seed file's Vehicle with the same ID; the TMS never edits it.
+
+| Column | Type | Nullable | Default | Key | Description |
+|---|---|---|---|---|---|
+| `Id` | `nvarchar(50)` | no |  | PK | The Vehicle ID. |
+| `Active` | `bit` | no |  |  | False once the ERP made the Vehicle inactive. |
+| `PalletPlaces` | `int` | no |  |  | How many pallets it holds. |
+| `PayloadKg` | `int` | no |  |  | The most it can carry, in kilograms. |
+| `Registration` | `nvarchar(50)` | no |  |  | The registration plate. |
+| `Revision` | `int` | no |  |  | The Master-data revision of the ERP record this copy was made from. |
+| `Type` | `nvarchar(30)` | no |  |  | Van, RigidTruck or TractorWithTrailer. |
+
+Primary key `PK_VehicleCopies`: `Id`.
 
 ### Sequences
 

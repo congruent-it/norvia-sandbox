@@ -8,7 +8,7 @@ using Norvia.Erp.Application.MasterData.Load;
 namespace Norvia.Erp.Infrastructure.Seed;
 
 /// <summary>
-/// Loads the Shippers, Carriers, Rate Cards and Carrier Rate Cards from the seed file as the ERP starts, so the ERP has them to show.
+/// Loads the Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles and Drivers from the seed file as the ERP starts, so the ERP has them to show.
 /// A second start reloads what is there instead of adding it again. A broken seed stops the ERP here.
 /// </summary>
 internal sealed partial class LoadSeedOnStart(IServiceScopeFactory scopes, IOptions<SeedOptions> options, ILogger<LoadSeedOnStart> logger) : IHostedService

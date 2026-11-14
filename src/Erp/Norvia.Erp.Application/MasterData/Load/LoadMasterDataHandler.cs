@@ -1,8 +1,10 @@
 using Ardalis.SharedKernel;
 using Mediator;
 using Norvia.Erp.Domain.Carriers;
+using Norvia.Erp.Domain.Drivers;
 using Norvia.Erp.Domain.RateCards;
 using Norvia.Erp.Domain.Shippers;
+using Norvia.Erp.Domain.Vehicles;
 
 namespace Norvia.Erp.Application.MasterData.Load;
 
@@ -10,7 +12,9 @@ public sealed class LoadMasterDataHandler(
     IRepository<Shipper> shippers,
     IRepository<Carrier> carriers,
     IRepository<RateCard> rateCards,
-    IRepository<CarrierRateCard> carrierRateCards) : ICommandHandler<LoadMasterDataCommand, LoadMasterDataResult>
+    IRepository<CarrierRateCard> carrierRateCards,
+    IRepository<Vehicle> vehicles,
+    IRepository<Driver> drivers) : ICommandHandler<LoadMasterDataCommand, LoadMasterDataResult>
 {
     public async ValueTask<LoadMasterDataResult> Handle(LoadMasterDataCommand command, CancellationToken cancellationToken)
     {
@@ -79,6 +83,38 @@ public sealed class LoadMasterDataHandler(
             else
             {
                 await carrierRateCards.AddAsync(new CarrierRateCard(id, new CarrierId(row.PartyId), row.Versions), cancellationToken);
+                added++;
+            }
+        }
+
+        foreach (var row in seed.Vehicles)
+        {
+            var id = new VehicleId(row.Id);
+            if (await vehicles.FirstOrDefaultAsync(new VehicleByIdSpec(id), cancellationToken) is { } existing)
+            {
+                existing.Reload(row.Registration, row.Type, row.PayloadKg, row.PalletPlaces, row.Active);
+                await vehicles.UpdateAsync(existing, cancellationToken);
+                reloaded++;
+            }
+            else
+            {
+                await vehicles.AddAsync(new Vehicle(id, row.Registration, row.Type, row.PayloadKg, row.PalletPlaces, row.Active), cancellationToken);
+                added++;
+            }
+        }
+
+        foreach (var row in seed.Drivers)
+        {
+            var id = new DriverId(row.Id);
+            if (await drivers.FirstOrDefaultAsync(new DriverByIdSpec(id), cancellationToken) is { } existing)
+            {
+                existing.Reload(row.Name, row.Licences, row.Active);
+                await drivers.UpdateAsync(existing, cancellationToken);
+                reloaded++;
+            }
+            else
+            {
+                await drivers.AddAsync(new Driver(id, row.Name, row.Licences, row.Active), cancellationToken);
                 added++;
             }
         }

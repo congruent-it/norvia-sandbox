@@ -79,6 +79,8 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
             "Carrier" => ("carrier", "carriers"),
             "RateCard" => ("rateCard", "rate-cards"),
             "CarrierRateCard" => ("carrierRateCard", "carrier-rate-cards"),
+            "Vehicle" => ("vehicle", "vehicles"),
+            "Driver" => ("driver", "drivers"),
             _ => (null, null),
         };
         if (parsed is null || recordName is null || Text(parsed, "correlationId") is not { } correlationId
@@ -105,13 +107,20 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
         return new TmsCall($"/v1/{collection}/{Uri.EscapeDataString(id)}", body, correlationId, keys);
     }
 
-    /// <summary>A Shipper or Carrier has a name and an active flag; a Rate Card or Carrier Rate Card its party and a list of versions.</summary>
+    /// <summary>A Shipper or Carrier has a name and an active flag; a Rate Card or Carrier Rate Card its party and a list of versions; a Vehicle its registration, type and capacity; a Driver a name and a list of licences.</summary>
     private static bool HasWhatTheTmsNeeds(string recordName, JsonObject record) => recordName switch
     {
         "rateCard" => Text(record, "shipperId") is not null && record["versions"] is JsonArray,
         "carrierRateCard" => Text(record, "carrierId") is not null && record["versions"] is JsonArray,
-        _ => Text(record, "name") is not null && record["active"] is JsonValue active && active.TryGetValue<bool>(out _),
+        "vehicle" => Text(record, "registration") is not null && Text(record, "type") is not null && IsInteger(record, "payloadKg") && IsInteger(record, "palletPlaces")
+            && IsBoolean(record, "active"),
+        "driver" => Text(record, "name") is not null && record["licences"] is JsonArray && IsBoolean(record, "active"),
+        _ => Text(record, "name") is not null && IsBoolean(record, "active"),
     };
+
+    private static bool IsBoolean(JsonObject record, string name) => record[name] is JsonValue value && value.TryGetValue<bool>(out _);
+
+    private static bool IsInteger(JsonObject record, string name) => record[name] is JsonValue value && value.TryGetValue<int>(out _);
 
     private static string? Text(JsonObject node, string name) =>
         node[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;

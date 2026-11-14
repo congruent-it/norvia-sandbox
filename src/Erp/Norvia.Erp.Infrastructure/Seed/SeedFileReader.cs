@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Norvia.Erp.Application.MasterData.Load;
+using Norvia.Erp.Domain.Drivers;
 using Norvia.Erp.Domain.RateCards;
+using Norvia.Erp.Domain.Vehicles;
 
 namespace Norvia.Erp.Infrastructure.Seed;
 
-/// <summary>Reads the master data out of the sandbox's seed file: Shippers, Carriers, Rate Cards and Carrier Rate Cards, with the IDs the TMS uses.</summary>
+/// <summary>Reads the master data out of the sandbox's seed file: Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles and Drivers, with the IDs the TMS uses.</summary>
 internal static class SeedFileReader
 {
     private static readonly JsonSerializerOptions SeedJson = new(JsonSerializerDefaults.Web);
@@ -19,7 +21,10 @@ internal static class SeedFileReader
             [.. (seed.Shippers ?? []).Select(shipper => new SeedShipper(shipper.Id, shipper.Name, shipper.Active))],
             [.. (seed.Carriers ?? []).Select(carrier => new SeedCarrier(carrier.Id, carrier.Name, carrier.Active))],
             [.. (seed.RateCards ?? []).Select(card => new SeedRateCard(card.Id, card.ShipperId, ToVersions(card.Versions, card.Id, path)))],
-            [.. (seed.CarrierRateCards ?? []).Select(card => new SeedRateCard(card.Id, card.CarrierId, ToVersions(card.Versions, card.Id, path)))]);
+            [.. (seed.CarrierRateCards ?? []).Select(card => new SeedRateCard(card.Id, card.CarrierId, ToVersions(card.Versions, card.Id, path)))],
+            [.. (seed.Vehicles ?? []).Select(vehicle => new SeedVehicle(
+                vehicle.Id, vehicle.Registration, Enum.Parse<VehicleType>(vehicle.Type), vehicle.PayloadKg, vehicle.PalletPlaces, vehicle.Active))],
+            [.. (seed.Drivers ?? []).Select(driver => new SeedDriver(driver.Id, driver.Name, [.. driver.Licences.Select(Enum.Parse<LicenceCategory>)], driver.Active))]);
     }
 
     private static List<RateCardVersion> ToVersions(IReadOnlyList<SeedVersion>? versions, string cardId, string path) =>
@@ -39,11 +44,17 @@ internal static class SeedFileReader
         IReadOnlyList<SeedShipperRow>? Shippers,
         IReadOnlyList<SeedCarrierRow>? Carriers,
         IReadOnlyList<SeedRateCardRow>? RateCards,
-        IReadOnlyList<SeedCarrierRateCardRow>? CarrierRateCards);
+        IReadOnlyList<SeedCarrierRateCardRow>? CarrierRateCards,
+        IReadOnlyList<SeedVehicleRow>? Vehicles,
+        IReadOnlyList<SeedDriverRow>? Drivers);
 
     private sealed record SeedShipperRow(string Id, string Name, bool Active);
 
     private sealed record SeedCarrierRow(string Id, string Name, bool Active);
+
+    private sealed record SeedVehicleRow(string Id, string Registration, string Type, int PayloadKg, int PalletPlaces, bool Active);
+
+    private sealed record SeedDriverRow(string Id, string Name, IReadOnlyList<string> Licences, bool Active);
 
     private sealed record SeedRateCardRow(string Id, string ShipperId, IReadOnlyList<SeedVersion>? Versions);
 

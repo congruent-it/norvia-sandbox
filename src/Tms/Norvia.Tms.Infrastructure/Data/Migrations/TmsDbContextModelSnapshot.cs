@@ -1009,6 +1009,66 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                     b.ToTable("CarrierCopies", (string)null);
                 });
 
+            modelBuilder.Entity("Norvia.Tms.Infrastructure.Fleet.DriverCopy", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Licences")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DriverCopies", (string)null);
+                });
+
+            modelBuilder.Entity("Norvia.Tms.Infrastructure.Fleet.VehicleCopy", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PalletPlaces")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PayloadKg")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Registration")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("VehicleCopies", (string)null);
+                });
+
             modelBuilder.Entity("Norvia.Tms.Infrastructure.Outbox.OutboxMessage", b =>
                 {
                     b.Property<long>("Id")

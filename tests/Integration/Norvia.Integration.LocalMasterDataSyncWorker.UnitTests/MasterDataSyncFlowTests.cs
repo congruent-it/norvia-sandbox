@@ -123,6 +123,11 @@ public class MasterDataSyncFlowTests
     [InlineData("not json")]
     [InlineData("[]")]
     [InlineData("""{"eventType":"Vehicle","correlationId":"c","vehicle":{"id":"V","name":"N","active":true,"revision":1}}""")]
+    [InlineData("""{"eventType":"Vehicle","correlationId":"c","vehicle":{"id":"V","registration":"R","type":"Van","payloadKg":"heavy","palletPlaces":4,"active":true,"revision":1}}""")]
+    [InlineData("""{"eventType":"Vehicle","correlationId":"c","vehicle":{"id":"V","registration":"R","payloadKg":1,"palletPlaces":4,"active":true,"revision":1}}""")]
+    [InlineData("""{"eventType":"Vehicle","correlationId":"c","vehicle":{"id":"V","registration":"R","type":"Van","payloadKg":1,"palletPlaces":4,"revision":1}}""")]
+    [InlineData("""{"eventType":"Driver","correlationId":"c","driver":{"id":"D","name":"N","licences":"B","active":true,"revision":1}}""")]
+    [InlineData("""{"eventType":"Driver","correlationId":"c","driver":{"id":"D","licences":[],"active":true,"revision":1}}""")]
     [InlineData("""{"eventType":"Carrier","correlationId":"c","shipper":{"id":"S","name":"N","active":true,"revision":1}}""")]
     [InlineData("""{"eventType":"Carrier","correlationId":"c","carrier":{"id":"C","name":"N","active":true}}""")]
     [InlineData("""{"eventType":"Shipper","correlationId":"c","carrier":{"id":"C","name":"N","active":true,"revision":1}}""")]
@@ -165,6 +170,46 @@ public class MasterDataSyncFlowTests
         world.Tms.Otherwise(HttpStatusCode.BadRequest, """{"detail":"Unreadable."}""");
 
         var run = await world.RunAsync(MasterDataSyncWorld.Carrier());
+
+        run.Reason.Should().Be("TmsCallRefused");
+    }
+
+    [Fact]
+    public async Task RunAsync_AVehicleEvent_PutsTheWholeVehicleToTheTmsVehicleEndpoint()
+    {
+        var world = new MasterDataSyncWorld();
+
+        var run = await world.RunAsync(MasterDataSyncWorld.Vehicle());
+
+        run.Replaced.Should().BeTrue();
+        var sent = world.Tms.Requests.Single();
+        sent.Method.Should().Be(HttpMethod.Put);
+        sent.Uri.Should().Be(new Uri("http://tms.test/v1/vehicles/VEH-0001"));
+        JsonNode.Parse(sent.Body)!.ToJsonString().Should().Be("""{"registration":"VN-101-A","type":"Van","payloadKg":1200,"palletPlaces":4,"active":false,"revision":2}""");
+        sent.Headers["X-Correlation-ID"].Should().Be("master-data-3");
+    }
+
+    [Fact]
+    public async Task RunAsync_ADriverEvent_PutsTheWholeDriverToTheTmsDriverEndpoint()
+    {
+        var world = new MasterDataSyncWorld();
+
+        var run = await world.RunAsync(MasterDataSyncWorld.Driver());
+
+        run.Replaced.Should().BeTrue();
+        var sent = world.Tms.Requests.Single();
+        sent.Uri.Should().Be(new Uri("http://tms.test/v1/drivers/DRV-0001"));
+        JsonNode.Parse(sent.Body)!.ToJsonString().Should().Be("""{"name":"Anouk de Vries","licences":["B","C"],"active":false,"revision":2}""");
+        sent.Headers["X-Correlation-ID"].Should().Be("master-data-4");
+    }
+
+    [Fact]
+    public async Task RunAsync_AVehicleRefusedByTheTms_IsDeadLetteredAsRefused()
+    {
+        var world = new MasterDataSyncWorld();
+        world.Tms.Otherwise(HttpStatusCode.BadRequest, """{"detail":"Unreadable."}""");
+
+        var run = await world.RunAsync(MasterDataSyncWorld.Vehicle());
 
         run.Reason.Should().Be("TmsCallRefused");
     }

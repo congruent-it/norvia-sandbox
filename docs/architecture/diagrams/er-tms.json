@@ -56,6 +56,18 @@
       ]
     },
     {
+      "name": "DriverCopies",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
       "name": "Exceptions",
       "columns": [
         {
@@ -278,6 +290,18 @@
         {
           "name": "Id",
           "type": "uniqueidentifier",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "VehicleCopies",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
           "keys": [
             "PK"
           ]
