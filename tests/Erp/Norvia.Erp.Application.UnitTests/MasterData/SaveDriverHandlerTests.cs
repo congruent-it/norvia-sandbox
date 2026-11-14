@@ -120,4 +120,17 @@ public sealed class SaveDriverHandlerTests
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
         await _drivers.DidNotReceive().UpdateAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task Handle_ForANewRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        await Handler.Handle(new SaveDriverCommand("DRV-0100", "Nieuw", ["CE", "B"], true), CancellationToken.None);
+
+        // The outbox is written by the save, so an event added after it would never be stored (nor published).
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _drivers.AddAsync(Arg.Any<Driver>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

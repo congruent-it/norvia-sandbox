@@ -115,4 +115,17 @@ public sealed class SaveShipperHandlerTests
         result.Status.Should().Be(ResultStatus.Invalid);
         result.ValidationErrors.Single().ErrorCode.Should().Be("MasterDataKeyTooLong");
     }
+
+    [Fact]
+    public async Task Handle_ForANewRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        await Handler.Handle(new SaveShipperCommand("SHP-0100", "Nieuwe Shipper", true), CancellationToken.None);
+
+        // The outbox is written by the save, so an event added after it would never be stored (nor published).
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _shippers.AddAsync(Arg.Any<Shipper>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

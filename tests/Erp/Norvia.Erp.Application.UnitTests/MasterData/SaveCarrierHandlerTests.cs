@@ -91,4 +91,17 @@ public sealed class SaveCarrierHandlerTests
         carrier.Revision.Should().Be(2);
         _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
     }
+
+    [Fact]
+    public async Task Handle_ForANewRecord_PutsTheEventInTheOutboxBeforeTheSaveThatWritesIt()
+    {
+        await Handler.Handle(new SaveCarrierCommand("CAR-0100", "Nieuwe Carrier", true), CancellationToken.None);
+
+        // The outbox is written by the save, so an event added after it would never be stored (nor published).
+        Received.InOrder(() =>
+        {
+            _outbox.Add(Arg.Any<IntegrationEvent>());
+            _shippers.AddAsync(Arg.Any<Carrier>(), Arg.Any<CancellationToken>());
+        });
+    }
 }

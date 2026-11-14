@@ -60,6 +60,13 @@ public static class TestAppHost
     /// <summary>Takes the resources the TMS API's tests don't use out of the AppHost, so it starts the TMS (with its UI, which the demo seed test needs), its database and the Service Bus emulator.</summary>
     public static void RemoveWhatTheTmsApiTestsDontUse(this IDistributedApplicationTestingBuilder builder) => builder.Remove(Unneeded);
 
+    /// <summary>
+    /// Takes the resources the E3 master-data sync's integration tests don't use out of the AppHost. They keep the ERP (its API, its UI, which publishes the outbox, and its
+    /// migrations), the TMS API and its database, the master-data sync worker that plays the Logic App, and the Service Bus emulators.
+    /// </summary>
+    public static void RemoveWhatTheMasterDataSyncTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
+        builder.Remove([.. Unneeded.Where(name => name is not "master-data-sync-worker")]);
+
     private static void Remove(this IDistributedApplicationTestingBuilder builder, string[] unneeded)
     {
         ArgumentNullException.ThrowIfNull(builder);
