@@ -108,6 +108,8 @@ var shipperInvoicesReportRole = 'ShipperInvoices.Report'
 var shipperInvoicesReportRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesReportRole)
 var shipperInvoicesManageRole = 'ShipperInvoices.Manage'
 var shipperInvoicesManageRoleId = guid('norvia-erp-api', environmentName, shipperInvoicesManageRole)
+var masterDataManageRole = 'MasterData.Manage'
+var masterDataManageRoleId = guid('norvia-erp-api', environmentName, masterDataManageRole)
 var erpResetRole = 'Estate.Reset'
 var erpResetRoleId = guid('norvia-erp-api', environmentName, erpResetRole)
 
@@ -1138,7 +1140,8 @@ resource simulatorReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = if (!
 }
 
 // The ERP's identity, which it runs as. Aspire deploys the ERP; the estate owns the identity because the estate grants it what it may do.
-// It holds no app role on another application: the ERP meets the rest of the estate only through Service Bus (ADR 0001).
+// The ERP meets the rest of the estate only through Service Bus (ADR 0001). The one app role it holds is on its own API: the ERP UI changes
+// master data through the ERP API as this identity (ADR 0028's split, for the ERP), granted below once the API's registration exists.
 resource erpIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: 'id-erp-${uniqueString(resourceGroup().id)}'
   location: location
@@ -1270,6 +1273,16 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: masterDataManageRoleId
+      value: masterDataManageRole
+      displayName: 'Create and edit master data'
+      description: 'Create or edit a Shipper, Carrier, Rate Card, Carrier Rate Card, Vehicle or Driver, as Finance does in the ERP UI (E3). Only the ERP\'s own identity holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: erpResetRoleId
       value: erpResetRole
       displayName: 'Reset the estate'
@@ -1285,6 +1298,13 @@ resource erpApi 'Microsoft.Graph/applications@v1.0' = {
 resource erpApiPrincipal 'Microsoft.Graph/servicePrincipals@v1.0' = {
   appId: erpApi.appId
   appRoleAssignmentRequired: true
+}
+
+// Finance's master-data forms reach the ERP API as the ERP's identity, which is the one principal holding the manage role.
+resource masterDataManageRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: erpApiPrincipal.id
+  appRoleId: masterDataManageRoleId
+  principalId: erpIdentity.properties.principalId
 }
 
 // The E1 Billing Logic App's identity, which it runs as. It is the one principal holding the ERP's record role, so no Billable line

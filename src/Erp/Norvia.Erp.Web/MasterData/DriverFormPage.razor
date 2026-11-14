@@ -1,0 +1,136 @@
+@page "/drivers/new"
+@page "/drivers/{Id}/edit"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Drivers
+@using Norvia.Erp.Application.MasterData.Drivers.List
+@using Norvia.Erp.Domain.Drivers
+@using Norvia.Erp.Web.ErpApi
+@inject IMediator Mediator
+@inject IMasterDataCommands Commands
+@inject NavigationManager Navigation
+@inject ILogger<DriverFormPage> Logger
+
+<PageTitle>@(Editing ? "Edit" : "New") Driver · Norvia ERP</PageTitle>
+
+<h1>@(Editing ? $"Edit Driver {Id}" : "New Driver")</h1>
+
+<MasterDataStates Name="drivers" Loaded="_loaded" Failed="_failed" Empty="false">
+    @if (_notFound)
+    {
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">There is no Driver with ID @Id.</FluentMessageBar>
+    }
+    else
+    {
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 32rem">
+            <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+            <FluentTextField @bind-Value="_name" Label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
+            <fieldset>
+                <legend>Licence categories</legend>
+                @foreach (var licence in Enum.GetNames<LicenceCategory>())
+                {
+                    <FluentCheckbox Label="@licence" Value="_licences.Contains(licence)" ValueChanged="@((bool held) => Hold(licence, held))" />
+                }
+            </fieldset>
+            <FluentCheckbox @bind-Value="_active" Label="Active" />
+            <div>
+                <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="Save Driver">Save</FluentButton>
+                <a href="/drivers" class="ml-2">Back to the Drivers</a>
+            </div>
+            <SaveStatus Kind="Driver" Problem="@_problem" Answer="_answer" />
+        </FluentStack>
+    }
+</MasterDataStates>
+
+@code {
+    private IReadOnlyList<DriverView> _all = [];
+    private string? _id;
+    private string? _name;
+    private readonly HashSet<string> _licences = [];
+    private bool _active = true;
+    private bool _loaded;
+    private bool _failed;
+    private bool _notFound;
+    private bool _running;
+    private string? _problem;
+    private MasterDataAnswer? _answer;
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    private bool Editing => Id is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _all = await Mediator.Send(new ListDriversQuery());
+            if (Editing)
+            {
+                var current = _all.FirstOrDefault(row => row.Id == Id);
+                if (current is null)
+                {
+                    _notFound = true;
+                }
+                else
+                {
+                    (_id, _name, _active) = (current.Id, current.Name, current.Active);
+                    _licences.UnionWith(current.Licences);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The drivers couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+
+    private void Hold(string licence, bool held)
+    {
+        if (held)
+        {
+            _licences.Add(licence);
+        }
+        else
+        {
+            _licences.Remove(licence);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _answer = null;
+        _problem = MasterDataFormRules.CheckNewId("Driver", _id, Editing, [.. _all.Select(row => row.Id)]) ?? MasterDataFormRules.CheckName("Driver", _name);
+        if (_problem is not null)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _answer = await Commands.SaveDriverAsync(_id!.Trim(), _name!.Trim(), [.. Enum.GetNames<LicenceCategory>().Where(_licences.Contains)], _active, CancellationToken.None);
+            if (_answer is MasterDataAnswer.Saved && !Editing)
+            {
+                Navigation.NavigateTo($"/drivers/{Uri.EscapeDataString(_id.Trim())}/edit");
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogError(exception, "The Driver couldn't be saved");
+            _problem = "The ERP API couldn't save the Driver. Nothing was saved; try again.";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

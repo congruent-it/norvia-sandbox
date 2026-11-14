@@ -1,0 +1,98 @@
+@using Norvia.Erp.Web.ErpApi
+@inject NavigationManager Navigation
+@inject ILogger<NamedRecordForm> Logger
+
+@* The create and edit form of a Shipper or a Carrier: an ID that is new, a name and the active flag. *@
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 32rem">
+    <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+    <FluentTextField @bind-Value="_name" Label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
+    <FluentCheckbox @bind-Value="_active" Label="Active" />
+    <div>
+        <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="@($"Save {Kind}")">Save</FluentButton>
+        <a href="@ListPath" class="ml-2">Back to the @ListName</a>
+    </div>
+    <SaveStatus Kind="@Kind" Problem="@_problem" Answer="_answer" />
+</FluentStack>
+
+@code {
+    private string? _id;
+    private string? _name;
+    private bool _active = true;
+    private bool _running;
+    private string? _problem;
+    private MasterDataAnswer? _answer;
+
+    [Parameter, EditorRequired]
+    public string Kind { get; set; } = "";
+
+    /// <summary>Where the list is, and what it is called, for the way back and for the page Finance lands on after creating one.</summary>
+    [Parameter, EditorRequired]
+    public string ListPath { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string ListName { get; set; } = "";
+
+    /// <summary>The path of a record's edit page, with <c>{0}</c> for its ID.</summary>
+    [Parameter, EditorRequired]
+    public string EditPath { get; set; } = "";
+
+    [Parameter]
+    public bool Editing { get; set; }
+
+    /// <summary>The record as it is now, when editing.</summary>
+    [Parameter]
+    public string InitialId { get; set; } = "";
+
+    [Parameter]
+    public string InitialName { get; set; } = "";
+
+    [Parameter]
+    public bool InitialActive { get; set; } = true;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyCollection<string> TakenIds { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public Func<string, string, bool, CancellationToken, Task<MasterDataAnswer>> Save { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        _id = InitialId;
+        _name = InitialName;
+        _active = InitialActive;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _answer = null;
+        _problem = MasterDataFormRules.CheckNewId(Kind, _id, Editing, TakenIds) ?? MasterDataFormRules.CheckName(Kind, _name);
+        if (_problem is not null)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _answer = await Save(_id!.Trim(), _name!.Trim(), _active, CancellationToken.None);
+            if (_answer is MasterDataAnswer.Saved && !Editing)
+            {
+                Navigation.NavigateTo(string.Format(System.Globalization.CultureInfo.InvariantCulture, EditPath, Uri.EscapeDataString(_id!.Trim())));
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogError(exception, "The {Kind} couldn't be saved", Kind);
+            _problem = $"The ERP API couldn't save the {Kind}. Nothing was saved; try again.";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

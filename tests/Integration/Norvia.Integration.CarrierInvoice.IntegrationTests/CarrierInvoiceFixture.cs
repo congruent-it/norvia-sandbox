@@ -210,6 +210,11 @@ public sealed class CarrierInvoiceFixture : IAsyncLifetime
             builder.UseSetting("Seed:Path", Path.Combine(AppContext.BaseDirectory, "norvia.seed.json"));
             builder.UseSetting("LocalUser:Name", "Finance (test)");
             builder.UseSetting("LocalUser:Roles:0", "Finance");
+            builder.UseSetting("ErpApi:BaseAddress", "http://erp-api");
+            builder.UseSetting("ErpApi:LocalTokens:Issuer", LocalTokens.Issuer);
+            builder.UseSetting("ErpApi:LocalTokens:Audience", LocalTokens.ErpAudience);
+            builder.UseSetting("ErpApi:LocalTokens:ClientId", "norvia-test-erp-ui");
+            builder.UseSetting("ErpApi:LocalTokens:SigningKey", SigningKeyBase64);
             builder.UseSetting("Outbox:PollingInterval", "00:00:00.050");
             builder.ConfigureTestServices(services =>
             {

@@ -1,10 +1,10 @@
 @using Norvia.Erp.Application.MasterData.RateCards
 
-@* A Rate Card or a Carrier Rate Card: its versions and, for each, the Lanes it prices. View only. *@
+@* A Rate Card or a Carrier Rate Card: its versions and, for each, the Lanes it prices. Finance edits one through its Edit link. *@
 @foreach (var card in Cards)
 {
     <section aria-label="@card.Id" class="mb-8">
-        <h2>@card.Id · @PartyKind @card.PartyName (@card.PartyId)</h2>
+        <h2>@card.Id · @PartyKind @card.PartyName (@card.PartyId) · <a href="@EditPath/@Uri.EscapeDataString(card.Id)/edit" aria-label="@($"Edit {card.Id}")">Edit</a></h2>
         @foreach (var version in card.Versions)
         {
             <h3>Version @version.Version</h3>
@@ -26,6 +26,10 @@
 @code {
     [Parameter, EditorRequired]
     public IReadOnlyList<RateCardView> Cards { get; set; } = [];
+
+    /// <summary>The list's path, which a card's edit page sits under.</summary>
+    [Parameter, EditorRequired]
+    public string EditPath { get; set; } = "";
 
     [Parameter, EditorRequired]
     public string PartyKind { get; set; } = "";

@@ -1,0 +1,55 @@
+@page "/carriers/new"
+@page "/carriers/{Id}/edit"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Carriers.List
+@using Norvia.Erp.Web.ErpApi
+@inject IMediator Mediator
+@inject IMasterDataCommands Commands
+@inject ILogger<CarrierFormPage> Logger
+
+<PageTitle>@(Editing ? "Edit" : "New") Carrier · Norvia ERP</PageTitle>
+
+<h1>@(Editing ? $"Edit Carrier {Id}" : "New Carrier")</h1>
+
+<MasterDataStates Name="carriers" Loaded="_loaded" Failed="_failed" Empty="false">
+    @if (_current is null && Editing)
+    {
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">There is no Carrier with ID @Id.</FluentMessageBar>
+    }
+    else
+    {
+        <NamedRecordForm Kind="Carrier" ListPath="/carriers" ListName="Carriers" EditPath="/carriers/{0}/edit" Editing="Editing"
+                         InitialId="@(_current?.Id ?? "")" InitialName="@(_current?.Name ?? "")" InitialActive="@(_current?.Active ?? true)"
+                         TakenIds="_taken" Save="Commands.SaveCarrierAsync" />
+    }
+</MasterDataStates>
+
+@code {
+    private CarrierView? _current;
+    private IReadOnlyCollection<string> _taken = [];
+    private bool _loaded;
+    private bool _failed;
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    private bool Editing => Id is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var all = await Mediator.Send(new ListCarriersQuery());
+            _taken = [.. all.Select(row => row.Id)];
+            _current = all.FirstOrDefault(row => row.Id == Id);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The carriers couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}

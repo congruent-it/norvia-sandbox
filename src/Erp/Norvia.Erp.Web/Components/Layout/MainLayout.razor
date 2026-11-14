@@ -63,6 +63,8 @@
             new("/carriers", "Carriers", NavLinkMatch.Prefix),
             new("/rate-cards", "Rate Cards", NavLinkMatch.Prefix),
             new("/carrier-rate-cards", "Carrier Rate Cards", NavLinkMatch.Prefix),
+            new("/vehicles", "Vehicles", NavLinkMatch.Prefix),
+            new("/drivers", "Drivers", NavLinkMatch.Prefix),
         ]),
     ];
 
@@ -83,6 +85,12 @@
 
         // The section whose view is open; a page that is in none, such as an invoice's page under Shipper invoices, falls under its prefix.
         var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/');
+        // The Shippers list is the front page, so its forms, under /shippers, belong with it.
+        if (path.StartsWith("/shippers", StringComparison.OrdinalIgnoreCase))
+        {
+            path = "/";
+        }
+
         _open = Sections.FirstOrDefault(section => section.Views.Any(view => Matches(view, path))) ?? Sections[0];
     }
 

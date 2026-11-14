@@ -1,0 +1,154 @@
+@page "/vehicles/new"
+@page "/vehicles/{Id}/edit"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Vehicles
+@using Norvia.Erp.Application.MasterData.Vehicles.List
+@using Norvia.Erp.Domain.Vehicles
+@using Norvia.Erp.Web.ErpApi
+@inject IMediator Mediator
+@inject IMasterDataCommands Commands
+@inject NavigationManager Navigation
+@inject ILogger<VehicleFormPage> Logger
+
+<PageTitle>@(Editing ? "Edit" : "New") Vehicle · Norvia ERP</PageTitle>
+
+<h1>@(Editing ? $"Edit Vehicle {Id}" : "New Vehicle")</h1>
+
+<MasterDataStates Name="vehicles" Loaded="_loaded" Failed="_failed" Empty="false">
+    @if (_notFound)
+    {
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">There is no Vehicle with ID @Id.</FluentMessageBar>
+    }
+    else
+    {
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 32rem">
+            <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+            <FluentTextField @bind-Value="_registration" Label="Registration" MaxLength="@SaveVehicleMaxRegistration" Required="true" />
+            <FluentSelect TOption="string" @bind-Value="_type" Label="Type" Items="@(Enum.GetNames<VehicleType>())" />
+            <FluentNumberField TValue="int" @bind-Value="_payloadKg" Label="Payload (kg)" Min="1" />
+            <FluentNumberField TValue="int" @bind-Value="_palletPlaces" Label="Pallet places" Min="0" />
+            <FluentCheckbox @bind-Value="_active" Label="Active" />
+            <div>
+                <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="Save Vehicle">Save</FluentButton>
+                <a href="/vehicles" class="ml-2">Back to the Vehicles</a>
+            </div>
+            <SaveStatus Kind="Vehicle" Problem="@_problem" Answer="_answer" />
+        </FluentStack>
+    }
+</MasterDataStates>
+
+@code {
+    private const int SaveVehicleMaxRegistration = Norvia.Erp.Application.MasterData.Vehicles.Save.SaveVehicleHandler.MaxRegistrationLength;
+
+    private IReadOnlyList<VehicleView> _all = [];
+    private string? _id;
+    private string? _registration;
+    private string _type = nameof(VehicleType.Van);
+    private int _payloadKg = 1000;
+    private int _palletPlaces;
+    private bool _active = true;
+    private bool _loaded;
+    private bool _failed;
+    private bool _notFound;
+    private bool _running;
+    private string? _problem;
+    private MasterDataAnswer? _answer;
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    private bool Editing => Id is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _all = await Mediator.Send(new ListVehiclesQuery());
+            if (Editing)
+            {
+                var current = _all.FirstOrDefault(row => row.Id == Id);
+                if (current is null)
+                {
+                    _notFound = true;
+                }
+                else
+                {
+                    (_id, _registration, _type, _payloadKg, _palletPlaces, _active) = (current.Id, current.Registration, current.Type, current.PayloadKg, current.PalletPlaces, current.Active);
+                }
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The vehicles couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _answer = null;
+        _problem = Check();
+        if (_problem is not null)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _answer = await Commands.SaveVehicleAsync(_id!.Trim(), _registration!.Trim(), _type, _payloadKg, _palletPlaces, _active, CancellationToken.None);
+            if (_answer is MasterDataAnswer.Saved && !Editing)
+            {
+                Navigation.NavigateTo($"/vehicles/{Uri.EscapeDataString(_id.Trim())}/edit");
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogError(exception, "The Vehicle couldn't be saved");
+            _problem = "The ERP API couldn't save the Vehicle. Nothing was saved; try again.";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private string? Check()
+    {
+        if (MasterDataFormRules.CheckNewId("Vehicle", _id, Editing, [.. _all.Select(row => row.Id)]) is { } idProblem)
+        {
+            return idProblem;
+        }
+
+        if (string.IsNullOrWhiteSpace(_registration))
+        {
+            return "The Vehicle needs a registration.";
+        }
+
+        var registration = _registration.Trim();
+        if (registration.Length > SaveVehicleMaxRegistration)
+        {
+            return $"The registration is at most {SaveVehicleMaxRegistration} characters.";
+        }
+
+        if (_all.Any(row => !string.Equals(row.Id, _id?.Trim(), StringComparison.OrdinalIgnoreCase) && string.Equals(row.Registration, registration, StringComparison.OrdinalIgnoreCase)))
+        {
+            return $"Another Vehicle already has the registration {registration}.";
+        }
+
+        if (_payloadKg < 1)
+        {
+            return "The payload is at least 1 kg.";
+        }
+
+        return _palletPlaces < 0 ? "The pallet places can't be negative." : null;
+    }
+}

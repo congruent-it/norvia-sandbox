@@ -1,0 +1,45 @@
+@page "/vehicles"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Vehicles
+@using Norvia.Erp.Application.MasterData.Vehicles.List
+@inject IMediator Mediator
+@inject ILogger<VehiclesPage> Logger
+
+<PageTitle>Vehicles · Norvia ERP</PageTitle>
+
+<h1>Vehicles</h1>
+<p>The Own fleet's Vehicles. The ERP loads them from the seed file with the TMS's IDs; <a href="/vehicles/new">New Vehicle</a>.</p>
+
+<MasterDataStates Name="vehicles" Loaded="_loaded" Failed="_failed" Empty="_rows.Count == 0">
+    <FluentDataGrid Class="cerulean-table" Items="_rows.AsQueryable()" TGridItem="VehicleView" aria-label="Vehicles">
+        <PropertyColumn Title="ID" Property="@(row => row.Id)" />
+        <PropertyColumn Title="Registration" Property="@(row => row.Registration)" />
+        <PropertyColumn Title="Type" Property="@(row => row.Type)" />
+        <PropertyColumn Title="Payload (kg)" Property="@(row => row.PayloadKg)" />
+        <PropertyColumn Title="Pallet places" Property="@(row => row.PalletPlaces)" />
+        <TemplateColumn Title="Active">@(context.Active ? "Yes" : "No")</TemplateColumn>
+        <TemplateColumn Title=""><a href="/vehicles/@Uri.EscapeDataString(context.Id)/edit" aria-label="Edit Vehicle @context.Id">Edit</a></TemplateColumn>
+    </FluentDataGrid>
+</MasterDataStates>
+
+@code {
+    private IReadOnlyList<VehicleView> _rows = [];
+    private bool _loaded;
+    private bool _failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _rows = await Mediator.Send(new ListVehiclesQuery());
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The vehicles couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}

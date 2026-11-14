@@ -1,0 +1,43 @@
+@page "/drivers"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Drivers
+@using Norvia.Erp.Application.MasterData.Drivers.List
+@inject IMediator Mediator
+@inject ILogger<DriversPage> Logger
+
+<PageTitle>Drivers · Norvia ERP</PageTitle>
+
+<h1>Drivers</h1>
+<p>The Own fleet's Drivers. The ERP loads them from the seed file with the TMS's IDs; <a href="/drivers/new">New Driver</a>.</p>
+
+<MasterDataStates Name="drivers" Loaded="_loaded" Failed="_failed" Empty="_rows.Count == 0">
+    <FluentDataGrid Class="cerulean-table" Items="_rows.AsQueryable()" TGridItem="DriverView" aria-label="Drivers">
+        <PropertyColumn Title="ID" Property="@(row => row.Id)" />
+        <PropertyColumn Title="Name" Property="@(row => row.Name)" />
+        <TemplateColumn Title="Licences">@string.Join(", ", context.Licences)</TemplateColumn>
+        <TemplateColumn Title="Active">@(context.Active ? "Yes" : "No")</TemplateColumn>
+        <TemplateColumn Title=""><a href="/drivers/@Uri.EscapeDataString(context.Id)/edit" aria-label="Edit Driver @context.Id">Edit</a></TemplateColumn>
+    </FluentDataGrid>
+</MasterDataStates>
+
+@code {
+    private IReadOnlyList<DriverView> _rows = [];
+    private bool _loaded;
+    private bool _failed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _rows = await Mediator.Send(new ListDriversQuery());
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The drivers couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}

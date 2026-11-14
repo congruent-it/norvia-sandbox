@@ -1,0 +1,69 @@
+@page "/rate-cards/new"
+@page "/rate-cards/{Id}/edit"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.RateCards
+@using Norvia.Erp.Application.MasterData.RateCards.List
+@using Norvia.Erp.Application.MasterData.RateCards.Read
+@using Norvia.Erp.Application.MasterData.Shippers.List
+@using Norvia.Erp.Web.ErpApi
+@inject IMediator Mediator
+@inject IMasterDataCommands Commands
+@inject ILogger<RateCardFormPage> Logger
+
+<PageTitle>@(Editing ? "Edit" : "New") Rate Card · Norvia ERP</PageTitle>
+
+<h1>@(Editing ? $"Edit Rate Card {Id}" : "New Rate Card")</h1>
+
+<MasterDataStates Name="Rate Cards" Loaded="_loaded" Failed="_failed" Empty="false">
+    @if (Editing && _current is null)
+    {
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">There is no Rate Card with ID @Id.</FluentMessageBar>
+    }
+    else
+    {
+        <RateCardForm Kind="Rate Card" PartyKind="Shipper" ListPath="/rate-cards" EditPath="/rate-cards/{0}/edit" Editing="Editing"
+                      InitialId="@(_current?.Id ?? "")" InitialPartyId="@_current?.ShipperId" InitialVersions="@(_current?.Versions ?? [Starter])"
+                      Parties="_parties" TakenIds="_taken"
+                      Save="SaveAsync" />
+    }
+</MasterDataStates>
+
+@code {
+    // A new card starts from one open-ended version, which Finance fills in.
+    private static readonly RateCardVersionData Starter = new(1, DateOnly.FromDateTime(DateTime.UtcNow), null, [new ZoneData("Zone", "NL", ["30"])], []);
+
+    private RateCardRecord? _current;
+    private IReadOnlyList<(string Id, string Name)> _parties = [];
+    private IReadOnlyCollection<string> _taken = [];
+    private bool _loaded;
+    private bool _failed;
+
+    private Task<MasterDataAnswer> SaveAsync(string id, string partyId, IReadOnlyList<RateCardVersionData> versions, CancellationToken cancellationToken) =>
+        Commands.SaveRateCardAsync(id, partyId, versions, cancellationToken);
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    private bool Editing => Id is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _parties = [.. (await Mediator.Send(new ListShippersQuery())).Select(shipper => (shipper.Id, shipper.Name))];
+            _taken = [.. (await Mediator.Send(new ListRateCardsQuery())).Select(card => card.Id)];
+            if (Editing)
+            {
+                _current = await Mediator.Send(new GetRateCardQuery(Id!));
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The Rate Cards couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}
