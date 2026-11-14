@@ -351,7 +351,7 @@ SPECS["l3-event-topology"] = dict(
         dict(id="sInvoice", col=2, row=6.0, palette=V, title="shipper-invoice", sub="[subscription]\nShipperInvoiceIssued, CreditNoteIssued"),
         dict(id="sOutcome", col=2, row=7.0, palette=V, title="carrier-invoice-outcome", sub="[subscription]\nCarrierInvoiceApproved"),
         dict(id="sReports", col=2, row=8.0, palette=V, title="driver-reports", sub="[subscription, sessions]\nthe four Driver reports, keyed by Trip number"),
-        dict(id="sMd", col=2, row=9.5, palette=V, title="master-data-sync", sub="[subscription]\nShipper, Carrier"),
+        dict(id="sMd", col=2, row=9.5, palette=V, title="master-data-sync", sub="[subscription]\nShipper, Carrier,\nRate Card, Carrier Rate Card"),
         dict(id="lBilling", col=3, row=0.0, palette=V, title="Billing", sub="[Logic App] E1"),
         dict(id="lBooking", col=3, row=1.0, palette=V, title="Carrier booking", sub="[Logic App] P4"),
         dict(id="lCancel", col=3, row=2.0, palette=V, title="Carrier cancellation", sub="[Logic App] P7"),

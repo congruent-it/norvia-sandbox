@@ -1,8 +1,8 @@
 using Asp.Versioning;
-using Microsoft.Extensions.DependencyInjection;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Norvia.Tms.Api.Agents;
 using NSubstitute;
 

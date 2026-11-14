@@ -878,6 +878,110 @@
         }
       }
     },
+    "/v1/rate-cards/{id}": {
+      "put": {
+        "tags": [
+          "MasterData"
+        ],
+        "summary": "Create or edit a Shipper's Rate Card, and replicate it to the TMS.",
+        "description": "Creates the Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes the whole Rate Card as the RateCard event, in one transaction. Idempotent on content: a repeat of what the card already is answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time, and a Shipper has one Rate Card. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardShipperHasCard.",
+        "operationId": "SaveRateCard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRateCardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveRateCardResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveRateCardResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-rate-cards/{id}": {
+      "put": {
+        "tags": [
+          "MasterData"
+        ],
+        "summary": "Create or edit a Carrier's Carrier Rate Card, and replicate it to the TMS.",
+        "description": "Creates the Carrier Rate Card (201, Master-data revision 1) or replaces its whole list of dated versions (200, the revision raised by one) and publishes the whole card as the CarrierRateCard event, in one transaction. Idempotent on content: a repeat of what the card already is answers 200 with the unchanged revision and publishes nothing. Versions must not overlap in time, and a Carrier has one Carrier Rate Card. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, RateCardVersionInvalid, RateCardVersionsOverlap, RateCardPartyUnknown and RateCardCarrierHasCard.",
+        "operationId": "SaveCarrierRateCard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveCarrierRateCardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveCarrierRateCardResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveCarrierRateCardResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/agent/finance/carriers/{carrierId}/invoices/{invoiceNumber}/lines/{carrierBookingReference}": {
       "get": {
         "tags": [
@@ -2059,6 +2163,38 @@
         },
         "additionalProperties": false
       },
+      "CarrierRateCardRecord": {
+        "required": [
+          "id",
+          "carrierId",
+          "revision",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "carrierId": {
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateCardVersionData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "CarrierRateCardVersionRequest": {
         "required": [
           "rateCardId",
@@ -2582,6 +2718,38 @@
         },
         "additionalProperties": false
       },
+      "LaneData": {
+        "required": [
+          "origin",
+          "destination",
+          "minimumCharge",
+          "weightBreaks"
+        ],
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "minimumCharge": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "weightBreaks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeightBreakData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "MasterDataSaveOutcome": {
         "enum": [
           "Created",
@@ -2612,6 +2780,82 @@
           },
           "message": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RateCardRecord": {
+        "required": [
+          "id",
+          "shipperId",
+          "revision",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "shipperId": {
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateCardVersionData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "RateCardVersionData": {
+        "required": [
+          "version",
+          "validFrom",
+          "validTo",
+          "zones",
+          "lanes"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneData"
+            }
+          },
+          "lanes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LaneData"
+            }
           }
         },
         "additionalProperties": false
@@ -2746,6 +2990,41 @@
         },
         "additionalProperties": false
       },
+      "SaveCarrierRateCardRequest": {
+        "required": [
+          "carrierId",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateCardVersionData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveCarrierRateCardResult": {
+        "required": [
+          "carrierRateCard",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierRateCard": {
+            "$ref": "#/components/schemas/CarrierRateCardRecord"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MasterDataSaveOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveCarrierRequest": {
         "required": [
           "name",
@@ -2771,6 +3050,41 @@
         "properties": {
           "carrier": {
             "$ref": "#/components/schemas/CarrierView"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/MasterDataSaveOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveRateCardRequest": {
+        "required": [
+          "shipperId",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "shipperId": {
+            "type": "string"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateCardVersionData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SaveRateCardResult": {
+        "required": [
+          "rateCard",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "rateCard": {
+            "$ref": "#/components/schemas/RateCardRecord"
           },
           "outcome": {
             "$ref": "#/components/schemas/MasterDataSaveOutcome"
@@ -3102,6 +3416,55 @@
           },
           "releasedWithoutProofOfDelivery": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WeightBreakData": {
+        "required": [
+          "upToKg",
+          "pricePer100Kg"
+        ],
+        "type": "object",
+        "properties": {
+          "upToKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pricePer100Kg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ZoneData": {
+        "required": [
+          "name",
+          "country",
+          "postcodePrefixes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "postcodePrefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "additionalProperties": false

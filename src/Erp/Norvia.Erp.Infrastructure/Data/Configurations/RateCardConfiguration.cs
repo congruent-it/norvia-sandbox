@@ -16,5 +16,9 @@ internal sealed class RateCardConfiguration : IEntityTypeConfiguration<RateCard>
         builder.Property(card => card.ShipperId).HasConversion(id => id.Value, value => new ShipperId(value)).HasMaxLength(50).IsRequired();
         builder.HasOne<Shipper>().WithMany().HasForeignKey(card => card.ShipperId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(card => card.Versions).AsJsonDocument();
+        builder.Property(card => card.Revision).HasDefaultValue(1);
+        builder.Property(card => card.FinanceOwned).HasDefaultValue(false);
+        // Two edits at once conflict instead of both winning; the loser is run again and sees the new revision.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
     }
 }

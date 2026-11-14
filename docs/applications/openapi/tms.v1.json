@@ -3428,6 +3428,90 @@
         }
       }
     },
+    "/v1/rate-cards/{id}": {
+      "put": {
+        "tags": [
+          "RateCards"
+        ],
+        "summary": "Replace the TMS's copy of a Rate Card with the ERP's record.",
+        "description": "Upserts the whole Rate Card, so a new one appears, and replaces its list of dated versions. Idempotent on the Master-data revision: a revision that is not higher than the copy's answers 200 with applied false and changes nothing. A replaced Rate Card changes only what is rated after it arrives. A record the TMS can't read is refused with 400 and the code MasterDataUnreadable; versions that overlap in time with RateCardVersionsOverlap.",
+        "operationId": "ReplaceRateCard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceRateCardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceRateCardResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/carrier-rate-cards/{id}": {
+      "put": {
+        "tags": [
+          "RateCards"
+        ],
+        "summary": "Replace the TMS's copy of a Carrier Rate Card with the ERP's record.",
+        "description": "Upserts the whole Carrier Rate Card, so a new one appears, and replaces its list of dated versions. Idempotent on the Master-data revision: a revision that is not higher than the copy's answers 200 with applied false and changes nothing. A record the TMS can't read is refused with 400 and the code MasterDataUnreadable; versions that overlap in time with RateCardVersionsOverlap.",
+        "operationId": "ReplaceCarrierRateCard",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceCarrierRateCardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplaceCarrierRateCardResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/reset": {
       "get": {
         "tags": [
@@ -6129,6 +6213,38 @@
           "Wms"
         ]
       },
+      "LaneData": {
+        "required": [
+          "origin",
+          "destination",
+          "minimumCharge",
+          "weightBreaks"
+        ],
+        "type": "object",
+        "properties": {
+          "origin": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "minimumCharge": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "weightBreaks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeightBreakData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "LastCarrierBookingOutcome": {
         "required": [
           "status",
@@ -7459,6 +7575,50 @@
         },
         "additionalProperties": false
       },
+      "RateCardVersionData": {
+        "required": [
+          "version",
+          "validFrom",
+          "validTo",
+          "zones",
+          "lanes"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneData"
+            }
+          },
+          "lanes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LaneData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "RateCardVersionView": {
         "required": [
           "rateCardId",
@@ -7990,6 +8150,55 @@
         },
         "additionalProperties": false
       },
+      "ReplaceCarrierRateCardRequest": {
+        "required": [
+          "carrierId",
+          "revision",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "carrierId": {
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateCardVersionData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceCarrierRateCardResult": {
+        "required": [
+          "applied",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReplaceCarrierRequest": {
         "required": [
           "name",
@@ -8016,6 +8225,55 @@
         "additionalProperties": false
       },
       "ReplaceCarrierResult": {
+        "required": [
+          "applied",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceRateCardRequest": {
+        "required": [
+          "shipperId",
+          "revision",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "shipperId": {
+            "type": "string"
+          },
+          "revision": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RateCardVersionData"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReplaceRateCardResult": {
         "required": [
           "applied",
           "revision"
@@ -10274,6 +10532,55 @@
           }
         },
         "additionalProperties": false
+      },
+      "WeightBreakData": {
+        "required": [
+          "upToKg",
+          "pricePer100Kg"
+        ],
+        "type": "object",
+        "properties": {
+          "upToKg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "pricePer100Kg": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ZoneData": {
+        "required": [
+          "name",
+          "country",
+          "postcodePrefixes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "postcodePrefixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
       }
     }
   },
@@ -10325,6 +10632,9 @@
     },
     {
       "name": "Carriers"
+    },
+    {
+      "name": "RateCards"
     },
     {
       "name": "Reset"

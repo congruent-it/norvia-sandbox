@@ -2,8 +2,8 @@
 #pragma warning disable CA2012
 using Ardalis.Result;
 using Norvia.Agents;
-using Norvia.HealthCheck.Application.Narrate;
 using Norvia.HealthCheck.Application.Cost;
+using Norvia.HealthCheck.Application.Narrate;
 using Norvia.HealthCheck.Application.Operators;
 using Norvia.HealthCheck.Web.Checks;
 using Norvia.HealthCheck.Web.Operators;

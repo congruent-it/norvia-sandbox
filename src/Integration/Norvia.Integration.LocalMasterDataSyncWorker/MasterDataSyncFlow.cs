@@ -72,18 +72,20 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
         }
 
         // The entity type is the event type; the record sits under the type's own name, and the TMS has a collection for each.
+        // The body is the record but for its ID, which the route carries, so each entity's record is what its TMS command takes.
         var (recordName, collection) = Text(parsed ?? [], "eventType") switch
         {
             "Shipper" => ("shipper", "shippers"),
             "Carrier" => ("carrier", "carriers"),
+            "RateCard" => ("rateCard", "rate-cards"),
+            "CarrierRateCard" => ("carrierRateCard", "carrier-rate-cards"),
             _ => (null, null),
         };
         if (parsed is null || recordName is null || Text(parsed, "correlationId") is not { } correlationId
             || parsed[recordName] is not JsonObject record
             || Text(record, "id") is not { } id
-            || Text(record, "name") is not { } name
-            || record["active"] is not JsonValue active || !active.TryGetValue<bool>(out var isActive)
-            || record["revision"] is not JsonValue revision || !revision.TryGetValue<int>(out var revisionNumber))
+            || record["revision"] is not JsonValue revision || !revision.TryGetValue<int>(out _)
+            || !HasWhatTheTmsNeeds(recordName, record))
         {
             return null;
         }
@@ -99,9 +101,17 @@ internal sealed partial class MasterDataSyncFlow(TmsMasterDataApi tms, IOptions<
             keys[TrackingKeys.SourceMessageId] = eventId;
         }
 
-        var body = new JsonObject { ["name"] = name, ["active"] = isActive, ["revision"] = revisionNumber }.ToJsonString();
+        var body = new JsonObject(record.Where(property => property.Key != "id").Select(property => KeyValuePair.Create(property.Key, property.Value?.DeepClone()))).ToJsonString();
         return new TmsCall($"/v1/{collection}/{Uri.EscapeDataString(id)}", body, correlationId, keys);
     }
+
+    /// <summary>A Shipper or Carrier has a name and an active flag; a Rate Card or Carrier Rate Card its party and a list of versions.</summary>
+    private static bool HasWhatTheTmsNeeds(string recordName, JsonObject record) => recordName switch
+    {
+        "rateCard" => Text(record, "shipperId") is not null && record["versions"] is JsonArray,
+        "carrierRateCard" => Text(record, "carrierId") is not null && record["versions"] is JsonArray,
+        _ => Text(record, "name") is not null && record["active"] is JsonValue active && active.TryGetValue<bool>(out _),
+    };
 
     private static string? Text(JsonObject node, string name) =>
         node[name] is JsonValue value && value.TryGetValue<string>(out var text) && !string.IsNullOrWhiteSpace(text) ? text : null;

@@ -121,8 +121,14 @@ public static class DependencyInjection
         builder.Services.AddSingleton<ReplicatedShipperDirectory>();
         builder.Services.AddSingleton<IShipperDirectory>(services => services.GetRequiredService<ReplicatedShipperDirectory>());
         builder.Services.AddSingleton<IShipperReplicas>(services => services.GetRequiredService<ReplicatedShipperDirectory>());
-        builder.Services.AddSingleton<IRateCardDirectory, SeedFileRateCardDirectory>();
-        builder.Services.AddSingleton<ICarrierRateCardDirectory, SeedFileCarrierRateCardDirectory>();
+        builder.Services.AddSingleton<SeedFileRateCardDirectory>();
+        builder.Services.AddSingleton<ReplicatedRateCardDirectory>();
+        builder.Services.AddSingleton<IRateCardDirectory>(services => services.GetRequiredService<ReplicatedRateCardDirectory>());
+        builder.Services.AddSingleton<IRateCardReplicas>(services => services.GetRequiredService<ReplicatedRateCardDirectory>());
+        builder.Services.AddSingleton<SeedFileCarrierRateCardDirectory>();
+        builder.Services.AddSingleton<ReplicatedCarrierRateCardDirectory>();
+        builder.Services.AddSingleton<ICarrierRateCardDirectory>(services => services.GetRequiredService<ReplicatedCarrierRateCardDirectory>());
+        builder.Services.AddSingleton<ICarrierRateCardReplicas>(services => services.GetRequiredService<ReplicatedCarrierRateCardDirectory>());
         builder.Services.AddSingleton<SeedFileCarrierDirectory>();
         builder.Services.AddSingleton<ReplicatedCarrierDirectory>();
         builder.Services.AddSingleton<ICarrierDirectory>(services => services.GetRequiredService<ReplicatedCarrierDirectory>());

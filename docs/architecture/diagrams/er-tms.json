@@ -44,6 +44,18 @@
       ]
     },
     {
+      "name": "CarrierRateCardCopies",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
+          ]
+        }
+      ]
+    },
+    {
       "name": "Exceptions",
       "columns": [
         {
@@ -113,6 +125,18 @@
           "type": "uniqueidentifier",
           "keys": [
             "FK"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RateCardCopies",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "nvarchar(50)",
+          "keys": [
+            "PK"
           ]
         }
       ]
