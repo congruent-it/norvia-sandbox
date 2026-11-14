@@ -76,7 +76,7 @@ public sealed partial class SaveCarrierHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.Id,
         });
-        outbox.Add(new CarrierV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+        outbox.Add(new CarrierChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveCarrierResult(view, outcome);
     }

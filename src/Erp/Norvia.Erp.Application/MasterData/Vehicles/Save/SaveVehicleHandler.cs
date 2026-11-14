@@ -93,7 +93,7 @@ public sealed partial class SaveVehicleHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.Id,
         });
-        outbox.Add(new VehicleV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+        outbox.Add(new VehicleChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveVehicleResult(view, outcome);
     }

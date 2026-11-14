@@ -35,7 +35,7 @@ internal sealed class MasterDataSyncWorld
     public static string Shipper(string id = "SHP-0001", int revision = 2) => $$"""
         {
           "eventId": "0198e7c0-0000-7000-8000-0000000000e3",
-          "eventType": "Shipper",
+          "eventType": "ShipperChanged",
           "eventVersion": 1,
           "occurredAt": "2030-10-02T09:05:00+00:00",
           "correlationId": "master-data-1",
@@ -46,7 +46,7 @@ internal sealed class MasterDataSyncWorld
     public static string Carrier(string id = "CAR-0001", int revision = 2) => $$"""
         {
           "eventId": "0198e7c0-0000-7000-8000-0000000000e4",
-          "eventType": "Carrier",
+          "eventType": "CarrierChanged",
           "eventVersion": 1,
           "occurredAt": "2030-10-02T09:05:00+00:00",
           "correlationId": "master-data-2",
@@ -57,7 +57,7 @@ internal sealed class MasterDataSyncWorld
     public static string Vehicle(string id = "VEH-0001", int revision = 2, bool active = false) => $$"""
         {
           "eventId": "0198e7c0-0000-7000-8000-0000000000e5",
-          "eventType": "Vehicle",
+          "eventType": "VehicleChanged",
           "eventVersion": 1,
           "occurredAt": "2030-10-02T09:05:00+00:00",
           "correlationId": "master-data-3",
@@ -68,7 +68,7 @@ internal sealed class MasterDataSyncWorld
     public static string Driver(string id = "DRV-0001", int revision = 2) => $$"""
         {
           "eventId": "0198e7c0-0000-7000-8000-0000000000e6",
-          "eventType": "Driver",
+          "eventType": "DriverChanged",
           "eventVersion": 1,
           "occurredAt": "2030-10-02T09:05:00+00:00",
           "correlationId": "master-data-4",

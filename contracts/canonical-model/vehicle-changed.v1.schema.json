@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://norvia.example/canonical-model/vehicle.v1.schema.json",
-  "title": "Vehicle",
+  "$id": "https://norvia.example/canonical-model/vehicle-changed.v1.schema.json",
+  "title": "VehicleChanged",
   "description": "The ERP created or edited a Vehicle of the Own fleet (Canonical Model event, version 1, E3). Published on the master-data events topic through the ERP's transactional outbox, in the transaction that saved the change, under a correlation ID created for the change. It carries the whole Vehicle and its Master-data revision, so the TMS replaces its copy and needs nothing more. Making a Vehicle inactive changes only its active flag; the TMS keeps its own availability apart from the copy (ADR 0014).",
   "type": "object",
   "required": ["eventId", "eventType", "eventVersion", "occurredAt", "correlationId", "vehicle"],
   "additionalProperties": false,
   "properties": {
     "eventId": { "type": "string", "description": "The event's own ID, a UUID." },
-    "eventType": { "const": "Vehicle" },
+    "eventType": { "const": "VehicleChanged" },
     "eventVersion": { "const": 1 },
     "occurredAt": { "type": "string", "format": "date-time" },
     "correlationId": { "type": "string", "minLength": 1 },

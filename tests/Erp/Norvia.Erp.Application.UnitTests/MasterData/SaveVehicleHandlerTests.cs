@@ -33,7 +33,7 @@ public sealed class SaveVehicleHandlerTests
         result.Value.Vehicle.Should().Be(new VehicleView("VEH-0100", "VN-900-Z", "RigidTruck", 9000, 14, true, 1));
         await _vehicles.Received().AddAsync(Arg.Is<Vehicle>(vehicle => vehicle.Id.Value == "VEH-0100" && vehicle.FinanceOwned), Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e =>
-            e is VehicleV1 && e.EventType == "Vehicle" && e.Topic == Topics.MasterDataEvents && ((VehicleV1)e).Vehicle.Revision == 1));
+            e is VehicleChangedV1 && e.EventType == "VehicleChanged" && e.Topic == Topics.MasterDataEvents && ((VehicleChangedV1)e).Vehicle.Revision == 1));
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class SaveVehicleHandlerTests
         result.Value.Outcome.Should().Be(MasterDataSaveOutcome.Updated);
         result.Value.Vehicle.Should().Be(new VehicleView("VEH-0001", "VN-101-A", "Van", 1200, 4, false, 2));
         await _vehicles.Received().UpdateAsync(vehicle, Arg.Any<CancellationToken>());
-        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => !((VehicleV1)e).Vehicle.Active && ((VehicleV1)e).Vehicle.Revision == 2));
+        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => !((VehicleChangedV1)e).Vehicle.Active && ((VehicleChangedV1)e).Vehicle.Revision == 2));
     }
 
     [Fact]

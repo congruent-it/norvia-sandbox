@@ -76,7 +76,7 @@ public sealed partial class SaveShipperHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.Id,
         });
-        outbox.Add(new ShipperV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+        outbox.Add(new ShipperChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveShipperResult(view, outcome);
     }

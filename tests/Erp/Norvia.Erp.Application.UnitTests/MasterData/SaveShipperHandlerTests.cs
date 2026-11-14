@@ -33,7 +33,7 @@ public sealed class SaveShipperHandlerTests
         result.Value.Shipper.Should().Be(new ShipperView("SHP-0100", "Nieuwe Shipper", true, 1));
         await _shippers.Received().AddAsync(Arg.Is<Shipper>(shipper => shipper.Id.Value == "SHP-0100"), Arg.Any<CancellationToken>());
         _outbox.Received().Add(Arg.Is<IntegrationEvent>(e =>
-            e is ShipperV1 && e.EventType == "Shipper" && e.Topic == Topics.MasterDataEvents && ((ShipperV1)e).Shipper.Revision == 1));
+            e is ShipperChangedV1 && e.EventType == "ShipperChanged" && e.Topic == Topics.MasterDataEvents && ((ShipperChangedV1)e).Shipper.Revision == 1));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class SaveShipperHandlerTests
         result.Value.Shipper.Should().Be(new ShipperView("SHP-0001", "New", false, 2));
         shipper.Revision.Should().Be(2);
         await _shippers.Received().UpdateAsync(shipper, Arg.Any<CancellationToken>());
-        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((ShipperV1)e).Shipper.Revision == 2 && !((ShipperV1)e).Shipper.Active));
+        _outbox.Received().Add(Arg.Is<IntegrationEvent>(e => ((ShipperChangedV1)e).Shipper.Revision == 2 && !((ShipperChangedV1)e).Shipper.Active));
     }
 
     [Fact]

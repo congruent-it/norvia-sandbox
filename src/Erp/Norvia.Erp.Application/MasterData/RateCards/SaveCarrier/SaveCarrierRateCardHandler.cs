@@ -94,7 +94,7 @@ public sealed partial class SaveCarrierRateCardHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.CarrierId,
         });
-        outbox.Add(new CarrierRateCardV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, record));
+        outbox.Add(new CarrierRateCardChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, record));
         LogSaved(logger, command.Id, outcome, record.Revision);
         return new SaveCarrierRateCardResult(record, outcome);
     }

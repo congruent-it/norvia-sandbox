@@ -32,7 +32,7 @@
         "type": "Compose",
         "inputs": {
           "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
-          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Carrier'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCard'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCard'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Vehicle'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Driver'), 'driver', 'shipper')))))]?['id']",
+          "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierChanged'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCardChanged'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCardChanged'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'VehicleChanged'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'DriverChanged'), 'driver', 'shipper')))))]?['id']",
           "eventType": "@json(base64ToString(triggerBody()?['ContentData']))?['eventType']",
           "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
         },
@@ -48,7 +48,7 @@
         "type": "If",
         "expression": {
           "equals": [
-            "@and(equals(actions('Track_the_master_data_record')?['status'], 'Succeeded'), or(equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'Shipper'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'Carrier'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'RateCard'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'CarrierRateCard'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'Vehicle'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'Driver')), not(empty(actions('Track_the_master_data_record')?['outputs']?['correlationId'])), not(empty(actions('Track_the_master_data_record')?['outputs']?['partyId'])))",
+            "@and(equals(actions('Track_the_master_data_record')?['status'], 'Succeeded'), or(equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'ShipperChanged'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'CarrierChanged'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'RateCardChanged'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'CarrierRateCardChanged'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'VehicleChanged'), equals(actions('Track_the_master_data_record')?['outputs']?['eventType'], 'DriverChanged')), not(empty(actions('Track_the_master_data_record')?['outputs']?['correlationId'])), not(empty(actions('Track_the_master_data_record')?['outputs']?['partyId'])))",
             true
           ]
         },
@@ -57,7 +57,7 @@
             "type": "Http",
             "inputs": {
               "method": "PUT",
-              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Carrier'), 'carriers', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'RateCard'), 'rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'CarrierRateCard'), 'carrier-rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Vehicle'), 'vehicles', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'Driver'), 'drivers', 'shippers')))))}/@{encodeUriComponent(outputs('Track_the_master_data_record')?['partyId'])}",
+              "uri": "@{parameters('tmsBaseUrl')}/v1/@{if(equals(outputs('Track_the_master_data_record')?['eventType'], 'CarrierChanged'), 'carriers', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'RateCardChanged'), 'rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'CarrierRateCardChanged'), 'carrier-rate-cards', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'VehicleChanged'), 'vehicles', if(equals(outputs('Track_the_master_data_record')?['eventType'], 'DriverChanged'), 'drivers', 'shippers')))))}/@{encodeUriComponent(outputs('Track_the_master_data_record')?['partyId'])}",
               "headers": {
                 "Content-Type": "application/json",
                 "X-Correlation-ID": "@{outputs('Track_the_master_data_record')?['correlationId']}"
@@ -67,7 +67,7 @@
                 "identity": "@parameters('masterDataSyncIdentityId')",
                 "audience": "@parameters('tmsAudience')"
               },
-              "body": "@removeProperty(json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Carrier'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCard'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCard'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Vehicle'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Driver'), 'driver', 'shipper')))))], 'id')",
+              "body": "@removeProperty(json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierChanged'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCardChanged'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCardChanged'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'VehicleChanged'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'DriverChanged'), 'driver', 'shipper')))))], 'id')",
               "retryPolicy": {
                 "type": "exponential",
                 "count": 3,
@@ -80,7 +80,7 @@
             "trackedProperties": {
               "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
               "flow": "master-data",
-              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Carrier'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCard'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCard'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Vehicle'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Driver'), 'driver', 'shipper')))))]?['id']",
+              "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierChanged'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCardChanged'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCardChanged'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'VehicleChanged'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'DriverChanged'), 'driver', 'shipper')))))]?['id']",
               "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
               "outcome": "@if(and(greaterOrEquals(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
               "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Replace_the_record_in_the_TMS')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
@@ -147,7 +147,7 @@
                   "trackedProperties": {
                     "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                     "flow": "master-data",
-                    "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Carrier'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCard'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCard'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Vehicle'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Driver'), 'driver', 'shipper')))))]?['id']",
+                    "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierChanged'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCardChanged'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCardChanged'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'VehicleChanged'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'DriverChanged'), 'driver', 'shipper')))))]?['id']",
                     "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                     "outcome": "DeadLettered",
                     "messageId": "@triggerBody()?['MessageId']",
@@ -204,7 +204,7 @@
               "trackedProperties": {
                 "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
                 "flow": "master-data",
-                "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Carrier'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCard'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCard'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Vehicle'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'Driver'), 'driver', 'shipper')))))]?['id']",
+                "partyId": "@json(base64ToString(triggerBody()?['ContentData']))?[if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierChanged'), 'carrier', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'RateCardChanged'), 'rateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'CarrierRateCardChanged'), 'carrierRateCard', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'VehicleChanged'), 'vehicle', if(equals(json(base64ToString(triggerBody()?['ContentData']))?['eventType'], 'DriverChanged'), 'driver', 'shipper')))))]?['id']",
                 "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']",
                 "outcome": "DeadLettered",
                 "messageId": "@triggerBody()?['MessageId']",

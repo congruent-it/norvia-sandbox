@@ -94,7 +94,7 @@ public sealed partial class SaveRateCardHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.ShipperId,
         });
-        outbox.Add(new RateCardV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, record));
+        outbox.Add(new RateCardChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, record));
         LogSaved(logger, command.Id, outcome, record.Revision);
         return new SaveRateCardResult(record, outcome);
     }

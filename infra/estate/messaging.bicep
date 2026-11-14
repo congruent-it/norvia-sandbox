@@ -501,7 +501,7 @@ resource masterDataSyncFilter 'Microsoft.ServiceBus/namespaces/topics/subscripti
   properties: {
     filterType: 'SqlFilter'
     sqlFilter: {
-      sqlExpression: '(eventType IN (\'Shipper\', \'Carrier\', \'RateCard\', \'CarrierRateCard\', \'Vehicle\', \'Driver\') AND resubmitTo IS NULL) OR resubmitTo = \'master-data-sync\''
+      sqlExpression: '(eventType IN (\'ShipperChanged\', \'CarrierChanged\', \'RateCardChanged\', \'CarrierRateCardChanged\', \'VehicleChanged\', \'DriverChanged\') AND resubmitTo IS NULL) OR resubmitTo = \'master-data-sync\''
     }
   }
 }

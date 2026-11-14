@@ -1,16 +1,16 @@
 using Norvia.Erp.Application.IntegrationEvents;
-using Norvia.Erp.Application.MasterData.Shippers.List;
+using Norvia.Erp.Application.MasterData.Drivers;
 
-namespace Norvia.Erp.Application.MasterData.Shippers;
+namespace Norvia.Erp.Application.MasterData.Drivers;
 
 /// <summary>
-/// The Canonical Model event <c>Shipper</c>, version 1 (contracts/canonical-model/shipper.v1.schema.json): the whole Shipper as it is
+/// The Canonical Model event <c>Driver</c>, version 1 (contracts/canonical-model/driver.v1.schema.json): the whole Driver as it is
 /// after an edit, with its Master-data revision. The TMS replaces its read copy with it (E3).
 /// </summary>
-public sealed record ShipperV1(Guid EventId, DateTimeOffset OccurredAt, string CorrelationId, ShipperView Shipper)
+public sealed record DriverChangedV1(Guid EventId, DateTimeOffset OccurredAt, string CorrelationId, DriverView Driver)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
-    public override string EventType => "Shipper";
+    public override string EventType => "DriverChanged";
 
     public override int EventVersion => 1;
 
@@ -19,6 +19,6 @@ public sealed record ShipperV1(Guid EventId, DateTimeOffset OccurredAt, string C
     protected override IEnumerable<KeyValuePair<string, object>> TrackingProperties() =>
     [
         new(TrackingKeys.Flow, Flows.MasterData),
-        new(TrackingKeys.PartyId, Shipper.Id),
+        new(TrackingKeys.PartyId, Driver.Id),
     ];
 }

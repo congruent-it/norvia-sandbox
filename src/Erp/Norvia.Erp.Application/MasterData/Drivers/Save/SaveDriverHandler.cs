@@ -88,7 +88,7 @@ public sealed partial class SaveDriverHandler(
             [TrackingKeys.Flow] = Flows.MasterData,
             [TrackingKeys.PartyId] = command.Id,
         });
-        outbox.Add(new DriverV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
+        outbox.Add(new DriverChangedV1(Guid.CreateVersion7(), time.GetUtcNow(), correlationId, view));
         LogSaved(logger, command.Id, outcome, view.Revision);
         return new SaveDriverResult(view, outcome);
     }

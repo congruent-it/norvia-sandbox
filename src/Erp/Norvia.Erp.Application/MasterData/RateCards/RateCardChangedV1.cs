@@ -6,10 +6,10 @@ namespace Norvia.Erp.Application.MasterData.RateCards;
 /// The Canonical Model event <c>RateCard</c>, version 1 (contracts/canonical-model/rate-card.v1.schema.json): the whole Rate Card with its
 /// full list of dated versions, as it is after an edit. The TMS replaces its list with it (E3).
 /// </summary>
-public sealed record RateCardV1(Guid EventId, DateTimeOffset OccurredAt, string CorrelationId, RateCardRecord RateCard)
+public sealed record RateCardChangedV1(Guid EventId, DateTimeOffset OccurredAt, string CorrelationId, RateCardRecord RateCard)
     : IntegrationEvent(EventId, OccurredAt, CorrelationId)
 {
-    public override string EventType => "RateCard";
+    public override string EventType => "RateCardChanged";
 
     public override int EventVersion => 1;
 
