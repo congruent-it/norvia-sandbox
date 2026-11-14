@@ -1,0 +1,132 @@
+@using System.Text.Json
+@using Norvia.Erp.Application.MasterData.RateCards
+@using Norvia.Erp.Web.ErpApi
+@inject NavigationManager Navigation
+@inject ILogger<RateCardForm> Logger
+
+@* The create and edit form of a Rate Card or a Carrier Rate Card: its ID, the party it belongs to, and its whole list of dated versions
+   as JSON in the shape of the ERP API's body. A party has one card, and the versions must not overlap in time; the ERP API checks both. *@
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 48rem">
+    <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+    <FluentSelect TOption="string" @bind-Value="_partyId" Label="@PartyKind" Items="Parties.Select(party => party.Id)" OptionText="@(id => PartyText(id))" OptionValue="@(id => id)" />
+    <FluentTextArea @bind-Value="_versions" Label="Versions (JSON)" Rows="18" Style="width: 100%; font-family: monospace" />
+    <div>
+        <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="@($"Save {Kind}")">Save</FluentButton>
+        <a href="@ListPath" class="ml-2">Back to the @Kind list</a>
+    </div>
+    <SaveStatus Kind="@Kind" Problem="@_problem" Answer="_answer" />
+</FluentStack>
+
+@code {
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+
+    private string? _id;
+    private string? _partyId;
+    private string? _versions;
+    private bool _running;
+    private string? _problem;
+    private MasterDataAnswer? _answer;
+
+    /// <summary>"Rate Card" or "Carrier Rate Card".</summary>
+    [Parameter, EditorRequired]
+    public string Kind { get; set; } = "";
+
+    /// <summary>"Shipper" or "Carrier": whose card it is.</summary>
+    [Parameter, EditorRequired]
+    public string PartyKind { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string ListPath { get; set; } = "";
+
+    /// <summary>The path of a card's edit page, with <c>{0}</c> for its ID.</summary>
+    [Parameter, EditorRequired]
+    public string EditPath { get; set; } = "";
+
+    [Parameter]
+    public bool Editing { get; set; }
+
+    [Parameter]
+    public string InitialId { get; set; } = "";
+
+    [Parameter]
+    public string? InitialPartyId { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<RateCardVersionData> InitialVersions { get; set; } = [];
+
+    /// <summary>The Shippers or Carriers a card can belong to, by ID and name.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<(string Id, string Name)> Parties { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyCollection<string> TakenIds { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public Func<string, string, IReadOnlyList<RateCardVersionData>, CancellationToken, Task<MasterDataAnswer>> Save { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        _id = InitialId;
+        _partyId = InitialPartyId ?? Parties.Select(party => party.Id).FirstOrDefault();
+        _versions = JsonSerializer.Serialize(InitialVersions, Json);
+    }
+
+    private string PartyText(string id) => $"{id} · {Parties.FirstOrDefault(party => party.Id == id).Name}";
+
+    private async Task SaveAsync()
+    {
+        if (_running)
+        {
+            return;
+        }
+
+        _answer = null;
+        IReadOnlyList<RateCardVersionData>? versions = null;
+        _problem = MasterDataFormRules.CheckNewId(Kind, _id, Editing, TakenIds);
+        if (_problem is null && string.IsNullOrEmpty(_partyId))
+        {
+            _problem = $"Choose the {PartyKind} the {Kind} belongs to.";
+        }
+
+        if (_problem is null)
+        {
+            try
+            {
+                versions = JsonSerializer.Deserialize<List<RateCardVersionData>>(_versions ?? "", Json);
+            }
+            catch (JsonException exception)
+            {
+                _problem = $"The versions aren't valid: {exception.Message}";
+            }
+
+            if (_problem is null && versions is not { Count: > 0 })
+            {
+                _problem = $"The {Kind} needs at least one version.";
+            }
+        }
+
+        if (_problem is not null)
+        {
+            return;
+        }
+
+        _running = true;
+        try
+        {
+            _answer = await Save(_id!.Trim(), _partyId!, versions!, CancellationToken.None);
+            if (_answer is MasterDataAnswer.Saved && !Editing)
+            {
+                Navigation.NavigateTo(string.Format(System.Globalization.CultureInfo.InvariantCulture, EditPath, Uri.EscapeDataString(_id!.Trim())));
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            Logger.LogError(exception, "The {Kind} couldn't be saved", Kind);
+            _problem = $"The ERP API couldn't save the {Kind}. Nothing was saved; try again.";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

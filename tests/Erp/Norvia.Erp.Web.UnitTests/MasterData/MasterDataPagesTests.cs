@@ -19,7 +19,7 @@ public sealed class MasterDataPagesTests : ErpWebContext
         [new RateCardVersionView(1, new DateOnly(2026, 1, 1), null, 6, [new LaneView("Rotterdam", "Utrecht", 65m, 4)])]);
 
     [Fact]
-    public void RenderShippers_ListsThemReadOnly()
+    public void RenderShippers_ListsThemWithALinkToCreateAndEachOne()
     {
         Answer<ListShippersQuery, IReadOnlyList<ShipperView>>([new ShipperView("SHP-0001", "Brouwer Dranken", true), new ShipperView("SHP-0002", "Old Shipper", false)]);
 
@@ -27,18 +27,20 @@ public sealed class MasterDataPagesTests : ErpWebContext
 
         page.Markup.Should().Contain("SHP-0001").And.Contain("Brouwer Dranken").And.Contain("Old Shipper");
         page.FindAll("td").Select(cell => cell.TextContent.Trim()).Should().Contain(["Yes", "No"]);
-        page.FindAll("button, form, input, a").Should().BeEmpty("master data is view only");
+        page.FindAll("button, form, input").Should().BeEmpty("a record is edited on a page of its own");
+        page.FindAll("a").Select(link => link.GetAttribute("href")).Should().Contain(["/shippers/new", "/shippers/SHP-0001/edit", "/shippers/SHP-0002/edit"]);
     }
 
     [Fact]
-    public void RenderCarriers_ListsThemReadOnly()
+    public void RenderCarriers_ListsThemWithALinkToCreateAndEachOne()
     {
         Answer<ListCarriersQuery, IReadOnlyList<CarrierView>>([new CarrierView("CAR-0001", "Van Dijk Transport", true)]);
 
         var page = Render<CarriersPage>();
 
         page.Markup.Should().Contain("CAR-0001").And.Contain("Van Dijk Transport");
-        page.FindAll("button, form, input, a").Should().BeEmpty();
+        page.FindAll("button, form, input").Should().BeEmpty();
+        page.FindAll("a").Select(link => link.GetAttribute("href")).Should().Contain(["/carriers/new", "/carriers/CAR-0001/edit"]);
     }
 
     [Fact]
@@ -51,6 +53,7 @@ public sealed class MasterDataPagesTests : ErpWebContext
         page.Find("section").TextContent.Should().Contain("RC-0001").And.Contain("Shipper Brouwer Dranken (SHP-0001)")
             .And.Contain("Version 1").And.Contain("with no end date").And.Contain("Rotterdam").And.Contain("Utrecht").And.Contain("65.00");
         page.FindAll("button, form, input").Should().BeEmpty();
+        page.FindAll("a").Select(link => link.GetAttribute("href")).Should().Contain(["/rate-cards/new", "/rate-cards/RC-0001/edit"]);
     }
 
     [Fact]

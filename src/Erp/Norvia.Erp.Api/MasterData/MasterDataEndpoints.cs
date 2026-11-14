@@ -65,7 +65,7 @@ public static class MasterDataEndpoints
                 + "type, payload, pallet places and active flag (200, the revision raised by one) and publishes the whole Vehicle as the Vehicle event, in one "
                 + "transaction. Idempotent on content: a repeat of what the Vehicle already is answers 200 with the unchanged revision and publishes nothing. "
                 + "A Vehicle is never deleted, only made inactive, which stores Active false and nothing else: it opens or closes no day. "
-                + "Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong and MasterDataFieldInvalid.");
+                + "A registration belongs to one Vehicle. Refusals carry a stable code (400): MasterDataFieldRequired, MasterDataFieldTooLong, MasterDataFieldInvalid and VehicleRegistrationTaken.");
 
         var drivers = app.NewVersionedApi("MasterData")
             .MapGroup("/v{version:apiVersion}/drivers")

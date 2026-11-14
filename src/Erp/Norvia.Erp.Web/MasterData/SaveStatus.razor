@@ -1,0 +1,35 @@
+@using Norvia.Erp.Web.ErpApi
+
+@* What a save did, said beside the form: a problem Finance can fix, the ERP API's refusal, or the revision that was saved. *@
+<div role="status" class="mt-2">
+    @if (Problem is not null)
+    {
+        <span role="alert">@Problem</span>
+    }
+    else
+    {
+        switch (Answer)
+        {
+            case MasterDataAnswer.Saved { Outcome: MasterDataOutcome.Unchanged } saved:
+                <span>Nothing changed: the @Kind already was like this, at Master-data revision @saved.Revision.</span>
+                break;
+            case MasterDataAnswer.Saved saved:
+                <span>Saved at Master-data revision @saved.Revision. It is replicated to the TMS.</span>
+                break;
+            case MasterDataAnswer.Refused refused:
+                <span role="alert">@refused.Reason</span>
+                break;
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Kind { get; set; } = "";
+
+    [Parameter]
+    public string? Problem { get; set; }
+
+    [Parameter]
+    public MasterDataAnswer? Answer { get; set; }
+}

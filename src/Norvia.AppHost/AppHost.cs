@@ -142,6 +142,9 @@ var erpApi = builder.AddProject<Projects.Norvia_Erp_Api>("erp-api")
     .WaitFor(erpWeb)
     .WithHttpHealthCheck("/health");
 
+// The ERP UI reads in process and changes master data through the ERP API, as its own identity (ADR 0028's split). It doesn't wait for the API, which waits for it.
+erpWeb.WithEnvironment("ErpApi__BaseAddress", erpApi.GetEndpoint("http"));
+
 // The Integration console, for the Integration operator. It has no database: it reads what the estate records (ADR 0017).
 var integrationConsole = builder.AddProject<Projects.Norvia_IntegrationConsole_Web>("integration-console-web")
     .WithHttpHealthCheck("/health")
@@ -445,6 +448,9 @@ if (builder.ExecutionContext.IsPublishMode)
         .WithAzureUserAssignedIdentity(erpIdentity);
     erpWeb.WithExternalHttpEndpoints()
         .WithAzureUserAssignedIdentity(erpIdentity)
+        // The ERP UI asks Entra for the ERP API's token as the ERP's managed identity, which holds the master-data manage role.
+        .WithEnvironment("ErpApi__Entra__Scope", ReferenceExpression.Create($"{estate.ErpApiClientId}/.default"))
+        .WithEnvironment("ErpApi__Entra__ManagedIdentityClientId", erpIdentity.Resource.ClientId)
         // The Agents (ADR 0040) are on only where the estate says so. The ERP UI asks the Agent published in the Foundry project as its own identity.
         .WithEnvironment("Agents__Enabled", estate.AgentsEnabled)
         .WithEnvironment("Agents__Foundry__ProjectEndpoint", estate.FoundryProjectEndpoint)
@@ -865,9 +871,12 @@ else
         .WithEnvironment("ResetEndpoint__ApiKey", resetApiKey);
     simulator.WithEnvironment("PartnerPortal__ResetApiKey", resetApiKey);
 
-    // Locally there is no Easy Auth either: the ERP signs the developer in as Finance.
+    // Locally there is no Easy Auth either: the ERP signs the developer in as Finance, and signs its own token for the ERP API, as Entra would issue it to its managed identity.
     erpWeb.WithEnvironment("LocalUser__Name", $"{Environment.UserName} (local)")
-        .WithEnvironment("LocalUser__Roles__0", "Finance");
+        .WithEnvironment("LocalUser__Roles__0", "Finance")
+        .WithEnvironment("ErpApi__LocalTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("ErpApi__LocalTokens__Audience", LocalTokens.ErpAudience)
+        .WithEnvironment("ErpApi__LocalTokens__ClientId", LocalTokens.ErpUiClientId);
 
     // Locally the ERP billing API trusts tokens signed with the same key. The Billing, Carrier cost and Shipper invoice Logic Apps' client IDs stand in for
     // their managed identities, the holders of the record and the report role.
@@ -957,6 +966,7 @@ else
     {
         (tmsApi.Resource as IResourceWithEnvironment, "Authentication__Schemes__Bearer__SigningKeys__0__Value"),
         (tmsWeb.Resource, "TmsApi__LocalTokens__SigningKey"),
+        (erpWeb.Resource, "ErpApi__LocalTokens__SigningKey"),
         (partnerApi.Resource, "PartnerApi__Tokens__SigningKey"),
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),

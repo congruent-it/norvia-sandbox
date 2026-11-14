@@ -20,13 +20,13 @@ public sealed class LayoutTests : ErpWebContext
         sections.Select(link => link.TextContent.Trim()).Should().Equal("Billing", "Carrier invoicing", "Master data");
         sections.Select(link => link.GetAttribute("href")).Should().Equal("/billable-lines", "/carrier-costs", "/");
         var views = layout.FindAll("nav:not([aria-label=Main]) a");
-        views.Select(link => link.TextContent.Trim()).Should().Equal("Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards"); // the test's address is the Shippers list
+        views.Select(link => link.TextContent.Trim()).Should().Equal("Shippers", "Carriers", "Rate Cards", "Carrier Rate Cards", "Vehicles", "Drivers"); // the test's address is the Shippers list
         layout.Find("main").TextContent.Should().Contain("the page");
     }
 
     [Theory]
-    [InlineData("/", "Master data", "Shippers, Carriers, Rate Cards, Carrier Rate Cards")]
-    [InlineData("/carriers", "Master data", "Shippers, Carriers, Rate Cards, Carrier Rate Cards")]
+    [InlineData("/", "Master data", "Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles, Drivers")]
+    [InlineData("/carriers", "Master data", "Shippers, Carriers, Rate Cards, Carrier Rate Cards, Vehicles, Drivers")]
     [InlineData("/shipper-invoices/INV-2030-000001", "Billing", "Waiting billable lines, Shipper invoices")]
     [InlineData("/carrier-costs", "Carrier invoicing", "Open carrier costs, Carrier invoices to decide, Carrier invoices")]
     [InlineData("/carrier-invoices/to-decide", "Carrier invoicing", "Open carrier costs, Carrier invoices to decide, Carrier invoices")]

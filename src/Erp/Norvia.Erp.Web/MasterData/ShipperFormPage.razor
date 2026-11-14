@@ -1,0 +1,55 @@
+@page "/shippers/new"
+@page "/shippers/{Id}/edit"
+@attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
+@using Mediator
+@using Norvia.Erp.Application.MasterData.Shippers.List
+@using Norvia.Erp.Web.ErpApi
+@inject IMediator Mediator
+@inject IMasterDataCommands Commands
+@inject ILogger<ShipperFormPage> Logger
+
+<PageTitle>@(Editing ? "Edit" : "New") Shipper · Norvia ERP</PageTitle>
+
+<h1>@(Editing ? $"Edit Shipper {Id}" : "New Shipper")</h1>
+
+<MasterDataStates Name="shippers" Loaded="_loaded" Failed="_failed" Empty="false">
+    @if (_current is null && Editing)
+    {
+        <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">There is no Shipper with ID @Id.</FluentMessageBar>
+    }
+    else
+    {
+        <NamedRecordForm Kind="Shipper" ListPath="/shippers" ListName="Shippers" EditPath="/shippers/{0}/edit" Editing="Editing"
+                         InitialId="@(_current?.Id ?? "")" InitialName="@(_current?.Name ?? "")" InitialActive="@(_current?.Active ?? true)"
+                         TakenIds="_taken" Save="Commands.SaveShipperAsync" />
+    }
+</MasterDataStates>
+
+@code {
+    private ShipperView? _current;
+    private IReadOnlyCollection<string> _taken = [];
+    private bool _loaded;
+    private bool _failed;
+
+    [Parameter]
+    public string? Id { get; set; }
+
+    private bool Editing => Id is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var all = await Mediator.Send(new ListShippersQuery());
+            _taken = [.. all.Select(row => row.Id)];
+            _current = all.FirstOrDefault(row => row.Id == Id);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The shippers couldn't be read");
+            _failed = true;
+        }
+
+        _loaded = true;
+    }
+}

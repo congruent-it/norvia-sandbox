@@ -9,10 +9,10 @@
 <PageTitle>Rate Cards · Norvia ERP</PageTitle>
 
 <h1>Rate Cards</h1>
-<p>Read-only. The ERP loads them from the seed file with the TMS's IDs.</p>
+<p>The ERP loads them from the seed file with the TMS's IDs; <a href="/rate-cards/new">New Rate Card</a>.</p>
 
 <MasterDataStates Name="Rate Cards" Loaded="_loaded" Failed="_failed" Empty="_cards.Count == 0">
-    <RateCardList Cards="_cards" PartyKind="Shipper" />
+    <RateCardList Cards="_cards" PartyKind="Shipper" EditPath="/rate-cards" />
 </MasterDataStates>
 
 @code {

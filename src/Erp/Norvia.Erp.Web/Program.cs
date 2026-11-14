@@ -4,6 +4,7 @@ using Norvia.Erp.Infrastructure;
 using Norvia.Erp.Infrastructure.Agents;
 using Norvia.Erp.Web.Agents;
 using Norvia.Erp.Web.CarrierInvoices;
+using Norvia.Erp.Web.ErpApi;
 using Norvia.Erp.Web.Live;
 using Norvia.Erp.Web.Operators;
 using Norvia.Erp.Web.ShipperInvoices;
@@ -19,6 +20,7 @@ builder.AddErpResetUnavailable();
 builder.AddErpSeedLoading();
 builder.AddErpOutboxPublisher();
 builder.AddFinanceSignIn();
+builder.AddErpApi();
 builder.Services.AddMediator(options =>
 {
     options.ServiceLifetime = ServiceLifetime.Scoped;
