@@ -37,6 +37,18 @@ public sealed class SaveVehicleHandlerTests
     }
 
     [Fact]
+    public async Task Handle_WithARegistrationAnotherVehicleHas_RefusesAndPublishesNothing()
+    {
+        Have(Van());
+
+        var result = await Handler.Handle(new SaveVehicleCommand("VEH-0100", "VN-101-A", "Van", 1200, 4, true), CancellationToken.None);
+
+        result.ValidationErrors.Single().ErrorCode.Should().Be("VehicleRegistrationTaken");
+        await _vehicles.DidNotReceive().AddAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>());
+        _outbox.DidNotReceive().Add(Arg.Any<IntegrationEvent>());
+    }
+
+    [Fact]
     public async Task Handle_MakingAVehicleInactive_StoresOnlyTheFlagAndPublishesTheRecord()
     {
         var vehicle = Van();

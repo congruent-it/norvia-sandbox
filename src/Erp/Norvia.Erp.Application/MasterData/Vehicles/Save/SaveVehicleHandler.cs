@@ -46,19 +46,25 @@ public sealed partial class SaveVehicleHandler(
         }
 
         var id = new VehicleId(command.Id);
+        var registration = command.Registration.Trim();
+        if (await vehicles.FirstOrDefaultAsync(new VehicleByRegistrationSpec(registration), cancellationToken) is { } holder && holder.Id != id)
+        {
+            return Refuse($"Vehicle {holder.Id.Value} already has the registration {registration}.", "VehicleRegistrationTaken");
+        }
+
         var existing = await vehicles.FirstOrDefaultAsync(new VehicleByIdSpec(id), cancellationToken);
         MasterDataSaveOutcome outcome;
         Vehicle vehicle;
         if (existing is null)
         {
-            vehicle = Vehicle.CreateByFinance(id, command.Registration, type, command.PayloadKg, command.PalletPlaces, command.Active);
+            vehicle = Vehicle.CreateByFinance(id, registration, type, command.PayloadKg, command.PalletPlaces, command.Active);
             await vehicles.AddAsync(vehicle, cancellationToken);
             outcome = MasterDataSaveOutcome.Created;
         }
         else
         {
             vehicle = existing;
-            if (!vehicle.Edit(command.Registration, type, command.PayloadKg, command.PalletPlaces, command.Active))
+            if (!vehicle.Edit(registration, type, command.PayloadKg, command.PalletPlaces, command.Active))
             {
                 LogUnchanged(logger, command.Id);
                 return new SaveVehicleResult(ViewOf(vehicle), MasterDataSaveOutcome.Unchanged);

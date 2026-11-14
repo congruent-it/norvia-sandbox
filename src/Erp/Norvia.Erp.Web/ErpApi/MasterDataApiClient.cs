@@ -74,6 +74,15 @@ internal sealed partial class MasterDataApiClient(HttpClient http, IErpApiTokens
                 }
 
                 return new MasterDataAnswer.Refused(reason);
+            case HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden:
+                // The estate didn't grant the ERP UI's identity MasterData.Manage: not something Finance can fix by trying again.
+                var denied = $"The ERP API didn't accept the ERP UI's identity ({(int)response.StatusCode}). Nothing was saved; ask an administrator.";
+                using (logger.Track(new() { [TrackingKeys.Outcome] = "Failed" }))
+                {
+                    LogDenied(kind, id, (int)response.StatusCode);
+                }
+
+                return new MasterDataAnswer.Refused(denied);
             default:
                 response.EnsureSuccessStatusCode();
                 throw new HttpRequestException($"The ERP API answered a save of {kind} {id} with {(int)response.StatusCode}.", null, response.StatusCode);
@@ -84,6 +93,9 @@ internal sealed partial class MasterDataApiClient(HttpClient http, IErpApiTokens
 
     [LoggerMessage(Level = LogLevel.Information, Message = "{Kind} {Id} {Outcome} at Master-data revision {Revision}")]
     private partial void LogSaved(string kind, string id, MasterDataOutcome outcome, int revision);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The ERP API answered a save of {Kind} {Id} with {StatusCode}: the ERP UI's identity lacks MasterData.Manage")]
+    private partial void LogDenied(string kind, string id, int statusCode);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Saving {Kind} {Id} was refused: {Reason}")]
     private partial void LogRefused(string kind, string id, string reason);

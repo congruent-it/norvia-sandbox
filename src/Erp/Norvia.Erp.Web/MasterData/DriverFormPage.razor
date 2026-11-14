@@ -4,7 +4,7 @@
 @using Mediator
 @using Norvia.Erp.Application.MasterData.Drivers
 @using Norvia.Erp.Application.MasterData.Drivers.List
-@using Norvia.Erp.Domain.Drivers
+@using Norvia.Erp.Application.MasterData
 @using Norvia.Erp.Web.ErpApi
 @inject IMediator Mediator
 @inject IMasterDataCommands Commands
@@ -27,7 +27,7 @@
             <FluentTextField @bind-Value="_name" Label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
             <fieldset>
                 <legend>Licence categories</legend>
-                @foreach (var licence in Enum.GetNames<LicenceCategory>())
+                @foreach (var licence in MasterDataChoices.LicenceCategories)
                 {
                     <FluentCheckbox Label="@licence" Value="_licences.Contains(licence)" ValueChanged="@((bool held) => Hold(licence, held))" />
                 }
@@ -117,7 +117,7 @@
         _running = true;
         try
         {
-            _answer = await Commands.SaveDriverAsync(_id!.Trim(), _name!.Trim(), [.. Enum.GetNames<LicenceCategory>().Where(_licences.Contains)], _active, CancellationToken.None);
+            _answer = await Commands.SaveDriverAsync(_id!.Trim(), _name!.Trim(), [.. MasterDataChoices.LicenceCategories.Where(_licences.Contains)], _active, CancellationToken.None);
             if (_answer is MasterDataAnswer.Saved && !Editing)
             {
                 Navigation.NavigateTo($"/drivers/{Uri.EscapeDataString(_id.Trim())}/edit");

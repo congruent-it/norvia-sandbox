@@ -127,6 +127,19 @@ public sealed class MasterDataApiClientTests : IDisposable
         _logger.Collector.GetSnapshot().Should().ContainSingle(record => record.Level == Microsoft.Extensions.Logging.LogLevel.Warning);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task SaveShipperAsync_SaysTheIdentityWasNotAccepted_WhenTheErpApiDeniesIt(HttpStatusCode status)
+    {
+        _erpApi.Answer(status, "{}");
+
+        var answer = await _client.SaveShipperAsync("SHP-1", "Name", active: true, Xunit.TestContext.Current.CancellationToken);
+
+        answer.Should().BeOfType<MasterDataAnswer.Refused>().Which.Reason.Should().Contain("ask an administrator").And.Contain(((int)status).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _logger.Collector.GetSnapshot().Should().ContainSingle(record => record.Level == Microsoft.Extensions.Logging.LogLevel.Error);
+    }
+
     [Fact]
     public async Task SaveShipperAsync_Throws_WhenTheErpApiFails()
     {
