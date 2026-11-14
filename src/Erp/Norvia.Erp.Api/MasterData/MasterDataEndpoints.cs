@@ -121,6 +121,12 @@ public static class MasterDataEndpoints
         return app;
     }
 
+    private const string ApiVersion = "1";
+
+    /// <summary>The 201 for a created record: it names the route that saves it, so the Location header follows the API version it was created under.</summary>
+    private static CreatedAtRoute<T> CreatedAt<T>(T value, string routeName, string id) =>
+        TypedResults.CreatedAtRoute(value, routeName, new RouteValueDictionary { ["version"] = ApiVersion, ["id"] = id });
+
     /// <summary>An empty header is no key: two blank keys must not look like one save sent twice.</summary>
     private static string? KeyOf(string? header) => string.IsNullOrWhiteSpace(header) ? null : header;
 
@@ -144,7 +150,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.CreatedAtRoute(result.Value, "SaveShipper", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
+            ? CreatedAt(result.Value, "SaveShipper", id)
             : TypedResults.Ok(result.Value);
     }
 
@@ -168,7 +174,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.CreatedAtRoute(result.Value, "SaveCarrier", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
+            ? CreatedAt(result.Value, "SaveCarrier", id)
             : TypedResults.Ok(result.Value);
     }
 
@@ -193,7 +199,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.CreatedAtRoute(result.Value, "SaveVehicle", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
+            ? CreatedAt(result.Value, "SaveVehicle", id)
             : TypedResults.Ok(result.Value);
     }
 
@@ -217,7 +223,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.CreatedAtRoute(result.Value, "SaveDriver", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
+            ? CreatedAt(result.Value, "SaveDriver", id)
             : TypedResults.Ok(result.Value);
     }
 
@@ -241,7 +247,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.CreatedAtRoute(result.Value, "SaveRateCard", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
+            ? CreatedAt(result.Value, "SaveRateCard", id)
             : TypedResults.Ok(result.Value);
     }
 
@@ -265,7 +271,7 @@ public static class MasterDataEndpoints
         }
 
         return result.Value.Outcome == MasterDataSaveOutcome.Created
-            ? TypedResults.CreatedAtRoute(result.Value, "SaveCarrierRateCard", new RouteValueDictionary { ["version"] = "1", ["id"] = id })
+            ? CreatedAt(result.Value, "SaveCarrierRateCard", id)
             : TypedResults.Ok(result.Value);
     }
 }
