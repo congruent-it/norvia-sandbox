@@ -1,5 +1,6 @@
 @page "/drivers/new"
 @page "/drivers/{Id}/edit"
+@rendermode InteractiveServer
 @attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
 @using Mediator
 @using Norvia.Erp.Application.MasterData.Drivers
@@ -23,8 +24,8 @@
     else
     {
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 32rem">
-            <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
-            <FluentTextField @bind-Value="_name" Label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
+            <FluentTextField @bind-Value="_id" Label="ID" aria-label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+            <FluentTextField @bind-Value="_name" Label="Name" aria-label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
             <fieldset>
                 <legend>Licence categories</legend>
                 @foreach (var licence in MasterDataChoices.LicenceCategories)

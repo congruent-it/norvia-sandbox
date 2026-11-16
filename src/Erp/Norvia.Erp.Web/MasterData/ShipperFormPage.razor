@@ -1,5 +1,6 @@
 @page "/shippers/new"
 @page "/shippers/{Id}/edit"
+@rendermode InteractiveServer
 @attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
 @using Mediator
 @using Norvia.Erp.Application.MasterData.Shippers.List

@@ -1,5 +1,6 @@
 @page "/carrier-rate-cards/new"
 @page "/carrier-rate-cards/{Id}/edit"
+@rendermode InteractiveServer
 @attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
 @using Mediator
 @using Norvia.Erp.Application.MasterData.Carriers.List
