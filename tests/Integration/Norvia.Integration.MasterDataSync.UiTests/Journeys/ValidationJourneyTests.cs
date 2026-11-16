@@ -36,16 +36,12 @@ public sealed class ValidationJourneyTests(MasterDataSyncUiFixture sync) : Journ
     {
         var shipper = NewId("SHP");
         await CreateShipperAsync(shipper, "Overlap journey Shipper");
-        await OpenErpAsync("/rate-cards/new");
-        await Page.GetByRole(AriaRole.Textbox, new() { Name = "ID", Exact = true }).FillAsync(NewId("RC"));
-        await Page.GetByRole(AriaRole.Combobox, new() { Name = "Shipper" }).ClickAsync();
-        await Page.GetByRole(AriaRole.Option, new() { Name = shipper, Exact = false }).ClickAsync();
-        await Page.GetByRole(AriaRole.Textbox, new() { Name = "Versions (JSON)", Exact = true })
-            .FillAsync(new System.Text.Json.Nodes.JsonArray(CardVersions.Version(1, "2020-01-01", "2025-06-30", 65m), CardVersions.Version(2, "2025-01-01", null, 130m)).ToJsonString());
+        await FillNewRateCardAsync(NewId("RC"), shipper,
+            [CardVersions.Version(1, "2020-01-01", "2025-06-30", 65m), CardVersions.Version(2, "2025-01-01", null, 130m)]);
 
         await ClickSaveAsync("Save Rate Card");
 
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("overlap");
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Versions 1 and 2 overlap in time; versions must not overlap.");
         await Expect(Page.GetByRole(AriaRole.Status)).Not.ToContainTextAsync("Saved");
     }
 }

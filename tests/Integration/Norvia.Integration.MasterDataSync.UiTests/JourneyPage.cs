@@ -13,9 +13,6 @@ namespace Norvia.Integration.MasterDataSync.UiTests;
 /// </summary>
 public abstract partial class JourneyPage(MasterDataSyncUiFixture sync) : TracedPage(sync.Browser, sync.ErpUi)
 {
-    private readonly List<string> _console = [];
-    private bool _listening;
-
     protected MasterDataSyncUiFixture Sync { get; } = sync;
 
     /// <summary>The TMS UI, in the same browser context as the ERP's.</summary>
@@ -32,43 +29,11 @@ public abstract partial class JourneyPage(MasterDataSyncUiFixture sync) : Traced
     /// <summary>Opens an ERP page and waits until the browser is talking to it, so what a test types isn't lost to a page that hasn't started.</summary>
     protected async Task OpenErpAsync(string path)
     {
-        if (!_listening)
-        {
-            _listening = true;
-            Page.Console += (_, message) => _console.Add($"{message.Type}: {message.Text}");
-            Page.PageError += (_, error) => _console.Add($"pageerror: {error}");
-            Page.RequestFailed += (_, request) => _console.Add($"requestfailed: {request.Url} {request.Failure}");
-        }
-
         await Page.GotoAsync(path);
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }
 
-    /// <summary>
-    /// Presses a form's Save button until the form answers, with what it saved or why it refused. A page whose circuit hasn't started ignores a press, and a form answers at once when it has.
-    /// A press that gets an answer isn't repeated.
-    /// </summary>
-    protected async Task ClickSaveAsync(string button)
-    {
-        var answer = Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Master-data revision" }).Or(Page.GetByRole(AriaRole.Alert));
-        for (var attempt = 1; ; attempt++)
-        {
-            await Page.GetByRole(AriaRole.Button, new() { Name = button }).ClickAsync();
-            try
-            {
-                await answer.First.WaitForAsync(new() { Timeout = 3000 });
-                return;
-            }
-            catch (TimeoutException) when (attempt < 10)
-            {
-                // Not started yet: press again.
-            }
-            catch (TimeoutException exception)
-            {
-                throw new TimeoutException($"The form never answered. The browser said:{Environment.NewLine}{string.Join(Environment.NewLine, _console.TakeLast(15))}", exception);
-            }
-        }
-    }
+    protected Task ClickSaveAsync(string button) => Page.GetByRole(AriaRole.Button, new() { Name = button }).ClickAsync();
 
     /// <summary>Creates a Shipper in the ERP's form, and returns the Master-data revision the ERP says it saved.</summary>
     protected async Task<int> CreateShipperAsync(string id, string name)
@@ -77,19 +42,43 @@ public abstract partial class JourneyPage(MasterDataSyncUiFixture sync) : Traced
         await Page.GetByRole(AriaRole.Textbox, new() { Name = "ID", Exact = true }).FillAsync(id);
         await Page.GetByRole(AriaRole.Textbox, new() { Name = "Name", Exact = true }).FillAsync(name);
         await ClickSaveAsync("Save Shipper");
-        return await SavedRevisionAsync(created: true);
+        return await SavedNewAsync();
+    }
+
+    /// <summary>
+    /// A new record's form saves it and moves on to the record's edit page, so that move is the answer. The record is new, so the revision it was saved at is 1.
+    /// </summary>
+    private async Task<int> SavedNewAsync()
+    {
+        await Expect(Page).ToHaveURLAsync(new Regex("/edit$"));
+        return 1;
     }
 
     /// <summary>Creates a Rate Card of a Shipper in the ERP's form with the versions as JSON in the shape of the ERP API's body, and returns the revision the ERP says it saved.</summary>
     protected async Task<int> CreateRateCardAsync(string id, string shipperId, JsonArray versions)
+    {
+        await FillNewRateCardAsync(id, shipperId, versions);
+        await ClickSaveAsync("Save Rate Card");
+        return await SavedNewAsync();
+    }
+
+    /// <summary>Opens the new Rate Card form and fills it, without saving.</summary>
+    protected async Task FillNewRateCardAsync(string id, string shipperId, JsonArray versions)
     {
         await OpenErpAsync("/rate-cards/new");
         await Page.GetByRole(AriaRole.Textbox, new() { Name = "ID", Exact = true }).FillAsync(id);
         await Page.GetByRole(AriaRole.Combobox, new() { Name = "Shipper" }).ClickAsync();
         await Page.GetByRole(AriaRole.Option, new() { Name = shipperId, Exact = false }).ClickAsync();
         await Page.GetByRole(AriaRole.Textbox, new() { Name = "Versions (JSON)", Exact = true }).FillAsync(versions.ToJsonString());
-        await ClickSaveAsync("Save Rate Card");
-        return await SavedRevisionAsync(created: true);
+    }
+
+    /// <summary>Renames a Shipper in its edit form, and returns the revision the ERP says it saved.</summary>
+    protected async Task<int> RenameShipperAsync(string id, string name)
+    {
+        await OpenErpAsync($"/shippers/{id}/edit");
+        await Page.GetByRole(AriaRole.Textbox, new() { Name = "Name", Exact = true }).FillAsync(name);
+        await ClickSaveAsync("Save Shipper");
+        return await SavedRevisionAsync();
     }
 
     /// <summary>Replaces the versions of a Rate Card in its edit form, and returns the revision the ERP says it saved.</summary>
@@ -118,12 +107,11 @@ public abstract partial class JourneyPage(MasterDataSyncUiFixture sync) : Traced
     }
 
     /// <summary>Waits for the status beside the form to say the save went through, and returns the revision it names.</summary>
-    protected async Task<int> SavedRevisionAsync(bool created = false)
+    protected async Task<int> SavedRevisionAsync()
     {
         var status = Page.GetByRole(AriaRole.Status).Filter(new() { HasText = "Master-data revision" });
 
-        // A new record's form moves on to the record's edit page as soon as it is saved, so a press that was sent again lands there and finds nothing to change.
-        await Expect(status).ToContainTextAsync(new Regex(created ? @"Saved at Master-data revision|Nothing changed" : "Saved at Master-data revision"));
+        await Expect(status).ToContainTextAsync("Saved at Master-data revision");
         return int.Parse(Revision().Match(await status.InnerTextAsync()).Groups[1].Value, CultureInfo.InvariantCulture);
     }
 
@@ -140,6 +128,4 @@ public abstract partial class JourneyPage(MasterDataSyncUiFixture sync) : Traced
         return number;
     }
 
-    /// <summary>The Transport Order's page in the TMS UI.</summary>
-    protected Task<IPage> OpenTransportOrderAsync(string number) => OpenTmsAsync($"/transport-orders/{number}");
 }

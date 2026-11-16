@@ -13,11 +13,13 @@ public sealed class FailureJourneyTests(MasterDataSyncUiFixture sync) : JourneyP
     public async Task WhenTheTmsRefusesTheCommand_TheErpEditStillSaves_AndTheConsoleShowsTheDeadLetter()
     {
         var shipper = NewId("SHP");
+        await CreateShipperAsync(shipper, "Shipper");
+        await Sync.WaitForReplicaAsync("ShipperCopies", shipper, 1, Ct);
         Sync.Proxy.Script($"/v1/shippers/{shipper}", Fault.Answer(400));
 
-        var revision = await CreateShipperAsync(shipper, "Refused Shipper");
+        var revision = await RenameShipperAsync(shipper, "Refused Shipper");
 
-        revision.Should().Be(1);
+        revision.Should().Be(2);
         await OpenErpAsync("/");
         await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipper })).ToContainTextAsync("Refused Shipper");
         var console = await Page.Context.NewPageAsync();
@@ -25,6 +27,6 @@ public sealed class FailureJourneyTests(MasterDataSyncUiFixture sync) : JourneyP
         await Expect(console.GetByRole(AriaRole.Main)).ToContainTextAsync("TmsCallRefused");
         await Expect(console.GetByRole(AriaRole.Main)).ToContainTextAsync("The test scripted 400.");
         // The one call the worker made for the Shipper is the one the TMS refused: a client error isn't retried.
-        Sync.Proxy.CallsTo($"/v1/shippers/{shipper}").Should().ContainSingle();
+        Sync.Proxy.CallsTo($"/v1/shippers/{shipper}").Should().HaveCount(2, "the create went through, and the refused edit was sent once and not retried");
     }
 }

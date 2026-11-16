@@ -25,11 +25,11 @@ public sealed class RateCardJourneyTests(MasterDataSyncUiFixture sync) : Journey
         await Sync.WaitForReplicaAsync("RateCardCopies", card, revision, Ct);
         var after = await SubmitRatedOrderAsync(shipper);
 
-        var rated = await OpenTransportOrderAsync(after);
+        var rated = await OpenTmsAsync($"/transport-orders/{after}");
         await Expect(rated.GetByText($"{card}, version 2")).ToBeVisibleAsync();
         await Expect(rated.GetByRole(AriaRole.Definition).Filter(new() { HasText = "EUR 130.00" }).First).ToBeVisibleAsync();
 
-        var earlier = await OpenTransportOrderAsync(before);
+        var earlier = await OpenTmsAsync($"/transport-orders/{before}");
         await Expect(earlier.GetByText($"{card}, version 1")).ToBeVisibleAsync();
         await Expect(earlier.GetByRole(AriaRole.Definition).Filter(new() { HasText = "EUR 65.00" }).First).ToBeVisibleAsync();
     }

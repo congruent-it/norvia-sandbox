@@ -19,7 +19,7 @@ public sealed class ShipperJourneyTests(MasterDataSyncUiFixture sync) : JourneyP
         await Expect(Page.GetByRole(AriaRole.Row).Filter(new() { HasText = shipper })).ToContainTextAsync(name);
         await Sync.WaitForReplicaAsync("ShipperCopies", shipper, 1, Ct);
         var order = await SubmitRatedOrderAsync(shipper);
-        var tms = await OpenTransportOrderAsync(order);
+        var tms = await OpenTmsAsync($"/transport-orders/{order}");
         await Expect(tms.GetByRole(AriaRole.Definition).Filter(new() { HasText = name })).ToBeVisibleAsync();
     }
 }
