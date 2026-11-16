@@ -1,5 +1,6 @@
 @page "/vehicles/new"
 @page "/vehicles/{Id}/edit"
+@rendermode InteractiveServer
 @attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
 @using Mediator
 @using Norvia.Erp.Application.MasterData.Vehicles
@@ -23,11 +24,11 @@
     else
     {
         <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 32rem">
-            <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
-            <FluentTextField @bind-Value="_registration" Label="Registration" MaxLength="@MaxRegistrationLength" Required="true" />
-            <FluentSelect TOption="string" @bind-Value="_type" Label="Type" Items="MasterDataChoices.VehicleTypes" />
-            <FluentNumberField TValue="int" @bind-Value="_payloadKg" Label="Payload (kg)" Min="1" />
-            <FluentNumberField TValue="int" @bind-Value="_palletPlaces" Label="Pallet places" Min="0" />
+            <FluentTextField @bind-Value="_id" Label="ID" aria-label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+            <FluentTextField @bind-Value="_registration" Label="Registration" aria-label="Registration" MaxLength="@MaxRegistrationLength" Required="true" />
+            <FluentSelect TOption="string" @bind-Value="_type" Label="Type" aria-label="Type" Items="MasterDataChoices.VehicleTypes" />
+            <FluentNumberField TValue="int" @bind-Value="_payloadKg" Label="Payload (kg)" aria-label="Payload (kg)" Min="1" />
+            <FluentNumberField TValue="int" @bind-Value="_palletPlaces" Label="Pallet places" aria-label="Pallet places" Min="0" />
             <FluentCheckbox @bind-Value="_active" Label="Active" />
             <div>
                 <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="Save Vehicle">Save</FluentButton>

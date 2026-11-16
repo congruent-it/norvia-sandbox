@@ -4,8 +4,8 @@
 
 @* The create and edit form of a Shipper or a Carrier: an ID that is new, a name and the active flag. *@
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 32rem">
-    <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
-    <FluentTextField @bind-Value="_name" Label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
+    <FluentTextField @bind-Value="_id" Label="ID" aria-label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+    <FluentTextField @bind-Value="_name" Label="Name" aria-label="Name" MaxLength="@MasterDataFormRules.MaxNameLength" Required="true" />
     <FluentCheckbox @bind-Value="_active" Label="Active" />
     <div>
         <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="@($"Save {Kind}")">Save</FluentButton>

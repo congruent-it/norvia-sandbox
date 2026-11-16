@@ -7,9 +7,9 @@
 @* The create and edit form of a Rate Card or a Carrier Rate Card: its ID, the party it belongs to, and its whole list of dated versions
    as JSON in the shape of the ERP API's body. A party has one card, and the versions must not overlap in time; the ERP API checks both. *@
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="12" Style="max-width: 48rem">
-    <FluentTextField @bind-Value="_id" Label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
-    <FluentSelect TOption="string" @bind-Value="_partyId" Label="@PartyKind" Items="Parties.Select(party => party.Id)" OptionText="@(id => PartyText(id))" OptionValue="@(id => id)" />
-    <FluentTextArea @bind-Value="_versions" Label="Versions (JSON)" Rows="18" Style="width: 100%; font-family: monospace" />
+    <FluentTextField @bind-Value="_id" Label="ID" aria-label="ID" Disabled="Editing" MaxLength="@MasterDataFormRules.MaxIdLength" Required="true" />
+    <FluentSelect TOption="string" @bind-Value="_partyId" Label="@PartyKind" aria-label="@PartyKind" Items="Parties.Select(party => party.Id)" OptionText="@(id => PartyText(id))" OptionValue="@(id => id)" />
+    <FluentTextArea @bind-Value="_versions" Label="Versions (JSON)" aria-label="Versions (JSON)" Rows="18" Style="width: 100%; font-family: monospace" />
     <div>
         <FluentButton Appearance="Appearance.Accent" Disabled="_running" OnClick="SaveAsync" aria-label="@($"Save {Kind}")">Save</FluentButton>
         <a href="@ListPath" class="ml-2">Back to the @Kind list</a>

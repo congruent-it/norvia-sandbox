@@ -67,6 +67,13 @@ public static class TestAppHost
     public static void RemoveWhatTheMasterDataSyncTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
         builder.Remove([.. Unneeded.Where(name => name is not "master-data-sync-worker")]);
 
+    /// <summary>
+    /// Takes the resources the E3 master-data sync's UI tests don't use out of the AppHost. They keep what the integration tests keep, with the TMS's UI, and the Integration console, where
+    /// an operator sees a message the sync dead-lettered. The Estate health check waits for the console and nothing here reads it, so it goes.
+    /// </summary>
+    public static void RemoveWhatTheMasterDataSyncUiTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
+        builder.Remove([.. Unneeded.Where(name => name is not ("master-data-sync-worker" or "integration-console-web")), "health-check-web"]);
+
     private static void Remove(this IDistributedApplicationTestingBuilder builder, string[] unneeded)
     {
         ArgumentNullException.ThrowIfNull(builder);

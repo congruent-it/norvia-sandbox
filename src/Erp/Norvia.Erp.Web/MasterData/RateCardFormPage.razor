@@ -1,5 +1,6 @@
 @page "/rate-cards/new"
 @page "/rate-cards/{Id}/edit"
+@rendermode InteractiveServer
 @attribute [Authorize(Policy = FinanceSignIn.FinancePolicy)]
 @using Mediator
 @using Norvia.Erp.Application.MasterData.RateCards
