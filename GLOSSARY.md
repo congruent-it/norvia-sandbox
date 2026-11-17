@@ -200,6 +200,10 @@ _Avoid_: status event, status update, scan, milestone
 What a Shipper is shown of where its Transport Order stands: Received, Scheduled, Collected, In transit or Delivered. It is derived from the Transport Order and its Shipment, and it hides how Norvia carries the goods, so a Shipment that goes back to planning before collection stays Scheduled. It never moves backwards.
 _Avoid_: Shipment status (that is Norvia's own, finer view), tracking state, milestone
 
+**Tracking code**:
+A random code the TMS gives each Transport Order, carried in the Consignee's tracking link. Whoever holds it can read that one Transport Order's Consignee view, with no token and no Persona. It expires after delivery and can be replaced by the Planner, and it is never logged ([ADR 0052](docs/adr/0052-consignees-track-with-a-tracking-code-in-a-link-and-no-token.md)).
+_Avoid_: tracking number, Shipper reference, Transport Order number
+
 **Stale**:
 Said of a Shipment on its way whose next expected Tracking event hasn't arrived in time: not collected after its collection window, silent for too long in transit, or not delivered after its delivery window. It is only a flag for the Planner.
 _Avoid_: overdue (that is for Carrier bookings), late, delayed
