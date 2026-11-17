@@ -23,6 +23,7 @@
     <Using Include="Norvia.Tms.TestSupport.Billing" />
     <Using Include="Norvia.Tms.TestSupport.Capacity" />
     <Using Include="Norvia.Tms.TestSupport.CarrierBookings" />
+    <Using Include="Norvia.Tms.TestSupport.ConsigneeTracking" />
     <Using Include="Norvia.Tms.TestSupport.Exceptions" />
     <Using Include="Norvia.Tms.TestSupport.Planning" />
     <Using Include="Norvia.Tms.TestSupport.ProofsOfDelivery" />
