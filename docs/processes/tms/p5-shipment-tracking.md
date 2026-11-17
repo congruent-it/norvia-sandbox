@@ -304,7 +304,7 @@ These were left out on purpose while designing P5, each with its reason.
 - **The Planner recording a Tracking event by hand**, for example when a Carrier phones in. It would add a third source with its own permissions, and it would cover up exactly the silent failure the demo exists to expose.
 - **A TMS-calculated ETA.** It would need routing data the sandbox doesn't have.
 - **What to do about an exception.** P5 records Collection failed, Delivery failed and Damaged. Re-planning or notifying the Shipper is [P7](p7-exception-handling.md).
-- **Showing the Shipper its progress.** That is [P8](p8-shipper-visibility.md), which also defers pushing progress and Consignee tracking.
+- **Showing the Shipper its progress.** That is [P8](p8-shipper-visibility.md), which also defers pushing progress, and gives the Consignee a tracking link.
 - **Driver and vehicle details from the Carrier.** Tracking doesn't need them either.
 - **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built (the alert toggles as `flowsWithoutFailedRunAlert` and `entitiesWithoutDeadLetterAlert`):
   - Presenter-panel fault: a Carrier sends a status code outside the mapping table (for example `DLV` instead of `POD`), so the Carrier-tracking Logic App run fails. Built: `carrier-tracking-unmapped-code` ([as-found](../../operations/as-found.md#faults-of-the-partner-portal)).

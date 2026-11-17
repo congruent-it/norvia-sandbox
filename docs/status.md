@@ -26,7 +26,7 @@ The estate (API Management, Logic Apps, Service Bus, monitoring, Entra) deploys 
 | E3 master-data sync, ERP UI forms | The Shipper, the Carrier, the Rate Card, the Carrier Rate Card, the Vehicle and the Driver are edited in the ERP API and replicated to the TMS. The ERP UI's forms are not built | [#907](https://github.com/congruent-it/norvia-sandbox/issues/907) |
 | Fuller Rate Card, re-rating | Deferred | [#908](https://github.com/congruent-it/norvia-sandbox/issues/908) |
 | Push Shipment progress to the Shipper | Deferred | [#909](https://github.com/congruent-it/norvia-sandbox/issues/909) |
-| Consignee tracking | Deferred | [#910](https://github.com/congruent-it/norvia-sandbox/issues/910) |
+| Consignee tracking | The tracking code, the link, the TMS read and the Partner portal page are built ([P8](processes/tms/p8-shipper-visibility.md#consignee-tracking)). The Consignee notification is not | [#910](https://github.com/congruent-it/norvia-sandbox/issues/910) |
 | Amend and cancel a Transport Order | Deferred | [#912](https://github.com/congruent-it/norvia-sandbox/issues/912) |
 | Carrier backing out, booking amendments | Deferred | [#913](https://github.com/congruent-it/norvia-sandbox/issues/913) |
 | Several Shipments per Transport Order | Deferred | [#914](https://github.com/congruent-it/norvia-sandbox/issues/914) |

@@ -393,7 +393,7 @@ These were left out on purpose while designing P7, each with its reason.
 - **Sending an agreed delivery window to the Carrier as a booking amendment.** The Planner agreed it with the Carrier already. It needs a new Carrier message.
 - **Automatic Shipper notification, and automatic re-planning.** The Planner decides, as in P3 to P6. The TMS only opens Exceptions.
 - **A Customer service role** that works Exceptions and talks to Shippers. The Planner does it for now. The role can be added without changing the model.
-- **Shipper replies, email notifications and notifying the Consignee.** The notification is one-way to the Shipper's endpoint. Consignee tracking is deferred in [P8](p8-shipper-visibility.md).
+- **Shipper replies, email notifications and notifying the Consignee.** The notification is one-way to the Shipper's endpoint. Consignee tracking is in [P8](p8-shipper-visibility.md#consignee-tracking).
 - **Claims.** Damage and shortages are settled outside the TMS and resolved as `ClaimHandledOutsideTms`. They don't affect invoicing: an open Exception holds billing back until it is resolved, and Finance issues a Credit note by hand if a claim is settled against the invoice ([P9](p9-freight-settlement.md#billable-is-final)).
 - **Stale opening an Exception.** Stale means the Shipment has gone quiet, which is about the integration's health, not news for the Shipper.
 - **As-found toggles and presenter-panel faults.** They are built in the [as-found estate](../../operations/as-found.md). The candidates, all built (the alert toggle as `flowsWithoutFailedRunAlert`):

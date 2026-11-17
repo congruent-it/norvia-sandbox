@@ -11,6 +11,7 @@ using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
 using Norvia.PartnerPortal.Application.CarrierShipments;
 using Norvia.PartnerPortal.Application.CarrierShipments.SendProofOfDelivery;
 using Norvia.PartnerPortal.Application.Faults;
+using Norvia.PartnerPortal.Application.ConsigneeTracking;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
@@ -339,6 +340,59 @@ internal sealed partial class NorviaPartnerApiClient(
                 await response.Content.ReadAsByteArrayAsync(token)),
             cancellationToken);
 
+    public async Task<TrackingAnswer<ConsigneeTrackingView>> GetConsigneeViewAsync(string trackingCode, string? clientIp, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(trackingCode);
+
+        using var span = activities.Source.StartActivity("Get Consignee view", ActivityKind.Internal);
+        TrackingAnswer<ConsigneeTrackingView> answer;
+        try
+        {
+            var key = options.Value.ConsigneeSubscriptionKey
+                ?? throw new InvalidOperationException("No subscription key is configured for Consignee tracking.");
+            // Its own API next to the Partner API, with the code in a header, never the URL, so no log of either holds it (ADR 0052).
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("../../consignee/v1/view", UriKind.Relative));
+            request.Headers.Add("Ocp-Apim-Subscription-Key", key);
+            request.Headers.Add("X-Tracking-Code", trackingCode);
+            if (!string.IsNullOrWhiteSpace(clientIp))
+            {
+                request.Headers.Add("X-Client-IP", clientIp);
+            }
+
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            var correlationId = CorrelationIdOf(response);
+            answer = response.IsSuccessStatusCode
+                ? TrackingAnswer.Found(ConsigneeTrackingFormat.ReadView(await response.Content.ReadAsStringAsync(cancellationToken)), correlationId)
+                : ShipperTrackingFailures.Read<ConsigneeTrackingView>((int)response.StatusCode, await response.Content.ReadAsStringAsync(cancellationToken), correlationId);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Unreachable, too slow, no key to call with, or an answer in no format we know: the Consignee sees none.
+            LogTrackingQueryFailed(exception, "consignee", "Get Consignee view");
+            answer = TrackingAnswer.Unavailable<ConsigneeTrackingView>(ShipperTrackingFailures.UnavailableText);
+        }
+
+        // The tracking code is a credential: the trail has the flow, the outcome and the correlation ID, and nothing that opens the Transport Order.
+        var keys = new Dictionary<string, object?> { ["flow"] = "consignee-tracking" };
+        foreach (var (name, value) in OutcomeOf(answer.Outcome))
+        {
+            keys[name] = value;
+        }
+
+        if (answer.MessageId is { } messageId)
+        {
+            keys["correlationId"] = messageId;
+        }
+
+        using (logger.BeginScope(keys))
+        {
+            LogConsigneeQueried(answer.Outcome);
+        }
+
+        return answer;
+    }
+
     private static async Task<ShipperTrackingDetail> ReadDetailAsync(HttpResponseMessage response, CancellationToken cancellationToken) =>
         ShipperTrackingFormat.ReadDetail(await response.Content.ReadAsStringAsync(cancellationToken));
 
@@ -504,4 +558,7 @@ internal sealed partial class NorviaPartnerApiClient(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Norvia answered the tracking query ({Query}) by Persona {PersonaId}: {Outcome}")]
     private partial void LogTrackingQueried(string personaId, string query, TrackingOutcome outcome);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Norvia answered a Consignee's tracking query: {Outcome}")]
+    private partial void LogConsigneeQueried(TrackingOutcome outcome);
 }

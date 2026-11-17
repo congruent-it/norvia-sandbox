@@ -1,0 +1,174 @@
+<policies>
+  <inbound>
+    <base />
+    <set-variable name="correlationId" value="@(Guid.NewGuid().ToString())" />
+    <!--
+      The Consignee operation is token-less (ADR 0052): the tracking code in the X-Tracking-Code header is the credential, and it is never logged,
+      traced or put in a URL. Abuse is limited here, so guessing is slow: 60 calls a minute for each end-user client IP (the portal passes it in X-Client-IP, as it is the caller), and 10 answers of
+      TrackingCodeNotFound a minute for each client IP, counted in the outbound section.
+    -->
+    <set-variable name="clientIp" value="@(context.Request.Headers.GetValueOrDefault(&quot;X-Client-IP&quot;, context.Request.IpAddress))" />
+    <rate-limit-by-key calls="60" renewal-period="60" counter-key="@((string)context.Variables[&quot;clientIp&quot;] + &quot;:consignee-tracking&quot;)" />
+    <cache-lookup-value key="@(&quot;consignee-misses:&quot; + (string)context.Variables[&quot;clientIp&quot;])" variable-name="misses" />
+    <choose>
+      <when condition="@(context.Variables.ContainsKey(&quot;misses&quot;) &amp;&amp; (int)context.Variables[&quot;misses&quot;] &gt;= 10)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Too many tracking codes that matched nothing.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="consignee-tracking" />
+          <metadata name="transportOrderNumber" value="none" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="RateLimited" />
+        </trace>
+        <return-response>
+          <set-status code="429" reason="Too Many Requests" />
+          <set-header name="Retry-After" exists-action="override">
+            <value>60</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("code", "RateLimited"),
+            new JProperty("text", "Too many tries. Try again in a minute.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <set-backend-service backend-id="tms-api" />
+    <rewrite-uri template="/v1/consignee-tracking/view" />
+    <authentication-managed-identity resource="{{tms-api-client-id}}" client-id="{{api-management-identity-client-id}}" />
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
+    </set-header>
+    <set-header name="Ocp-Apim-Subscription-Key" exists-action="delete" />
+    <set-header name="X-Client-IP" exists-action="delete" />
+  </inbound>
+  <backend>
+    <!-- A short wait and no retry: a failure reaches the Consignee at once. -->
+    <forward-request timeout="5" follow-redirects="false" />
+  </backend>
+  <outbound>
+    <base />
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
+    </set-header>
+    <set-header name="Cache-Control" exists-action="override">
+      <value>no-store</value>
+    </set-header>
+    <choose>
+      <when condition="@(context.Response.StatusCode &gt;= 500)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS answered with a server error.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="consignee-tracking" />
+          <metadata name="transportOrderNumber" value="none" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="TmsUnavailable" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "Tracking is temporarily unavailable. Try again shortly.")).ToString())</set-body>
+        </return-response>
+      </when>
+      <when condition="@(context.Response.StatusCode == 404)">
+        <!-- A wrong, expired and replaced code is one answer, the same status and body: nothing says whether a code ever existed. -->
+        <set-variable name="missCount" value="@(context.Variables.ContainsKey(&quot;misses&quot;) ? (int)context.Variables[&quot;misses&quot;] + 1 : 1)" />
+        <cache-store-value key="@(&quot;consignee-misses:&quot; + (string)context.Variables[&quot;clientIp&quot;])" value="@((int)context.Variables[&quot;missCount&quot;])" duration="60" />
+        <trace source="norvia-partner-api" severity="information">
+          <message>A tracking code matched no Transport Order.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="consignee-tracking" />
+          <metadata name="transportOrderNumber" value="none" />
+          <metadata name="outcome" value="Refused" />
+          <metadata name="failureCode" value="TrackingCodeNotFound" />
+        </trace>
+        <return-response>
+          <set-status code="404" reason="Not Found" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>{"code":"TrackingCodeNotFound","text":"We can't find this shipment."}</set-body>
+        </return-response>
+      </when>
+      <when condition="@(context.Response.StatusCode == 200)">
+        <!-- The TMS sends the Transport Order number so the logs can name it. It is read here and never passed on. -->
+        <set-variable name="transportOrderNumber" value="@((string)context.Response.Body.As&lt;JObject&gt;(preserveContent: true)[&quot;transportOrderNumber&quot;])" />
+        <set-body template="liquid" parse-date="false">[[consignee-tracking.liquid]]</set-body>
+      </when>
+    </choose>
+    <!-- The map gives an empty code for a Tracking status or event type the Consignee format has no code for. The Consignee gets no wrong answer. -->
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200 &amp;&amp; System.Text.RegularExpressions.Regex.IsMatch(context.Response.Body.As&lt;string&gt;(preserveContent: true), &quot;\&quot;(status|code)\&quot;\\s*:\\s*\&quot;\&quot;&quot;))">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS answered with a Tracking status or event the Consignee format has no code for.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="consignee-tracking" />
+          <metadata name="transportOrderNumber" value="@((string)context.Variables[&quot;transportOrderNumber&quot;])" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="TrackingNotMapped" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "Tracking is temporarily unavailable. Try again shortly.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <choose>
+      <when condition="@(context.Response.StatusCode == 200)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>Answered the Consignee</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="consignee-tracking" />
+          <metadata name="transportOrderNumber" value="@((string)context.Variables[&quot;transportOrderNumber&quot;])" />
+          <metadata name="outcome" value="Succeeded" />
+        </trace>
+      </when>
+    </choose>
+  </outbound>
+  <on-error>
+    <base />
+    <set-variable name="correlationId" value="@(context.Variables.ContainsKey(&quot;correlationId&quot;) ? (string)context.Variables[&quot;correlationId&quot;] : Guid.NewGuid().ToString())" />
+    <choose>
+      <when condition="@(context.LastError.Source == &quot;forward-request&quot;)">
+        <trace source="norvia-partner-api" severity="information">
+          <message>The TMS did not answer in time.</message>
+          <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+          <metadata name="flow" value="consignee-tracking" />
+          <metadata name="transportOrderNumber" value="none" />
+          <metadata name="outcome" value="Failed" />
+          <metadata name="failureCode" value="TmsUnavailable" />
+        </trace>
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@(new JObject(
+            new JProperty("messageId", (string)context.Variables["correlationId"]),
+            new JProperty("text", "Tracking is temporarily unavailable. Try again shortly.")).ToString())</set-body>
+        </return-response>
+      </when>
+    </choose>
+    <trace source="norvia-partner-api" severity="information">
+      <message>@(context.LastError.Message)</message>
+      <metadata name="correlationId" value="@((string)context.Variables[&quot;correlationId&quot;])" />
+      <metadata name="flow" value="consignee-tracking" />
+      <metadata name="transportOrderNumber" value="none" />
+      <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 || context.Response.StatusCode == 429 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
+      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+    </trace>
+    <set-header name="X-Correlation-ID" exists-action="override">
+      <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
+    </set-header>
+  </on-error>
+</policies>

@@ -21,7 +21,7 @@ The model is [p8-shipper-visibility.bpmn](p8-shipper-visibility.bpmn), which ope
 P8 is **pull only**. The Shipper queries, and nothing is sent to it. A query goes from API Management straight to the TMS, because Logic Apps are never used for read actions (ADR 0003). No Logic App, queue or read model sits in between, so the Shipper always sees what the TMS believes.
 
 - **Shippers** are designed here in full, through their Personas.
-- **Consignees** get no tracking view. See [Deferred](#deferred).
+- **Consignees** track through a link with a tracking code and no token, on a page of the Partner portal ([ADR 0052](../../adr/0052-consignees-track-with-a-tracking-code-in-a-link-and-no-token.md)). See [Consignee tracking](#consignee-tracking).
 - **Telling the Shipper** about a problem stays with [P7](p7-exception-handling.md): the Planner decides what the Shipper hears, through a Shipper notification.
 
 ## Tracking status
@@ -141,6 +141,18 @@ While `Agents:Enabled` is on, the list and the detail also show a panel where th
 
 In Azure the answer is written by the real model (#879) from the same data; the Persona's question and the data go to the Foundry project of the Intake agent, which keeps nothing (`store: false`) and traces no content. Over a per-Persona limit the Shipper is refused without a model call. The rest of the screen works as before in every case. The Partner portal's [architecture page](../../architecture/partner-portal-architecture.md#the-shipper-tracking-assistant) describes the parts.
 
+## Consignee tracking
+
+A Consignee is whoever stands at the delivery address. It has no system, no Persona and no sign-in, so it tracks with a link the Shipper or the Consignee notification (#983) hands it, `/track/{code}` on the Partner portal ([ADR 0052](../../adr/0052-consignees-track-with-a-tracking-code-in-a-link-and-no-token.md)). The code opens one Transport Order and nothing else.
+
+- **The tracking code.** The TMS generates it when the Transport Order is Accepted: 16 random Crockford base32 characters (80 bits), unrelated to any other field. It works from Accepted and expires 30 days after the Transport Order's Delivered, or after its last progress Tracking event if it is never delivered. The Planner reads it on the Transport Order's page in the TMS UI (the **Consignee tracking link** card) and can **replace** it: the old code stops working at once. A Transport Order accepted before codes existed has none until the Planner replaces it.
+- **What the Consignee sees.** The Tracking status, the progress Tracking events (type, time, city and country), the ETA, the delivery window (the agreed one if there is one), the last update, the collection and delivery places, and the current Proof of delivery as received by, delivery time and condition, without its files. Never the Shipper reference, the Shipper, the Carrier, the Shipment number, Exceptions, remarks, Stale or a price. The TMS makes this view in a read model of its own, not by filtering the Shipper's.
+- **The path.** The Partner portal calls the `consignee-tracking` product of API Management (`GET /consignee/v1/view`) with the product's subscription key and the code in the `X-Tracking-Code` header, so the code is in no URL log. No token is validated. API Management calls the TMS with its managed identity (role `ConsigneeTracking.Read`) and a correlation ID, and an API Management policy changes the format only, to the [Consignee tracking format](../../../contracts/partner-api/consignee-tracking.v1.schema.json) (JSON, every time a UTC instant, which the page shows in Rotterdam's time).
+- **One answer for a wrong code.** A malformed, unknown, expired or replaced code is the same `TrackingCodeNotFound` answer, with the same status, body and shape. The page says "We can't find this shipment. Check the link, or contact the sender."
+- **Abuse limits.** API Management allows 60 calls a minute and 10 `TrackingCodeNotFound` answers a minute for each client IP. A call over a limit is answered 429 and logged `Refused` with `RateLimited`.
+- **Nothing personal in the logs.** The code is a credential and is never logged, traced or put in a URL log: the TMS and API Management log the Transport Order number it resolved to, or `none`, under the flow `consignee-tracking`.
+- **The page.** A page of its own, outside the Entra gate of ADR 0024, with no script and no stylesheet to fetch. It reads no Persona. It shows the last update as the Shipper's screen does (the time, or a dash before collection) and the time it was fetched, and looks again every minute. The response says `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
+
 ## TMS API
 
 The Shipper tracking API returns only the Canonical Model (ADR 0003).
@@ -151,6 +163,8 @@ Who holds each role, and what else each identity may reach, is in [Identity and 
 |---|---|---|
 | List, get and find Transport Orders for a Shipper | API Management's managed identity | `ShipperTracking.Read` |
 | Read a current Proof of delivery file for a Shipper | API Management's managed identity | `ShipperTracking.Read` |
+| Get a Consignee's view by tracking code | API Management's managed identity | `ConsigneeTracking.Read` |
+| Read and replace a Transport Order's tracking code | The TMS UI | `TransportOrders.Manage` |
 
 Only API Management holds `ShipperTracking.Read`. The TMS trusts the Shipper ID header only from that caller, as it trusts the Shipper from the intake Logic App in P1. Every operation is scoped to that Shipper. The role is separate from the Planner permissions, so a Shipper-scoped call can never reach the Planner's views. P6's "Read a Proof of delivery file" stays the Planner's.
 
@@ -226,7 +240,7 @@ Designed in this document and not built yet:
 
 | Gap | Where it stands |
 |---|---|
-| Consignee tracking, pushing progress to the Shipper, a tracking read model or caching, the Freight Charge, Fulfilment Transport Orders | Left out on purpose ([Deferred](#deferred)) |
+| Pushing progress to the Shipper, a tracking read model or caching, the Freight Charge, Fulfilment Transport Orders | Left out on purpose ([Deferred](#deferred)) |
 | As-found toggles and presenter-panel faults for P8 | Two toggles, `shipperTrackingCached` and `noShipperRateLimit`, and the fault `tms-shipper-tracking-api-failing`, which makes the TMS Shipper tracking API fail for a few minutes ([Deferred](#deferred)). [Failure behaviour](../../architecture/failure-behaviour.md#p8-shipper-visibility) names the rows they change |
 | Alerts on P8 | None built: failed requests on the Shipper tracking operations are planned only ([monitoring.bicep](../../../infra/estate/monitoring.bicep) declares no alert rule) |
 | The Integration console's panels for P8 | None. API Management's failures can be found by search only, with no panel |
@@ -236,7 +250,6 @@ Designed in this document and not built yet:
 These were left out on purpose while designing P8, each with its reason.
 
 - **Pushing progress to the Shipper**, including telling it a Shipment is booked (P4). Pull shows the headline incident as it happened: the Shipper's screen stays on In transit. Push would add a second outbound Logic App path next to P7's Shipper notifications. When it is built, it can consume the Shipment events of P3 to P7.
-- **Consignee tracking.** It needs another identity model, such as a link with a tracking code and no token, and a new kind of Persona.
 - **Exceptions and exception Tracking events.** The Planner decides what the Shipper hears (P7, ADR 0011).
 - **Goods going back to the Shipper.** P7's `ReturnedToShipper` doesn't change the Shipment, so the Shipper stays on its last Tracking status. It needs return legs, deferred with several Shipments per Transport Order (ADR 0007). The Shipper hears through a P7 notification.
 - **A tracking read model or response caching.** Reading the TMS directly keeps the Shipper's view equal to the TMS's. Caching comes back only as an as-found toggle.

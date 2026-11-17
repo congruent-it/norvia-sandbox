@@ -108,6 +108,27 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
     /// <summary>The longest name of who released.</summary>
     public const int MaxReleasedByLength = 200;
 
+    /// <summary>
+    /// What the Consignee tracks the Transport Order with (ADR 0052), set when it is Accepted. Null for a Rejected booking, and for an
+    /// Accepted one from before the code existed, which the Planner can give one with <see cref="ReplaceTrackingCode"/>.
+    /// </summary>
+    public TrackingCode? TrackingCode { get; private set; }
+
+    /// <summary>
+    /// Gives an Accepted Transport Order a new tracking code, and the old one stops working at once. Returns the new code, or null,
+    /// changing nothing, for a Rejected booking, which has no Consignee to track it.
+    /// </summary>
+    public TrackingCode? ReplaceTrackingCode()
+    {
+        if (Number is null)
+        {
+            return null;
+        }
+
+        TrackingCode = TransportOrders.TrackingCode.Generate();
+        return TrackingCode;
+    }
+
     /// <summary>The number of the Transport Order's one Shipment, once it is Planned; null until then.</summary>
     public ShipmentNumber? ShipmentNumber { get; private set; }
 
@@ -310,6 +331,7 @@ public sealed class TransportOrder : EntityBase<TransportOrderId>, IAggregateRoo
             Number = number,
             NumberText = number.Value,
             Status = TransportOrderStatus.Accepted,
+            TrackingCode = TransportOrders.TrackingCode.Generate(),
             ShipperReference = details.ShipperReference,
             BillingState = channel == IntakeChannel.Wms ? TransportOrders.BillingState.NotBilledSeparately : TransportOrders.BillingState.NotYetBillable,
             RatingResult = channel == IntakeChannel.Wms ? TransportOrders.RatingResult.NotRatedSeparately : TransportOrders.RatingResult.NotYetRated,

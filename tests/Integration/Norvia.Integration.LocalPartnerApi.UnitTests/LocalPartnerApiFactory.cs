@@ -20,6 +20,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
 {
     public const string BrouwerKey = "brouwer-subscription-key";
     public const string VanDijkKey = "van-dijk-subscription-key";
+    public const string ConsigneeKey = "consignee-subscription-key";
     public const string BrouwerClientId = "norvia-local-persona-brouwer-dranken";
     public const string VanDijkClientId = "norvia-local-persona-van-dijk-transport";
     public const string Issuer = "https://norvia.local/tokens";
@@ -64,6 +65,7 @@ public sealed class LocalPartnerApiFactory : WebApplicationFactory<Program>
         {
             ["PartnerApi:SubscriptionKeys:brouwer-dranken"] = BrouwerKey,
             ["PartnerApi:SubscriptionKeys:van-dijk-transport"] = VanDijkKey,
+            ["PartnerApi:ConsigneeSubscriptionKey"] = ConsigneeKey,
             ["PartnerApi:ShippersByClientId:" + BrouwerClientId] = "SHP-0001",
             ["PartnerApi:CarriersByClientId:" + VanDijkClientId] = "CAR-0001",
             ["PartnerApi:Tokens:Issuer"] = Issuer,

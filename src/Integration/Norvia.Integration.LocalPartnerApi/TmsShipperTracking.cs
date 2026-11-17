@@ -42,6 +42,30 @@ internal sealed partial class TmsShipperTracking(HttpClient http, IOptions<TmsOp
         }
     }
 
+    /// <summary>
+    /// A Consignee's view by tracking code (ADR 0052): the code goes in a header, never the URL, so no log of either side holds it. The
+    /// same identity, API Management's, with the Consignee tracking role.
+    /// </summary>
+    public async Task<TmsAnswer> QueryConsigneeAsync(string trackingCode, string correlationId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/v1/consignee-tracking/view", UriKind.Relative));
+            request.Headers.Add("X-Tracking-Code", trackingCode);
+            request.Headers.Add("X-Correlation-ID", correlationId);
+            request.Headers.Authorization = new AuthenticationHeaderValue(
+                "Bearer", TmsTokens.Create(options.Value.Tokens, time, options.Value.ShipperTrackingClientId!, "ConsigneeTracking.Read"));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            return new TmsAnswer((int)response.StatusCode, await response.Content.ReadAsByteArrayAsync(cancellationToken), response.Content.Headers.ContentType?.ToString(), null);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            LogTmsUnreachable(exception);
+            return TmsAnswer.Unreachable;
+        }
+    }
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "The TMS couldn't be reached, or didn't answer in time")]
     private partial void LogTmsUnreachable(Exception exception);
 }

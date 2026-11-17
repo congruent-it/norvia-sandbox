@@ -54,4 +54,7 @@ internal sealed class RecordingPartnerApi : INorviaPartnerApi
 
     public Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(Persona persona, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken) =>
         throw new NotSupportedException();
+
+    public Task<TrackingAnswer<Norvia.PartnerPortal.Application.ConsigneeTracking.ConsigneeTrackingView>> GetConsigneeViewAsync(string trackingCode, string? clientIp, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
 }

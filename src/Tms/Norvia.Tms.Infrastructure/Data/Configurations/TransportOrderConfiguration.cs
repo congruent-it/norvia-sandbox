@@ -136,6 +136,13 @@ internal sealed class TransportOrderConfiguration : IEntityTypeConfiguration<Tra
         builder.Property(order => order.BillingCorrelationId)
             .HasConversion(id => id!.Value, value => new CorrelationId(value))
             .HasMaxLength(128);
+
+        // What the Consignee tracks the Transport Order with (ADR 0052). Unique, so a code opens one Transport Order, and found by it.
+        builder.Property(order => order.TrackingCode)
+            .HasConversion(code => code!.Value, value => TrackingCode.FromStored(value))
+            .HasMaxLength(TrackingCode.Length);
+        builder.HasIndex(order => order.TrackingCode).IsUnique().HasFilter("[TrackingCode] IS NOT NULL");
+
         builder.Property(order => order.ReleasedWithoutProofOfDelivery);
         builder.Property(order => order.ReleasedBy).HasMaxLength(TransportOrder.MaxReleasedByLength);
         builder.Property(order => order.ReleaseRemark).HasMaxLength(TransportOrder.MaxReleaseRemarkLength);

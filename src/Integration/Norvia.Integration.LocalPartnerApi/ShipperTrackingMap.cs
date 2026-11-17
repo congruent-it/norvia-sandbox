@@ -15,6 +15,7 @@ internal sealed class ShipperTrackingMap
 {
     private readonly Template _detail = Parse("shipper-tracking.liquid");
     private readonly Template _list = Parse("shipper-tracking-list.liquid");
+    private readonly Template _consignee = Parse("consignee-tracking.liquid");
 
     // A parsed DotLiquid template keeps its state while it renders, so the calls take turns.
     private readonly Lock _render = new();
@@ -24,6 +25,9 @@ internal sealed class ShipperTrackingMap
 
     /// <summary>A Canonical Model list of Transport Orders, as the Shipper tracking list format.</summary>
     public string List(string canonicalList) => Run(_list, canonicalList);
+
+    /// <summary>A Consignee's view, as the Consignee tracking format (ADR 0052).</summary>
+    public string Consignee(string canonicalView) => Run(_consignee, canonicalView);
 
     private static Template Parse(string name)
     {

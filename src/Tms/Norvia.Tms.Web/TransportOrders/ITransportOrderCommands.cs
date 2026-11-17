@@ -73,6 +73,12 @@ public interface ITransportOrderCommands
     /// <param name="actingOn">The Agent run whose Suggestion Customer service acted on, which the release's trace then names; null when they acted on their own.</param>
     Task<ReleaseWithoutProofOfDeliveryAnswer> ReleaseWithoutProofOfDeliveryAsync(string transportOrderNumber, string remark, AgentRun? actingOn, CancellationToken cancellationToken);
 
+    /// <summary>Reads a Transport Order's tracking code, which the Consignee's link carries (ADR 0052).</summary>
+    Task<TrackingCodeAnswer> GetTrackingCodeAsync(string transportOrderNumber, CancellationToken cancellationToken);
+
+    /// <summary>Replaces a Transport Order's tracking code, because its link went to the wrong person. The old code stops working at once (ADR 0052).</summary>
+    Task<TrackingCodeAnswer> ReplaceTrackingCodeAsync(string transportOrderNumber, CancellationToken cancellationToken);
+
     /// <summary>The Planner records an Absence for a Driver, for the days from first to last (P10).</summary>
     Task<CapacityAnswer> RecordAbsenceAsync(PeriodEntry entry, CancellationToken cancellationToken);
 

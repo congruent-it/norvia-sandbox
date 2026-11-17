@@ -29,6 +29,12 @@ public sealed class PartnerApiOptions
     /// <summary>Each Persona's subscription key for the Norvia partners product, by Persona ID.</summary>
     public Dictionary<string, string> SubscriptionKeys { get; set; } = [];
 
+    /// <summary>
+    /// The subscription key of the Consignee tracking product (ADR 0052), the portal's own: a Consignee is no Persona and has no token, so the
+    /// key is all the product asks. Null when the estate has no Consignee tracking, and the page then says tracking is unavailable.
+    /// </summary>
+    public string? ConsigneeSubscriptionKey { get; set; }
+
     /// <summary>In Azure: the Persona tokens come from Entra, through federated credentials that trust the portal's identity (ADR 0005).</summary>
     public EntraTokenOptions? Entra { get; set; }
 
