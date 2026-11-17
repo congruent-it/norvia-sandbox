@@ -165,7 +165,7 @@
       <metadata name="flow" value="consignee-tracking" />
       <metadata name="transportOrderNumber" value="none" />
       <metadata name="outcome" value="@(context.Response.StatusCode == 401 || context.Response.StatusCode == 403 || context.Response.StatusCode == 429 ? &quot;Refused&quot; : &quot;Failed&quot;)" />
-      <metadata name="failureCode" value="@(string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
+      <metadata name="failureCode" value="@(context.LastError.Source == &quot;rate-limit-by-key&quot; ? &quot;RateLimited&quot; : string.IsNullOrEmpty(context.LastError.Reason) ? context.LastError.Source : context.LastError.Reason)" />
     </trace>
     <set-header name="X-Correlation-ID" exists-action="override">
       <value>@((string)context.Variables[&quot;correlationId&quot;])</value>
