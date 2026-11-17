@@ -30,6 +30,7 @@ internal static class ConsigneeTrackingCalls
     /// <summary>The raw body of the view a code opens, which the TMS must answer.</summary>
     public static async Task<string> ViewBodyAsync(this TmsFixture tms, string trackingCode, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(tms);
         using var response = await tms.ViewAsync(tms.ConsigneeTracking, trackingCode, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
@@ -45,9 +46,7 @@ internal static class ConsigneeTrackingCalls
     {
         ArgumentNullException.ThrowIfNull(tms);
         using var response = await tms.TmsUi.GetAsync(new Uri($"/v1/transport-orders/{transportOrderNumber}/tracking-code", UriKind.Relative), cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.StatusCode.Should().Be(HttpStatusCode.OK, body);
-        return JsonNode.Parse(body)!["trackingCode"]!.GetValue<string>();
+        return await CodeOfAsync(response, cancellationToken);
     }
 
     /// <summary>Replaces the Transport Order's tracking code as the Planner does, through the TMS UI, and returns the new one.</summary>
@@ -55,6 +54,15 @@ internal static class ConsigneeTrackingCalls
     {
         ArgumentNullException.ThrowIfNull(tms);
         using var response = await tms.TmsUi.PostAsync(new Uri($"/v1/transport-orders/{transportOrderNumber}/tracking-code/replace", UriKind.Relative), content: null, cancellationToken);
+        return await CodeOfAsync(response, cancellationToken);
+    }
+
+    /// <summary>The code of a Shipment's Transport Order, as the Planner reads it.</summary>
+    public static async Task<string> CodeOfShipmentAsync(this TmsFixture tms, string shipmentNumber, CancellationToken cancellationToken) =>
+        await tms.TrackingCodeOfAsync(await tms.TransportOrderOfAsync(shipmentNumber, cancellationToken), cancellationToken);
+
+    private static async Task<string> CodeOfAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK, body);
         return JsonNode.Parse(body)!["trackingCode"]!.GetValue<string>();

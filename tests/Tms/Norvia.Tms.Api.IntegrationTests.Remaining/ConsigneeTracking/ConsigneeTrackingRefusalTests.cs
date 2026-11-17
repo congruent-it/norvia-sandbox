@@ -35,14 +35,14 @@ public sealed class ConsigneeTrackingRefusalTests(TmsFixture tms) : IClassFixtur
     [Fact]
     public async Task Replace_GivesANewCode_TheOldOneStopsAtOnce_AndTheNewOneOpensTheSameTransportOrder()
     {
-        var (number, old) = await tms.AcceptedWithCodeAsync(_cancellationToken);
-        (await tms.ViewedAsync(old, _cancellationToken))["transportOrderNumber"]!.GetValue<string>().Should().Be(number);
+        var (number, previous) = await tms.AcceptedWithCodeAsync(_cancellationToken);
+        (await tms.ViewedAsync(previous, _cancellationToken))["transportOrderNumber"]!.GetValue<string>().Should().Be(number);
 
         var replacement = await tms.ReplacedTrackingCodeOfAsync(number, _cancellationToken);
 
-        replacement.Should().NotBe(old).And.MatchRegex("^[0-9A-HJKMNP-TV-Z]{16}$");
+        replacement.Should().NotBe(previous).And.MatchRegex("^[0-9A-HJKMNP-TV-Z]{16}$");
         (await tms.TrackingCodeOfAsync(number, _cancellationToken)).Should().Be(replacement);
-        using var oldAnswer = await tms.ViewAsync(tms.ConsigneeTracking, old, _cancellationToken);
+        using var oldAnswer = await tms.ViewAsync(tms.ConsigneeTracking, previous, _cancellationToken);
         oldAnswer.StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await tms.ViewedAsync(replacement, _cancellationToken))["transportOrderNumber"]!.GetValue<string>().Should().Be(number);
     }
@@ -117,7 +117,10 @@ public sealed class ConsigneeTrackingRefusalTests(TmsFixture tms) : IClassFixtur
         var correlationId = TmsCalls.NewCorrelationId();
         using var hit = await tms.ViewAsync(tms.ConsigneeTracking, code, _cancellationToken, correlationId);
         using var miss = await tms.ViewAsync(tms.ConsigneeTracking, UnknownCode, _cancellationToken, correlationId);
+        var typed = code.ToLowerInvariant();
+        using var typedHit = await tms.ViewAsync(tms.ConsigneeTracking, typed, _cancellationToken, correlationId);
         hit.StatusCode.Should().Be(HttpStatusCode.OK);
+        typedHit.StatusCode.Should().Be(HttpStatusCode.OK);
         miss.StatusCode.Should().Be(HttpStatusCode.NotFound);
 
         await tms.TmsLogAsync(log => log.Text.Contains($"A Consignee opened Transport Order {number}", StringComparison.Ordinal), _cancellationToken);

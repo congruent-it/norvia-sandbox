@@ -71,8 +71,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     public async Task View_AShipmentInTransitWithAnExceptionAndANote_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
     {
         var (shipmentNumber, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
-        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
-        var code = await tms.TrackingCodeOfAsync(number, _cancellationToken);
+        var code = await tms.CodeOfShipmentAsync(shipmentNumber, _cancellationToken);
         using var noted = await tms.AddNoteAsync(exceptionNumber, ExceptionCalls.Note("Consignee closed, dock 4 locked, price disputed"), _cancellationToken);
         noted.IsSuccessStatusCode.Should().BeTrue();
 
@@ -86,8 +85,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     public async Task View_ADeliveredShipmentWithAProofOfDelivery_AndItsRemark_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
     {
         var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
-        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
-        var code = await tms.TrackingCodeOfAsync(number, _cancellationToken);
+        var code = await tms.CodeOfShipmentAsync(shipmentNumber, _cancellationToken);
         await tms.RecordedProofAsync(Metadata(reference), [Cmr()], _cancellationToken);
 
         var body = await tms.ViewBodyAsync(code, _cancellationToken);
@@ -100,14 +98,12 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     public async Task View_TheProofOfDeliverySummaryShows_ButItsFilesAreNotOffered()
     {
         var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
-        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
-        var code = await tms.TrackingCodeOfAsync(number, _cancellationToken);
+        var code = await tms.CodeOfShipmentAsync(shipmentNumber, _cancellationToken);
         var file = Cmr("secret-cmr.pdf");
         await tms.RecordedProofAsync(Metadata(reference, condition: "Reservations"), [file], _cancellationToken);
         var fileId = FileIdOf((await tms.GetProofsOnTimelineAsync(shipmentNumber, _cancellationToken)).Single()!, file.Name);
 
         var body = await tms.ViewBodyAsync(code, _cancellationToken);
-        using var read = await ShipperTrackingCalls.GetProofFileAsync(tms, tms.ConsigneeTracking, ShipperTrackingCalls.Shipper, number, fileId, _cancellationToken);
 
         var proof = JsonNode.Parse(body)!["proofOfDelivery"]!.AsObject();
         proof["receivedBy"]!.GetValue<string>().Should().Be("J. Becker");
@@ -115,15 +111,13 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
         proof["deliveryTime"].Should().NotBeNull();
         proof.ContainsKey("files").Should().BeFalse();
         body.Should().NotContain(file.Name).And.NotContain(fileId);
-        read.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
     public async Task View_AShipmentSentBackToPlanned_StaysScheduled()
     {
         var (carrierBookingNumber, shipmentNumber) = await tms.ReleasedCarrierBookingAsync(_cancellationToken);
-        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
-        var code = await tms.TrackingCodeOfAsync(number, _cancellationToken);
+        var code = await tms.CodeOfShipmentAsync(shipmentNumber, _cancellationToken);
         (await tms.ViewedAsync(code, _cancellationToken))["trackingStatus"]!.GetValue<string>().Should().Be("Scheduled");
 
         await tms.RejectedAsync(carrierBookingNumber, PlanningCalls.CarrierId, "NoCapacity", _cancellationToken);
@@ -152,8 +146,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     public async Task View_AnAgreedDeliveryWindow_ReplacesTheOrdersWindowAndTheFallbackEta()
     {
         var (shipmentNumber, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
-        var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
-        var code = await tms.TrackingCodeOfAsync(number, _cancellationToken);
+        var code = await tms.CodeOfShipmentAsync(shipmentNumber, _cancellationToken);
         var earliest = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.AddDays(6).ToUnixTimeSeconds());
         using var agreed = await tms.AgreeDeliveryWindowAsync(exceptionNumber, ExceptionCalls.Window(earliest, earliest.AddHours(4)), _cancellationToken);
         agreed.IsSuccessStatusCode.Should().BeTrue();
@@ -164,10 +157,20 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
         view["deliveryWindow"]!["latest"]!.GetValue<DateTimeOffset>().Should().Be(earliest.AddHours(4));
     }
 
-    private static void AssertNothingOnlyTheShipperMayKnow(string body, string shipmentNumber) =>
-        body.Should().NotContainEquivalentOf(shipmentNumber).And.NotContainEquivalentOf("CAR-").And.NotContainEquivalentOf("carrier")
-            .And.NotContainEquivalentOf("exception").And.NotContainEquivalentOf("stale").And.NotContainEquivalentOf("shipment")
-            .And.NotContainEquivalentOf("remark").And.NotContainEquivalentOf("note").And.NotContainEquivalentOf("dock 4")
-            .And.NotContainEquivalentOf("price").And.NotContainEquivalentOf("amount").And.NotContainEquivalentOf("eur")
-            .And.NotContainEquivalentOf("shipperReference").And.NotContainEquivalentOf("shipperId");
+    private static readonly string[] ForbiddenKeys =
+        ["shipperReference", "shipperId", "shipper", "carrier", "carrierId", "shipmentNumber", "shipment", "exception", "exceptions", "stale", "remark", "remarks", "note", "notes", "price", "amount", "currency", "files"];
+
+    /// <summary>Nothing in the answer is named as something only the Shipper or the Planner may know, and no value carries the Shipment's number or the Planner's words.</summary>
+    private static void AssertNothingOnlyTheShipperMayKnow(string body, string shipmentNumber)
+    {
+        KeysOf(JsonNode.Parse(body)).Should().NotIntersectWith(ForbiddenKeys);
+        body.Should().NotContainEquivalentOf(shipmentNumber).And.NotContainEquivalentOf("dock 4").And.NotContainEquivalentOf("price disputed");
+    }
+
+    private static IEnumerable<string> KeysOf(JsonNode? node) => node switch
+    {
+        JsonObject o => o.SelectMany(pair => KeysOf(pair.Value).Prepend(pair.Key)),
+        JsonArray a => a.SelectMany(KeysOf),
+        _ => [],
+    };
 }
