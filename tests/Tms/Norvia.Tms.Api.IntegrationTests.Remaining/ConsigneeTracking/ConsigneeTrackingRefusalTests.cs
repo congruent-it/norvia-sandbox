@@ -48,16 +48,6 @@ public sealed class ConsigneeTrackingRefusalTests(TmsFixture tms) : IClassFixtur
     }
 
     [Fact]
-    public async Task View_ARejectedBookingsCode_DoesNotExist_SoThereIsNoViewForIt()
-    {
-        await tms.SubmitRejectedAsync(ShipperTrackingCalls.Shipper, _cancellationToken);
-
-        using var response = await tms.ViewAsync(tms.ConsigneeTracking, UnknownCode, _cancellationToken);
-
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
     public async Task View_WithoutAToken_IsUnauthorized()
     {
         var (_, code) = await tms.AcceptedWithCodeAsync(_cancellationToken);

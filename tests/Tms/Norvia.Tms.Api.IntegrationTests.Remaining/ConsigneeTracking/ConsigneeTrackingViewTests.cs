@@ -68,7 +68,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
-    public async Task View_ADeliveredShipmentWithAnExceptionAndANote_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
+    public async Task View_AShipmentInTransitWithAnExceptionAndANote_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
     {
         var (shipmentNumber, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
         var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
@@ -83,7 +83,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
-    public async Task View_ADeliveredShipmentWithAProofOfDelivery_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
+    public async Task View_ADeliveredShipmentWithAProofOfDelivery_AndItsRemark_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
     {
         var (shipmentNumber, reference) = await tms.DeliveredShipmentAsync(_cancellationToken);
         var number = await tms.TransportOrderOfAsync(shipmentNumber, _cancellationToken);
