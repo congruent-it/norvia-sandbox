@@ -48,6 +48,12 @@ public static class Flows
     public const string ShipperTracking = "shipper-tracking";
 
     /// <summary>
+    /// A Consignee's query of one Transport Order by its tracking code (ADR 0052), on the correlation ID API Management creates for it.
+    /// It changes nothing. The tracking code is a credential and is never in a log: only the Transport Order number it resolved to.
+    /// </summary>
+    public const string ConsigneeTracking = "consignee-tracking";
+
+    /// <summary>
     /// Deciding that a Transport Order is Billable (P9), on the Message trail of the transaction that completed its last condition.
     /// </summary>
     public const string Billing = "billing";

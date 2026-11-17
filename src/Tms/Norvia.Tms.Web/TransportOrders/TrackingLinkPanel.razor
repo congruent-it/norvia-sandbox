@@ -1,0 +1,109 @@
+@using Microsoft.Extensions.Options
+@implements IDisposable
+@inject ITransportOrderCommands Commands
+@inject IOptions<PartnerPortalLinkOptions> Portal
+@inject ILogger<TrackingLinkPanel> Logger
+
+@* The Planner hands the Consignee's tracking link to the Shipper, or replaces it when it went to the wrong person (ADR 0052). *@
+<TransportOrderSection Heading="Consignee tracking link">
+    @if (_failure is { } failure)
+    {
+        <div role="alert" class="mb-2">
+            <FluentMessageBar Intent="MessageIntent.Warning" AllowDismiss="false">@failure</FluentMessageBar>
+        </div>
+    }
+
+    @if (!_loaded)
+    {
+        <span role="status" class="text-muted">Loading the tracking link…</span>
+    }
+    else if (_code is null)
+    {
+        <p class="!mb-2 text-muted" data-testid="tracking-link-none">This Transport Order has no tracking link yet. Replace it to give it one.</p>
+    }
+    else
+    {
+        <p class="!mb-2 break-all" data-testid="tracking-link">@Link</p>
+    }
+
+    <FluentButton Appearance="Appearance.Outline" Disabled="_working || !_loaded" OnClick="ReplaceAsync" data-testid="replace-tracking-code">Replace tracking link</FluentButton>
+    <p class="!mt-2 !mb-0 text-muted">A replaced link stops working at once. Use it when a link went to the wrong person.</p>
+</TransportOrderSection>
+
+@code {
+    private readonly CancellationTokenSource _closed = new();
+    private string? _code;
+    private string? _failure;
+    private bool _loaded;
+    private bool _working;
+
+    [Parameter, EditorRequired]
+    public string TransportOrderNumber { get; set; } = string.Empty;
+
+    private string Link => $"{Portal.Value.BaseAddress?.TrimEnd('/')}/track/{_code}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            ShowAnswer(await Commands.GetTrackingCodeAsync(TransportOrderNumber, _closed.Token));
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Reading the tracking link of Transport Order {TransportOrderNumber} failed", TransportOrderNumber);
+            _failure = "The tracking link couldn't be loaded. Reload the page to try again.";
+        }
+    }
+
+    private async Task ReplaceAsync()
+    {
+        if (_working)
+        {
+            return;
+        }
+
+        _working = true;
+        _failure = null;
+        try
+        {
+            ShowAnswer(await Commands.ReplaceTrackingCodeAsync(TransportOrderNumber, _closed.Token));
+        }
+        catch (OperationCanceledException) when (_closed.IsCancellationRequested)
+        {
+            // The page closed while the TMS was answering.
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning(exception, "Replacing the tracking link of Transport Order {TransportOrderNumber} failed", TransportOrderNumber);
+            _failure = "The tracking link couldn't be replaced. Try again.";
+        }
+        finally
+        {
+            _working = false;
+        }
+    }
+
+    private void ShowAnswer(TrackingCodeAnswer answer)
+    {
+        _loaded = true;
+        switch (answer)
+        {
+            case TrackingCodeAnswer.Shown shown:
+                _code = shown.Code;
+                break;
+            default:
+                _failure = $"There is no tracking link for Transport Order {TransportOrderNumber}.";
+                break;
+        }
+    }
+
+    public void Dispose()
+    {
+        _closed.Cancel();
+        _closed.Dispose();
+    }
+}

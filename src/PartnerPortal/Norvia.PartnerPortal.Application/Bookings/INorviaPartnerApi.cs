@@ -1,4 +1,5 @@
 using Norvia.PartnerPortal.Application.CarrierInvoices.Submit;
+using Norvia.PartnerPortal.Application.ConsigneeTracking;
 using Norvia.PartnerPortal.Application.ShipperTracking;
 using Norvia.PartnerPortal.Domain.Bookings;
 using Norvia.PartnerPortal.Domain.CarrierBookings;
@@ -74,4 +75,11 @@ public interface INorviaPartnerApi
 
     /// <summary>Downloads a file of the Transport Order's current Proof of delivery, as Norvia streams it.</summary>
     Task<TrackingAnswer<ShipperProofFileContent>> DownloadProofOfDeliveryFileAsync(Persona persona, string transportOrderNumber, Guid fileId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A Consignee's view of the Transport Order a tracking code opens (ADR 0052), as the Consignee tracking product's own subscription key and
+    /// no token: nobody signs in as a Consignee. The code goes in a header, never the URL. A wrong, expired or replaced code is
+    /// <see cref="TrackingOutcome.NotFound"/>, one answer for all three. A failure is an answer, not an error.
+    /// </summary>
+    Task<TrackingAnswer<ConsigneeTrackingView>> GetConsigneeViewAsync(string trackingCode, string? clientIp, CancellationToken cancellationToken);
 }

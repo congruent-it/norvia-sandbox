@@ -1,0 +1,118 @@
+@using Norvia.PartnerPortal.Application.ConsigneeTracking
+@using Norvia.PartnerPortal.Application.ShipperTracking
+@using Norvia.PartnerPortal.Web.ShipperTracking
+
+@* A document of its own: no Persona switcher, no scripts, and no file to fetch from behind the gate (ADR 0052). It looks again every minute. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta http-equiv="refresh" content="60" />
+    <title>Track your shipment · Norvia</title>
+    <style>
+        body { margin: 0; font-family: system-ui, sans-serif; color: #1a1a1a; background: #fff; line-height: 1.5; }
+        header { border-bottom: 1px solid #dee2e6; padding: 1.25rem 1rem; text-transform: uppercase; letter-spacing: .25em; font-weight: 600; }
+        main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+        h1 { font-size: 1.75rem; margin: 0 0 1rem; }
+        h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+        dl { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 2rem; margin: 0; }
+        dt { font-weight: 600; }
+        dd { margin: 0; }
+        ol { list-style: none; margin: 0; padding: 0; }
+        li { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: .5rem 0; border-bottom: 1px solid #dee2e6; }
+        .muted { color: #6c757d; font-size: .875rem; }
+        .notice { border: 1px solid #dee2e6; border-left: 4px solid #1a1a1a; padding: .75rem 1rem; }
+    </style>
+</head>
+<body>
+    <header>Norvia</header>
+    <main>
+        <h1>Track your shipment</h1>
+
+        @if (Answer.Value is { } view)
+        {
+            <dl aria-label="Shipment">
+                <dt>Status</dt>
+                <dd>@TrackingText.Status(view.Status)</dd>
+                <dt>From</dt>
+                <dd>@view.Pickup</dd>
+                <dt>To</dt>
+                <dd>@view.Receiver</dd>
+                <dt>Delivery window</dt>
+                <dd>@Window(view)</dd>
+                <dt>ETA</dt>
+                <dd>@Time(view.Eta)</dd>
+                <dt>Last update</dt>
+                <dd>@Time(view.LastUpdate)</dd>
+            </dl>
+
+            <h2>Progress</h2>
+            @if (view.Progress.Count == 0)
+            {
+                <p>Nothing has happened to the goods yet.</p>
+            }
+            else
+            {
+                <ol aria-label="Progress">
+                    @foreach (var step in view.Progress)
+                    {
+                        <li><span>@PortalTime.Format(step.Time)</span> <strong>@TrackingText.Progress(step.Type)</strong> <span>@step.Place</span></li>
+                    }
+                </ol>
+            }
+
+            <h2>Proof of delivery</h2>
+            @if (view.ProofOfDelivery is not { } proof)
+            {
+                <p>There is no Proof of delivery yet.</p>
+            }
+            else
+            {
+                <dl aria-label="Proof of delivery">
+                    <dt>Received by</dt>
+                    <dd>@proof.ReceivedBy</dd>
+                    <dt>Delivered</dt>
+                    <dd>@PortalTime.Format(proof.DeliveredAt)</dd>
+                    <dt>Condition</dt>
+                    <dd>@TrackingText.Condition(proof.Condition)</dd>
+                </dl>
+            }
+
+            <p class="muted" data-testid="fetched-at">Fetched at <time datetime="@FetchedAt.ToString("O")">@PortalTime.FormatTimeOfDay(FetchedAt)</time>. This page looks again every minute.</p>
+        }
+        else
+        {
+            <p role="alert" class="notice" data-testid="tracking-message">@Message</p>
+        }
+    </main>
+</body>
+</html>
+
+@code {
+    [Parameter, EditorRequired]
+    public TrackingAnswer<ConsigneeTrackingView> Answer { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public DateTimeOffset FetchedAt { get; set; }
+
+    // A wrong, expired or replaced code is this one text: the page doesn't say whether the code ever existed (ADR 0052).
+    private string Message => Answer.Outcome switch
+    {
+        TrackingOutcome.NotFound => "We can't find this shipment. Check the link, or contact the sender.",
+        TrackingOutcome.Refused => "You have asked a lot of times. Try again in a minute.",
+        _ => "Tracking is temporarily unavailable. Try again shortly.",
+    };
+
+    private static string Time(DateTimeOffset? moment) => moment is { } value ? PortalTime.Format(value) : "–";
+
+    private static string Window(ConsigneeTrackingView view) => (view.DeliverFrom, view.DeliverUntil) switch
+    {
+        ({ } from, { } until) => $"{PortalTime.Format(from)} – {PortalTime.Format(until)}",
+        ({ } from, null) => $"From {PortalTime.Format(from)}",
+        (null, { } until) => $"Until {PortalTime.Format(until)}",
+        _ => "–",
+    };
+}

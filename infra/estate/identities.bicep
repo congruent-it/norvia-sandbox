@@ -62,6 +62,8 @@ var recordProofRole = 'ProofsOfDelivery.Record'
 var recordProofRoleId = guid('norvia-tms-api', environmentName, recordProofRole)
 var shipperTrackingReadRole = 'ShipperTracking.Read'
 var shipperTrackingReadRoleId = guid('norvia-tms-api', environmentName, shipperTrackingReadRole)
+var consigneeTrackingReadRole = 'ConsigneeTracking.Read'
+var consigneeTrackingReadRoleId = guid('norvia-tms-api', environmentName, consigneeTrackingReadRole)
 var trackingSubmitRole = 'Tracking.Submit'
 var trackingSubmitRoleId = guid('norvia-partner-api', environmentName, trackingSubmitRole)
 var proofSubmitRole = 'ProofsOfDelivery.Submit'
@@ -265,6 +267,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       value: recordRole
       displayName: 'Record Tracking events'
       description: 'Record a Tracking event reported for a Shipment (P5). Only the Carrier-tracking Logic App holds it, and later the Driver reports Logic App (P12).'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
+      id: consigneeTrackingReadRoleId
+      value: consigneeTrackingReadRole
+      displayName: 'Read a Consignee\'s view'
+      description: 'Read the Consignee\'s view of the one Transport Order a tracking code opens (ADR 0052). Only API Management holds it.'
       allowedMemberTypes: [
         'Application'
       ]
@@ -579,6 +591,13 @@ resource apiManagementIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities
 resource shipperTrackingReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
   resourceId: tmsApiPrincipal.id
   appRoleId: shipperTrackingReadRoleId
+  principalId: apiManagementIdentity.properties.principalId
+}
+
+// API Management holds the Consignee tracking role too: its token-less operation opens one Transport Order by its code and nothing else.
+resource consigneeTrackingReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: consigneeTrackingReadRoleId
   principalId: apiManagementIdentity.properties.principalId
 }
 

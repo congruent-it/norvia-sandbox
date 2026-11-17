@@ -26,3 +26,7 @@ The panel on the tracking screen ([P8](../processes/tms/p8-shipper-visibility.md
 - **Locally** the scripted fake plays the Agent; there is nothing to configure.
 - **Post-deploy smoke run:** [infra/smoke-test-tracking-assistant.ps1](../../infra/smoke-test-tracking-assistant.ps1) (a presenter asks as two Shipper Personas; the script checks the Agent's identity holds no role, the answer's values are in the data, the other Shipper's order is not reachable and no question is in the log).
 - **What the model costs** is tagged `workload: foundry-agents`, `cost-category: ai-model` on the Foundry resources, as for every Agent.
+
+## Consignee tracking page
+
+`/track/{code}` is the page a Consignee opens from a tracking link ([P8](../processes/tms/p8-shipper-visibility.md#consignee-tracking), [ADR 0052](../adr/0052-consignees-track-with-a-tracking-code-in-a-link-and-no-token.md)). It is outside the Entra gate in Azure and has no Persona. It is a document of its own with no script and no stylesheet, because everything else the portal serves is behind the gate. Get a link from the TMS UI: open a Transport Order and read the **Consignee tracking link** card, which can also replace the code. The portal asks API Management's `consignee-tracking` product with its own subscription key (`PartnerApi:ConsigneeSubscriptionKey`; locally the AppHost sets it, in Azure it is the Key Vault secret `subscription-key-consignee-tracking`) and sends the code in a header.

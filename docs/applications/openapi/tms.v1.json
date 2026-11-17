@@ -2963,6 +2963,54 @@
         }
       }
     },
+    "/v1/consignee-tracking/view": {
+      "get": {
+        "tags": [
+          "ConsigneeTracking"
+        ],
+        "summary": "Get a Consignee's view of the one Transport Order a tracking code opens (Canonical Model).",
+        "description": "The tracking code is in X-Tracking-Code, and a X-Correlation-ID is required; otherwise the call is a 400. Returns the collection and delivery places, the delivery window (the agreed one when there is one), the Tracking status, the ETA, the last update, the progress Tracking events in event-time order and the current Proof of delivery without its files. Nothing in the answer names a Shipper, a Shipper reference, a Carrier, a Shipment number, an Exception, a remark, Stale or a price. A code that is malformed, unknown, expired or replaced is the same 404 with the code TrackingCodeNotFound, in status, body and shape. The code is never logged: the logs carry the Transport Order number it resolved to, or none.",
+        "operationId": "GetConsigneeView",
+        "parameters": [
+          {
+            "name": "X-Tracking-Code",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsigneeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/agent/customer-service/rejected-bookings/{id}": {
       "get": {
         "tags": [
@@ -5664,6 +5712,110 @@
               "string"
             ],
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsigneeProofOfDelivery": {
+        "required": [
+          "receivedBy",
+          "deliveryTime",
+          "condition"
+        ],
+        "type": "object",
+        "properties": {
+          "receivedBy": {
+            "type": "string"
+          },
+          "deliveryTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/DeliveryCondition"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsigneeView": {
+        "required": [
+          "transportOrderNumber",
+          "collection",
+          "delivery",
+          "deliveryWindow",
+          "trackingStatus",
+          "eta",
+          "lastUpdate",
+          "progress",
+          "proofOfDelivery"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "collection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShipperPlaceView"
+              }
+            ]
+          },
+          "delivery": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShipperPlaceView"
+              }
+            ]
+          },
+          "deliveryWindow": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ShipperWindowView"
+              }
+            ]
+          },
+          "trackingStatus": {
+            "$ref": "#/components/schemas/TrackingStatus"
+          },
+          "eta": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastUpdate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "progress": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipperProgressEntry"
+            }
+          },
+          "proofOfDelivery": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ConsigneeProofOfDelivery"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -10819,6 +10971,9 @@
     },
     {
       "name": "ShipperTracking"
+    },
+    {
+      "name": "ConsigneeTracking"
     },
     {
       "name": "CustomerServiceAgent"

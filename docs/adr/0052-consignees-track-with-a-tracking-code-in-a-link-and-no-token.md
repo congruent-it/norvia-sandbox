@@ -31,4 +31,6 @@ A Consignee is not a party with a system, a contract or a sign-in. It is whoever
 - The Transport Order gains a tracking code and a replace-code action for the Planner, and a Canonical Model field. The ADR leaves the Planner's screen for #982.
 - The Consignee notification (#983) sends the link and nothing else, so a lost email leaks no more than the link.
 - #982 and #984 say "revoked": it means replaced here, since there is no separate revocation. Both change to say so.
+- The Consignee page is a plain HTML page with a small inline style, not Fluent UI: everything the portal serves except `/track/*` is behind the Entra gate, so a script or stylesheet would not load for a Consignee. It has no scripts, and so no interactive components.
+- The two abuse limits are per end-user client IP, which the Partner portal passes on in `X-Client-IP`, since API Management sees only the portal as its caller.
 - Shipper tracking is untouched: the operations, roles and projection of P8 do not change.

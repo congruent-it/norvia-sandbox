@@ -37,6 +37,7 @@ builder.Services.AddSingleton(services => new BookingDraftExtractor(
 builder.Services.AddSingleton<PartnerEdge>();
 builder.Services.AddSingleton<TrackingRateLimit>();
 builder.Services.AddSingleton<ShipperTrackingMap>();
+builder.Services.AddSingleton<ConsigneeAbuseLimits>();
 builder.Services.AddSingleton<ITrackingQueue, ServiceBusTrackingQueue>();
 builder.Services.AddSingleton<IInboundProofsOfDelivery, BlobInboundProofsOfDelivery>();
 builder.Services.AddSingleton<IProofOfDeliveryQueue, ServiceBusProofOfDeliveryQueue>();
@@ -76,5 +77,6 @@ app.MapSubmitCarrierInvoice();
 app.MapSubmitCarrierTracking();
 app.MapSubmitCarrierProofOfDelivery();
 app.MapShipperTrackingQueries();
+app.MapConsigneeTrackingQueries();
 
 await app.RunAsync();

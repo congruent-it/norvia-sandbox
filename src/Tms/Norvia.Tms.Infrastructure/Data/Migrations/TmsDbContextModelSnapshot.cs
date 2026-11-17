@@ -1051,11 +1051,19 @@ namespace Norvia.Tms.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("TrackingCode")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Number")
                         .IsUnique()
                         .HasFilter("[Number] IS NOT NULL");
+
+                    b.HasIndex("TrackingCode")
+                        .IsUnique()
+                        .HasFilter("[TrackingCode] IS NOT NULL");
 
                     b.HasIndex("BillingState", "ReceivedAt");
 

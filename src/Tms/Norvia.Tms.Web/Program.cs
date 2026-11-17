@@ -31,6 +31,7 @@ builder.AddTmsApi();
 builder.Services.AddOptions<LiveListOptions>().BindConfiguration(LiveListOptions.SectionName)
     .ValidateDataAnnotations().ValidateOnStart();
 
+builder.Services.AddOptions<PartnerPortalLinkOptions>().BindConfiguration(PartnerPortalLinkOptions.SectionName);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddFluentUIComponents();
 

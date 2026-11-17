@@ -1,0 +1,58 @@
+{%- comment -%}
+  The Canonical Model ConsigneeView -> the Consignee tracking format (contracts/partner-api/consignee-tracking.v1.schema.json), for API Management's
+  set-body policy (template="liquid", parse-date="false"). Filter names are Pascal case: the policy runs Liquid in C# mode.
+  The policy only changes the format. What the Consignee may see is decided in the TMS (ADR 0011, ADR 0052), so nothing is left out here that the
+  TMS sent, and the Transport Order number the TMS sends for its logs is not passed on. Times stay UTC instants: the Partner portal shows them
+  in the viewer's own time. Tokens that aren't known give an empty code, so the policy refuses the result instead of the map guessing.
+{%- endcomment -%}
+{
+  "status": "{% case body.trackingStatus %}{% when 'Received' %}RECEIVED{% when 'Scheduled' %}SCHEDULED{% when 'Collected' %}COLLECTED{% when 'InTransit' %}IN_TRANSIT{% when 'Delivered' %}DELIVERED{% endcase %}"
+  {%- if body.collection.city -%},
+  "pickupCity": "{{ body.collection.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+  {%- endif -%}
+  {%- if body.collection.countryCode -%},
+  "pickupCountry": "{{ body.collection.countryCode }}"
+  {%- endif -%}
+  {%- if body.delivery.city -%},
+  "receiverCity": "{{ body.delivery.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+  {%- endif -%}
+  {%- if body.delivery.countryCode -%},
+  "receiverCountry": "{{ body.delivery.countryCode }}"
+  {%- endif -%}
+  {%- if body.deliveryWindow.earliest -%},
+  "deliverFrom": "{{ body.deliveryWindow.earliest }}"
+  {%- endif -%}
+  {%- if body.deliveryWindow.latest -%},
+  "deliverUntil": "{{ body.deliveryWindow.latest }}"
+  {%- endif -%}
+  {%- if body.eta -%},
+  "eta": "{{ body.eta }}"
+  {%- endif -%}
+  {%- if body.lastUpdate -%},
+  "lastUpdate": "{{ body.lastUpdate }}"
+  {%- endif -%},
+  "events": [
+  {%- assign eventCount = 0 -%}
+  {%- for e in body.progress -%}
+    {%- if eventCount > 0 -%},{%- endif -%}
+    {%- assign eventCount = eventCount | Plus: 1 -%}
+    {
+      "code": "{% case e.type %}{% when 'Collected' %}COLLECTED{% when 'Departed' %}DEPARTED{% when 'Arrived' %}ARRIVED{% when 'OutForDelivery' %}OUT_FOR_DELIVERY{% when 'Delivered' %}DELIVERED{% endcase %}",
+      "time": "{{ e.eventTime }}"
+      {%- if e.place.city -%},
+      "city": "{{ e.place.city | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}"
+      {%- endif -%}
+      {%- if e.place.countryCode -%},
+      "country": "{{ e.place.countryCode }}"
+      {%- endif -%}
+    }
+  {%- endfor -%}
+  ]
+  {%- if body.proofOfDelivery -%},
+  "proofOfDelivery": {
+    "receivedBy": "{{ body.proofOfDelivery.receivedBy | Replace: '\\', '\\' | Replace: '"', '\"' | Replace: '\n', '\n' | Replace: '\r', '\r' | Replace: '\t', '\t' }}",
+    "deliveredAt": "{{ body.proofOfDelivery.deliveryTime }}",
+    "condition": "{% case body.proofOfDelivery.condition %}{% when 'Clean' %}CLEAN{% when 'Reservations' %}RESERVATIONS{% endcase %}"
+  }
+  {%- endif -%}
+}

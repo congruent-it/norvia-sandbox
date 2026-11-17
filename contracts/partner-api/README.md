@@ -19,6 +19,7 @@ The format in which a Shipper books a Transport-only transport through the Norvi
 | [shipper-invoice.v1](shipper-invoice.v1.schema.json) | A Shipper invoice or Credit note, as Norvia's E1 Shipper invoice Logic App sends it to a Shipper's invoice endpoint (see [Shipper invoice](#shipper-invoice)) |
 | [shipper-tracking.v1](shipper-tracking.v1.schema.json) | One Transport Order with its tracking, as a Shipper gets or finds it (see [Shipper tracking](#shipper-tracking)) |
 | [shipper-tracking-list-item.v1](shipper-tracking-list-item.v1.schema.json) | One Transport Order in the list a Shipper gets; the list is an array of these (see [Shipper tracking](#shipper-tracking)) |
+| [consignee-tracking.v1](consignee-tracking.v1.schema.json) | One Transport Order as a Consignee gets it by tracking code, with UTC instants and no Shipper, Carrier or Shipment details (see [Consignee tracking](#consignee-tracking)) |
 
 The booking never names the Shipper. API Management takes it from the token and passes it to the Logic App ([ADR 0005](../../docs/adr/0005-partner-identity-comes-from-the-token.md)).
 
@@ -358,3 +359,13 @@ The checks are those of the other operations, in the same order: the subscriptio
 | 503 | `AgentUnavailable` | The model failed, was too slow, or its reply did not match the draft schema |
 
 The request and the response bodies are never logged, the traces carry keys and never the text, and the sample inputs are synthetic.
+
+## Consignee tracking
+
+[P8](../../docs/processes/tms/p8-shipper-visibility.md#consignee-tracking), [ADR 0052](../../docs/adr/0052-consignees-track-with-a-tracking-code-in-a-link-and-no-token.md): a Consignee opens a link with a tracking code, and the Partner portal asks API Management for what the TMS shows it. It is a separate API, `consignee/v1`, in the `consignee-tracking` product, with no token: the product's subscription key and the code in the `X-Tracking-Code` header are all it takes.
+
+| Operation | Route | Answer |
+|---|---|---|
+| Get a Consignee's view by tracking code | `GET /consignee/v1/view`, the code in `X-Tracking-Code` | [consignee-tracking.v1](consignee-tracking.v1.schema.json), or `404` `{"code":"TrackingCodeNotFound","text":"We can't find this shipment."}` for a code that is malformed, unknown, expired or replaced |
+
+The format differs from the Shipper tracking format on purpose: every time is a UTC instant (`yyyy-MM-ddTHH:mm:ssZ`), and it carries no Shipper reference, Transport Order number, Carrier, Shipment number, Exception, remark, price or Proof of delivery file. The policy maps the Canonical Model `ConsigneeView` to it and changes nothing else. API Management allows 60 calls a minute and 10 `TrackingCodeNotFound` answers a minute for each client IP, and answers `429` over either.

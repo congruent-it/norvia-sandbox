@@ -107,6 +107,9 @@ var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app
     .WithHttpHealthCheck("/health");
 
 // The Partner portal's presenter panel switches the faults the applications own through their APIs: the Driver app's (P11, P12) and the TMS's (P5, P8, P12).
+// The Planner's tracking link for a Consignee (ADR 0052) opens on the Partner portal.
+tmsWeb.WithEnvironment("PartnerPortal__BaseAddress", partnerPortal.GetEndpoint("http"));
+
 partnerPortal.WithEnvironment("Faults__Owners__driver-app__Address", driverAppApi.GetEndpoint("http"))
     .WithEnvironment("Faults__Owners__tms__Address", tmsApi.GetEndpoint("http"));
 
@@ -276,6 +279,8 @@ if (builder.ExecutionContext.IsPublishMode)
         .Concat(personas.Select(persona => persona.InvoiceOutcomePath).OfType<string>())
         // The Simulator's Reset estate calls the portal's reset endpoint, which asks for the Simulator's key (ADR 0039).
         .Append("/reset/v1")
+        // A Consignee's tracking link has no sign-in to give: the code in it is the credential (ADR 0052).
+        .Append("/track/*")
         .ToList();
     foreach (var (demoUi, pathsOutsideTheGate) in new[] { (tmsWeb, []), (partnerPortal, personaEndpoints) })
     {
@@ -383,6 +388,9 @@ if (builder.ExecutionContext.IsPublishMode)
     {
         partnerPortal.WithEnvironment($"PartnerApi__SubscriptionKeys__{persona.Id}", partnerPortalSecrets.Resource.GetSecret($"subscription-key-{persona.Id}"));
     }
+
+    // The Consignee tracking page calls its own product of API Management with a key of its own (ADR 0052).
+    partnerPortal.WithEnvironment("PartnerApi__ConsigneeSubscriptionKey", partnerPortalSecrets.Resource.GetSecret("subscription-key-consignee-tracking"));
 
     // The Driver app's Trip endpoint asks its caller, the P11 Trip dispatch Logic App, for a credential the estate keeps in a
     // vault of its own as driver-app-endpoint-key. The Logic App runs outside the Container Apps environment, so the API is
@@ -928,6 +936,9 @@ else
         .WithEnvironment("Faults__LocalTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("Faults__LocalTokens__ClientId", LocalTokens.PartnerPortalClientId)
         .WithEnvironment("Faults__LogicApp__FlagPath", driverReportsDisabledFlag);
+    var consigneeSubscriptionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+    partnerApi.WithEnvironment("PartnerApi__ConsigneeSubscriptionKey", consigneeSubscriptionKey);
+    partnerPortal.WithEnvironment("PartnerApi__ConsigneeSubscriptionKey", consigneeSubscriptionKey);
     foreach (var persona in personas)
     {
         var subscriptionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();

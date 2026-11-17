@@ -13,6 +13,9 @@ public sealed class PartnerApiOptions
     [MinLength(1)]
     public Dictionary<string, string> SubscriptionKeys { get; set; } = [];
 
+    /// <summary>The Partner portal's subscription key for the Consignee tracking product (ADR 0052). A Persona's key doesn't open it, nor does this one open a Persona's operations.</summary>
+    public string? ConsigneeSubscriptionKey { get; set; }
+
     /// <summary>The Shipper each Shipper Persona's client books for, by client ID (the token's <c>azp</c>).</summary>
     public Dictionary<string, string> ShippersByClientId { get; set; } = [];
 

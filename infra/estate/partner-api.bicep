@@ -528,6 +528,79 @@ resource getShipperProofOfDeliveryFilePolicy 'Microsoft.ApiManagement/service/ap
   ]
 }
 
+// A Consignee tracks with a tracking code in a link and no token (ADR 0052). Its API has one read operation, in a product of its own, and
+// the Partner portal calls it with the product's subscription key. No JWT is validated and no Persona is involved: the code in the
+// X-Tracking-Code header is the credential, and it is never logged. The policy limits abuse at the edge and maps the format only (ADR 0011).
+var consigneeTrackingMap = xmlEscaped(loadTextContent('partner-api/consignee-tracking.liquid'))
+
+resource consigneeApi 'Microsoft.ApiManagement/service/apis@2024-05-01' = {
+  parent: apiManagement
+  name: 'norvia-consignee-api'
+  properties: {
+    displayName: 'Norvia Consignee tracking API'
+    path: 'consignee/v1'
+    protocols: [
+      'https'
+    ]
+    subscriptionRequired: true
+    subscriptionKeyParameterNames: {
+      header: 'Ocp-Apim-Subscription-Key'
+      query: ''
+    }
+  }
+}
+
+resource getConsigneeView 'Microsoft.ApiManagement/service/apis/operations@2024-05-01' = {
+  parent: consigneeApi
+  name: 'get-consignee-view'
+  properties: {
+    displayName: 'Get a Consignee\'s view by tracking code'
+    description: 'Get the Consignee\'s view of the one Transport Order a tracking code opens, with the code in the X-Tracking-Code header (contracts/partner-api).'
+    method: 'GET'
+    urlTemplate: '/view'
+  }
+}
+
+resource getConsigneeViewPolicy 'Microsoft.ApiManagement/service/apis/operations/policies@2024-05-01' = {
+  parent: getConsigneeView
+  name: 'policy'
+  properties: {
+    format: 'rawxml'
+    value: replace(loadTextContent('partner-api/get-consignee-view.policy.xml'), '[[consignee-tracking.liquid]]', consigneeTrackingMap)
+  }
+  dependsOn: [
+    policyValues
+    tmsApi
+  ]
+}
+
+resource consigneeTracking 'Microsoft.ApiManagement/service/products@2024-05-01' = {
+  parent: apiManagement
+  name: 'consignee-tracking'
+  properties: {
+    displayName: 'Consignee tracking'
+    description: 'The Partner portal\'s tracking page for a Consignee, opened from a link with a tracking code (ADR 0052).'
+    subscriptionRequired: true
+    approvalRequired: false
+    state: 'published'
+  }
+}
+
+resource consigneeTrackingUsesTheConsigneeApi 'Microsoft.ApiManagement/service/products/apis@2024-05-01' = {
+  parent: consigneeTracking
+  name: consigneeApi.name
+}
+
+resource consigneeTrackingSubscription 'Microsoft.ApiManagement/service/subscriptions@2024-05-01' = {
+  parent: apiManagement
+  name: 'consignee-tracking'
+  properties: {
+    displayName: 'Partner portal: Consignee tracking'
+    scope: consigneeTracking.id
+    state: 'active'
+  }
+}
+
 // The subscription key names the product and rates the partner; the token says who the partner is (ADR 0005).
 resource partners 'Microsoft.ApiManagement/service/products@2024-05-01' = {
   parent: apiManagement
@@ -586,6 +659,15 @@ resource subscriptionKeys 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = [
     }
   }
 ]
+
+// The Partner portal's own subscription key for the Consignee tracking product, read from the same vault as the Personas' keys.
+resource consigneeTrackingKey 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+  parent: partnerPortalSecrets
+  name: 'subscription-key-consignee-tracking'
+  properties: {
+    value: consigneeTrackingSubscription.listSecrets().primaryKey
+  }
+}
 
 // The Carrier Personas are the seed file's, as in identities.bicep. Each one's booking endpoint in the Partner portal has
 // a credential of its own, named after the Carrier's ID at Norvia, which is what the endpoint's address names.

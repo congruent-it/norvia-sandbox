@@ -29,7 +29,7 @@ Every consumer reaches the TMS API **directly**, with a token for its own identi
 | **Driver reports Logic App** | `driver-reports`, `Trips.Start`, `Trips.End`, `TrackingEvents.Record` and `ProofsOfDelivery.Record` | [P12](../processes/tms/p12-trip-execution.md) | No: reads the `driver-reports` subscription, then calls direct |
 | **Carrier tracking Logic App** | `tracking`, `TrackingEvents.Record` | [P5](../processes/tms/p5-shipment-tracking.md) | API Management fills the `carrier-tracking` queue; the Logic App reads it and calls direct |
 | **Carrier Proof of delivery Logic App** | `proof-of-delivery`, `ProofsOfDelivery.Record` | [P6](../processes/tms/p6-proof-of-delivery.md) | API Management fills the `carrier-proof-of-delivery` queue and the inbound container; the Logic App reads them and calls direct |
-| **API Management** | `apim`, `ShipperTracking.Read` | [P8](../processes/tms/p8-shipper-visibility.md) | Yes: the Norvia Partner API's Shipper tracking operations call `tms-api` as a backend |
+| **API Management** | `apim`, `ShipperTracking.Read`, `ConsigneeTracking.Read` | [P8](../processes/tms/p8-shipper-visibility.md) | Yes: the Norvia Partner API's Shipper tracking operations call `tms-api` as a backend |
 | **Agents (planned)** | One read role per Agent, none for the TMS yet | None yet | Yes, through API Management's MCP server, read-only ([ADR 0040](../adr/0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md)) |
 
 No Agent calls the TMS today, so no endpoint below lists one. [c4.md](../architecture/c4.md#l2-containers) draws the same callers.
@@ -159,6 +159,9 @@ The Shipper ID comes in the `X-Shipper-ID` header, which the TMS trusts from API
 | `GET /v1/shipper-tracking/transport-orders/find` | Find one of a Shipper's Transport Orders by the Shipper's own reference. | `ShipperTracking.Read` | `shipperReference` → `ShipperTransportOrderDetail` | API Management (P8), as above |
 | `GET /v1/shipper-tracking/transport-orders/{transportOrderNumber}` | Get one of a Shipper's Transport Orders by Norvia's number, with its tracking. | `ShipperTracking.Read` | → `ShipperTransportOrderDetail` | API Management (P8), as above |
 | `GET /v1/shipper-tracking/transport-orders/{transportOrderNumber}/proof-of-delivery/files/{fileId}` | Read one file of the order's current Proof of delivery, streamed with the content type it was sent with. | `ShipperTracking.Read` | → file stream | API Management (P8), as above |
+| `GET /v1/consignee-tracking/view` | Get a Consignee's view of the one Transport Order a tracking code opens (Canonical Model). The code is in the `X-Tracking-Code` header, never the URL, with an `X-Correlation-ID`. A malformed, unknown, expired or replaced code is one 404, `TrackingCodeNotFound`. | `ConsigneeTracking.Read` | → `ConsigneeView` (no Shipper, Shipper reference, Carrier, Shipment number, Exception, remark, Stale, price or Proof of delivery file) | API Management ([P8](../processes/tms/p8-shipper-visibility.md#consignee-tracking)) |
+| `GET /v1/transport-orders/{transportOrderNumber}/tracking-code` | Read the Transport Order's tracking code, which the Consignee's link carries. It is in no other view of the Transport Order. | `TransportOrders.Manage` | → `TransportOrderTrackingCodeView` | TMS UI |
+| `POST /v1/transport-orders/{transportOrderNumber}/tracking-code/replace` | Replace the tracking code; the old code stops working at once. | `TransportOrders.Manage` | → `TransportOrderTrackingCodeView` | TMS UI |
 
 ### Faults
 
@@ -617,6 +620,7 @@ A Transport Order: a Shipper's instruction to move goods from an origin to a des
 | `ShipperId` | `nvarchar(50)` | no |  |  | The Shipper who sent the booking, taken from the caller's token (ADR 0005); owned by the ERP (ADR 0002). |
 | `ShipperReference` | `nvarchar(100)` | yes |  |  | The Shipper's own reference. Unique per Shipper among Accepted orders, so the same booking sent again gets the original back; null for a Rejected booking. |
 | `Status` | `nvarchar(20)` | no |  |  | `Accepted`, `Planned` or `Rejected`. |
+| `TrackingCode` | `nvarchar(16)` | yes |  |  |  |
 
 Primary key `PK_TransportOrders`: `Id`.
 
@@ -627,6 +631,7 @@ Primary key `PK_TransportOrders`: `Id`.
 | `IX_TransportOrders_RatingResult_ReceivedAt` | `RatingResult`, `ReceivedAt` | no |  |
 | `IX_TransportOrders_ShipperId_ShipperReference` | `ShipperId`, `ShipperReference` | yes | `[ShipperReference] IS NOT NULL` |
 | `IX_TransportOrders_Status_ReceivedAt` | `Status`, `ReceivedAt` | no |  |
+| `IX_TransportOrders_TrackingCode` | `TrackingCode` | yes | `[TrackingCode] IS NOT NULL` |
 
 #### `TripStops`
 
