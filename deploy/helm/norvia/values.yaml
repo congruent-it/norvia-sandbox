@@ -81,3 +81,11 @@ serviceBus:
       queues: [carrier-tracking, carrier-proof-of-delivery]
   # The subscriptions that use sessions (ADR 0016): one Trip's reports are read one at a time and in order.
   sessionSubscriptions: [driver-reports]
+  # Lock durations of infra/estate/messaging.bicep, by subscription or queue name (ISO 8601). Long enough for a Logic App's retries of one
+  # message, which hold the lock. The AppHost's emulator sets none; the chart matches the Bicep.
+  lockDurations:
+    billing: PT5M
+    carrier-cost: PT5M
+    driver-reports: PT5M
+    carrier-tracking: PT1M
+    carrier-proof-of-delivery: PT5M

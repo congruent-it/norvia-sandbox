@@ -56,14 +56,18 @@ Endpoint=sb://{{ .name }}:5300;SharedAccessKeyName=RootManageSharedAccessKey;Sha
     {{- $condition := index $.root.Values.serviceBus.conditions $subscription -}}
     {{- $expression := printf "resubmitTo IS NULL OR resubmitTo = '%s'" $subscription -}}
     {{- if $condition }}{{ if contains " OR " $condition }}{{ $condition = printf "(%s)" $condition }}{{ end }}{{ $expression = printf "(%s AND resubmitTo IS NULL) OR resubmitTo = '%s'" $condition $subscription }}{{ end -}}
-    {{- $sub := dict "Name" $subscription "Properties" (dict "RequiresSession" (has $subscription $.root.Values.serviceBus.sessionSubscriptions)) "Rules" (list (dict "Name" "resubmit-aware" "Properties" (dict "FilterType" "Sql" "SqlFilter" (dict "SqlExpression" $expression)))) -}}
+    {{- $properties := dict "RequiresSession" (has $subscription $.root.Values.serviceBus.sessionSubscriptions) -}}
+    {{- with index $.root.Values.serviceBus.lockDurations $subscription }}{{ $_ := set $properties "LockDuration" . }}{{ end -}}
+    {{- $sub := dict "Name" $subscription "Properties" $properties "Rules" (list (dict "Name" "resubmit-aware" "Properties" (dict "FilterType" "Sql" "SqlFilter" (dict "SqlExpression" $expression)))) -}}
     {{- $subs = append $subs $sub -}}
   {{- end -}}
   {{- $topics = append $topics (dict "Name" $topic "Subscriptions" $subs) -}}
 {{- end -}}
 {{- $queues := list -}}
 {{- range $queue := $emulator.queues -}}
-  {{- $queues = append $queues (dict "Name" $queue "Properties" (dict "MaxDeliveryCount" 10)) -}}
+  {{- $queueProperties := dict "MaxDeliveryCount" 10 -}}
+  {{- with index $.root.Values.serviceBus.lockDurations $queue }}{{ $_ := set $queueProperties "LockDuration" . }}{{ end -}}
+  {{- $queues = append $queues (dict "Name" $queue "Properties" $queueProperties) -}}
 {{- end -}}
 {{- dict "UserConfig" (dict "Namespaces" (list (dict "Name" "emulatorNs" "Queues" $queues "Topics" $topics)) "Logging" (dict "Type" "File")) | toPrettyJson -}}
 {{- end }}

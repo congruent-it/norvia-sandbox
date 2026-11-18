@@ -40,7 +40,7 @@ BeforeAll {
         ($json -replace '(?m)^ {4}', '') | ConvertFrom-Json -Depth 20
     }
 
-    # Every entity of the namespace, as "topic/subscription" or "queue" strings.
+    # Every subscription of the namespace, with the name of its topic added.
     function script:Get-Subscriptions($Config) {
         foreach ($topic in $Config.UserConfig.Namespaces[0].Topics) {
             foreach ($subscription in $topic.Subscriptions) { $subscription | Add-Member -NotePropertyName Topic -NotePropertyValue $topic.Name -PassThru -Force }
@@ -215,5 +215,17 @@ Describe 'the rendered chart with the emulators' -Skip:$script:helmMissing {
         $manifests = & helm template norvia $script:chart --namespace norvia --set sql.saPassword=Test-Passw0rd
         $output = $manifests | & kubeconform -strict -summary 2>&1
         $LASTEXITCODE | Should -Be 0 -Because ($output -join "`n")
+    }
+}
+
+Describe 'the lock durations' -Skip:$script:helmMissing {
+    It 'gives every subscription and queue the lock duration the Bicep gives it, and no other one' {
+        $entities = @(Get-Subscriptions $messaging) + @(Get-Subscriptions $messaging2) + @($messaging2.UserConfig.Namespaces[0].Queues)
+        $actual = $entities | Where-Object { $_.Properties.LockDuration } | ForEach-Object { "$($_.Name)=$($_.Properties.LockDuration)" } | Sort-Object
+        # Every lockDuration in the Bicep, in the file's order: three subscriptions, then the two queues.
+        $bicepDurations = [regex]::Matches($script:bicep, "lockDuration: '(PT\w+)'") | ForEach-Object { $_.Groups[1].Value }
+        $bicepDurations.Count | Should -Be 5
+        $actual | Should -Be @('billing=PT5M', 'carrier-cost=PT5M', 'carrier-proof-of-delivery=PT5M', 'carrier-tracking=PT1M', 'driver-reports=PT5M')
+        (($bicepDurations | Sort-Object) -join ',') | Should -Be ((($actual | ForEach-Object { $_ -replace '.*=' }) | Sort-Object) -join ',')
     }
 }
