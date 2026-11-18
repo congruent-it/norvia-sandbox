@@ -1,0 +1,45 @@
+# Values for the Norvia chart. Cluster-scoped pieces (storage class, ingress, issuer) are values, never installs (ADR 0053).
+
+image:
+  # The registry (and path) the Norvia images are pulled from, e.g. registry.example.com/norvia. Empty means the image
+  # names are used as they are, which suits a cluster that has them loaded locally.
+  registry: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+persistence:
+  # The storage class of every PVC. Empty means the cluster's default class.
+  storageClass: ""
+
+sql:
+  image: mcr.microsoft.com/mssql/server:2022-latest
+  # The SA password. Empty: the chart generates one at install and keeps it on upgrade (a lookup of the Secret; helm template
+  # and --dry-run cannot look, so they render a random one). It goes into connection strings, so it must not contain a semicolon.
+  saPassword: ""
+  # SQL Server takes the memory the node has unless told otherwise. The AppHost holds its container to 1 GB too.
+  memoryLimitMb: 1024
+  storage: 10Gi
+  resources:
+    requests: { cpu: 250m, memory: 1536Mi }
+    limits: { memory: 2Gi }
+
+azurite:
+  image: mcr.microsoft.com/azure-storage/azurite:3.34.0
+  storage: 2Gi
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+
+# One Job per migrations project, keyed by the name of the database it owns. Each Job creates its database first.
+migrations:
+  tms: { database: tms, image: tms-migrations }
+  erp: { database: erp, image: erp-migrations }
+  driver-app: { database: driver-app, image: driver-app-migrations }
+  partner-portal: { database: partner-portal, image: partner-portal-migrations }
+  simulator: { database: simulator, image: simulator-migrations }
+
+# The image of the initContainers that wait for the migrations Jobs. Any image with kubectl in it.
+kubectl:
+  # Must have kubectl and need no shell (the waiter runs kubectl directly). Match it to the cluster's version.
+  image: registry.k8s.io/kubectl:v1.37.2

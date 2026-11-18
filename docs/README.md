@@ -22,6 +22,7 @@ Where to look. Terms are defined in [GLOSSARY.md](../GLOSSARY.md); the company b
 |---|---|
 | [running-locally.md](operations/running-locally.md) | Running the estate under Aspire, running the tests, or using the local tokens and logs |
 | [dev-container.md](operations/dev-container.md) | Running the script gate, or later the chart's tests, without installing `helm`, `kubectl` or PowerShell on the host |
+| [deploy/helm/norvia/README.md](../deploy/helm/norvia/README.md) | The Kubernetes chart: the data tier (SQL Server, Azurite, migrations as Jobs) and how an application waits for the migrations |
 | [deploying-to-azure.md](operations/deploying-to-azure.md) | Deploying the estate with `azd up`, checking it with the smoke test, or tearing it down |
 | [agent-evaluation.md](operations/agent-evaluation.md) | Adding evaluation cases for an Agent, or reading a run's result |
 | [agent-mcp-servers.md](operations/agent-mcp-servers.md) | Putting an application's agent view behind an API Management MCP server |

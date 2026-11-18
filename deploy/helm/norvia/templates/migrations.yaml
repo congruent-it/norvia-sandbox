@@ -1,0 +1,89 @@
+{{- /*
+  The migrations projects run as Jobs the applications wait for, as PublishAsAzureContainerAppJob does in Azure. A Job is
+  immutable, so each is named with the release revision: an upgrade makes new ones and Helm prunes the old. They are not Helm
+  hooks, because helm --wait would then wait for applications that are themselves waiting for the Jobs.
+*/ -}}
+{{- range $key, $migration := .Values.migrations }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $key }}-migrations-{{ $.Release.Revision }}
+  labels:
+    app.kubernetes.io/name: {{ $key }}-migrations
+    {{- include "norvia.labels" $ | nindent 4 }}
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $key }}-migrations
+    spec:
+      restartPolicy: OnFailure
+      {{- if $.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml $.Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Makes the database when SQL Server is up and it is not there yet (the AppHost's AddDatabase does the same).
+        - name: create-database
+          image: {{ $.Values.sql.image }}
+          env:
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql
+                  key: sa-password
+          command:
+            - /bin/sh
+            - -c
+            - >-
+              until /opt/mssql-tools18/bin/sqlcmd -C -S sql,1433 -U sa -P "$MSSQL_SA_PASSWORD" -b
+              -Q "IF DB_ID(N'{{ $migration.database }}') IS NULL CREATE DATABASE [{{ $migration.database }}]";
+              do echo "waiting for SQL Server"; sleep 3; done
+      containers:
+        - name: migrations
+          image: {{ include "norvia.image" (dict "root" $ "name" $migration.image) }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql
+                  key: sa-password
+            # Kubernetes expands $(MSSQL_SA_PASSWORD) because it is defined above this variable.
+            - name: ConnectionStrings__{{ $migration.database }}
+              value: "Server=sql,1433;Database={{ $migration.database }};User ID=sa;Password=$(MSSQL_SA_PASSWORD);TrustServerCertificate=true"
+---
+{{- end }}
+# What a pod needs to wait for the Jobs above: set serviceAccountName: migrations-waiter and include norvia.waitForMigrations.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: migrations-waiter
+  labels:
+    {{- include "norvia.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: migrations-waiter
+  labels:
+    {{- include "norvia.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: migrations-waiter
+  labels:
+    {{- include "norvia.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: migrations-waiter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: migrations-waiter
