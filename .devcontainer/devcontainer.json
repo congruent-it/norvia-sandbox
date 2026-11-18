@@ -5,8 +5,12 @@
   "mounts": [
     "source=claude-code-config,target=/home/vscode/.claude,type=volume"
   ],
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
   "containerEnv": {
-    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
   "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude",
   "customizations": {
