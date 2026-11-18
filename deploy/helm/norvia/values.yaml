@@ -49,7 +49,7 @@ kubectl:
 # "messaging" (include "norvia.serviceBusConnectionString"); in Azure both are the one namespace. Their state is in the data tier's
 # SQL Server. The topics, subscriptions, filters and queues are those of infra/estate/messaging.bicep; the template tests compare them.
 serviceBus:
-  image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+  image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits: { memory: 1Gi }

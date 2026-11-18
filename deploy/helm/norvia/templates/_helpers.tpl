@@ -38,12 +38,16 @@ DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02x
 
 {{/* The connection string an application reads for a Service Bus emulator, as ConnectionStrings__messaging: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") }}. Both emulators are asked for as "messaging" by the apps that use them. */}}
 {{- define "norvia.serviceBusConnectionString" -}}
-Endpoint=sb://{{ .name }};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+{{ include "norvia.serviceBusEndpoint" (dict "host" .name) }}
 {{- end }}
 
 {{/* The same for the emulator's management port, which the Integration console reads the entities through (LocalServiceBus__Namespaces__<name>__ManagementConnectionString). */}}
 {{- define "norvia.serviceBusManagementConnectionString" -}}
-Endpoint=sb://{{ .name }}:5300;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+{{ include "norvia.serviceBusEndpoint" (dict "host" (printf "%s:5300" .name)) }}
+{{- end }}
+
+{{- define "norvia.serviceBusEndpoint" -}}
+Endpoint=sb://{{ .host }};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
 {{- end }}
 
 {{/* The Config.json of one emulator: {{ include "norvia.serviceBusConfig" (dict "root" . "name" "messaging") }}. */}}
