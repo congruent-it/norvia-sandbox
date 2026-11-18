@@ -1,0 +1,89 @@
+{{- /* The SA password is generated once and kept: a later upgrade reads it back from the Secret. */ -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace "sql" -}}
+{{- $password := .Values.sql.saPassword -}}
+{{- if and (not $password) $existing }}{{ $password = index $existing.data "sa-password" | b64dec }}{{ end -}}
+{{- if not $password }}{{ $password = printf "Aa1%s" (randAlphaNum 29) }}{{ end -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sql
+  labels:
+    app.kubernetes.io/name: sql
+    {{- include "norvia.labels" . | nindent 4 }}
+type: Opaque
+data:
+  sa-password: {{ $password | b64enc }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql
+  labels:
+    app.kubernetes.io/name: sql
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: sql
+  ports:
+    - name: tds
+      port: 1433
+      targetPort: 1433
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sql
+  labels:
+    app.kubernetes.io/name: sql
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  serviceName: sql
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sql
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sql
+    spec:
+      # The mssql user (10001) must be able to write to the volume.
+      securityContext:
+        fsGroup: 10001
+      containers:
+        - name: sql
+          image: {{ .Values.sql.image }}
+          ports:
+            - name: tds
+              containerPort: 1433
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: MSSQL_MEMORY_LIMIT_MB
+              value: {{ .Values.sql.memoryLimitMb | quote }}
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql
+                  key: sa-password
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.sql.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/opt/mssql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.sql.storage }}

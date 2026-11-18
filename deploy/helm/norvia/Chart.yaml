@@ -1,0 +1,6 @@
+apiVersion: v2
+name: norvia
+description: The Norvia sandbox's local topology on Kubernetes (ADR 0053). A hand-written chart; the AppHost stays as it is.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
