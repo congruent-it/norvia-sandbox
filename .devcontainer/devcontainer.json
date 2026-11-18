@@ -8,6 +8,7 @@
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
   },
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude",
   "customizations": {
     "vscode": {
       "extensions": [
