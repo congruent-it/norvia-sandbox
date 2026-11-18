@@ -89,3 +89,85 @@ serviceBus:
     driver-reports: PT5M
     carrier-tracking: PT1M
     carrier-proof-of-delivery: PT5M
+
+# The edge (#928, ADR 0053): every UI and API the chart deploys is reachable at <host>.<baseDomain>, through an ingress controller the
+# cluster already has. The chart installs no controller and no issuer.
+edge:
+  # Required, and with no default, so that none points at one cluster. Each application gets <its host>.<baseDomain>; DNS (a wildcard
+  # record) is the operator's.
+  baseDomain: ""
+  ingress:
+    # Traefik on K3S is the tested default.
+    className: traefik
+    annotations: {}
+  tls:
+    enabled: true
+    # The cert-manager ClusterIssuer that signs each hostname's certificate. Empty: the Ingress asks for none and expects a Secret named
+    # <application>-tls to exist.
+    clusterIssuer: ""
+
+# Where the applications listen. Every Norvia image listens here, and each Service is reached as http://<name>:<port>.
+appPort: 8080
+
+# The Agents (ADR 0040): off, as under Aspire. On, the Partner API runs the Intake agent's scripted fake and the MCP stand-in is deployed.
+agents:
+  enabled: false
+
+# The stand-ins that play API Management and the Logic Apps' front door (ADR 0023, ADR 0041). One replica: their rate limits are in memory.
+apps:
+  partner-api:
+    image: partner-api
+    host: partner-api
+    resources:
+      requests: { cpu: 50m, memory: 192Mi }
+      limits: { memory: 512Mi }
+  agent-mcp:
+    image: agent-mcp
+    host: agent-mcp
+    resources:
+      requests: { cpu: 50m, memory: 128Mi }
+      limits: { memory: 384Mi }
+
+# The Personas the Partner portal plays, in the order of seed/norvia.seed.json (a template test compares them). Each gets a client ID
+# (norvia-local-persona-<id>) and a subscription key generated at install, and is a Shipper or a Carrier of the party named.
+personas:
+  - { id: brouwer-dranken, type: Shipper, party: SHP-0001 }
+  - { id: tuincentrum-groenrijk, type: Shipper, party: SHP-0003 }
+  - { id: van-dijk-transport, type: Carrier, party: CAR-0001 }
+  - { id: kessler-spedition, type: Carrier, party: CAR-0002 }
+  - { id: pakketpunt-express, type: Carrier, party: CAR-0003 }
+
+# The constants of src/Norvia.AppHost/LocalTokens.cs that the chart's applications are given, under the same names (a template test
+# compares each). The token-signing key is not here: it is generated at install and kept in the Secret local-tokens.
+localTokens:
+  Issuer: https://norvia.local/tokens
+  TmsAudience: api://norvia-tms
+  ErpAudience: api://norvia-erp
+  PartnerApiAudience: api://norvia-partner-api
+  CarrierInvoiceTriggerAudience: api://norvia-carrier-invoice-logic-app
+  IntakeLogicAppClientId: norvia-local-intake-logic-app
+  AnswerLogicAppClientId: norvia-local-answer-logic-app
+  ApiManagementClientId: norvia-local-api-management
+  AgentAudience: api://norvia-integration-console-agent
+  ConsoleAgentApiAudience: api://norvia-integration-console-agent-api
+  HealthCheckAgentAudience: api://norvia-health-check-agent
+  HealthCheckAgentApiAudience: api://norvia-health-check-agent-api
+  FinOpsAgentAudience: api://norvia-health-check-cost-agent
+  CustomerServiceAgentAudience: api://norvia-customer-service-agent
+  CustomerServiceReplyAgentAudience: api://norvia-customer-service-reply-agent
+  FinanceAgentAudience: api://norvia-finance-matching-agent
+  FinanceRejectionReasonAgentAudience: api://norvia-finance-rejection-reason-agent
+  PlannerAgentAudience: api://norvia-planner-agent
+  PlannerNotificationAgentAudience: api://norvia-planner-notification-agent
+
+# The MCP stand-in's servers beyond the Integration operations agent's (which is /mcp): the settings section, the audience of the Agent's
+# token, the agent view it calls and the audience of its own token for that view.
+agentMcpServers:
+  - { section: HealthCheck, audience: HealthCheckAgentAudience, service: health-check-web, path: "agent/v1", apiAudience: HealthCheckAgentApiAudience }
+  - { section: HealthCheckCost, audience: FinOpsAgentAudience, service: health-check-web, path: "agent/v1", apiAudience: HealthCheckAgentApiAudience }
+  - { section: CustomerService, audience: CustomerServiceAgentAudience, service: tms-api, path: "v1/agent/customer-service", apiAudience: TmsAudience }
+  - { section: CustomerServiceReply, audience: CustomerServiceReplyAgentAudience, service: tms-api, path: "v1/agent/customer-service-reply", apiAudience: TmsAudience }
+  - { section: Planner, audience: PlannerAgentAudience, service: tms-api, path: "v1/agent/planner", apiAudience: TmsAudience }
+  - { section: PlannerNotification, audience: PlannerNotificationAgentAudience, service: tms-api, path: "v1/agent/planner-notification", apiAudience: TmsAudience }
+  - { section: FinanceMatching, audience: FinanceAgentAudience, service: erp-api, path: "v1/agent/finance", apiAudience: ErpAudience }
+  - { section: FinanceRejectionReason, audience: FinanceRejectionReasonAgentAudience, service: erp-api, path: "v1/agent/finance-rejection-reason", apiAudience: ErpAudience }

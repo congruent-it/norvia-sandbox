@@ -75,3 +75,132 @@ Endpoint=sb://{{ .host }};SharedAccessKeyName=RootManageSharedAccessKey;SharedAc
 {{- end -}}
 {{- dict "UserConfig" (dict "Namespaces" (list (dict "Name" "emulatorNs" "Queues" $queues "Topics" $topics)) "Logging" (dict "Type" "File")) | toPrettyJson -}}
 {{- end }}
+
+{{/* The in-cluster address of an application: {{ include "norvia.url" (dict "root" . "name" "tms-api") }}. */}}
+{{- define "norvia.url" -}}
+http://{{ .name }}:{{ .root.Values.appPort }}
+{{- end }}
+
+{{/* The hostname of an application under the base domain: {{ include "norvia.host" (dict "root" . "app" "partner-api") }}. */}}
+{{- define "norvia.host" -}}
+{{- $app := index .root.Values.apps .app -}}
+{{ $app.host }}.{{ required "edge.baseDomain is required: every UI and API gets <name>.<baseDomain>" .root.Values.edge.baseDomain }}
+{{- end }}
+
+{{/* A token constant of LocalTokens.cs: {{ include "norvia.token" (dict "root" . "name" "TmsAudience") }}. */}}
+{{- define "norvia.token" -}}
+{{ index .root.Values.localTokens .name }}
+{{- end }}
+
+{{/* An environment variable holding the install's token signing key (base64, as JWT bearer configuration takes it): {{ include "norvia.signingKeyEnv" "Tms__Tokens__SigningKey" }}. */}}
+{{- define "norvia.signingKeyEnv" -}}
+- name: {{ . }}
+  valueFrom:
+    secretKeyRef:
+      name: local-tokens
+      key: signing-key
+{{- end }}
+
+{{/* The Persona's client ID, which stands in for its Entra client app. */}}
+{{- define "norvia.personaClientId" -}}
+norvia-local-persona-{{ . }}
+{{- end }}
+
+{{/* The Service of an application on the app port: {{ include "norvia.service" (dict "root" . "name" "partner-api") }}. */}}
+{{- define "norvia.service" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    {{- include "norvia.labels" .root | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ .name }}
+  ports:
+    - name: http
+      port: {{ .root.Values.appPort }}
+      targetPort: http
+{{- end }}
+
+{{/* The pod spec's parts every .NET application shares: the pull secrets, the port, the probes of ServiceDefaults (/health, /alive) and the limits. */}}
+{{- define "norvia.appContainer" -}}
+image: {{ include "norvia.image" (dict "root" .root "name" .app.image) }}
+imagePullPolicy: {{ .root.Values.image.pullPolicy }}
+ports:
+  - name: http
+    containerPort: {{ .root.Values.appPort }}
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  periodSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /alive
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 15
+resources:
+  {{- toYaml .app.resources | nindent 2 }}
+{{- end }}
+
+{{/*
+  The settings of one token identity (the AppHost's <prefix>__Issuer, __Audience, optionally __ClientId, and the __SigningKey of the install):
+    {{- include "norvia.tokenEnv" (dict "root" . "prefix" "Tms__Tokens" "audience" "TmsAudience" "clientId" "IntakeLogicAppClientId") | nindent 12 }}
+  audience and clientId name constants of localTokens.
+*/}}
+{{- define "norvia.tokenEnv" -}}
+- name: {{ .prefix }}__Issuer
+  value: {{ include "norvia.token" (dict "root" .root "name" "Issuer") | quote }}
+- name: {{ .prefix }}__Audience
+  value: {{ include "norvia.token" (dict "root" .root "name" .audience) | quote }}
+{{- if .clientId }}
+- name: {{ .prefix }}__ClientId
+  value: {{ include "norvia.token" (dict "root" .root "name" .clientId) | quote }}
+{{- end }}
+{{ include "norvia.signingKeyEnv" (printf "%s__SigningKey" .prefix) }}
+{{- end }}
+
+{{/*
+  A one-replica Deployment of an application, with the shared container parts. env is the rendered list of its environment
+  variables; secrets names the Secrets it takes as envFrom:
+    {{ include "norvia.deployment" (dict "root" . "name" "partner-api" "env" $env "secrets" (list "subscription-keys")) }}
+*/}}
+{{- define "norvia.deployment" -}}
+{{- $app := index .root.Values.apps .name -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    {{- include "norvia.labels" .root | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .name }}
+    spec:
+      {{- if .root.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .root.Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .name }}
+          {{- include "norvia.appContainer" (dict "root" .root "app" $app) | nindent 10 }}
+          {{- range .secrets | default list }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          env:
+            - name: ASPNETCORE_HTTP_PORTS
+              value: {{ .root.Values.appPort | quote }}
+            {{- .env | nindent 12 }}
+{{- end }}

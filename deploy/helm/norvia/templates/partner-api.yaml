@@ -1,0 +1,35 @@
+{{- /*
+  LocalPartnerApi plays API Management and the intake and Carrier-answer Logic Apps (ADR 0023). Its settings are those the AppHost gives
+  it; the subscription keys are the install's, in the Secret the Partner portal and the Simulator read too. One replica: the rate
+  limits are in memory.
+*/ -}}
+{{- $env := include "partner-api.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "partner-api" "env" $env "secrets" (list "subscription-keys")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "partner-api") }}
+{{- define "partner-api.env" -}}
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+- name: ConnectionStrings__blobs
+  value: {{ include "norvia.azuriteConnectionString" . | quote }}
+{{- include "norvia.tokenEnv" (dict "root" . "prefix" "PartnerApi__Tokens" "audience" "PartnerApiAudience") | nindent 0 }}
+- name: Tms__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "tms-api") | quote }}
+{{ include "norvia.tokenEnv" (dict "root" . "prefix" "Tms__Tokens" "audience" "TmsAudience" "clientId" "IntakeLogicAppClientId") }}
+- name: Tms__AnswerClientId
+  value: {{ include "norvia.token" (dict "root" . "name" "AnswerLogicAppClientId") | quote }}
+- name: Tms__ShipperTrackingClientId
+  value: {{ include "norvia.token" (dict "root" . "name" "ApiManagementClientId") | quote }}
+- name: CarrierInvoice__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "carrier-invoice-worker") | quote }}
+{{ include "norvia.tokenEnv" (dict "root" . "prefix" "CarrierInvoice__Tokens" "audience" "CarrierInvoiceTriggerAudience" "clientId" "ApiManagementClientId") }}
+{{- range .Values.personas }}
+- name: PartnerApi__{{ if eq .type "Shipper" }}ShippersByClientId{{ else }}CarriersByClientId{{ end }}__{{ include "norvia.personaClientId" .id }}
+  value: {{ .party | quote }}
+{{- end }}
+{{- if .Values.agents.enabled }}
+# The Intake agent's Booking drafts, run in process with the scripted fake; it has no tools and needs no token.
+- name: Agents__Enabled
+  value: "true"
+{{- end }}
+{{- end }}

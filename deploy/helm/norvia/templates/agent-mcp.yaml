@@ -1,0 +1,37 @@
+{{- /*
+  LocalAgentMcp plays API Management's MCP servers for the Agents (ADR 0041), deployed only when the agents are on, as under Aspire.
+  Each server takes the Agent's token and calls its application's agent view with a token of its own, both signed with the install's key.
+*/ -}}
+{{- if .Values.agents.enabled }}
+{{- $env := include "agent-mcp.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "agent-mcp" "env" $env) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "agent-mcp") }}
+{{- end }}
+{{- define "agent-mcp.env" -}}
+# The Integration operations agent's server, at /mcp.
+{{ include "norvia.tokenEnv" (dict "root" . "prefix" "AgentMcp__Tokens" "audience" "AgentAudience") }}
+- name: AgentMcp__ConsoleAgentApi
+  value: {{ include "norvia.url" (dict "root" . "name" "integration-console-web") }}/agent/v1
+{{ include "norvia.tokenEnv" (dict "root" . "prefix" "AgentMcp__ConsoleTokens" "audience" "ConsoleAgentApiAudience") }}
+{{- range .Values.agentMcpServers }}
+# /mcp/{{ .section | kebabcase }}
+{{ include "norvia.tokenEnv" (dict "root" $ "prefix" (printf "AgentMcp__%s__Tokens" .section) "audience" .audience) }}
+- name: AgentMcp__{{ .section }}__Api
+  value: {{ include "norvia.url" (dict "root" $ "name" .service) }}/{{ .path }}
+{{ include "norvia.tokenEnv" (dict "root" $ "prefix" (printf "AgentMcp__%s__ApiTokens" .section) "audience" .apiAudience) }}
+{{- end }}
+# The FinOps agent's token for the Estate health check's agent API (Agents:Cost) and the check's API audience, as the AppHost sets them on the stand-in (the keys are set on the apps that sign with them).
+- name: Agents__Cost__Tokens__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: Agents__Cost__Tokens__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "FinOpsAgentAudience") | quote }}
+- name: Agents__Cost__Tokens__ClientId
+  value: norvia-local-agent-finops
+- name: Agents__Cost__Tokens__Role
+  value: HealthCheck.Cost.Read
+- name: Agents__Api__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: Agents__Api__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "HealthCheckAgentApiAudience") | quote }}
+{{- end }}
