@@ -29,11 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install PSScriptAnalyzer and Pester
+      # The same script and versions (infra/tool-versions.psd1) as the dev container's image, so a check that passes there passes here.
+      - name: Install the pinned tools and PowerShell modules
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Force
-          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+          $bin = Join-Path $HOME '.local/bin'
+          New-Item -ItemType Directory -Force $bin | Out-Null
+          ./infra/install-tools.ps1 -BinDir $bin
+          $bin | Out-File -Append -FilePath $env:GITHUB_PATH
 
       - name: Parse, analyze and test the scripts
         shell: pwsh

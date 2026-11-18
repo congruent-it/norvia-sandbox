@@ -3,6 +3,13 @@
 
 BeforeAll {
     Import-Module (Join-Path $PSScriptRoot 'Norvia.Infra.psm1') -Force
+    # Pester can only mock a command that exists. The Azure CLI is on CI's runner but not in the dev container (#993), so stand in for it.
+    $script:azStub = -not (Get-Command az -ErrorAction SilentlyContinue)
+    if ($script:azStub) { function global:az { throw 'az is a stub for the Pester mocks' } }
+}
+
+AfterAll {
+    if ($script:azStub) { Remove-Item Function:\az -ErrorAction SilentlyContinue }
 }
 
 Describe 'Write-Pass and Write-Fail' {
