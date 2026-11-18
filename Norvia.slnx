@@ -192,14 +192,21 @@
     <Project Path="tests/Docs/Norvia.Docs.Generator.UnitTests/Norvia.Docs.Generator.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Tms/">
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests/Norvia.Tms.Api.IntegrationTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Billing/Norvia.Tms.Api.IntegrationTests.Billing.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Capacity/Norvia.Tms.Api.IntegrationTests.Capacity.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.CarrierBookings/Norvia.Tms.Api.IntegrationTests.CarrierBookings.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.ConsigneeTracking/Norvia.Tms.Api.IntegrationTests.ConsigneeTracking.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent/Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Exceptions/Norvia.Tms.Api.IntegrationTests.Exceptions.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Faults/Norvia.Tms.Api.IntegrationTests.Faults.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Planning/Norvia.Tms.Api.IntegrationTests.Planning.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.PlannerAgent/Norvia.Tms.Api.IntegrationTests.PlannerAgent.csproj" />
-    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Remaining/Norvia.Tms.Api.IntegrationTests.Remaining.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery/Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Reset/Norvia.Tms.Api.IntegrationTests.Reset.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.ShipperTracking/Norvia.Tms.Api.IntegrationTests.ShipperTracking.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.TrackingEvents/Norvia.Tms.Api.IntegrationTests.TrackingEvents.csproj" />
+    <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.TransportOrders/Norvia.Tms.Api.IntegrationTests.TransportOrders.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.IntegrationTests.Trips/Norvia.Tms.Api.IntegrationTests.Trips.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Api.UnitTests/Norvia.Tms.Api.UnitTests.csproj" />
     <Project Path="tests/Tms/Norvia.Tms.Application.UnitTests/Norvia.Tms.Application.UnitTests.csproj" />

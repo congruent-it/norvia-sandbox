@@ -1,4 +1,4 @@
-namespace Norvia.Tms.Api.IntegrationTests.Planner;
+namespace Norvia.Tms.Api.IntegrationTests.Planning.PlannerHome;
 
 /// <summary>With nothing to do the Planner's home page counts 0 everywhere and the read still succeeds. A TMS of its own, so nothing else has made work.</summary>
 public sealed class PlannerHomeNothingToDoTests(TmsFixture tms) : IClassFixture<TmsFixture>

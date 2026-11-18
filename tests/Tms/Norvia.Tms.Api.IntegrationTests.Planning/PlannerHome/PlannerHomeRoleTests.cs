@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace Norvia.Tms.Api.IntegrationTests.Planner;
+namespace Norvia.Tms.Api.IntegrationTests.Planning.PlannerHome;
 
 /// <summary>The TMS UI opens on the home page of the role the browser last switched to: the Planner's own, and Customer service's first view.</summary>
 public sealed class PlannerHomeRoleTests(TmsFixture tms)

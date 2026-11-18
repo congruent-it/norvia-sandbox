@@ -1,7 +1,7 @@
 using static Norvia.Tms.TestSupport.Exceptions.ExceptionCalls;
 using static Norvia.Tms.TestSupport.TrackingEvents.TrackingEventCalls;
 
-namespace Norvia.Tms.Api.IntegrationTests.Planner;
+namespace Norvia.Tms.Api.IntegrationTests.Planning.PlannerHome;
 
 /// <summary>
 /// The counts of the Planner's home page (#521), read through the TMS UI's own adapter against the AppHost's SQL Server. The

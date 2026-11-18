@@ -173,9 +173,30 @@ jobs:
           - application: TMS (Trips)
             directory: Tms
             kinds: IntegrationTests.Trips
-          - application: TMS (other components)
+          - application: TMS (Consignee tracking)
             directory: Tms
-            kinds: IntegrationTests.Remaining
+            kinds: IntegrationTests.ConsigneeTracking
+          - application: TMS (Exceptions)
+            directory: Tms
+            kinds: IntegrationTests.Exceptions
+          - application: TMS (Proofs of delivery)
+            directory: Tms
+            kinds: IntegrationTests.ProofsOfDelivery
+          - application: TMS (Reset)
+            directory: Tms
+            kinds: IntegrationTests.Reset
+          - application: TMS (Shipper tracking)
+            directory: Tms
+            kinds: IntegrationTests.ShipperTracking
+          - application: TMS (Tracking events)
+            directory: Tms
+            kinds: IntegrationTests.TrackingEvents
+          - application: TMS (Transport Orders)
+            directory: Tms
+            kinds: IntegrationTests.TransportOrders
+          - application: TMS (API reference, seeds and AppHost model)
+            directory: Tms
+            kinds: IntegrationTests
           - application: TMS (UI, Customer service agent)
             directory: Tms
             kinds: UiTests.CustomerServiceAgent
