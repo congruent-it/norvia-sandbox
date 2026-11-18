@@ -1,6 +1,6 @@
 # The Norvia chart
 
-Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1'`.
+Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1'`.
 
 ## The data tier (#926)
 
@@ -18,3 +18,21 @@ serviceAccountName: migrations-waiter
 initContainers:
   {{- include "norvia.waitForMigrations" (dict "root" . "names" (list "tms")) | nindent 2 }}
 ```
+
+## The Service Bus emulators (#927)
+
+| Piece | What it is |
+|---|---|
+| `messaging`, `messaging-2` | Two emulators, each a Deployment, a Service (AMQP on 5672, management on 5300) and a ConfigMap holding its `Config.json`, as under Aspire: each accepts only 10 concurrent connections. `messaging-2` holds the Driver app's, the ERP's and the Carrier tracking path's topics and queues. Their state is in the `sql` StatefulSet, so each waits for it. |
+| `serviceBus.emulators` in `values.yaml` | The topics, subscriptions and queues. `serviceBus.conditions` holds each filtered subscription's condition; the template adds the resubmit clause and brackets a condition with an `OR`. The template tests compare every expression with `infra/estate/messaging.bicep`. |
+
+An application asks for either emulator as `ConnectionStrings__messaging`; the Integration console reads the entities through the management port:
+
+```yaml
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+- name: LocalServiceBus__Namespaces__messaging-edge__ManagementConnectionString
+  value: {{ include "norvia.serviceBusManagementConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+```
+
+Lock durations are the Bicep's (the AppHost's emulators set none). Not verified on a cluster: that two emulators can share one SQL Server (the spike's chart did the same; Aspire gives each its own). The smoke script is the check.
