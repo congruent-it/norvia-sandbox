@@ -200,31 +200,33 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
         return TransportOrderNumber().Match(await assignment.InnerTextAsync()).Value;
     }
 
-    // The Planner opens the Transport Order in the TMS UI and reads the link it hands the Shipper.
-    private async Task<string> TrackingCodeAsync(string number)
+    // The Planner opens the Transport Order in the TMS UI, where the link it hands the Shipper is.
+    private async Task<(IPage Planner, ILocator Link)> OpenPlannerPageAsync(string number)
     {
         var planner = await Page.Context.NewPageAsync();
         await planner.GotoAsync(new Uri(_simulator.TmsUi, $"/transport-orders/{number}").ToString());
         var link = planner.GetByTestId("tracking-link");
         await Expect(link).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        return (planner, link);
+    }
+
+    private async Task<string> TrackingCodeAsync(string number)
+    {
+        var (planner, link) = await OpenPlannerPageAsync(number);
+        await using var _ = planner;
         var code = TrackingCode().Match(await link.InnerTextAsync()).Groups["code"].Value;
         code.Should().HaveLength(16);
-        await planner.CloseAsync();
         return code;
     }
 
     private async Task<string> ReplaceTrackingCodeAsync(string number)
     {
-        var planner = await Page.Context.NewPageAsync();
-        await planner.GotoAsync(new Uri(_simulator.TmsUi, $"/transport-orders/{number}").ToString());
-        var link = planner.GetByTestId("tracking-link");
-        await Expect(link).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        var (planner, link) = await OpenPlannerPageAsync(number);
+        await using var _ = planner;
         var before = await link.InnerTextAsync();
         await planner.GetByTestId("replace-tracking-code").ClickAsync();
         await Expect(link).Not.ToHaveTextAsync(before);
-        var code = TrackingCode().Match(await link.InnerTextAsync()).Groups["code"].Value;
-        await planner.CloseAsync();
-        return code;
+        return TrackingCode().Match(await link.InnerTextAsync()).Groups["code"].Value;
     }
 
     [GeneratedRegex(@"TO-\d{7}")]
