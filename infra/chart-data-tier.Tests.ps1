@@ -13,7 +13,7 @@ BeforeAll {
     # Renders the chart and returns its documents as { Kind; Name; Text }.
     function script:Get-Rendered {
         param([string[]] $Set = @(), [string] $Path = $script:chart)
-        $arguments = @('template', 'norvia', $Path, '--namespace', 'norvia', '--set', 'sql.saPassword=Test-Passw0rd')
+        $arguments = @('template', 'norvia', $Path, '--namespace', 'norvia', '--set', 'sql.saPassword=Test-Passw0rd', '--set', 'edge.baseDomain=norvia.test')
         foreach ($s in $Set) { $arguments += '--set', $s }
         $output = & helm @arguments 2>&1
         if ($LASTEXITCODE -ne 0) { throw "helm template failed: $output" }
@@ -184,12 +184,12 @@ data:
 
 Describe 'the rendered chart' -Skip:$script:helmMissing {
     It 'passes helm lint' {
-        $output = & helm lint $script:chart --set sql.saPassword=Test-Passw0rd 2>&1
+        $output = & helm lint $script:chart --set sql.saPassword=Test-Passw0rd --set edge.baseDomain=norvia.test 2>&1
         $LASTEXITCODE | Should -Be 0 -Because ($output -join "`n")
     }
 
     It 'is valid Kubernetes YAML (kubeconform)' -Skip:(-not (Get-Command kubeconform -ErrorAction SilentlyContinue)) {
-        $manifests = & helm template norvia $script:chart --namespace norvia --set sql.saPassword=Test-Passw0rd
+        $manifests = & helm template norvia $script:chart --namespace norvia --set sql.saPassword=Test-Passw0rd --set edge.baseDomain=norvia.test
         $output = $manifests | & kubeconform -strict -summary 2>&1
         $LASTEXITCODE | Should -Be 0 -Because ($output -join "`n")
     }

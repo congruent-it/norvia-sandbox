@@ -1,0 +1,79 @@
+{{- /*
+  LocalPartnerApi plays API Management and the intake and Carrier-answer Logic Apps (ADR 0023). Its settings are those the AppHost gives
+  it; the subscription keys are the install's, in the Secret the Partner portal and the Simulator read too. One replica: the rate
+  limits are in memory.
+*/ -}}
+{{- $name := "partner-api" }}
+{{- $app := index .Values.apps $name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          {{- include "norvia.appContainer" (dict "root" . "app" $app) | nindent 10 }}
+          envFrom:
+            - secretRef:
+                name: subscription-keys
+          env:
+            - name: ASPNETCORE_HTTP_PORTS
+              value: {{ .Values.appPort | quote }}
+            - name: ConnectionStrings__messaging
+              value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+            - name: ConnectionStrings__blobs
+              value: {{ include "norvia.azuriteConnectionString" . | quote }}
+            - name: PartnerApi__Tokens__Issuer
+              value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+            - name: PartnerApi__Tokens__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "PartnerApiAudience") | quote }}
+            {{- include "norvia.signingKeyEnv" "PartnerApi__Tokens__SigningKey" | nindent 12 }}
+            - name: Tms__BaseAddress
+              value: {{ include "norvia.url" (dict "root" . "name" "tms-api") | quote }}
+            - name: Tms__Tokens__Issuer
+              value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+            - name: Tms__Tokens__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "TmsAudience") | quote }}
+            - name: Tms__Tokens__ClientId
+              value: {{ include "norvia.token" (dict "root" . "name" "IntakeLogicAppClientId") | quote }}
+            {{- include "norvia.signingKeyEnv" "Tms__Tokens__SigningKey" | nindent 12 }}
+            - name: Tms__AnswerClientId
+              value: {{ include "norvia.token" (dict "root" . "name" "AnswerLogicAppClientId") | quote }}
+            - name: Tms__ShipperTrackingClientId
+              value: {{ include "norvia.token" (dict "root" . "name" "ApiManagementClientId") | quote }}
+            - name: CarrierInvoice__BaseAddress
+              value: {{ include "norvia.url" (dict "root" . "name" "carrier-invoice-worker") | quote }}
+            - name: CarrierInvoice__Tokens__Issuer
+              value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+            - name: CarrierInvoice__Tokens__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "CarrierInvoiceTriggerAudience") | quote }}
+            - name: CarrierInvoice__Tokens__ClientId
+              value: {{ include "norvia.token" (dict "root" . "name" "ApiManagementClientId") | quote }}
+            {{- include "norvia.signingKeyEnv" "CarrierInvoice__Tokens__SigningKey" | nindent 12 }}
+            {{- range .Values.personas }}
+            - name: PartnerApi__{{ if eq .type "Shipper" }}ShippersByClientId{{ else }}CarriersByClientId{{ end }}__{{ include "norvia.personaClientId" .id }}
+              value: {{ .party | quote }}
+            {{- end }}
+            {{- if .Values.agents.enabled }}
+            # The Intake agent's Booking drafts, run in process with the scripted fake; it has no tools and needs no token.
+            - name: Agents__Enabled
+              value: "true"
+            {{- end }}
+---
+{{ include "norvia.service" (dict "root" . "name" $name) }}

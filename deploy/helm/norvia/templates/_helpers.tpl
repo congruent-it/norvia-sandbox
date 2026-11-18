@@ -75,3 +75,73 @@ Endpoint=sb://{{ .host }};SharedAccessKeyName=RootManageSharedAccessKey;SharedAc
 {{- end -}}
 {{- dict "UserConfig" (dict "Namespaces" (list (dict "Name" "emulatorNs" "Queues" $queues "Topics" $topics)) "Logging" (dict "Type" "File")) | toPrettyJson -}}
 {{- end }}
+
+{{/* The in-cluster address of an application: {{ include "norvia.url" (dict "root" . "name" "tms-api") }}. */}}
+{{- define "norvia.url" -}}
+http://{{ .name }}:{{ .root.Values.appPort }}
+{{- end }}
+
+{{/* The hostname of an application under the base domain: {{ include "norvia.host" (dict "root" . "app" "partner-api") }}. */}}
+{{- define "norvia.host" -}}
+{{- $app := index .root.Values.apps .app -}}
+{{ $app.host }}.{{ required "edge.baseDomain is required: every UI and API gets <name>.<baseDomain>" .root.Values.edge.baseDomain }}
+{{- end }}
+
+{{/* A token constant of LocalTokens.cs: {{ include "norvia.token" (dict "root" . "name" "TmsAudience") }}. */}}
+{{- define "norvia.token" -}}
+{{ index .root.Values.localTokens .name }}
+{{- end }}
+
+{{/* An environment variable holding the install's token signing key (base64, as JWT bearer configuration takes it): {{ include "norvia.signingKeyEnv" "Tms__Tokens__SigningKey" }}. */}}
+{{- define "norvia.signingKeyEnv" -}}
+- name: {{ . }}
+  valueFrom:
+    secretKeyRef:
+      name: local-tokens
+      key: signing-key
+{{- end }}
+
+{{/* The Persona's client ID, which stands in for its Entra client app. */}}
+{{- define "norvia.personaClientId" -}}
+norvia-local-persona-{{ . }}
+{{- end }}
+
+{{/* The Service of an application on the app port: {{ include "norvia.service" (dict "root" . "name" "partner-api") }}. */}}
+{{- define "norvia.service" -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    {{- include "norvia.labels" .root | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ .name }}
+  ports:
+    - name: http
+      port: {{ .root.Values.appPort }}
+      targetPort: http
+{{- end }}
+
+{{/* The pod spec's parts every .NET application shares: the pull secrets, the port, the probes of ServiceDefaults (/health, /alive) and the limits. */}}
+{{- define "norvia.appContainer" -}}
+image: {{ include "norvia.image" (dict "root" .root "name" .app.image) }}
+imagePullPolicy: {{ .root.Values.image.pullPolicy }}
+ports:
+  - name: http
+    containerPort: {{ .root.Values.appPort }}
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  periodSeconds: 5
+livenessProbe:
+  httpGet:
+    path: /alive
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 15
+resources:
+  {{- toYaml .app.resources | nindent 2 }}
+{{- end }}

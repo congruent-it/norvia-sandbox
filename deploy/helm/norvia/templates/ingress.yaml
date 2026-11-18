@@ -1,0 +1,43 @@
+{{- /*
+  One Ingress per application, each at its own hostname under edge.baseDomain, on edge.ingress.className. The chart installs no
+  controller and no issuer (ADR 0053): TLS asks the cert-manager ClusterIssuer named in edge.tls.clusterIssuer. An application the chart
+  deploys later is added to this list.
+*/ -}}
+{{- $exposed := list "partner-api" }}
+{{- if .Values.agents.enabled }}{{ $exposed = append $exposed "agent-mcp" }}{{ end }}
+{{- range $name := $exposed }}
+{{- $host := include "norvia.host" (dict "root" $ "app" $name) }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "norvia.labels" $ | nindent 4 }}
+  {{- $annotations := deepCopy $.Values.edge.ingress.annotations }}
+  {{- if and $.Values.edge.tls.enabled $.Values.edge.tls.clusterIssuer }}{{ $_ := set $annotations "cert-manager.io/cluster-issuer" $.Values.edge.tls.clusterIssuer }}{{ end }}
+  {{- with $annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ $.Values.edge.ingress.className }}
+  {{- if $.Values.edge.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $host }}
+      secretName: {{ $name }}-tls
+  {{- end }}
+  rules:
+    - host: {{ $host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  name: http
+---
+{{- end }}

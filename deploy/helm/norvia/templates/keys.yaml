@@ -1,0 +1,41 @@
+{{- /*
+  The keys of an install (#928), generated once and kept: a later upgrade reads them back from the Secrets, as the SA password is.
+  helm template and --dry-run cannot look, so they render new ones. They are not in values.yaml, so they are not in git or in a ConfigMap.
+*/ -}}
+{{- $tokens := lookup "v1" "Secret" .Release.Namespace "local-tokens" -}}
+{{- $signingKey := "" -}}
+{{- if $tokens }}{{ $signingKey = index $tokens.data "signing-key" | b64dec }}{{ end -}}
+{{- if not $signingKey }}{{ $signingKey = randAlphaNum 48 | b64enc }}{{ end -}}
+# The key every local stand-in and application signs or checks tokens with, base64 as JWT bearer configuration takes it. Whatever
+# needs it reads it as secretKeyRef local-tokens/signing-key (include "norvia.signingKeyEnv").
+apiVersion: v1
+kind: Secret
+metadata:
+  name: local-tokens
+  labels:
+    app.kubernetes.io/name: local-tokens
+    {{- include "norvia.labels" . | nindent 4 }}
+type: Opaque
+data:
+  signing-key: {{ $signingKey | b64enc }}
+---
+{{- $subscriptions := lookup "v1" "Secret" .Release.Namespace "subscription-keys" }}
+# What API Management's subscriptions hold in Azure: a key for each Persona and one for the Consignee tracking product. The names are
+# the settings that read them, so the Partner API, the Partner portal and the Simulator all take the Secret as envFrom.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: subscription-keys
+  labels:
+    app.kubernetes.io/name: subscription-keys
+    {{- include "norvia.labels" . | nindent 4 }}
+type: Opaque
+data:
+  {{- $names := list "PartnerApi__ConsigneeSubscriptionKey" }}
+  {{- range .Values.personas }}{{ $names = append $names (printf "PartnerApi__SubscriptionKeys__%s" .id) }}{{ end }}
+  {{- range $name := $names }}
+  {{- $value := "" }}
+  {{- if $subscriptions }}{{ $value = (get $subscriptions.data $name) | default "" | b64dec }}{{ end }}
+  {{- if not $value }}{{ $value = randAlphaNum 32 | lower }}{{ end }}
+  {{ $name }}: {{ $value | b64enc }}
+  {{- end }}

@@ -1,0 +1,79 @@
+{{- /*
+  LocalAgentMcp plays API Management's MCP servers for the Agents (ADR 0041), deployed only when the agents are on, as under Aspire.
+  Each server takes the Agent's token and calls its application's agent view with a token of its own, both signed with the install's key.
+*/ -}}
+{{- if .Values.agents.enabled }}
+{{- $name := "agent-mcp" }}
+{{- $app := index .Values.apps $name }}
+{{- $issuer := include "norvia.token" (dict "root" . "name" "Issuer") }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          {{- include "norvia.appContainer" (dict "root" . "app" $app) | nindent 10 }}
+          env:
+            - name: ASPNETCORE_HTTP_PORTS
+              value: {{ .Values.appPort | quote }}
+            # The Integration operations agent's server, at /mcp.
+            - name: AgentMcp__Tokens__Issuer
+              value: {{ $issuer | quote }}
+            - name: AgentMcp__Tokens__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "AgentAudience") | quote }}
+            {{- include "norvia.signingKeyEnv" "AgentMcp__Tokens__SigningKey" | nindent 12 }}
+            - name: AgentMcp__ConsoleAgentApi
+              value: {{ include "norvia.url" (dict "root" . "name" "integration-console-web") }}/agent/v1
+            - name: AgentMcp__ConsoleTokens__Issuer
+              value: {{ $issuer | quote }}
+            - name: AgentMcp__ConsoleTokens__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "ConsoleAgentApiAudience") | quote }}
+            {{- include "norvia.signingKeyEnv" "AgentMcp__ConsoleTokens__SigningKey" | nindent 12 }}
+            {{- range .Values.agentMcpServers }}
+            # /mcp/{{ .section | kebabcase }}
+            - name: AgentMcp__{{ .section }}__Tokens__Issuer
+              value: {{ $issuer | quote }}
+            - name: AgentMcp__{{ .section }}__Tokens__Audience
+              value: {{ include "norvia.token" (dict "root" $ "name" .audience) | quote }}
+            {{- include "norvia.signingKeyEnv" (printf "AgentMcp__%s__Tokens__SigningKey" .section) | nindent 12 }}
+            - name: AgentMcp__{{ .section }}__Api
+              value: {{ include "norvia.url" (dict "root" $ "name" (first (splitList "/" .api))) }}/{{ rest (splitList "/" .api) | join "/" }}
+            - name: AgentMcp__{{ .section }}__ApiTokens__Issuer
+              value: {{ $issuer | quote }}
+            - name: AgentMcp__{{ .section }}__ApiTokens__Audience
+              value: {{ include "norvia.token" (dict "root" $ "name" .apiAudience) | quote }}
+            {{- include "norvia.signingKeyEnv" (printf "AgentMcp__%s__ApiTokens__SigningKey" .section) | nindent 12 }}
+            {{- end }}
+            # The FinOps agent's own token for the Estate health check's agent API (Agents:Cost), as the AppHost sets it on the stand-in.
+            - name: Agents__Cost__Tokens__Issuer
+              value: {{ $issuer | quote }}
+            - name: Agents__Cost__Tokens__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "FinOpsAgentAudience") | quote }}
+            - name: Agents__Cost__Tokens__ClientId
+              value: norvia-local-agent-finops
+            - name: Agents__Cost__Tokens__Role
+              value: HealthCheck.Cost.Read
+            - name: Agents__Api__Issuer
+              value: {{ $issuer | quote }}
+            - name: Agents__Api__Audience
+              value: {{ include "norvia.token" (dict "root" . "name" "HealthCheckAgentApiAudience") | quote }}
+---
+{{ include "norvia.service" (dict "root" . "name" $name) }}
+{{- end }}
