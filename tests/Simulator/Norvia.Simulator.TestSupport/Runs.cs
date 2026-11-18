@@ -11,7 +11,7 @@ using Norvia.Simulator.Domain.Runs;
 
 using SimulatorWeb::Norvia.Simulator.Web;
 
-namespace Norvia.Simulator.Web.IntegrationTests;
+namespace Norvia.Simulator.TestSupport;
 
 /// <summary>What the tests do with the Simulator's runs, through the doors its pages use.</summary>
 internal static class Runs

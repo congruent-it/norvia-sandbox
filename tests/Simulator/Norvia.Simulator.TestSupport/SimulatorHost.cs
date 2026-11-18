@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SimulatorWeb::Norvia.Simulator.Web;
 
-namespace Norvia.Simulator.Web.IntegrationTests;
+namespace Norvia.Simulator.TestSupport;
 
 /// <summary>The Simulator running in the tests' process, with its settings.</summary>
 public sealed class SimulatorHost : IAsyncDisposable

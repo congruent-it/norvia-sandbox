@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using Norvia.Simulator.Web.UiTests.Runs;
 using static Microsoft.Playwright.Assertions;
 
 namespace Norvia.Simulator.Web.UiTests.Personas;

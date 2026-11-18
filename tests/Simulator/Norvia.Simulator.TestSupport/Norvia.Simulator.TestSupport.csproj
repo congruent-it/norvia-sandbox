@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The fixture and helpers the Simulator integration test projects share: the AppHost the Simulator books into, and a Simulator started in the test process. Each test project registers SimulatorFixture as its assembly fixture. -->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+    <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
+    <ProjectReference Include="..\..\..\src\Simulator\Norvia.Simulator.Domain\Norvia.Simulator.Domain.csproj" />
+    <ProjectReference Include="..\..\..\src\Simulator\Norvia.Simulator.Web\Norvia.Simulator.Web.csproj" Aliases="SimulatorWeb" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests" />
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests.Invoicing" />
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests.Personas" />
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests.Reset" />
+  </ItemGroup>
+</Project>

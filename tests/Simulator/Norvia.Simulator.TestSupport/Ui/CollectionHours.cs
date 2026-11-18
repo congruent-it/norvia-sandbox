@@ -1,4 +1,4 @@
-namespace Norvia.Simulator.Web.UiTests.Runs;
+namespace Norvia.Simulator.TestSupport.Ui;
 
 /// <summary>
 /// When "Collected today" still means today. A booking's collection window starts no earlier than the next full hour and no later than 18:00 in Norvia's time,

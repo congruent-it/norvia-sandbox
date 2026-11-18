@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace Norvia.Simulator.Web.IntegrationTests;
+namespace Norvia.Simulator.TestSupport;
 
 /// <summary>Changes a test makes to a copy of the seed file before it starts a Simulator on it.</summary>
 internal static class SeedEdits

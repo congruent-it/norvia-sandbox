@@ -17,9 +17,8 @@ using Norvia.AppHost;
 using Norvia.Simulator.Domain.Plans;
 using SimulatorWeb::Norvia.Simulator.Web;
 
-[assembly: AssemblyFixture(typeof(Norvia.Simulator.Web.IntegrationTests.SimulatorFixture))]
 
-namespace Norvia.Simulator.Web.IntegrationTests;
+namespace Norvia.Simulator.TestSupport;
 
 /// <summary>
 /// Runs the AppHost once for the whole test run, cut down to what a booking needs: SQL Server, the Service Bus emulator, the TMS and its

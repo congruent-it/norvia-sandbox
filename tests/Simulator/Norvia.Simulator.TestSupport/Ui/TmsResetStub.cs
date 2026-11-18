@@ -2,20 +2,20 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Norvia.Simulator.Web.UiTests;
+namespace Norvia.Simulator.TestSupport.Ui;
 
 /// <summary>
 /// Stands in for the TMS API's reset door (ADR 0039) where the real one is switched on: two of them, one that says its reset is switched off and one that
 /// takes the check and then refuses the reset with a reason. The Simulator reaches them through its TMS API address.
 /// </summary>
-public sealed class ResetStub : IDisposable
+public sealed class TmsResetStub : IDisposable
 {
     public const string RefusalDetail = "A Service Bus subscription filled while the reset ran.";
 
     private readonly HttpListener _listener = new();
     private readonly Uri _root;
 
-    private ResetStub(int port)
+    private TmsResetStub(int port)
     {
         _root = new Uri($"http://127.0.0.1:{port}/");
         _listener.Prefixes.Add(_root.ToString());
@@ -27,11 +27,11 @@ public sealed class ResetStub : IDisposable
     /// <summary>A TMS API that would take a reset, and refuses it.</summary>
     public Uri Refusing => new(_root, "refusing/");
 
-    public static ResetStub Start()
+    public static TmsResetStub Start()
     {
         using var probe = new TcpListener(IPAddress.Loopback, 0);
         probe.Start();
-        var stub = new ResetStub(((IPEndPoint)probe.LocalEndpoint).Port);
+        var stub = new TmsResetStub(((IPEndPoint)probe.LocalEndpoint).Port);
         probe.Stop();
         stub._listener.Start();
         _ = stub.ServeAsync();

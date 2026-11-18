@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Norvia.Simulator.Web.IntegrationTests;
+namespace Norvia.Simulator.TestSupport;
 
 /// <summary>
 /// Stands in for an application's reset door, such as the TMS API's or the ERP API's, (ADR 0039) where a test needs to see or steer what the Simulator asks of it: it records every call, says its reset is

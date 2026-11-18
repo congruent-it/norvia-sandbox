@@ -17,6 +17,8 @@
     <Using Include="AwesomeAssertions" />
     <ProjectReference Include="..\..\..\src\Norvia.AppHost\Norvia.AppHost.csproj" />
     <ProjectReference Include="..\..\..\src\Simulator\Norvia.Simulator.Web\Norvia.Simulator.Web.csproj" Aliases="SimulatorWeb" />
+    <ProjectReference Include="..\Norvia.Simulator.TestSupport\Norvia.Simulator.TestSupport.csproj" />
+    <Using Include="Norvia.Simulator.TestSupport" />
   </ItemGroup>
   <ItemGroup>
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />

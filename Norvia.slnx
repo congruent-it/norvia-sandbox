@@ -184,9 +184,16 @@
     <Project Path="tests/Simulator/Norvia.Simulator.ArchitectureTests/Norvia.Simulator.ArchitectureTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Domain.UnitTests/Norvia.Simulator.Domain.UnitTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Infrastructure.UnitTests/Norvia.Simulator.Infrastructure.UnitTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.TestSupport/Norvia.Simulator.TestSupport.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.IntegrationTests/Norvia.Simulator.Web.IntegrationTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.IntegrationTests.Invoicing/Norvia.Simulator.Web.IntegrationTests.Invoicing.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.IntegrationTests.Personas/Norvia.Simulator.Web.IntegrationTests.Personas.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.IntegrationTests.Reset/Norvia.Simulator.Web.IntegrationTests.Reset.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UnitTests/Norvia.Simulator.Web.UnitTests.csproj" />
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests/Norvia.Simulator.Web.UiTests.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests.ConsigneeTracking/Norvia.Simulator.Web.UiTests.ConsigneeTracking.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests.Personas/Norvia.Simulator.Web.UiTests.Personas.csproj" />
+    <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests.Reset/Norvia.Simulator.Web.UiTests.Reset.csproj" />
   </Folder>
   <Folder Name="/tests/Docs/">
     <Project Path="tests/Docs/Norvia.Docs.Generator.UnitTests/Norvia.Docs.Generator.UnitTests.csproj" />

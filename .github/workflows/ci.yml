@@ -248,6 +248,24 @@ jobs:
           - application: Simulator
             directory: Simulator
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Simulator (Invoicing)
+            directory: Simulator
+            kinds: IntegrationTests.Invoicing
+          - application: Simulator (Personas)
+            directory: Simulator
+            kinds: IntegrationTests.Personas
+          - application: Simulator (Reset)
+            directory: Simulator
+            kinds: IntegrationTests.Reset
+          - application: Simulator (UI, Personas)
+            directory: Simulator
+            kinds: UiTests.Personas
+          - application: Simulator (UI, Reset)
+            directory: Simulator
+            kinds: UiTests.Reset
+          - application: Simulator (UI, Consignee tracking)
+            directory: Simulator
+            kinds: UiTests.ConsigneeTracking
           - application: Integration console
             directory: IntegrationConsole
             kinds: UnitTests ArchitectureTests IntegrationTests IntegrationTests.LocalTelemetry UiTests

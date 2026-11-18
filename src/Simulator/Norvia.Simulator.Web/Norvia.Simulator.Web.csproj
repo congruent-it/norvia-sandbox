@@ -15,6 +15,10 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests" />
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests.Invoicing" />
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests.Personas" />
+    <InternalsVisibleTo Include="Norvia.Simulator.Web.IntegrationTests.Reset" />
+    <InternalsVisibleTo Include="Norvia.Simulator.TestSupport" />
     <InternalsVisibleTo Include="Norvia.Simulator.Web.UnitTests" />
   </ItemGroup>
 

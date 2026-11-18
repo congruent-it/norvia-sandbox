@@ -1,4 +1,5 @@
 using System.Net;
+using System.Reflection;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
@@ -14,17 +15,16 @@ using Microsoft.Playwright;
 using Norvia.AppHost;
 using Norvia.Simulator.Domain.Plans;
 
-[assembly: AssemblyFixture(typeof(Norvia.Simulator.Web.UiTests.SimulatorUiFixture))]
-
-namespace Norvia.Simulator.Web.UiTests;
+namespace Norvia.Simulator.TestSupport.Ui;
 
 /// <summary>
 /// Runs the Norvia AppHost once for the whole test run, cut down to what a booking needs: SQL Server, the Service Bus emulator, the TMS and
 /// its migrations, the local Partner API, the tracking and Proof of delivery workers (the Carriers' tracking only reaches the TMS through them),
 /// the Integration console (the log's Message trail links point at it), the TMS UI (the log's Transport Order, Shipment and Trip links point at it, and the Simulator waits for its address), the Partner portal (the Shipper's tracking view, which needs the Driver app API its settings point at), the Trip dispatch and Driver reports workers (a dispatched Trip only reaches the Driver app
 /// through the first, and the Drivers' reports only reach the TMS through the second) and the Simulator with its database. A headless Chromium drives the Simulator, which sends its bookings to the real Partner API.
-/// Seven more Simulators share its database and settings, each changed in one thing a journey needs: an operator who may only read, two whose TMS API
-/// is a <see cref="ResetStub"/> that switches its reset off or refuses it, three with the Agents on (one whose model fails for one profile, one with an Own fleet of its own for the Driver texts), and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
+/// The test assembly names more Simulators with <see cref="SimulatorVariantsAttribute"/>, which share the first one's database and settings and each change one thing a journey needs: an operator who may only read, two whose TMS API
+/// is a <see cref="TmsResetStub"/> that switches its reset off or refuses it, three with the Agents on (one whose model fails for one profile, one with an Own fleet of its own for the Driver texts), and one whose Own fleet is another Vehicle and Driver, so the signatures journey gets a Trip of its own on a day.
+/// Only the Simulators a test assembly names are started. A test assembly registers this class as its assembly fixture.
 /// </summary>
 public sealed class SimulatorUiFixture : IAsyncLifetime
 {
@@ -49,6 +49,8 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     private const string DriverTextsFleetVehicle = "VEH-0002";
     private const string DriverTextsFleetDriver = "DRV-0002";
 
+    private static readonly string[] AlwaysStarted = ["tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web"];
+
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(10);
 
     private DistributedApplication? _app;
@@ -56,7 +58,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     private string? _seedCopy;
     private string? _signatureSeedCopy;
     private string? _driverTextsSeedCopy;
-    private ResetStub? _stub;
+    private TmsResetStub? _stub;
     private readonly string _tokenSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     private readonly Dictionary<string, JsonObject> _originalRosters = [];
 
@@ -86,7 +88,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     /// <summary>A Simulator whose TMS API says its reset is switched off.</summary>
     public Uri ResetSwitchedOff { get; private set; } = null!;
 
-    /// <summary>A Simulator whose TMS API refuses the reset, with <see cref="ResetStub.RefusalDetail"/>.</summary>
+    /// <summary>A Simulator whose TMS API refuses the reset, with <see cref="TmsResetStub.RefusalDetail"/>.</summary>
     public Uri ResetRefused { get; private set; } = null!;
 
     public IBrowser Browser { get; private set; } = null!;
@@ -116,21 +118,56 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         _seedCopy = await CopySeedOfAsync(PricedShipper, OwnFleetVehicle, OwnFleetDriver, startup.Token);
         builder.CreateResourceBuilder((ProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
 
-        _signatureSeedCopy = await CopySeedOfAsync(PricedShipper, SignatureFleetVehicle, SignatureFleetDriver, startup.Token);
-        _driverTextsSeedCopy = await CopySeedOfAsync(PricedShipper, DriverTextsFleetVehicle, DriverTextsFleetDriver, startup.Token);
-        _stub = ResetStub.Start();
-        AddVariant(builder, simulator, "simulator-signatures", ("Seed__Path", _signatureSeedCopy));
-        AddVariant(builder, simulator, "simulator-agents", ("Agents__Enabled", "true"));
-        // The scripted model reads the language from the question's "language:" line, so a style that carries a line of its own with a language it doesn't know makes it answer with no texts.
-        AddVariant(builder, simulator, "simulator-agents-drivers", ("Agents__Enabled", "true"), ("Seed__Path", _driverTextsSeedCopy));
-        AddVariant(builder, simulator, "simulator-agents-failing", ("Agents__Enabled", "true"), ("Personas__Profiles__1__Style", "a few blunt words\nlanguage: tlh"));
-        AddVariant(builder, simulator, "simulator-viewer", ("LocalOperator__Roles__0", "Simulator.Read"), ("LocalOperator__Roles__1", ""));
-        AddVariant(builder, simulator, "simulator-reset-off", ("TmsApi__BaseAddress", _stub.SwitchedOff.ToString()));
-        AddVariant(builder, simulator, "simulator-reset-refused", ("TmsApi__BaseAddress", _stub.Refusing.ToString()));
+        var wanted = (Assembly.GetEntryAssembly() ?? throw new InvalidOperationException("The test assembly is the entry assembly."))
+            .GetCustomAttributes<SimulatorVariantsAttribute>().SelectMany(attribute => attribute.Names).ToHashSet();
+        var drivers = new List<string> { OwnFleetDriver };
+        if (wanted.Contains(SimulatorVariants.Signatures))
+        {
+            _signatureSeedCopy = await CopySeedOfAsync(PricedShipper, SignatureFleetVehicle, SignatureFleetDriver, startup.Token);
+            AddVariant(builder, simulator, SimulatorVariants.Signatures, ("Seed__Path", _signatureSeedCopy));
+            drivers.Add(SignatureFleetDriver);
+        }
+
+        if (wanted.Contains(SimulatorVariants.Agents))
+        {
+            AddVariant(builder, simulator, SimulatorVariants.Agents, ("Agents__Enabled", "true"));
+        }
+
+        if (wanted.Contains(SimulatorVariants.AgentsWithDriverFleet))
+        {
+            _driverTextsSeedCopy = await CopySeedOfAsync(PricedShipper, DriverTextsFleetVehicle, DriverTextsFleetDriver, startup.Token);
+            AddVariant(builder, simulator, SimulatorVariants.AgentsWithDriverFleet, ("Agents__Enabled", "true"), ("Seed__Path", _driverTextsSeedCopy));
+            drivers.Add(DriverTextsFleetDriver);
+        }
+
+        if (wanted.Contains(SimulatorVariants.FailingAgent))
+        {
+            // The scripted model reads the language from the question's "language:" line, so a style that carries a line of its own with a language it doesn't know makes it answer with no texts.
+            AddVariant(builder, simulator, SimulatorVariants.FailingAgent, ("Agents__Enabled", "true"), ("Personas__Profiles__1__Style", "a few blunt words\nlanguage: tlh"));
+        }
+
+        if (wanted.Contains(SimulatorVariants.Viewer))
+        {
+            AddVariant(builder, simulator, SimulatorVariants.Viewer, ("LocalOperator__Roles__0", "Simulator.Read"), ("LocalOperator__Roles__1", ""));
+        }
+
+        if (wanted.Contains(SimulatorVariants.ResetSwitchedOff) || wanted.Contains(SimulatorVariants.ResetRefused))
+        {
+            _stub = TmsResetStub.Start();
+            if (wanted.Contains(SimulatorVariants.ResetSwitchedOff))
+            {
+                AddVariant(builder, simulator, SimulatorVariants.ResetSwitchedOff, ("TmsApi__BaseAddress", _stub.SwitchedOff.ToString()));
+            }
+
+            if (wanted.Contains(SimulatorVariants.ResetRefused))
+            {
+                AddVariant(builder, simulator, SimulatorVariants.ResetRefused, ("TmsApi__BaseAddress", _stub.Refusing.ToString()));
+            }
+        }
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);
-        foreach (var resource in new[] { "tms-api", "partner-api", "partner-portal-web", "tms-web", "simulator-web", "simulator-signatures", "simulator-agents", "simulator-agents-drivers", "simulator-agents-failing", "simulator-viewer", "simulator-reset-off", "simulator-reset-refused" })
+        foreach (var resource in AlwaysStarted.Concat(wanted))
         {
             await _app.ResourceNotifications.WaitForResourceHealthyAsync(resource, startup.Token);
         }
@@ -138,16 +175,16 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         Address = _app.GetEndpoint("simulator-web", "http");
         PartnerPortal = _app.GetEndpoint("partner-portal-web", "http");
         TmsUi = _app.GetEndpoint("tms-web", "http");
-        SignatureFleet = _app.GetEndpoint("simulator-signatures", "http");
-        WithAgents = _app.GetEndpoint("simulator-agents", "http");
-        WithAgentsAndDriverFleet = _app.GetEndpoint("simulator-agents-drivers", "http");
-        WithFailingAgent = _app.GetEndpoint("simulator-agents-failing", "http");
-        Viewer = _app.GetEndpoint("simulator-viewer", "http");
-        ResetSwitchedOff = _app.GetEndpoint("simulator-reset-off", "http");
-        ResetRefused = _app.GetEndpoint("simulator-reset-refused", "http");
+        SignatureFleet = EndpointOf(SimulatorVariants.Signatures, wanted);
+        WithAgents = EndpointOf(SimulatorVariants.Agents, wanted);
+        WithAgentsAndDriverFleet = EndpointOf(SimulatorVariants.AgentsWithDriverFleet, wanted);
+        WithFailingAgent = EndpointOf(SimulatorVariants.FailingAgent, wanted);
+        Viewer = EndpointOf(SimulatorVariants.Viewer, wanted);
+        ResetSwitchedOff = EndpointOf(SimulatorVariants.ResetSwitchedOff, wanted);
+        ResetRefused = EndpointOf(SimulatorVariants.ResetRefused, wanted);
 
         // The Drivers' rosters are Monday to Friday; at the weekend they work today by a change of Roster, as a Planner would make, so the Trip journeys run on any day.
-        foreach (var driver in new[] { OwnFleetDriver, SignatureFleetDriver, DriverTextsFleetDriver })
+        foreach (var driver in drivers)
         {
             await WorkTodayAsync(driver, startup.Token);
         }
@@ -155,6 +192,9 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         _playwright = await Playwright.CreateAsync();
         Browser = await _playwright.Chromium.LaunchAsync();
     }
+
+    // The address of a Simulator this assembly named, and null for one it did not, which none of its journeys use.
+    private Uri EndpointOf(string name, HashSet<string> wanted) => wanted.Contains(name) ? _app!.GetEndpoint(name, "http") : null!;
 
     /// <summary>Stops the TMS API, so nothing can ask it anything, until <see cref="StartTmsAsync"/>.</summary>
     public async Task StopTmsAsync(CancellationToken cancellationToken)

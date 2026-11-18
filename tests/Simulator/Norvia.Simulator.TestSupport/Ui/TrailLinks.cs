@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Norvia.Simulator.Web.UiTests;
+namespace Norvia.Simulator.TestSupport.Ui;
 
 /// <summary>What a log line's Message trail link looks like: its accessible name, and its address in the Integration console, with the correlation ID captured as <c>key</c>.</summary>
 public static partial class TrailLinks
