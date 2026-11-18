@@ -1,13 +1,17 @@
 {
   "name": "Norvia sandbox (Kubernetes tools)",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
+  "build": { "dockerfile": "Dockerfile", "context": ".." },
   "remoteUser": "vscode",
+  "mounts": [
+    "source=claude-code-config,target=/home/vscode/.claude,type=volume"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
+        "anthropic.claude-code",
         "ms-dotnettools.csdevkit",
         "ms-vscode.powershell",
         "ms-kubernetes-tools.vscode-kubernetes-tools"
