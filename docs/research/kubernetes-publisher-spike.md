@@ -48,7 +48,7 @@ Not tried: `PublishAsKubernetesService(...)`, the callback that edits a generate
 
 | | A. Second AppHost | B. Third mode in the current AppHost | C. Hand-written Helm chart |
 |---|---|---|---|
-| **Fits the sandbox** | A local-topology AppHost that shares the project references. Run 2 is a sketch of it at about 150 lines, but the real wiring is the 1,224-line `AppHost.cs`: personas, keys, 14 workers' settings, filters. A second file copies it. | One file. But it has 5 `IsPublishMode` sites, 31 Azure-specific calls (`PublishAsAzureContainerApp`, `PublishAsExisting`, `WithRoleAssignments`) and 106 `estate.` references, and `IsPublishMode` is binary. A third mode means a switch outside `IsPublishMode`, and `AddSqlServer`, containers and emulator config in place of the Azure types in each branch. | Nothing in the AppHost changes. The chart is a second place that knows each application's environment variables. |
+| **Fits the sandbox** | A local-topology AppHost that shares the project references. Run 2 is a sketch of it at 130 lines, but the real wiring is the 1,224-line `AppHost.cs`: personas, keys, 13 workers' settings, filters. A second file copies it. | One file. But it has 5 `IsPublishMode` sites, 31 Azure-specific calls (`PublishAsAzureContainerApp`, `PublishAsExisting`, `WithRoleAssignments`) and 106 `estate.` references, and `IsPublishMode` is binary. A third mode means a switch outside `IsPublishMode`, and `AddSqlServer`, containers and emulator config in place of the Azure types in each branch. | Nothing in the AppHost changes. The chart is a second place that knows each application's environment variables. |
 | **What it generates** | Run 2's output, with the gaps above. | Run 1: it does not publish until every resource names its compute environment, and any Azure resource left in the model writes Bicep and an empty value (run 3). | Whatever is written: `Job` or hook for migrations, probes, PVCs, `ConfigMap` for the emulator config and the seed, `Namespace`, `NetworkPolicy`, `ResourceQuota`, `Ingress`, limits. All are in #923 and #938 as chart values. |
 | **Gaps closed how** | Post-process the chart (kustomize patches or a script) or `PublishAsKubernetesService`. Still a second source to maintain, and the output is `0.1.0` preview-shaped. | Same, plus the risk to the shared file: the integration and UI test projects use `Aspire.Hosting.Testing` against the AppHost, and `azd` publishes it to Azure. | Directly. |
 | **Drift** | Two AppHosts: wiring drifts between them. | None between modes, but each Azure/local branch drifts from the others inside one file. | The chart can drift from the AppHost's environment variables. See the check below. |
@@ -63,7 +63,7 @@ Not tried: `PublishAsKubernetesService(...)`, the callback that edits a generate
 
 ### One use of the publisher
 
-Run 2's `values.yaml` is a complete list of the settings the 14 workers, the migrations and the applications take, with the secrets named. Start the chart from it. Once.
+Run 2's `values.yaml` is a complete list of the settings the 13 workers, the migrations and the applications take, with the secrets named. Start the chart from it. Once.
 
 ## How manifests are applied
 
