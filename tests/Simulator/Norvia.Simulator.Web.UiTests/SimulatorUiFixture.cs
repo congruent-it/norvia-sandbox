@@ -156,6 +156,32 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         Browser = await _playwright.Chromium.LaunchAsync();
     }
 
+    /// <summary>Stops the TMS API, so nothing can ask it anything, until <see cref="StartTmsAsync"/>.</summary>
+    public async Task StopTmsAsync(CancellationToken cancellationToken)
+    {
+        using var stopping = WithinTwoMinutes(cancellationToken);
+        await _app!.ResourceCommands.ExecuteCommandAsync("tms-api", KnownResourceCommands.StopCommand, stopping.Token);
+        // What a stopped project reports varies (Exited, Finished, even Unknown); it is down once it is none of these.
+        string[] up = [KnownResourceStates.Starting, KnownResourceStates.Running, KnownResourceStates.Stopping, KnownResourceStates.Waiting];
+        await _app.ResourceNotifications.WaitForResourceAsync(
+            "tms-api", resource => resource.Snapshot.State?.Text is { } state && !up.Contains(state), stopping.Token);
+    }
+
+    public async Task StartTmsAsync(CancellationToken cancellationToken)
+    {
+        using var starting = WithinTwoMinutes(cancellationToken);
+        await _app!.ResourceCommands.ExecuteCommandAsync("tms-api", KnownResourceCommands.StartCommand, starting.Token);
+        await _app.ResourceNotifications.WaitForResourceHealthyAsync("tms-api", starting.Token);
+    }
+
+    // A resource that never gets there fails the test, rather than hanging the run.
+    private static CancellationTokenSource WithinTwoMinutes(CancellationToken cancellationToken)
+    {
+        var within = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        within.CancelAfter(TimeSpan.FromMinutes(2));
+        return within;
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var (driver, roster) in _originalRosters)
