@@ -163,11 +163,11 @@ localTokens:
 # The MCP stand-in's servers beyond the Integration operations agent's (which is /mcp): the settings section, the audience of the Agent's
 # token, the agent view it calls and the audience of its own token for that view.
 agentMcpServers:
-  - { section: HealthCheck, audience: HealthCheckAgentAudience, api: "health-check-web/agent/v1", apiAudience: HealthCheckAgentApiAudience }
-  - { section: HealthCheckCost, audience: FinOpsAgentAudience, api: "health-check-web/agent/v1", apiAudience: HealthCheckAgentApiAudience }
-  - { section: CustomerService, audience: CustomerServiceAgentAudience, api: "tms-api/v1/agent/customer-service", apiAudience: TmsAudience }
-  - { section: CustomerServiceReply, audience: CustomerServiceReplyAgentAudience, api: "tms-api/v1/agent/customer-service-reply", apiAudience: TmsAudience }
-  - { section: Planner, audience: PlannerAgentAudience, api: "tms-api/v1/agent/planner", apiAudience: TmsAudience }
-  - { section: PlannerNotification, audience: PlannerNotificationAgentAudience, api: "tms-api/v1/agent/planner-notification", apiAudience: TmsAudience }
-  - { section: FinanceMatching, audience: FinanceAgentAudience, api: "erp-api/v1/agent/finance", apiAudience: ErpAudience }
-  - { section: FinanceRejectionReason, audience: FinanceRejectionReasonAgentAudience, api: "erp-api/v1/agent/finance-rejection-reason", apiAudience: ErpAudience }
+  - { section: HealthCheck, audience: HealthCheckAgentAudience, service: health-check-web, path: "agent/v1", apiAudience: HealthCheckAgentApiAudience }
+  - { section: HealthCheckCost, audience: FinOpsAgentAudience, service: health-check-web, path: "agent/v1", apiAudience: HealthCheckAgentApiAudience }
+  - { section: CustomerService, audience: CustomerServiceAgentAudience, service: tms-api, path: "v1/agent/customer-service", apiAudience: TmsAudience }
+  - { section: CustomerServiceReply, audience: CustomerServiceReplyAgentAudience, service: tms-api, path: "v1/agent/customer-service-reply", apiAudience: TmsAudience }
+  - { section: Planner, audience: PlannerAgentAudience, service: tms-api, path: "v1/agent/planner", apiAudience: TmsAudience }
+  - { section: PlannerNotification, audience: PlannerNotificationAgentAudience, service: tms-api, path: "v1/agent/planner-notification", apiAudience: TmsAudience }
+  - { section: FinanceMatching, audience: FinanceAgentAudience, service: erp-api, path: "v1/agent/finance", apiAudience: ErpAudience }
+  - { section: FinanceRejectionReason, audience: FinanceRejectionReasonAgentAudience, service: erp-api, path: "v1/agent/finance-rejection-reason", apiAudience: ErpAudience }

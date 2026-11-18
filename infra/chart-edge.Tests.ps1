@@ -54,7 +54,7 @@ BeforeAll {
     $script:docs = Get-Rendered
     $script:withAgents = Get-Rendered @('agents.enabled=true')
     $script:appHost = Get-Content (Join-Path $script:root 'src/Norvia.AppHost/AppHost.cs') -Raw
-    $script:tokens = Get-Content (Join-Path $script:root 'src/Norvia.AppHost/LocalTokens.cs') -Raw
+    $script:localTokensSource = Get-Content (Join-Path $script:root 'src/Norvia.AppHost/LocalTokens.cs') -Raw
     $script:values = Get-Content (Join-Path $script:chart 'values.yaml') -Raw
     $script:seed = Get-Content (Join-Path $script:root 'seed/norvia.seed.json') -Raw | ConvertFrom-Json
 }
@@ -94,7 +94,7 @@ Describe 'the Partner API stand-in' -Skip:$script:helmMissing {
             CarrierInvoice__Tokens__Issuer = 'Issuer'; CarrierInvoice__Tokens__Audience = 'CarrierInvoiceTriggerAudience'; CarrierInvoice__Tokens__ClientId = 'ApiManagementClientId'
         }
         foreach ($name in $expected.Keys) {
-            $constant = [regex]::Match($tokens, "public const string $($expected[$name]) = ""([^""]+)""").Groups[1].Value
+            $constant = [regex]::Match($localTokensSource, "public const string $($expected[$name]) = ""([^""]+)""").Groups[1].Value
             $constant | Should -Not -BeNullOrEmpty
             $partnerApiEnv[$name] | Should -Be $constant -Because $name
         }
@@ -135,7 +135,7 @@ Describe 'the values the chart repeats from the AppHost' -Skip:$script:helmMissi
         $pairs = [regex]::Matches($block, '(?m)^\s+(\w+): (\S+)$')
         $pairs.Count | Should -BeGreaterThan 10
         foreach ($pair in $pairs) {
-            $constant = [regex]::Match($tokens, "public const string $($pair.Groups[1].Value) = ""([^""]+)""").Groups[1].Value
+            $constant = [regex]::Match($localTokensSource, "public const string $($pair.Groups[1].Value) = ""([^""]+)""").Groups[1].Value
             $pair.Groups[2].Value | Should -Be $constant -Because $pair.Groups[1].Value
         }
     }
