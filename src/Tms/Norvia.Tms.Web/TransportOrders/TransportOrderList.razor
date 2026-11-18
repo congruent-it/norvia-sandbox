@@ -52,7 +52,7 @@
     </div>
     @* Applied when the Planner presses Enter or leaves the box: the database searches, so each search is a read. *@
     <div class="flex flex-col">
-        <FluentTextField Label="Search" aria-label="Search" Value="@_search" ValueChanged="SearchChangedAsync" Placeholder="Number, Shipper reference or Shipment" Style="width: 18rem;" />
+        <FluentTextField Label="Search" aria-label="Search" @bind-Value="_search" @bind-Value:after="SearchChangedAsync" Placeholder="Number, Shipper reference or Shipment" Style="width: 18rem;" />
     </div>
 </div>
 
@@ -191,11 +191,8 @@ else
         return LoadAsync(1);
     }
 
-    private Task SearchChangedAsync(string? search)
-    {
-        _search = search;
-        return LoadAsync(1);
-    }
+    // The bound field has taken the text by now, so the box keeps what the Planner typed while the read runs.
+    private Task SearchChangedAsync() => LoadAsync(1);
 
     private Task GoToAsync(int page) => LoadAsync(page);
 
