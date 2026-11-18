@@ -167,6 +167,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
             "tms-api", resource => resource.Snapshot.State?.Text is { } state && !up.Contains(state), stopping.Token);
     }
 
+    /// <summary>Starts the TMS API again and waits until it is healthy.</summary>
     public async Task StartTmsAsync(CancellationToken cancellationToken)
     {
         using var starting = WithinTwoMinutes(cancellationToken);

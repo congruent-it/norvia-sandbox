@@ -15,6 +15,11 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
     // The Carriers' events reach the TMS through the tracking and Proof of delivery workers, a little after the run sends them.
     private const float PatienceMilliseconds = 120_000;
 
+    // A stopped TMS makes the portal wait for its own timeout before it answers.
+    private const float TmsDownPatienceMilliseconds = 90_000;
+
+    private const float PlannerPagePatienceMilliseconds = 30_000;
+
     private static readonly string[] StatusOrder = ["Received", "Scheduled", "Collected", "In transit", "Delivered"];
 
     private readonly SimulatorUiFixture _simulator = simulator;
@@ -66,6 +71,7 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
         {
             await consignee.Page.GotoAsync(LinkOf(code));
             var status = StatusOnPage().Match(await consignee.Page.GetByLabel("Shipment", new() { Exact = true }).InnerTextAsync()).Groups["status"].Value;
+            status.Should().NotBeEmpty("the page shows a Status in its Shipment list");
             if (seen.LastOrDefault() != status)
             {
                 seen.Add(status);
@@ -128,6 +134,9 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
 
         response!.Status.Should().Be(404);
         await Expect(consignee.Page.GetByTestId("tracking-message")).ToHaveTextAsync("We can't find this shipment. Check the link, or contact the sender.");
+        var replacedPage = await consignee.Page.GetByRole(AriaRole.Main).InnerHTMLAsync();
+        await consignee.Page.GotoAsync(LinkOf("ZZZZZZZZZZZZZZZZ"));
+        (await consignee.Page.GetByRole(AriaRole.Main).InnerHTMLAsync()).Should().Be(replacedPage, "a replaced code and a wrong one are one answer");
     }
 
     [Fact]
@@ -144,7 +153,7 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
         try
         {
             // The page keeps no state between visits (it is a plain page behind no session), so it has no earlier answer to show beside the error: it shows only the error.
-            var response = await consignee.Page.ReloadAsync(new() { Timeout = 90_000 });
+            var response = await consignee.Page.ReloadAsync(new() { Timeout = TmsDownPatienceMilliseconds });
 
             response!.Status.Should().Be(503);
             await Expect(consignee.Page.GetByTestId("tracking-message")).ToHaveTextAsync("Tracking is temporarily unavailable. Try again shortly.");
@@ -195,7 +204,7 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
     private async Task<string> TransportOrderNumberAsync()
     {
         var assignment = Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" }).GetByRole(AriaRole.Row)
-            .Filter(new() { HasText = "Assign Transport Order" }).Filter(new() { Has = Page.Locator("[data-outcome=Planned]") });
+            .Filter(new() { HasText = "Assign Transport Order" }).Filter(new() { HasText = "Planned" });
         await Expect(assignment).ToHaveCountAsync(1, new() { Timeout = PatienceMilliseconds });
         return TransportOrderNumber().Match(await assignment.InnerTextAsync()).Value;
     }
@@ -206,7 +215,7 @@ public sealed partial class ConsigneeTrackingJourneyTests(SimulatorUiFixture sim
         var planner = await Page.Context.NewPageAsync();
         await planner.GotoAsync(new Uri(_simulator.TmsUi, $"/transport-orders/{number}").ToString());
         var link = planner.GetByTestId("tracking-link");
-        await Expect(link).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await Expect(link).ToBeVisibleAsync(new() { Timeout = PlannerPagePatienceMilliseconds });
         return (planner, link);
     }
 
