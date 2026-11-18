@@ -30,7 +30,7 @@ public sealed class ConsigneeTrackingExpiryTests(ControlledClockTmsFixture tms) 
 
         justBefore.StatusCode.Should().Be(HttpStatusCode.OK);
         justAfter.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        (await justAfter.Content.ReadAsStringAsync(_cancellationToken)).Should().Be(await unknown.Content.ReadAsStringAsync(_cancellationToken));
+        (await justAfter.Content.ReadAsStringAsync(_cancellationToken)).WithoutTraceId().Should().Be((await unknown.Content.ReadAsStringAsync(_cancellationToken)).WithoutTraceId());
     }
 
     [Fact]

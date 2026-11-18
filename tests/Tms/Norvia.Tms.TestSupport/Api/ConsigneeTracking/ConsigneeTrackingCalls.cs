@@ -41,6 +41,14 @@ internal static class ConsigneeTrackingCalls
     public static async Task<JsonNode> ViewedAsync(this TmsFixture tms, string trackingCode, CancellationToken cancellationToken) =>
         JsonNode.Parse(await tms.ViewBodyAsync(trackingCode, cancellationToken))!;
 
+    /// <summary>An answer without its trace ID, which is different for every request, so two answers to the same question can be compared.</summary>
+    public static string WithoutTraceId(this string body)
+    {
+        var answer = JsonNode.Parse(body)!.AsObject();
+        answer.Remove("traceId");
+        return answer.ToJsonString();
+    }
+
     /// <summary>The Transport Order's tracking code as the Planner reads it, through the TMS UI.</summary>
     public static async Task<string> TrackingCodeOfAsync(this TmsFixture tms, string transportOrderNumber, CancellationToken cancellationToken)
     {

@@ -68,7 +68,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
     }
 
     [Fact]
-    public async Task View_AShipmentInTransitWithAnExceptionAndANote_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
+    public async Task View_ACollectedShipmentWithAnExceptionAndANote_NeverShowsTheCarrierShipmentNumberExceptionRemarkOrPrice()
     {
         var (shipmentNumber, exceptionNumber) = await tms.CollectedWithDeliveryFailedAsync(_cancellationToken);
         var code = await tms.CodeOfShipmentAsync(shipmentNumber, _cancellationToken);
@@ -78,7 +78,7 @@ public sealed class ConsigneeTrackingViewTests(TmsFixture tms) : IClassFixture<T
         var body = await tms.ViewBodyAsync(code, _cancellationToken);
 
         AssertNothingOnlyTheShipperMayKnow(body, shipmentNumber);
-        JsonNode.Parse(body)!["trackingStatus"]!.GetValue<string>().Should().Be("InTransit");
+        JsonNode.Parse(body)!["trackingStatus"]!.GetValue<string>().Should().Be("Collected");
     }
 
     [Fact]

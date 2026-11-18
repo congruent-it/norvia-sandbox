@@ -23,7 +23,7 @@ public sealed class ConsigneeTrackingRefusalTests(TmsFixture tms) : IClassFixtur
         foreach (var code in new[] { UnknownCode, "too-short", "not a code at all, far too long", replaced })
         {
             using var response = await tms.ViewAsync(tms.ConsigneeTracking, code, _cancellationToken, correlationId);
-            answers.Add((response.StatusCode, await response.Content.ReadAsStringAsync(_cancellationToken)));
+            answers.Add((response.StatusCode, (await response.Content.ReadAsStringAsync(_cancellationToken)).WithoutTraceId()));
         }
 
         answers.Should().AllSatisfy(answer => answer.Status.Should().Be(HttpStatusCode.NotFound));
@@ -85,15 +85,16 @@ public sealed class ConsigneeTrackingRefusalTests(TmsFixture tms) : IClassFixtur
     }
 
     [Fact]
-    public async Task View_TheConsigneeTrackingRole_OpensNothingButTheView()
+    public async Task View_TheConsigneeTrackingRole_CannotReadOrReplaceATrackingCode()
     {
-        var (number, _) = await tms.AcceptedWithCodeAsync(_cancellationToken);
+        var (number, code) = await tms.AcceptedWithCodeAsync(_cancellationToken);
 
-        using var transportOrder = await tms.ConsigneeTracking.GetAsync(new Uri($"/v1/transport-orders/{number}", UriKind.Relative), _cancellationToken);
-        using var code = await tms.ConsigneeTracking.GetAsync(new Uri($"/v1/transport-orders/{number}/tracking-code", UriKind.Relative), _cancellationToken);
+        using var read = await tms.ConsigneeTracking.GetAsync(new Uri($"/v1/transport-orders/{number}/tracking-code", UriKind.Relative), _cancellationToken);
+        using var replace = await tms.ConsigneeTracking.PostAsync(new Uri($"/v1/transport-orders/{number}/tracking-code/replace", UriKind.Relative), content: null, _cancellationToken);
 
-        transportOrder.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        code.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        read.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        replace.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await tms.TrackingCodeOfAsync(number, _cancellationToken)).Should().Be(code);
     }
 
     [Fact]
