@@ -1,0 +1,107 @@
+{{- /*
+  One Deployment per emulator, each with its Service and Config.json. Each emulator keeps its state in the data tier's SQL Server,
+  so it waits for it. The Config.json is rendered from values.serviceBus; a change to it changes the checksum, which rolls the pod.
+*/ -}}
+{{- range $name, $emulator := .Values.serviceBus.emulators }}
+{{- $config := include "norvia.serviceBusConfig" (dict "root" $ "name" $name) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "norvia.labels" $ | nindent 4 }}
+data:
+  Config.json: |
+    {{- $config | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "norvia.labels" $ | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    # Kept apart from the AMQP port, as under Aspire: the Integration console reads the entities through it.
+    - name: management
+      port: 5300
+      targetPort: 5300
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "norvia.labels" $ | nindent 4 }}
+spec:
+  replicas: 1
+  # Two emulators on one SQL Server must not overlap while one rolls.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+      annotations:
+        checksum/config: {{ $config | sha256sum }}
+    spec:
+      initContainers:
+        - name: wait-for-sql
+          image: {{ $.Values.sql.image }}
+          env:
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql
+                  key: sa-password
+          command:
+            - /bin/sh
+            - -c
+            - until /opt/mssql-tools18/bin/sqlcmd -C -S sql,1433 -U sa -P "$MSSQL_SA_PASSWORD" -b -Q "SELECT 1"; do echo "waiting for SQL Server"; sleep 3; done
+      containers:
+        - name: emulator
+          image: {{ $.Values.serviceBus.image }}
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SQL_SERVER
+              value: sql
+            - name: MSSQL_SA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sql
+                  key: sa-password
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 5300
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5300
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            {{- toYaml $.Values.serviceBus.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /ServiceBus_Emulator/ConfigFiles/Config.json
+              subPath: Config.json
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}-config
+---
+{{- end }}

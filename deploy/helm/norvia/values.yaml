@@ -43,3 +43,41 @@ migrations:
 kubectl:
   # Must have kubectl and need no shell (the waiter runs kubectl directly). Match it to the cluster's version.
   image: registry.k8s.io/kubectl:v1.37.2
+
+# The Service Bus emulators (ADR 0053). Two, as under Aspire: each accepts only 10 concurrent connections and every app holds one, so
+# messaging-2 holds the topics and queues of the Driver app, the ERP and the Carrier tracking path. The apps ask for either as
+# "messaging" (include "norvia.serviceBusConnectionString"); in Azure both are the one namespace. Their state is in the data tier's
+# SQL Server. The topics, subscriptions, filters and queues are those of infra/estate/messaging.bicep; the template tests compare them.
+serviceBus:
+  image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+  # The condition of each subscription that takes only some of its topic's messages. Every subscription also admits a resubmit aimed
+  # at it (coding guidelines §7), which the template adds, bracketing a condition that has an OR. The same list is ResubmitAwareFilters.Conditions in the AppHost.
+  conditions:
+    carrier-booking: "assignedTo = 'Carrier'"
+    shipper-notification: "eventType = 'ShipperNotificationRequested'"
+    carrier-cancellation: "eventType = 'CarrierBookingCancelled' OR eventType = 'CarrierBookingWithdrawn'"
+    carrier-invoice-outcome: "eventType = 'CarrierInvoiceApproved'"
+    shipper-invoice: "eventType IN ('ShipperInvoiceIssued', 'CreditNoteIssued')"
+    carrier-cost: "eventType = 'CarrierCostIncurred'"
+    billing: "eventType = 'TransportOrderBillable'"
+    master-data-sync: "eventType IN ('ShipperChanged', 'CarrierChanged', 'RateCardChanged', 'CarrierRateCardChanged', 'VehicleChanged', 'DriverChanged')"
+    trip-dispatch: "eventType = 'TripDispatched'"
+    driver-reports: "eventType = 'TripStartReported' OR eventType = 'TripEndReported' OR eventType = 'StopCompletedReported' OR eventType = 'ProofOfDeliveryCaptured'"
+  emulators:
+    messaging:
+      topics:
+        transport-order-events: [monitoring, billing]
+        shipment-events: [monitoring, carrier-booking, shipper-notification, carrier-cancellation, carrier-cost]
+        trip-events: [monitoring, trip-dispatch]
+      queues: []
+    messaging-2:
+      topics:
+        driver-app-events: [driver-reports]
+        invoicing-events: [monitoring, shipper-invoice, carrier-invoice-outcome]
+        master-data-events: [monitoring, master-data-sync]
+      queues: [carrier-tracking, carrier-proof-of-delivery]
+  # The subscriptions that use sessions (ADR 0016): one Trip's reports are read one at a time and in order.
+  sessionSubscriptions: [driver-reports]

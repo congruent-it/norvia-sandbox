@@ -35,3 +35,35 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- define "norvia.azuriteConnectionString" -}}
 DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
 {{- end }}
+
+{{/* The connection string an application reads for a Service Bus emulator, as ConnectionStrings__messaging: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") }}. Both emulators are asked for as "messaging" by the apps that use them. */}}
+{{- define "norvia.serviceBusConnectionString" -}}
+Endpoint=sb://{{ .name }};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+{{- end }}
+
+{{/* The same for the emulator's management port, which the Integration console reads the entities through (LocalServiceBus__Namespaces__<name>__ManagementConnectionString). */}}
+{{- define "norvia.serviceBusManagementConnectionString" -}}
+Endpoint=sb://{{ .name }}:5300;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;
+{{- end }}
+
+{{/* The Config.json of one emulator: {{ include "norvia.serviceBusConfig" (dict "root" . "name" "messaging") }}. */}}
+{{- define "norvia.serviceBusConfig" -}}
+{{- $emulator := index .root.Values.serviceBus.emulators .name -}}
+{{- $topics := list -}}
+{{- range $topic, $subscriptions := $emulator.topics -}}
+  {{- $subs := list -}}
+  {{- range $subscription := $subscriptions -}}
+    {{- $condition := index $.root.Values.serviceBus.conditions $subscription -}}
+    {{- $expression := printf "resubmitTo IS NULL OR resubmitTo = '%s'" $subscription -}}
+    {{- if $condition }}{{ if contains " OR " $condition }}{{ $condition = printf "(%s)" $condition }}{{ end }}{{ $expression = printf "(%s AND resubmitTo IS NULL) OR resubmitTo = '%s'" $condition $subscription }}{{ end -}}
+    {{- $sub := dict "Name" $subscription "Properties" (dict "RequiresSession" (has $subscription $.root.Values.serviceBus.sessionSubscriptions)) "Rules" (list (dict "Name" "resubmit-aware" "Properties" (dict "FilterType" "Sql" "SqlFilter" (dict "SqlExpression" $expression)))) -}}
+    {{- $subs = append $subs $sub -}}
+  {{- end -}}
+  {{- $topics = append $topics (dict "Name" $topic "Subscriptions" $subs) -}}
+{{- end -}}
+{{- $queues := list -}}
+{{- range $queue := $emulator.queues -}}
+  {{- $queues = append $queues (dict "Name" $queue "Properties" (dict "MaxDeliveryCount" 10)) -}}
+{{- end -}}
+{{- dict "UserConfig" (dict "Namespaces" (list (dict "Name" "emulatorNs" "Queues" $queues "Topics" $topics)) "Logging" (dict "Type" "File")) | toPrettyJson -}}
+{{- end }}
