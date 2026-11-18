@@ -73,13 +73,14 @@ public sealed class LocalWorkerFailureTests(MasterDataSyncFixture fixture)
     public async Task AMessageTheTmsCannotReplaceARecordFrom_IsDeadLetteredAsMasterDataUnreadable_AndNothingIsSent(string eventType, string body)
     {
         var id = Guid.NewGuid().ToString();
-        var before = fixture.Proxy.CallCount;
 
         await fixture.SendToTopicAsync(eventType, body, id, id, Ct);
 
         var dead = await fixture.DeadLetteredAsync(MasterDataSyncFixture.SyncSubscription, id, Ct);
         dead.DeadLetterReason.Should().Be("MasterDataUnreadable");
-        fixture.Proxy.CallCount.Should().Be(before, "nothing was sent to the TMS");
+        // Not the proxy's total: the worker is still handling the events earlier tests saved, and calls the TMS for them while this test runs. It sends the correlation ID of the body.
+        var correlationId = System.Text.Json.Nodes.JsonNode.Parse(body)!["correlationId"]!.GetValue<string>();
+        fixture.Proxy.CallsWith(correlationId).Should().BeEmpty("nothing was sent to the TMS for this message");
     }
 
     private static Fault Failure(string failure) => failure == "none" ? Fault.NoAnswer : Fault.Answer(int.Parse(failure, System.Globalization.CultureInfo.InvariantCulture));
