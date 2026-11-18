@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 
-namespace Norvia.Simulator.Web.IntegrationTests;
+namespace Norvia.Simulator.TestSupport;
 
 /// <summary>
 /// What the Simulator in the tests' process logged and traced, as text: each log entry's message, its scope and its exception, and each span's name and tags.

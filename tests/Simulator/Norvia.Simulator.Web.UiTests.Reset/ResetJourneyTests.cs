@@ -131,7 +131,7 @@ public sealed class ResetJourneyTests(SimulatorUiFixture simulator) : BrowserPag
 
         var result = Page.GetByRole(AriaRole.Status, new() { Name = "Reset result" });
         await Expect(result).ToContainTextAsync("Not everything was reset.", new() { Timeout = 120_000 });
-        await Expect(result).ToContainTextAsync($"TMS: refused. {ResetStub.RefusalDetail}");
+        await Expect(result).ToContainTextAsync($"TMS: refused. {TmsResetStub.RefusalDetail}");
         await Expect(result).Not.ToContainTextAsync("The estate is a clean sheet.");
         await Expect(runs.GetByRole(AriaRole.Row)).ToHaveCountAsync(before);
         await Expect(Page.GetByText("No runs yet.")).ToHaveCountAsync(0);

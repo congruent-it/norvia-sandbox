@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace Norvia.Simulator.Web.UiTests;
+namespace Norvia.Simulator.TestSupport.Ui;
 
 /// <summary>
 /// A fresh browser page per test, on the Simulator, recording a trace and a video that are kept only when the test fails (coding guidelines §10),
