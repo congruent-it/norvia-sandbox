@@ -25,7 +25,14 @@
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.CustomerServiceAgent" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.PlannerAgent" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Planning" />
-    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Remaining" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.ConsigneeTracking" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Exceptions" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.ProofsOfDelivery" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Reset" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.ShipperTracking" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.TrackingEvents" />
+    <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.TransportOrders" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Trips" />
   </ItemGroup>
   <ItemGroup>

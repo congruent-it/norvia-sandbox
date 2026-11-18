@@ -302,6 +302,12 @@ public sealed class ErpFixture : IAsyncLifetime
             builder.UseSetting("Seed:Path", Path.Combine(AppContext.BaseDirectory, "norvia.seed.json"));
             builder.UseSetting("LocalUser:Name", "Finance (test)");
             builder.UseSetting("LocalUser:Roles:0", "Finance");
+            // The UI's master-data saves go to the ERP API over HTTP; these tests don't make one, but the UI refuses to start without where and as whom.
+            builder.UseSetting("ErpApi:BaseAddress", "http://erp-api");
+            builder.UseSetting("ErpApi:LocalTokens:Issuer", LocalTokens.Issuer);
+            builder.UseSetting("ErpApi:LocalTokens:Audience", LocalTokens.ErpAudience);
+            builder.UseSetting("ErpApi:LocalTokens:ClientId", "norvia-test-erp-ui");
+            builder.UseSetting("ErpApi:LocalTokens:SigningKey", Convert.ToBase64String(Encoding.UTF8.GetBytes(SigningKey)));
             builder.UseSetting("Outbox:PollingInterval", OutboxPollingInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture));
             builder.ConfigureTestServices(services =>
             {

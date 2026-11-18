@@ -51,6 +51,10 @@ public sealed class DriverSignatureJourneyTests(SimulatorUiFixture simulator) : 
         var deliveries = Rows(log, "DriverReported").Filter(new() { HasText = "Deliver" });
         var reserved = await ShipmentsOfAsync(deliveries.Filter(new() { HasText = "With reservations" }));
         var clean = await ShipmentsOfAsync(deliveries.Filter(new() { HasNotText = "With reservations" }));
+
+        // The Own fleet has one Trip a day, and only the Shipments that fit its Vehicle go on it (the weights come from the seed), so a run can have too few
+        // deliveries for both kinds: half of one delivery rounds up to one with reservations and none clean.
+        Assert.SkipWhen(reserved.Count + clean.Count < 2, $"Only {reserved.Count + clean.Count} Shipment(s) fit the Own fleet's one Trip, too few to deliver one with reservations and one clean.");
         reserved.Should().NotBeEmpty("half of the deliveries carry reservations");
         clean.Should().NotBeEmpty("half of the deliveries are clean");
 

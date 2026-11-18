@@ -50,6 +50,10 @@ public sealed partial class DriverTextsJourneyTests(SimulatorUiFixture simulator
         var log = Page.GetByRole(AriaRole.Table, new() { Name = "Log lines" });
         await Expect(Rows(log, "TripCompleted")).ToHaveCountAsync(1, new() { Timeout = PatienceMilliseconds });
 
+        // A Driver's reports are logged before the Trip completes. One Shipment can show only one of the three kinds, so there must be two to work.
+        var worked = await Rows(log, "DriverReported").Filter(new() { HasTextRegex = WorkedShipment() }).CountAsync();
+        Assert.SkipWhen(worked < 2, $"Only {worked} Shipment(s) fit the Own fleet's one Trip, too few for each kind of Driver report to occur.");
+
         // Each kind of Driver report that carries a text names the Driver's pool and the index drawn from it.
         foreach (var (action, category) in new[]
         {
@@ -72,6 +76,8 @@ public sealed partial class DriverTextsJourneyTests(SimulatorUiFixture simulator
     }
 
     // A run in which every booking is good, collected today and goes to the Own fleet's one Driver, who fails some collections and deliveries and reports some damage.
+    // The shares are exact, of the Shipments that fit the Own fleet's one Trip of the day, which are a few of the orders and not all of them (the weights come from the
+    // seed). At 40% two Shipments are enough for one failed collection, one failed delivery and one damage report, as the Drivers' shares round half up.
     private async Task ConfigureRunAsync()
     {
         // A seed of this test's own, so its plan and its Shipper references are its own.
@@ -84,8 +90,8 @@ public sealed partial class DriverTextsJourneyTests(SimulatorUiFixture simulator
         foreach (var (label, percent) in new[]
         {
             ("Bad bookings (%)", 0), ("Collected today (%)", 100), ("Assigned by the Planner (%)", 100), ("To Own fleet where it fits (%)", 100),
-            ("Reassigned (%)", 0), ("Own fleet put on Trips (%)", 100), ("Collections that fail (%)", 20), ("Deliveries that fail (%)", 40),
-            ("Damage reported (%)", 30), ("Delivered with reservations (%)", 0),
+            ("Reassigned (%)", 0), ("Own fleet put on Trips (%)", 100), ("Collections that fail (%)", 40), ("Deliveries that fail (%)", 40),
+            ("Damage reported (%)", 40), ("Delivered with reservations (%)", 0),
         })
         {
             await Page.GetByLabel(label).FillAsync(percent.ToString(CultureInfo.InvariantCulture));
@@ -101,6 +107,9 @@ public sealed partial class DriverTextsJourneyTests(SimulatorUiFixture simulator
     private static Regex AgentSource() => AgentSourceRegex();
 
     private static Regex PoolReference(string pool) => new($@"pool {Regex.Escape(pool)}, index \d+", RegexOptions.None, TimeSpan.FromSeconds(5));
+
+    [GeneratedRegex("Collected|Collection failed", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex WorkedShipment();
 
     [GeneratedRegex(@"Source: agent, run \d+\.")]
     private static partial Regex AgentSourceRegex();

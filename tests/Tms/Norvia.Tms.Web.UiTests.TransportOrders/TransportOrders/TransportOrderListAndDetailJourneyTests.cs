@@ -31,6 +31,9 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
         await OpenTransportOrdersAsPlannerAsync();
         await SearchAsync(tag);
 
+        // The box keeps what the Planner typed, so a filter chosen next still narrows the search and does not drop it.
+        await Expect(Page.GetByRole(AriaRole.Textbox, new() { Name = "Search" })).ToHaveValueAsync(tag);
+
         await Expect(OrderRow(accepted)).ToContainTextAsync("Accepted");
         await Expect(OrderRow(groenrijk)).ToContainTextAsync("Tuincentrum Groenrijk");
         await Expect(OrderRow(planned)).ToContainTextAsync("Planned");
@@ -38,6 +41,7 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
         await Expect(Footer()).ToContainTextAsync("3 Transport Orders");
 
         await ChooseAsync("Status", "Planned");
+        await Expect(Page.GetByRole(AriaRole.Textbox, new() { Name = "Search" })).ToHaveValueAsync(tag);
         await Expect(OrderRow(planned)).ToBeVisibleAsync();
         await Expect(OrderRow(accepted)).ToHaveCountAsync(0);
         await Expect(OrderRow(groenrijk)).ToHaveCountAsync(0);

@@ -1,4 +1,4 @@
-namespace Norvia.Tms.Api.IntegrationTests.Planner;
+namespace Norvia.Tms.Api.IntegrationTests.Planning.PlannerHome;
 
 /// <summary>
 /// The Planner's home page counts a Carrier booking awaiting an answer only once it is overdue: it was requested longer ago than the

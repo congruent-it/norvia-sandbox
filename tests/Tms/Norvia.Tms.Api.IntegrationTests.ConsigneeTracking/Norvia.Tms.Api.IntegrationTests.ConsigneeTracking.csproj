@@ -23,6 +23,7 @@
     <Using Include="Norvia.Tms.TestSupport.Billing" />
     <Using Include="Norvia.Tms.TestSupport.Capacity" />
     <Using Include="Norvia.Tms.TestSupport.CarrierBookings" />
+    <Using Include="Norvia.Tms.TestSupport.ConsigneeTracking" />
     <Using Include="Norvia.Tms.TestSupport.Exceptions" />
     <Using Include="Norvia.Tms.TestSupport.Planning" />
     <Using Include="Norvia.Tms.TestSupport.ProofsOfDelivery" />
@@ -35,6 +36,5 @@
     <!-- Each test class with a fixture of its own starts an AppHost (SQL Server and the Service Bus emulator in Docker). xUnit runs
          one test collection per core, so a many-core machine started a few dozen at once, and containers failed to start. -->
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\..\..\seed\norvia.seed.json" Link="DemoSeed\norvia.seed.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

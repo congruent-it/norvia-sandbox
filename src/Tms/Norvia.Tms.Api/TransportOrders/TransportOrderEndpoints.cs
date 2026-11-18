@@ -145,6 +145,9 @@ public static class TransportOrderEndpoints
                 + "changing and publishing nothing, with a problem whose code says which, and whose correlationId names the Message trail the refusal is traced on: "
                 + "TransportOrderNotFound (404), or AlreadyBillable, NotBilledSeparately, ShipmentNotDelivered or AlreadyReleased (409).");
 
+        // The Planner reads and replaces the code a Consignee's link carries from the TMS UI (ADR 0052).
+        transportOrders.MapTrackingCodes();
+
         return app;
     }
 
