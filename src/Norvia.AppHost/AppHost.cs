@@ -108,7 +108,14 @@ var driverAppApi = builder.AddProject<Projects.Norvia_DriverApp_Api>("driver-app
 
 // The Partner portal's presenter panel switches the faults the applications own through their APIs: the Driver app's (P11, P12) and the TMS's (P5, P8, P12).
 // The Planner's tracking link for a Consignee (ADR 0052) opens on the Partner portal.
-tmsWeb.WithEnvironment("PartnerPortal__BaseAddress", partnerPortal.GetEndpoint("http"));
+// Only while the Partner portal is in the AppHost: a test that takes it out has no link to give, and a reference to its address would keep the UI waiting for ever.
+tmsWeb.WithEnvironment(context =>
+{
+    if (builder.Resources.Contains(partnerPortal.Resource))
+    {
+        context.EnvironmentVariables["PartnerPortal__BaseAddress"] = partnerPortal.GetEndpoint("http");
+    }
+});
 
 partnerPortal.WithEnvironment("Faults__Owners__driver-app__Address", driverAppApi.GetEndpoint("http"))
     .WithEnvironment("Faults__Owners__tms__Address", tmsApi.GetEndpoint("http"));
