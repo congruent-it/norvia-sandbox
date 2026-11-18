@@ -36,7 +36,9 @@ function Save-Download {
     Invoke-WebRequest -Uri $Url -OutFile $file
     $lines = (Invoke-RestMethod -Uri $ChecksumUrl) -split "`n" | Where-Object { $_.Trim() }
     $line = $lines | Where-Object { $_ -match "\b$([regex]::Escape($Name))\b" } | Select-Object -First 1
-    $line ??= $lines | Select-Object -First 1   # kubectl's .sha256 holds the bare hash
+    # kubectl's .sha256 holds the bare hash, alone on its line. Any other file must name the asset, or the download fails.
+    if (-not $line -and @($lines).Count -eq 1 -and $lines -match '^[0-9a-fA-F]{64}$') { $line = $lines }
+    if (-not $line) { throw "No checksum for $Name in $ChecksumUrl" }
     $expected = ($line.Trim() -split '\s+')[0]
     $actual = (Get-FileHash -Algorithm SHA256 -Path $file).Hash
     if ($actual -ne $expected) { throw "Checksum mismatch for $Url (expected $expected, got $actual)" }

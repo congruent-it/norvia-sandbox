@@ -21,7 +21,7 @@ pwsh infra/test-scripts.ps1
 
 ## One set of versions
 
-`infra/tool-versions.psd1` is the only place a version lives. The image build and the `powershell` job of [CI](../../.github/workflows/ci.yml) both run `infra/install-tools.ps1`, which checks each download against the checksum its publisher posts, so a test that passes in the container passes in CI. To bump a tool, change the manifest. CI's runner brings its own `pwsh` (7.4 or later) and, unlike the container, the Azure CLI; the Pester tests stand in for `az` when it is missing.
+`infra/tool-versions.psd1` is the only place a version lives. The image build and the `powershell` job of [CI](../../.github/workflows/ci.yml) both run `infra/install-tools.ps1`, which checks each download (and the image build, PowerShell's) against the checksum its publisher posts, so a test that passes in the container passes in CI. To bump a tool, change the manifest. CI's runner brings its own `pwsh` (7.4 or later) and, unlike the container, the Azure CLI; the Pester tests stand in for `az` when it is missing.
 
 ## Not in the container
 
