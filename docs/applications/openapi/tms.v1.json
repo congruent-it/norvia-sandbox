@@ -323,6 +323,76 @@
         }
       }
     },
+    "/v1/transport-orders/{transportOrderNumber}/tracking-code": {
+      "get": {
+        "tags": [
+          "TransportOrders"
+        ],
+        "summary": "Read a Transport Order's tracking code, which the Consignee's link carries.",
+        "description": "The code is a credential, so it is in no other view of the Transport Order. It is null for an Accepted Transport Order from before codes existed, until the Planner replaces it. A Transport Order that is unknown, or a Rejected booking, is a 404.",
+        "operationId": "GetTransportOrderTrackingCode",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportOrderTrackingCodeView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/v1/transport-orders/{transportOrderNumber}/tracking-code/replace": {
+      "post": {
+        "tags": [
+          "TransportOrders"
+        ],
+        "summary": "Replace a Transport Order's tracking code; the old code stops working at once.",
+        "description": "For a link that went to the wrong person. There is no revocation without a replacement. Returns the new code. Only the TMS UI calls it, and it is deliberately not idempotent: every call issues a new code and the previous one stops working, so a retry rotates the code again. A Transport Order that is unknown, or a Rejected booking, is a 404.",
+        "operationId": "ReplaceTransportOrderTrackingCode",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportOrderTrackingCodeView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/v1/transport-orders/{id}": {
       "get": {
         "tags": [
@@ -10398,6 +10468,25 @@
           "receivedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TransportOrderTrackingCodeView": {
+        "required": [
+          "transportOrderNumber",
+          "trackingCode"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "trackingCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
         "additionalProperties": false
