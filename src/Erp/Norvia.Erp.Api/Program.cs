@@ -24,11 +24,14 @@ using Norvia.Erp.Application.ShipperInvoices.ReportNotDelivered;
 using Norvia.Erp.Application.ShipperInvoices.ReportSent;
 using Norvia.Erp.Infrastructure;
 using Norvia.Erp.Infrastructure.Agents;
+using Norvia.ServiceDefaults;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// The AppHost's local signing key is trusted only in Development, or where LocalAuth:Allowed is set (ADR 0053).
+LocalAuth.RequireForSigningKeys(builder.Environment, builder.Configuration);
 builder.Services.AddScoped<IPipelineBehavior<RecordBillableLineCommand, Result<RecordBillableLineResult>>, TrackBillableLineInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<RecordCarrierCostCommand, Result<RecordCarrierCostResult>>, TrackCarrierCostInLoggingScope>();
 builder.Services.AddScoped<IPipelineBehavior<ReceiveCarrierInvoiceCommand, Result<ReceiveCarrierInvoiceResult>>, TrackCarrierInvoiceInLoggingScope>();

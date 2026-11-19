@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Norvia.Branding;
 using Norvia.DriverApp.Application.Drivers.List;
+using Norvia.ServiceDefaults;
 
 namespace Norvia.DriverApp.Web.Drivers;
 
@@ -41,14 +42,12 @@ public static class DriverSignIn
                 $"The sign-in stand-in ({StandInSettingsSection}) and the Driver picker ({DriverPicker.SettingsSection}) are two ways to pick a Driver; turn on one.");
         }
 
+        LocalAuth.RequireLocalSignInWhenAllowed(builder.Configuration, builder.Configuration.IsStandIn() || builder.Configuration.IsPicker());
+
         if (builder.Configuration.IsStandIn())
         {
-            // Anywhere else, the stand-in would let anyone in as any Driver.
-            if (!builder.Environment.IsDevelopment())
-            {
-                throw new InvalidOperationException(
-                    $"The sign-in stand-in ({StandInSettingsSection}) runs only in Development; in Azure Easy Auth signs Drivers in.");
-            }
+            // Outside Development and LocalAuth:Allowed, the stand-in would let anyone in as any Driver.
+            LocalAuth.Require(builder.Environment, builder.Configuration, $"The sign-in stand-in ({StandInSettingsSection})");
 
             builder.Services.AddAuthentication(StandInAuthenticationType)
                 .AddCookie(StandInAuthenticationType, options =>

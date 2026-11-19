@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- Only the faults are covered here: the rest of ServiceDefaults is telemetry wiring that every application's own tests and the AppHost run. -->
-    <Include>[Norvia.ServiceDefaults]Norvia.ServiceDefaults.Faults.*</Include>
+    <!-- Only the faults and LocalAuth are covered here: the rest of ServiceDefaults is telemetry wiring that every application's own tests and the AppHost run. -->
+    <Include>[Norvia.ServiceDefaults]Norvia.ServiceDefaults.Faults.*,[Norvia.ServiceDefaults]Norvia.ServiceDefaults.LocalAuth</Include>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="xunit.v3.mtp-off" />
   </ItemGroup>

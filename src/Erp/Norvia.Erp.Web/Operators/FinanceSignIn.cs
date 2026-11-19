@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Norvia.Erp.Application.Operators;
+using Norvia.ServiceDefaults;
 
 namespace Norvia.Erp.Web.Operators;
 
@@ -18,14 +19,11 @@ public static class FinanceSignIn
         ArgumentNullException.ThrowIfNull(builder);
 
         var localUser = builder.Configuration.GetSection(LocalUserOptions.SectionName);
+        LocalAuth.RequireLocalSignInWhenAllowed(builder.Configuration, localUser.Exists());
         if (localUser.Exists())
         {
-            // Anywhere else, a configured user would let anyone in with the roles it names.
-            if (!builder.Environment.IsDevelopment())
-            {
-                throw new InvalidOperationException(
-                    $"A local user ({LocalUserOptions.SectionName}) signs in only in Development; in Azure Easy Auth signs users in.");
-            }
+            // Outside Development and LocalAuth:Allowed, a configured user would let anyone in with the roles it names.
+            LocalAuth.Require(builder.Environment, builder.Configuration, $"A local user ({LocalUserOptions.SectionName})");
 
             builder.Services.AddOptions<LocalUserOptions>().Bind(localUser).ValidateDataAnnotations().ValidateOnStart();
             builder.Services.AddAuthentication(LocalUserHandler.SchemeName)

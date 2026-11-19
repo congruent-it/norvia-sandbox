@@ -12,7 +12,7 @@ The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernet
 
 In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, an Ingress per exposed application, and the namespace's protection ([below](#the-namespace-is-closed-to-the-others)): a default-deny `NetworkPolicy`, an internal-only ingress, Secrets read by name, requests and limits on every pod, and a `ResourceQuota` with a `LimitRange`.
 
-Not in the chart yet: the TMS API, the ERP, the UIs, the Integration console and the Driver app. The workers and the smoke script call them by name, so until they are deployed a worker starts and retries, and the smoke script fails at its first step that needs one, naming it. The `LocalAuth:Allowed` setting itself is #930, and is still open.
+Not in the chart yet: the TMS API, the ERP, the UIs, the Integration console and the Driver app. The workers and the smoke script call them by name, so until they are deployed a worker starts and retries, and the smoke script fails at its first step that needs one, naming it.
 
 ## Before you deploy
 
@@ -62,9 +62,9 @@ Not verified on a cluster: that a given CNI enforces the policies (the smoke scr
 
 ## `LocalAuth:Allowed`
 
-There is no identity provider on the cluster. The local operator sign-in ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)), the Driver app's sign-in page ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)) and the local token-signing key refuse to start outside Development. `LocalAuth:Allowed` is the named setting, independent of the environment name, that will let them run on Kubernetes. **It does not exist yet (#930):** until it lands, they refuse to start on the cluster, so the Integration console and the Driver app cannot be signed in to there. Once it lands it is off by default, and while it is on an Easy Auth header is not trusted.
+There is no identity provider on the cluster. The local operator sign-in ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)), the Driver app's sign-in page ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)) and the local token-signing key refuse to start outside Development. `LocalAuth:Allowed` is the named setting, independent of the environment name, that lets them run on Kubernetes. It is off by default: set it to `true` (the environment variable is `LocalAuth__Allowed`) and they start; a value that is not `true` or `false` stops the application at startup. While it is on, an Easy Auth header is not trusted, so an application that is given no local sign-in refuses to start. The check is `LocalAuth` in `Norvia.ServiceDefaults`, which the sign-in classes and the TMS, ERP and Driver app APIs (for the local signing key) call.
 
-Setting it will be a statement that this holds: **Norvia's ingress is not reachable from the public internet, and no other namespace can reach Norvia's pods.** Anyone who can reach the ingress is signed in as an operator holding both console roles, and anyone who can reach a pod can get a token signed by the local key.
+Setting it is a statement that this holds: **Norvia's ingress is not reachable from the public internet, and no other namespace can reach Norvia's pods.** Anyone who can reach the ingress is signed in as an operator holding both console roles, and anyone who can reach a pod can get a token signed by the local key.
 
 Before you set it, check:
 

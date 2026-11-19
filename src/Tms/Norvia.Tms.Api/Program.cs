@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Norvia.ServiceDefaults.Faults;
+using Norvia.ServiceDefaults;
 using Norvia.Tms.Api.Agents;
 using Norvia.Tms.Api.Capacity;
 using Norvia.Tms.Api.CarrierBookings;
@@ -53,6 +54,8 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// The AppHost's local signing key is trusted only in Development, or where LocalAuth:Allowed is set (ADR 0053).
+LocalAuth.RequireForSigningKeys(builder.Environment, builder.Configuration);
 // The faults the presenter can switch on: off by default, and each expires by itself. The gate is TmsFaultMiddleware, below.
 builder.AddFaults(TmsFaultDefinitions.All);
 builder.Services.AddScoped<IPipelineBehavior<SubmitTransportOrderCommand, Result<SubmitTransportOrderResult>>, TrackIntakeInLoggingScope>();
