@@ -4,7 +4,7 @@ How the Driver app is built inside, in the same hexagon as the [TMS](tms-archite
 
 ![The Driver app as a hexagon: the Driver app API and UI and the outbox worker, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](diagrams/driver-app-hexagon.png)
 
-The editable source is [driver-app-hexagon.excalidraw](diagrams/driver-app-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+The editable source is [driver-app-hexagon.excalidraw](diagrams/driver-app-hexagon.excalidraw), generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs).
 
 ## What differs from the TMS
 

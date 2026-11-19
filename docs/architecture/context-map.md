@@ -4,7 +4,7 @@ The estate's bounded contexts: what each one owns, what it holds only a copy of,
 
 ![Context map: the TMS, ERP, Driver app, Partner portal, WMS, Simulator and Integration console, with what each owns and how they relate](diagrams/context-map.png)
 
-The editable source is [context-map.excalidraw](diagrams/context-map.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py) in the [graph style](diagrams/README.md#graph-style).
+The editable source is [context-map.excalidraw](diagrams/context-map.excalidraw), generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs) in the [graph style](diagrams/README.md#graph-style).
 
 ## One context per application
 

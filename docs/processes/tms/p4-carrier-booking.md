@@ -14,7 +14,7 @@ Carrier booking asks a Carrier to carry a Shipment that the Planner released to 
 
 ![P4 Carrier booking as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p4-carrier-booking.png)
 
-The model is [p4-carrier-booking.bpmn](p4-carrier-booking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p4-carrier-booking.excalidraw)).
+The model is [p4-carrier-booking.bpmn](p4-carrier-booking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p4-carrier-booking.excalidraw)).
 
 ## One Carrier booking per Shipment
 
@@ -216,13 +216,13 @@ The Hops of both trails, named as the [Integration console](../../operations/int
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p4-1.png)
 
-*Editable source: [message-trail-p4-1.excalidraw](../../architecture/diagrams/message-trail-p4-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p4-1.excalidraw](../../architecture/diagrams/message-trail-p4-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 The answer arrives later, as a trail of its own:
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p4-2.png)
 
-*Editable source: [message-trail-p4-2.excalidraw](../../architecture/diagrams/message-trail-p4-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p4-2.excalidraw](../../architecture/diagrams/message-trail-p4-2.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - A rejection publishes `CarrierBookingRejected` instead. A repeated answer and a refused one publish nothing, so the trail ends at the TMS call.
 - A refused call stops at `apim-norvia`. The Logic App refuses anything but API Management's call, and its run fails with `CallerNotApiManagement`.

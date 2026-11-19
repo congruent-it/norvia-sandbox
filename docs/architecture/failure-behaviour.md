@@ -24,7 +24,7 @@ Hops that only fail in one place and look alike are written once: a Logic App wh
 
 ![Failure patterns: five ways a hop fails, and who finds out, in the caller, the owner's user, the Integration operator or nobody](diagrams/failure-patterns.png)
 
-The editable source is [failure-patterns.excalidraw](diagrams/failure-patterns.excalidraw), generated from [resilience.py](diagrams/resilience.py). Every row in the tables below fails in one of these ways, which is the quickest way to know what to expect of a hop you have not read yet.
+The editable source is [failure-patterns.excalidraw](diagrams/failure-patterns.excalidraw), generated from [resilience.cs](diagrams/resilience.cs). Every row in the tables below fails in one of these ways, which is the quickest way to know what to expect of a hop you have not read yet.
 
 | Pattern | Hops | What happens | Who finds out |
 |---|---|---|---|

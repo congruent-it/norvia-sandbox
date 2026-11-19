@@ -14,7 +14,7 @@ Rating calculates the Freight Charge for an accepted Transport Order from the Sh
 
 ![P2 Rating as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p2-rating.png)
 
-The model is [p2-rating.bpmn](p2-rating.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p2-rating.excalidraw)).
+The model is [p2-rating.bpmn](p2-rating.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p2-rating.excalidraw)).
 
 ## Rating result
 
@@ -117,7 +117,7 @@ The Hops that Rating adds to the Message trail of the Transport Order's intake, 
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p2-1.png)
 
-*Editable source: [message-trail-p2-1.excalidraw](../../architecture/diagrams/message-trail-p2-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p2-1.excalidraw](../../architecture/diagrams/message-trail-p2-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - A Transport Order the Rate Card can't price publishes `TransportOrderRatingFailed` instead, and the `Rate Transport Order` Hop carries the `failureCode`. Its `outcome` is still `Succeeded`: Rating failed is Rating's answer, not a failed flow.
 - A Transport Order from the WMS channel is *Not rated separately* and has no rating Hop and no event.

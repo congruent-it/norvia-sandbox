@@ -2,7 +2,7 @@
 
 How each of the TMS's aggregates moves through its states, with the domain method that makes each move and the guard it must pass. For engineers and coding agents working on the TMS, and for anyone who needs to know what a status means before they change it. These are the Domain at the centre of the [TMS hexagon](tms-architecture.md). Terms are defined in [GLOSSARY.md](../../GLOSSARY.md).
 
-A transition that fails its guard returns `false` or a refusal with a stable code, and changes nothing. Every command is idempotent, so a repeat of one that took effect is recorded once ([coding guidelines §6](../coding-guidelines.md)). The editable sources are the `.excalidraw` files next to each picture, generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+A transition that fails its guard returns `false` or a refusal with a stable code, and changes nothing. Every command is idempotent, so a repeat of one that took effect is recorded once ([coding guidelines §6](../coding-guidelines.md)). The editable sources are the `.excalidraw` files next to each picture, generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs).
 
 ## Transport Order
 
@@ -85,4 +85,4 @@ A Trip has two lifecycles that move independently: its own status, and the deliv
 
 ## Keeping it true
 
-The states and moves come from the status enums and transition methods in [src/Tms/Norvia.Tms.Domain](../../src/Tms/Norvia.Tms.Domain/). A PR that adds a status or a transition updates the picture, its table and, if the Shipper can see it, [P8](../processes/tms/p8-shipper-visibility.md), in the same PR. Edit the spec in [bounded_contexts.py](diagrams/bounded_contexts.py) and run it.
+The states and moves come from the status enums and transition methods in [src/Tms/Norvia.Tms.Domain](../../src/Tms/Norvia.Tms.Domain/). A PR that adds a status or a transition updates the picture, its table and, if the Shipper can see it, [P8](../processes/tms/p8-shipper-visibility.md), in the same PR. Edit the spec in [bounded-contexts.cs](diagrams/bounded-contexts.cs) and run it.

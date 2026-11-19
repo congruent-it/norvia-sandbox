@@ -4,7 +4,7 @@ How the Partner portal is built inside, in the same hexagon as the [TMS](tms-arc
 
 ![The Partner portal as a hexagon: the Persona endpoints, the UI and the hosted workers, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](diagrams/partner-portal-hexagon.png)
 
-The editable source is [partner-portal-hexagon.excalidraw](diagrams/partner-portal-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+The editable source is [partner-portal-hexagon.excalidraw](diagrams/partner-portal-hexagon.excalidraw), generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs).
 
 ## What differs from the TMS
 

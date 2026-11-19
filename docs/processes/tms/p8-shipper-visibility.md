@@ -14,7 +14,7 @@ Shipper visibility lets a Shipper see where its Transport Orders stand. The Ship
 
 ![P8 Shipper visibility as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p8-shipper-visibility.png)
 
-The model is [p8-shipper-visibility.bpmn](p8-shipper-visibility.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p8-shipper-visibility.excalidraw)).
+The model is [p8-shipper-visibility.bpmn](p8-shipper-visibility.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p8-shipper-visibility.excalidraw)).
 
 ## Scope
 
@@ -206,7 +206,7 @@ The Hops a Shipper's query leaves on its Message trail, named as the [Integratio
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p8-1.png)
 
-*Editable source: [message-trail-p8-1.excalidraw](../../architecture/diagrams/message-trail-p8-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p8-1.excalidraw](../../architecture/diagrams/message-trail-p8-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - A refused call stops at `apim-norvia` with `Refused` and a `failureCode`: `NotAllowedToReadTracking` (a Carrier Persona's token), `NoShipperForClient` or a rate-limited call. A TMS that doesn't answer in 5 seconds, or answers with a server error, ends the trail at `apim-norvia` with `TmsUnavailable`. The TMS hop is missing when it never got the call.
 - The TMS's 4xx answers (`TransportOrderNotFound`, `ProofOfDeliveryNotFound`) pass through as `TmsRefused`.

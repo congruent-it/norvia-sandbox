@@ -78,6 +78,7 @@
     <Project Path="src/Simulator/Norvia.Simulator.Web/Norvia.Simulator.Web.csproj" />
   </Folder>
   <Folder Name="/src/Docs/">
+    <Project Path="src/Docs/Norvia.Docs.Diagrams/Norvia.Docs.Diagrams.csproj" />
     <Project Path="src/Docs/Norvia.Docs.Generator/Norvia.Docs.Generator.csproj" />
   </Folder>
   <Folder Name="/src/Tms/">
@@ -196,6 +197,7 @@
     <Project Path="tests/Simulator/Norvia.Simulator.Web.UiTests.Reset/Norvia.Simulator.Web.UiTests.Reset.csproj" />
   </Folder>
   <Folder Name="/tests/Docs/">
+    <Project Path="tests/Docs/Norvia.Docs.Diagrams.UnitTests/Norvia.Docs.Diagrams.UnitTests.csproj" />
     <Project Path="tests/Docs/Norvia.Docs.Generator.UnitTests/Norvia.Docs.Generator.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/Tms/">

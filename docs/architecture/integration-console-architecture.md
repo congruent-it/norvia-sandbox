@@ -4,7 +4,7 @@ How the Integration console is built inside. For engineers and coding agents wor
 
 ![The Integration console as a hexagon: the UI, the Application with its use cases and ports, and the adapters in Infrastructure, with no Domain](diagrams/integration-console-hexagon.png)
 
-The editable source is [integration-console-hexagon.excalidraw](diagrams/integration-console-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py).
+The editable source is [integration-console-hexagon.excalidraw](diagrams/integration-console-hexagon.excalidraw), generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs).
 
 ## What differs from the other applications
 

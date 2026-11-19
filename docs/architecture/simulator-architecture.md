@@ -4,7 +4,7 @@ How the Simulator is built inside, in the same hexagon as the [TMS](tms-architec
 
 ![The Simulator as a hexagon: the UI and the run executor, the Application with its use cases and ports, the Domain, and the clients in Infrastructure](diagrams/simulator-hexagon.png)
 
-The editable source is [simulator-hexagon.excalidraw](diagrams/simulator-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py). Operating it is in [operations/simulator.md](../operations/simulator.md).
+The editable source is [simulator-hexagon.excalidraw](diagrams/simulator-hexagon.excalidraw), generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs). Operating it is in [operations/simulator.md](../operations/simulator.md).
 
 ## What differs from the TMS
 

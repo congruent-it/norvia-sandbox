@@ -8,7 +8,7 @@ The chart runs the **local topology**, not the Azure estate: no Azure account, E
 
 ![Kubernetes: the local topology as pods in the norvia namespace](../architecture/diagrams/kubernetes.png)
 
-The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernetes.excalidraw), generated from [deployment.py](../architecture/diagrams/deployment.py).
+The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernetes.excalidraw), generated from [deployment.cs](../architecture/diagrams/deployment.cs).
 
 In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, an Ingress per exposed application, and the namespace's protection ([below](#the-namespace-is-closed-to-the-others)): a default-deny `NetworkPolicy`, an internal-only ingress, Secrets read by name, requests and limits on every pod, and a `ResourceQuota` with a `LimitRange`.
 

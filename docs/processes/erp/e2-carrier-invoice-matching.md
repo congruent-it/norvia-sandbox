@@ -14,7 +14,7 @@ Carrier invoice matching checks what a Carrier asks to be paid against the Carri
 
 ![E2 Carrier invoice matching as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-e2-carrier-invoice-matching.png)
 
-The model is [e2-carrier-invoice-matching.bpmn](e2-carrier-invoice-matching.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-e2-carrier-invoice-matching.excalidraw)).
+The model is [e2-carrier-invoice-matching.bpmn](e2-carrier-invoice-matching.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-e2-carrier-invoice-matching.excalidraw)).
 
 ## Carrier costs
 
@@ -207,25 +207,25 @@ The Hops of E2, named as the [Integration console](../../operations/integration-
 
 ![Sequence diagram of the Hops: A Carrier cost](../../architecture/diagrams/message-trail-e2-1.png)
 
-*Editable source: [message-trail-e2-1.excalidraw](../../architecture/diagrams/message-trail-e2-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e2-1.excalidraw](../../architecture/diagrams/message-trail-e2-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **2. A Carrier invoice.** The Carrier's submission starts a new trail, and API Management creates its correlation ID.
 
 ![Sequence diagram of the Hops: A Carrier invoice](../../architecture/diagrams/message-trail-e2-2.png)
 
-*Editable source: [message-trail-e2-2.excalidraw](../../architecture/diagrams/message-trail-e2-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e2-2.excalidraw](../../architecture/diagrams/message-trail-e2-2.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **3. Finance decides the lines left To decide.** Finance's action starts a new trail.
 
 ![Sequence diagram of the Hops: Finance decides the lines left To decide](../../architecture/diagrams/message-trail-e2-3.png)
 
-*Editable source: [message-trail-e2-3.excalidraw](../../architecture/diagrams/message-trail-e2-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e2-3.excalidraw](../../architecture/diagrams/message-trail-e2-3.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **4. The Carrier is told.** The Carrier invoice outcome Logic App reacts to the Approved event on its trail.
 
 ![Sequence diagram of the Hops: The Carrier is told](../../architecture/diagrams/message-trail-e2-4.png)
 
-*Editable source: [message-trail-e2-4.excalidraw](../../architecture/diagrams/message-trail-e2-4.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e2-4.excalidraw](../../architecture/diagrams/message-trail-e2-4.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 ### What is built
 

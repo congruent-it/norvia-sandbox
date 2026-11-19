@@ -14,7 +14,7 @@ Fleet capacity planning keeps track, day by day, of which Vehicles and Drivers N
 
 ![P10 Fleet capacity planning as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p10-fleet-capacity-planning.png)
 
-The model is [p10-fleet-capacity-planning.bpmn](p10-fleet-capacity-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p10-fleet-capacity-planning.excalidraw)).
+The model is [p10-fleet-capacity-planning.bpmn](p10-fleet-capacity-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p10-fleet-capacity-planning.excalidraw)).
 
 ## What P10 decides, and what it doesn't
 

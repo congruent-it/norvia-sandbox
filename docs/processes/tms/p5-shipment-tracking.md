@@ -14,7 +14,7 @@ Shipment tracking records what happens to a Shipment after it has been handed ov
 
 ![P5 Shipment tracking as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p5-shipment-tracking.png)
 
-The model is [p5-shipment-tracking.bpmn](p5-shipment-tracking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p5-shipment-tracking.excalidraw)).
+The model is [p5-shipment-tracking.bpmn](p5-shipment-tracking.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p5-shipment-tracking.excalidraw)).
 
 ## Scope
 
@@ -235,7 +235,7 @@ The Hops a Carrier's Tracking event leaves on its Message trail, named as the [I
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p5-1.png)
 
-*Editable source: [message-trail-p5-1.excalidraw](../../architecture/diagrams/message-trail-p5-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p5-1.excalidraw](../../architecture/diagrams/message-trail-p5-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - The Carrier's reply ends at `202 Accepted`. Everything after the queue is invisible to it ([ADR 0008](../../adr/0008-carrier-tracking-events-are-accepted-asynchronously.md)).
 - The publish Hop is named after the event the status landed on: `ShipmentCollected`, `ShipmentInTransit` or `ShipmentDelivered`. An exception Tracking event publishes `ShipmentExceptionReported`. A Tracking event that moves nothing, an ETA-only update and a repeat publish nothing, so the trail ends at the TMS call. The publish Hop appears only once the outbox has sent the message ([failure behaviour](../../architecture/failure-behaviour.md#the-tms-outbox)).

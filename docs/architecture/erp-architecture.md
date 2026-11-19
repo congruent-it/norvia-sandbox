@@ -4,7 +4,7 @@ How the ERP is built inside, in the same hexagon as the [TMS](tms-architecture.m
 
 ![The ERP as a hexagon: the ERP API and UI and hosted workers, the Application with its use cases and ports, the Domain, and the adapters in Infrastructure](diagrams/erp-hexagon.png)
 
-The editable source is [erp-hexagon.excalidraw](diagrams/erp-hexagon.excalidraw), generated from [bounded_contexts.py](diagrams/bounded_contexts.py). The layers and the dependency rule are as for the TMS; this page covers what differs.
+The editable source is [erp-hexagon.excalidraw](diagrams/erp-hexagon.excalidraw), generated from [bounded-contexts.cs](diagrams/bounded-contexts.cs). The layers and the dependency rule are as for the TMS; this page covers what differs.
 
 ## What differs from the TMS
 

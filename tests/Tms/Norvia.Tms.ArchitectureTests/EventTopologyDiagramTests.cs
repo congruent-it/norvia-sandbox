@@ -15,7 +15,7 @@ public sealed class EventTopologyDiagramTests
     {
         var declared = EventCatalogueTests.BicepSubscriptions().Select(key => key.Split('/')[0]).ToHashSet();
 
-        DrawnBefore("[topic]").Should().BeEquivalentTo(declared, "every topic in infra/estate/messaging.bicep is a node of c4-l3-event-topology; change c4.py and draw it again");
+        DrawnBefore("[topic]").Should().BeEquivalentTo(declared, "every topic in infra/estate/messaging.bicep is a node of c4-l3-event-topology; change c4.cs and draw it again");
     }
 
     [Fact]
@@ -23,7 +23,7 @@ public sealed class EventTopologyDiagramTests
     {
         var declared = EventCatalogueTests.BicepSubscriptions().Select(key => key.Split('/')[1]).Where(name => name != "monitoring").ToHashSet();
 
-        DrawnBefore("[subscription").Should().BeEquivalentTo(declared, "every subscription but `monitoring` in infra/estate/messaging.bicep is a node of c4-l3-event-topology; change c4.py and draw it again");
+        DrawnBefore("[subscription").Should().BeEquivalentTo(declared, "every subscription but `monitoring` in infra/estate/messaging.bicep is a node of c4-l3-event-topology; change c4.cs and draw it again");
     }
 
     // The diagram's text elements come in pairs: a node's title, then its subtitle, which starts with its kind in square brackets.

@@ -8,7 +8,7 @@ Everything is declared in [identities.bicep](../../infra/estate/identities.bicep
 
 ![Identity and access grid: each managed identity against the APIs, Service Bus, storage, Key Vault and telemetry it may use](diagrams/identity-access.png)
 
-The editable source is [identity-access.excalidraw](diagrams/identity-access.excalidraw), generated from [access.py](diagrams/access.py) in the [grid style](diagrams/README.md#grid-style). Read a row to see everything one identity may do, and a column to see who may reach one resource. The tables below have the detail and the reasons.
+The editable source is [identity-access.excalidraw](diagrams/identity-access.excalidraw), generated from [access.cs](diagrams/access.cs) in the [grid style](diagrams/README.md#grid-style). Read a row to see everything one identity may do, and a column to see who may reach one resource. The tables below have the detail and the reasons.
 
 ## The API audiences
 
@@ -149,7 +149,7 @@ Three patterns, none with a client secret. Easy Auth asks Entra for an ID token 
 
 ![Sequence diagram of sign-in 1: a person signs in to a UI with Easy Auth](diagrams/sign-in-easy-auth.png)
 
-*Editable source: [sign-in-easy-auth.excalidraw](diagrams/sign-in-easy-auth.excalidraw), generated from [sign_in.py](diagrams/sign_in.py).*
+*Editable source: [sign-in-easy-auth.excalidraw](diagrams/sign-in-easy-auth.excalidraw), generated from [sign-in.cs](diagrams/sign-in.cs).*
 
 **2. A Driver signs in to the Driver app.** The same Easy Auth, but the Driver's one app role has their Driver ID as its value, and the Driver app turns it into the `driverId` claim. The Driver ID is never taken from a request ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)).
 

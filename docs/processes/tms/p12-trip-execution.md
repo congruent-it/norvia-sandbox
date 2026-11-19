@@ -14,7 +14,7 @@ Trip execution is the Driver working a Dispatched Trip on the road. In the Drive
 
 ![P12 Trip execution as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p12-trip-execution.png)
 
-The model is [p12-trip-execution.bpmn](p12-trip-execution.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p12-trip-execution.excalidraw)).
+The model is [p12-trip-execution.bpmn](p12-trip-execution.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p12-trip-execution.excalidraw)).
 
 ## What P12 decides, and what it doesn't
 
@@ -335,7 +335,7 @@ The Hops one Driver action leaves on the Message trail, named as the [Integratio
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p12-1.png)
 
-*Editable source: [message-trail-p12-1.excalidraw](../../architecture/diagrams/message-trail-p12-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p12-1.excalidraw](../../architecture/diagrams/message-trail-p12-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - A Start Trip calls `POST /v1/trips/TRIP-0000007/start`, an End Trip `.../end`, and a Proof of delivery `POST /v1/proofs-of-delivery`, preceded by `Fetch_the_files` and followed on success by `Delete_the_files`.
 - When the TMS refuses the report (a client error), `Send_the_report_to_the_TMS` is `Failed` with `TmsCallRefused`, the Logic App dead-letters the message with the TMS's failure code and message (`Dead_letter_the_refused_report`, `DeadLettered`) and calls `Report_refused`, which tells the Driver app the report is Refused. No retry, and the next report in the session goes on.
