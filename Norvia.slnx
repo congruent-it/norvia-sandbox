@@ -96,6 +96,7 @@
     <Project Path="tests/Integration/Norvia.Integration.BookingDraft.IntegrationTests/Norvia.Integration.BookingDraft.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.CarrierBooking.UnitTests/Norvia.Integration.CarrierBooking.UnitTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.CarrierInvoice.IntegrationTests/Norvia.Integration.CarrierInvoice.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/Norvia.Integration.ConsigneeNotification.IntegrationTests/Norvia.Integration.ConsigneeNotification.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.MasterDataSync.IntegrationTests/Norvia.Integration.MasterDataSync.IntegrationTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.MasterDataSync.UiTests/Norvia.Integration.MasterDataSync.UiTests.csproj" />
     <Project Path="tests/Integration/Norvia.Integration.LocalBookingWorker.UnitTests/Norvia.Integration.LocalBookingWorker.UnitTests.csproj" />

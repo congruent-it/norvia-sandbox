@@ -12,7 +12,7 @@ public static class TestAppHost
     private static readonly string[] Unneeded =
     [
         "dbgate", "partner-portal", "partner-portal-migrations", "partner-portal-web", "integration-console-web",
-        "partner-api", "booking-worker", "shipper-notification-worker", "carrier-cancellation-worker", "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
+        "partner-api", "booking-worker", "shipper-notification-worker", "consignee-notification-worker", "carrier-cancellation-worker", "trip-dispatch-worker", "driver-reports-worker", "tracking-worker", "proof-of-delivery-worker",
         "billing-worker", "shipper-invoice-worker", "carrier-invoice-outcome-worker", "master-data-sync-worker",
         "simulator", "simulator-migrations", "simulator-web",
     ];
@@ -73,6 +73,13 @@ public static class TestAppHost
     /// </summary>
     public static void RemoveWhatTheMasterDataSyncUiTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
         builder.Remove([.. Unneeded.Where(name => name is not ("master-data-sync-worker" or "integration-console-web")), "health-check-web"]);
+
+    /// <summary>
+    /// Takes the resources the Consignee notification's integration tests don't use out of the AppHost. They keep the TMS API and its database, the Service Bus emulator and the worker that plays the
+    /// Consignee notification Logic App, which writes its emails to a folder the tests read. The Partner portal is gone, so the link's address is the one the fixture gives the worker.
+    /// </summary>
+    public static void RemoveWhatTheConsigneeNotificationTestsDontUse(this IDistributedApplicationTestingBuilder builder) =>
+        builder.Remove([.. Unneeded.Where(name => name is not "consignee-notification-worker")]);
 
     private static void Remove(this IDistributedApplicationTestingBuilder builder, string[] unneeded)
     {
