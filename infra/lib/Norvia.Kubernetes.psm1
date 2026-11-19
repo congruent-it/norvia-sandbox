@@ -53,7 +53,7 @@ function Get-IngressUrl {
     "$($Insecure ? 'http' : 'https')://$Application.$BaseDomain"
 }
 
-function Test-Status {
+function Test-SameStatus {
     <# .SYNOPSIS Whether a status is the expected one, ignoring case, spaces and hyphens ("In transit" is what the TMS may spell InTransit). #>
     param($Actual, [Parameter(Mandatory)][string] $Expected)
     if ($null -eq $Actual) { return $false }
@@ -93,4 +93,49 @@ function Invoke-SmokeStep {
     $result
 }
 
-Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-Status, Wait-ForValue, Invoke-SmokeStep
+
+function Invoke-Kubectl {
+    <# .SYNOPSIS Runs kubectl and returns its output; a non-zero exit stops with kubectl's own message (as Invoke-Az does for az). #>
+    param([Parameter(Mandatory, ValueFromRemainingArguments)][string[]] $Arguments)
+    $output = & kubectl @Arguments 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "kubectl $($Arguments -join ' ') failed: $($output -join ' ')" }
+    ($output -join "`n")
+}
+
+function Get-SecretValue {
+    <# .SYNOPSIS One key of a Secret, decoded. #>
+    param([Parameter(Mandatory)][string] $Namespace, [Parameter(Mandatory)][string] $Secret, [Parameter(Mandatory)][string] $Key)
+    $encoded = Invoke-Kubectl get secret $Secret --namespace $Namespace --output "jsonpath={.data['$Key']}"
+    if (-not $encoded) { throw "the Secret $Secret has no key $Key" }
+    [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))
+}
+
+function Invoke-Call {
+    <# .SYNOPSIS One HTTP call. Never throws for a status; returns { Status, Body (parsed, or $null), CorrelationId }. #>
+    param([Parameter(Mandatory)][string] $Method, [Parameter(Mandatory)][string] $Uri, [hashtable] $Headers = @{}, $Body = $null, [switch] $SkipCertificateCheck)
+    $arguments = @{ Method = $Method; Uri = $Uri; Headers = $Headers; SkipHttpErrorCheck = $true; TimeoutSec = 30 }
+    if ($SkipCertificateCheck) { $arguments.SkipCertificateCheck = $true }
+    if ($null -ne $Body) { $arguments.Body = ($Body | ConvertTo-Json -Depth 20 -Compress); $arguments.ContentType = 'application/json' }
+    $response = Invoke-WebRequest @arguments
+    $parsed = try { $response.Content | ConvertFrom-Json -Depth 20 -AsHashtable } catch { $null }
+    [pscustomobject]@{ Status = [int] $response.StatusCode; Body = $parsed; CorrelationId = @($response.Headers['X-Correlation-ID'])[0] }
+}
+
+function Format-Answer {
+    <# .SYNOPSIS What a failing call says, without its body: the status, and the problem's title, code, text or message. #>
+    param([Parameter(Mandatory)] $Answer)
+    $detail = if ($Answer.Body -is [hashtable]) { ($Answer.Body['title'], $Answer.Body['code'], $Answer.Body['text'], $Answer.Body['message'] | Where-Object { $_ }) -join ', ' }
+    "answered $($Answer.Status)$($detail ? " ($detail)" : '')"
+}
+
+function Assert-Accepted {
+    <#
+    .SYNOPSIS Throws, naming who answered what, unless the answer is a 2xx (or exactly -Status), and with a correlation ID when asked.
+    #>
+    param([Parameter(Mandatory)] $Answer, [Parameter(Mandatory)][string] $What, [int] $Status, [switch] $RequireCorrelationId)
+    $accepted = $Status ? $Answer.Status -eq $Status : ($Answer.Status -ge 200 -and $Answer.Status -lt 300)
+    if (-not $accepted) { throw "$What $(Format-Answer $Answer)$($Status ? ", not $Status Accepted" : '')" }
+    if ($RequireCorrelationId -and -not $Answer.CorrelationId) { throw "$What accepted the call but it carries no X-Correlation-ID" }
+}
+
+Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted

@@ -57,73 +57,62 @@ $carrierPersona = 'van-dijk-transport'
 $carrierId = 'CAR-0001'
 $interval = 5
 $attempts = [math]::Max(1, [int][math]::Ceiling($TimeoutSeconds / $interval))
-$acceptAnyCertificate = $SkipCertificateCheck.IsPresent
 $run = [DateTime]::UtcNow.ToString('yyyyMMddHHmmss')
-
-function Get-SecretValue([string] $Secret, [string] $Key) {
-    $encoded = & kubectl get secret $Secret --namespace $Namespace --output "jsonpath={.data['$Key']}" 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "kubectl could not read the Secret $Secret in namespace ${Namespace}: $encoded" }
-    if (-not $encoded) { throw "the Secret $Secret has no key $Key" }
-    [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($encoded -join '')))
-}
+# The module's helpers take these on every call.
+$PSDefaultParameterValues['Invoke-Call:SkipCertificateCheck'] = $SkipCertificateCheck.IsPresent
+$PSDefaultParameterValues['Get-SecretValue:Namespace'] = $Namespace
+$PSDefaultParameterValues['Wait-ForValue:Attempts'] = $attempts
+$PSDefaultParameterValues['Wait-ForValue:IntervalSeconds'] = $interval
 
 if (-not $BaseDomain) {
-    $ingressHost = & kubectl get ingress partner-api --namespace $Namespace --output 'jsonpath={.spec.rules[0].host}' 2>&1
-    if ($LASTEXITCODE -ne 0 -or -not $ingressHost) { Write-Fail "no -BaseDomain, and the Ingress partner-api in namespace $Namespace could not be read: $ingressHost" }
-    $BaseDomain = ($ingressHost -join '') -replace '^partner-api\.', ''
+    try { $ingressHost = Invoke-Kubectl get ingress partner-api --namespace $Namespace --output 'jsonpath={.spec.rules[0].host}' }
+    catch { Write-Fail "no -BaseDomain, and the Ingress partner-api in namespace $Namespace could not be read: $($_.Exception.Message)" }
+    if (-not $ingressHost) { Write-Fail "no -BaseDomain, and the Ingress partner-api in namespace $Namespace has no host" }
+    $BaseDomain = $ingressHost -replace '^partner-api\.', ''
 }
 $partnerApi = Get-IngressUrl -Application 'partner-api' -BaseDomain $BaseDomain -Insecure:$Insecure
 $tms = Get-IngressUrl -Application 'tms-api' -BaseDomain $BaseDomain -Insecure:$Insecure
 Write-Host "Partner API: $partnerApi"
 Write-Host "TMS API: $tms"
 
-function Invoke-Call {
-    # One HTTP call. Never throws for a status; returns { Status, Body (parsed, or $null), CorrelationId }.
-    param([string] $Method, [string] $Uri, [hashtable] $Headers = @{}, $Body = $null)
-    $arguments = @{ Method = $Method; Uri = $Uri; Headers = $Headers; SkipHttpErrorCheck = $true; TimeoutSec = 30 }
-    if ($script:acceptAnyCertificate) { $arguments.SkipCertificateCheck = $true }
-    if ($null -ne $Body) { $arguments.Body = ($Body | ConvertTo-Json -Depth 20 -Compress); $arguments.ContentType = 'application/json' }
-    $response = Invoke-WebRequest @arguments
-    $parsed = try { $response.Content | ConvertFrom-Json -Depth 20 -AsHashtable } catch { $null }
-    [pscustomobject]@{ Status = [int] $response.StatusCode; Body = $parsed; CorrelationId = @($response.Headers['X-Correlation-ID'])[0] }
-}
-
-function Format-Answer($Answer) {
-    # What a failing call says, without a body: the status, and the problem's title or code when it has one.
-    $detail = if ($Answer.Body -is [hashtable]) { ($Answer.Body['title'], $Answer.Body['code'], $Answer.Body['text'], $Answer.Body['message'] | Where-Object { $_ }) -join ', ' }
-    "answered $($Answer.Status)$($detail ? " ($detail)" : '')"
-}
-
 # The credentials, from the cluster's Secrets.
 $signingKey = $null
 $subscriptionKeys = @{}
 Invoke-SmokeStep 'Read the signing key and the Personas'' subscription keys from the cluster' {
-    $script:signingKey = Get-SecretValue 'local-tokens' 'signing-key'
-    foreach ($persona in $shipperPersona, $carrierPersona) { $script:subscriptionKeys[$persona] = Get-SecretValue 'subscription-keys' "PartnerApi__SubscriptionKeys__$persona" }
+    $script:signingKey = Get-SecretValue -Secret 'local-tokens' -Key 'signing-key'
+    foreach ($persona in $shipperPersona, $carrierPersona) { $script:subscriptionKeys[$persona] = Get-SecretValue -Secret 'subscription-keys' -Key "PartnerApi__SubscriptionKeys__$persona" }
 }
 
+# What src/Norvia.AppHost/LocalTokens.cs and values.yaml (localTokens, personas) hold; the chart's template tests compare those two.
 $issuer = 'https://norvia.local/tokens'
+$partnerApiAudience = 'api://norvia-partner-api'
+$tmsAudience = 'api://norvia-tms'
 function Get-PersonaHeader([string] $Persona, [string[]] $Roles) {
     @{
-        Authorization               = 'Bearer ' + (Get-LocalToken -SigningKey $signingKey -Issuer $issuer -Audience 'api://norvia-partner-api' -ClientId "norvia-local-persona-$Persona" -Roles $Roles)
+        Authorization               = 'Bearer ' + (Get-LocalToken -SigningKey $signingKey -Issuer $issuer -Audience $partnerApiAudience -ClientId "norvia-local-persona-$Persona" -Roles $Roles)
         'Ocp-Apim-Subscription-Key' = $subscriptionKeys[$Persona]
     }
 }
 $shipperHeaders = Get-PersonaHeader $shipperPersona @('TransportOrders.Submit', 'Tracking.Read')
 $carrierHeaders = Get-PersonaHeader $carrierPersona @('CarrierBookings.Respond', 'Tracking.Submit', 'ProofsOfDelivery.Submit')
 # The Planner's actions in the TMS UI are the manage role, which the Simulator's identity holds locally.
-$plannerHeaders = @{ Authorization = 'Bearer ' + (Get-LocalToken -SigningKey $signingKey -Issuer $issuer -Audience 'api://norvia-tms' -ClientId 'norvia-local-simulator' -Roles @('TransportOrders.Manage')) }
+$plannerHeaders = @{ Authorization = 'Bearer ' + (Get-LocalToken -SigningKey $signingKey -Issuer $issuer -Audience $tmsAudience -ClientId 'norvia-local-simulator' -Roles @('TransportOrders.Manage')) }
 
-function Get-Shipment([string] $ShipmentNumber) {
-    $answer = Invoke-Call GET "$tms/v1/shipments/$ShipmentNumber" $plannerHeaders
-    if ($answer.Status -eq 200) { $answer.Body }
+function Get-PlannerHeader([string] $IdempotencyKey) { $plannerHeaders + @{ 'Idempotency-Key' = $IdempotencyKey } }
+
+function Wait-ForShipmentStatus([string] $ShipmentNumber, [string] $Status, [string] $After = '') {
+    Wait-ForValue -Description "Shipment $ShipmentNumber to be $Status$After" -Describe { "its status was $($script:seen)" } -Condition {
+        $answer = Invoke-Call GET "$tms/v1/shipments/$ShipmentNumber" $plannerHeaders
+        $script:seen = $answer.Status -eq 200 ? $answer.Body['status'] : "unreadable, the TMS $(Format-Answer $answer)"
+        if (Test-SameStatus $script:seen $Status) { $true }
+    }
 }
 
-# 1. The ingress routes to both applications.
+# 1. The ingress routes to both applications. Waits for a cold ingress or certificate, so a missing application takes the timeout to fail.
 Invoke-SmokeStep 'The Partner API and the TMS API answer on their ingress hostnames' {
     foreach ($app in @(@{ Name = 'Partner API'; Url = $partnerApi }, @{ Name = 'TMS API'; Url = $tms })) {
-        $null = Wait-ForValue -Description "the $($app.Name) to answer /health at $($app.Url)" -Attempts $attempts -IntervalSeconds $interval -Condition {
-            try { $answer = Invoke-Call GET "$($app.Url)/health"; if ($answer.Status -eq 200) { $answer } } catch { $script:lastError = $_.Exception.Message }
+        $null = Wait-ForValue -Description "the $($app.Name) to answer /health at $($app.Url)" -Condition {
+            try { $answer = Invoke-Call GET "$($app.Url)/health"; if ($answer.Status -eq 200) { $answer } else { $script:lastError = Format-Answer $answer } } catch { $script:lastError = $_.Exception.Message }
         } -Describe { $script:lastError }
     }
 } | Out-Null
@@ -134,7 +123,7 @@ $orderNumber = Invoke-SmokeStep "Brouwer Dranken books Rotterdam to Dusseldorf (
     $booking = Get-Content -Raw (Join-Path $PSScriptRoot '../contracts/partner-api/samples/bookings/full.booking.json') | ConvertFrom-Json -AsHashtable
     $booking.bookingRef = $bookingReference
     $answer = Invoke-Call POST "$partnerApi/partner/v1/transport-orders" $shipperHeaders $booking
-    if ($answer.Status -lt 200 -or $answer.Status -ge 300) { throw "the Partner API $(Format-Answer $answer)" }
+    Assert-Accepted $answer -What 'the Partner API'
     $number = $answer.Body['norviaOrderNo']
     if ($number -notmatch '^TO-[0-9]+$') { throw "the Partner API accepted the booking (status $($answer.Status)) but gave no Transport Order number" }
     $number
@@ -143,16 +132,16 @@ Write-Host "Transport Order: $orderNumber"
 
 # 3. The Planner assigns and releases.
 $release = Invoke-SmokeStep "The Planner assigns Transport Order $orderNumber to Van Dijk Transport and releases its Shipment" {
-    $assign = Wait-ForValue -Description "the TMS to take the assignment of $orderNumber" -Attempts $attempts -IntervalSeconds $interval -Describe { $script:lastError } -Condition {
-        $headers = $plannerHeaders + @{ 'Idempotency-Key' = "smoke-assign-$run" }
-        $answer = Invoke-Call POST "$tms/v1/transport-orders/$orderNumber/assign" $headers @{ assignedTo = 'Carrier'; carrierId = $carrierId }
+    $assign = Wait-ForValue -Description "the TMS to take the assignment of $orderNumber" -Describe { $script:lastError } -Condition {
+        $answer = Invoke-Call POST "$tms/v1/transport-orders/$orderNumber/assign" (Get-PlannerHeader "smoke-assign-$run") @{ assignedTo = 'Carrier'; carrierId = $carrierId }
         if ($answer.Status -eq 200) { return $answer }
         $script:lastError = "the TMS $(Format-Answer $answer)"
-        if ($answer.Status -notin 404, 409, 502, 503, 504) { throw $script:lastError }
+        # Not found, not yet accepted and a server error can pass as the sandbox catches up; the other refusals never will.
+        $waitable = $answer.Status -in 404, 502, 503, 504 -or ($answer.Status -eq 409 -and $answer.Body -is [hashtable] -and $answer.Body['code'] -eq 'TransportOrderNotAccepted')
+        if (-not $waitable) { throw $script:lastError }
     }
     $shipmentNumber = $assign.Body['shipmentNumber']
-    $headers = $plannerHeaders + @{ 'Idempotency-Key' = "smoke-release-$run" }
-    $released = Invoke-Call POST "$tms/v1/shipments/$shipmentNumber/release" $headers
+    $released = Invoke-Call POST "$tms/v1/shipments/$shipmentNumber/release" (Get-PlannerHeader "smoke-release-$run")
     if ($released.Status -ne 200) { throw "releasing Shipment $shipmentNumber, the TMS $(Format-Answer $released)" }
     [pscustomobject]@{ ShipmentNumber = $shipmentNumber; CarrierBookingNumber = $released.Body['carrierBookingNumber'] }
 }
@@ -168,50 +157,41 @@ Invoke-SmokeStep "Van Dijk Transport confirms Carrier booking $carrierBookingNum
         carrierBookingNumber = $carrierBookingNumber; decision = 'CONFIRMED'; bookingRef = $carrierReference
         plannedCollection    = [DateTimeOffset]::UtcNow.AddDays(1).ToString('yyyy-MM-ddTHH:mm:sszzz')
     }
-    if ($answer.Status -lt 200 -or $answer.Status -ge 300) { throw "the Partner API $(Format-Answer $answer)" }
-    Wait-ForValue -Description "Shipment $shipmentNumber to be Booked" -Attempts $attempts -IntervalSeconds $interval -Describe { "its status was $($script:seen)" } -Condition {
-        $script:seen = (Get-Shipment $shipmentNumber).status
-        if (Test-Status $script:seen 'Booked') { $true }
-    }
+    Assert-Accepted $answer -What 'the Partner API'
+    Wait-ForShipmentStatus $shipmentNumber 'Booked'
 } | Out-Null
 
 # 5. Tracking.
-$eventTime = [DateTime]::UtcNow.AddHours(-2).ToString('yyyy-MM-ddTHH:mm:ss')
+$eventTime = [DateTime]::UtcNow.AddHours(-2)
 $index = 0
 foreach ($step in @(@{ Code = 'PU'; Status = 'Collected' }, @{ Code = 'DEP'; Status = 'In transit' }, @{ Code = 'POD'; Status = 'Delivered' })) {
     $index++
     Invoke-SmokeStep "Van Dijk Transport sends $($step.Code); the Shipment is $($step.Status)" {
         $answer = Invoke-Call POST "$partnerApi/partner/v1/carrier-tracking" $carrierHeaders @{
             bookingRef = $carrierReference; eventId = "SMOKE-$run-$index"; statusCode = $step.Code
-            eventTime  = ([DateTime]::Parse($eventTime).AddMinutes(10 * $index)).ToString('yyyy-MM-ddTHH:mm:ss')
+            eventTime  = $eventTime.AddMinutes(10 * $index).ToString('yyyy-MM-ddTHH:mm:ss')
             place      = 'Rotterdam'; postcode = '3011 AA'; country = 'NLD'
         }
-        if ($answer.Status -ne 202) { throw "the Partner API $(Format-Answer $answer), not 202 Accepted" }
-        if (-not $answer.CorrelationId) { throw 'the accepted call carries no X-Correlation-ID' }
-        Wait-ForValue -Description "Shipment $shipmentNumber to be $($step.Status) (correlation ID $($answer.CorrelationId))" -Attempts $attempts -IntervalSeconds $interval `
-            -Describe { "its status was $($script:seen)" } -Condition {
-            $script:seen = (Get-Shipment $shipmentNumber).status
-            if (Test-Status $script:seen $step.Status) { $true }
-        }
+        Assert-Accepted $answer -What 'the Partner API' -Status 202 -RequireCorrelationId
+        Wait-ForShipmentStatus $shipmentNumber $step.Status " (correlation ID $($answer.CorrelationId))"
     } | Out-Null
 }
 
-# 6. The Proof of delivery.
-Invoke-SmokeStep "Van Dijk Transport sends a Proof of delivery; Brouwer Dranken reads it on $orderNumber" {
+# 6. The Proof of delivery, and the tracking as the Shipper reads it.
+Invoke-SmokeStep "Van Dijk Transport sends a Proof of delivery; Brouwer Dranken reads it and the tracking on $orderNumber" {
     $proof = Get-Content -Raw (Join-Path $PSScriptRoot '../contracts/partner-api/samples/carrier-proofs-of-delivery/clean-winter.carrier-proof-of-delivery.json') | ConvertFrom-Json -AsHashtable
     $proof.bookingRef = $carrierReference
     $proof.carrierBookingNumber = $carrierBookingNumber
     $proof.documentId = "SMOKE-POD-$run"
     $proof.deliveryTime = [DateTime]::UtcNow.AddHours(-2).ToString('yyyy-MM-ddTHH:mm:ss')
     $answer = Invoke-Call POST "$partnerApi/partner/v1/carrier-proofs-of-delivery" $carrierHeaders $proof
-    if ($answer.Status -ne 202) { throw "the Partner API $(Format-Answer $answer), not 202 Accepted" }
-    if (-not $answer.CorrelationId) { throw 'the accepted call carries no X-Correlation-ID' }
-    Wait-ForValue -Description "the Proof of delivery of $orderNumber, with a file, in the Shipper's tracking (correlation ID $($answer.CorrelationId))" `
-        -Attempts $attempts -IntervalSeconds $interval -Describe { $script:seen } -Condition {
+    Assert-Accepted $answer -What 'the Partner API' -Status 202 -RequireCorrelationId
+    Wait-ForValue -Description "$orderNumber to read Delivered, with its tracking events and a Proof of delivery file, for the Shipper (correlation ID $($answer.CorrelationId))" -Describe { $script:seen } -Condition {
         $read = Invoke-Call GET "$partnerApi/partner/v1/transport-orders/$orderNumber" $shipperHeaders
         $script:seen = "the Partner API $(Format-Answer $read)"
-        $pod = $read.Status -eq 200 ? $read.Body['proofOfDelivery'] : $null
-        if ($pod -and @($pod['files']).Count -gt 0 -and (Test-Status $read.Body['status'] 'Delivered')) { $true }
+        if ($read.Status -ne 200) { return }
+        $pod = $read.Body['proofOfDelivery']
+        if ($pod -and @($pod['files']).Count -gt 0 -and @($read.Body['events']).Count -ge 3 -and (Test-SameStatus $read.Body['status'] 'Delivered')) { $true }
     }
 } | Out-Null
 

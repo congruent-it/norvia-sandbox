@@ -71,18 +71,18 @@ Describe 'Get-IngressUrl' {
     }
 }
 
-Describe 'Test-Status' {
+Describe 'Test-SameStatus' {
     It 'ignores case, spaces and hyphens' {
-        Test-Status -Actual 'InTransit' -Expected 'In transit' | Should -BeTrue
-        Test-Status -Actual 'in-transit' -Expected 'In transit' | Should -BeTrue
+        Test-SameStatus -Actual 'InTransit' -Expected 'In transit' | Should -BeTrue
+        Test-SameStatus -Actual 'in-transit' -Expected 'In transit' | Should -BeTrue
     }
 
     It 'tells two statuses apart' {
-        Test-Status -Actual 'Collected' -Expected 'Delivered' | Should -BeFalse
+        Test-SameStatus -Actual 'Collected' -Expected 'Delivered' | Should -BeFalse
     }
 
     It 'is false for nothing' {
-        Test-Status -Actual $null -Expected 'Delivered' | Should -BeFalse
+        Test-SameStatus -Actual $null -Expected 'Delivered' | Should -BeFalse
     }
 }
 
@@ -115,5 +115,82 @@ Describe 'Wait-ForValue' {
     It 'reports the last thing it saw' {
         { Wait-ForValue -Description 'x' -Condition { $null } -Describe { 'status was Planned' } -Attempts 1 -IntervalSeconds 0 } |
             Should -Throw '*status was Planned*'
+    }
+}
+
+Describe 'Format-Answer' {
+    It 'says the status alone when there is no problem' {
+        Format-Answer ([pscustomobject]@{ Status = 503; Body = $null }) | Should -Be 'answered 503'
+    }
+
+    It 'adds the title, code, text and message of a problem, never the rest of the body' {
+        $answer = [pscustomobject]@{ Status = 409; Body = @{ title = 'Conflict'; code = 'TransportOrderAlreadyPlanned'; secret = 'hunter2' } }
+        Format-Answer $answer | Should -Be 'answered 409 (Conflict, TransportOrderAlreadyPlanned)'
+    }
+}
+
+Describe 'Assert-Accepted' {
+    It 'passes a 2xx' {
+        { Assert-Accepted ([pscustomobject]@{ Status = 201; Body = $null; CorrelationId = $null }) -What 'the Partner API' } | Should -Not -Throw
+    }
+
+    It 'refuses anything else, saying what answered' {
+        { Assert-Accepted ([pscustomobject]@{ Status = 401; Body = @{ message = 'bad key' }; CorrelationId = $null }) -What 'the Partner API' } |
+            Should -Throw 'the Partner API answered 401 (bad key)'
+    }
+
+    It 'with -Status 202 refuses a 200' {
+        { Assert-Accepted ([pscustomobject]@{ Status = 200; Body = $null; CorrelationId = 'c' }) -What 'the Partner API' -Status 202 } |
+            Should -Throw '*not 202 Accepted*'
+    }
+
+    It 'with -RequireCorrelationId refuses an answer without one' {
+        { Assert-Accepted ([pscustomobject]@{ Status = 202; Body = $null; CorrelationId = $null }) -What 'the Partner API' -Status 202 -RequireCorrelationId } |
+            Should -Throw '*X-Correlation-ID*'
+    }
+}
+
+Describe 'Invoke-Call' {
+    It 'returns the status, the parsed body and the correlation ID without throwing for an error status' {
+        Mock Invoke-WebRequest -ModuleName Norvia.Kubernetes {
+            [pscustomobject]@{ StatusCode = 409; Content = '{"code":"X"}'; Headers = @{ 'X-Correlation-ID' = @('abc') } }
+        }
+        $answer = Invoke-Call -Method GET -Uri 'https://x.test/a'
+        $answer.Status | Should -Be 409
+        $answer.Body.code | Should -Be 'X'
+        $answer.CorrelationId | Should -Be 'abc'
+        Should -Invoke Invoke-WebRequest -ModuleName Norvia.Kubernetes -ParameterFilter { $SkipHttpErrorCheck -and -not $SkipCertificateCheck }
+    }
+
+    It 'sends the body as JSON and can skip the certificate check' {
+        Mock Invoke-WebRequest -ModuleName Norvia.Kubernetes { [pscustomobject]@{ StatusCode = 202; Content = ''; Headers = @{} } }
+        $answer = Invoke-Call -Method POST -Uri 'https://x.test/a' -Body @{ a = 1 } -SkipCertificateCheck
+        $answer.Body | Should -BeNullOrEmpty
+        Should -Invoke Invoke-WebRequest -ModuleName Norvia.Kubernetes -ParameterFilter { $Body -eq '{"a":1}' -and $ContentType -eq 'application/json' -and $SkipCertificateCheck }
+    }
+}
+
+Describe 'Get-SecretValue' {
+    BeforeAll {
+        # kubectl is on the dev container but not on every runner; Pester can only mock a command that exists.
+        $script:kubectlStub = -not (Get-Command kubectl -ErrorAction SilentlyContinue)
+        if ($script:kubectlStub) { function global:kubectl { throw 'kubectl is a stub for the Pester mocks' } }
+    }
+    AfterAll { if ($script:kubectlStub) { Remove-Item Function:\kubectl -ErrorAction SilentlyContinue } }
+
+    It 'decodes the Secret key' {
+        Mock Invoke-Kubectl -ModuleName Norvia.Kubernetes { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('s3cret')) }
+        Get-SecretValue -Namespace 'norvia' -Secret 'local-tokens' -Key 'signing-key' | Should -Be 's3cret'
+        Should -Invoke Invoke-Kubectl -ModuleName Norvia.Kubernetes -ParameterFilter { ($Arguments -join ' ') -match 'get secret local-tokens --namespace norvia' }
+    }
+
+    It 'fails when the key is empty' {
+        Mock Invoke-Kubectl -ModuleName Norvia.Kubernetes { '' }
+        { Get-SecretValue -Namespace 'norvia' -Secret 'local-tokens' -Key 'nope' } | Should -Throw '*has no key nope*'
+    }
+
+    It 'Invoke-Kubectl fails with kubectl''s own message when it exits non-zero' {
+        Mock kubectl -ModuleName Norvia.Kubernetes { $global:LASTEXITCODE = 1; 'Forbidden' }
+        { Invoke-Kubectl get secret x } | Should -Throw '*Forbidden*'
     }
 }
