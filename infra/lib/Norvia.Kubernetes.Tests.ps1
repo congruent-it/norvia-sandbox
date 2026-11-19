@@ -216,21 +216,27 @@ Describe 'Assert-Isolated' {
     }
 
     It 'passes when a pod of the namespace connects and a pod of the other namespace does not' {
-        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Namespace -eq 'norvia' }
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Target -like 'kube-dns.*' -or $Namespace -eq 'norvia' }
         { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } | Should -Not -Throw
         Should -Invoke Test-CanConnect -ModuleName Norvia.Kubernetes -ParameterFilter { $Namespace -eq 'elsewhere' -and $Target -eq 'sql.norvia.svc.cluster.local:1433' }
     }
 
     It 'fails naming every target the other namespace reaches' {
-        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Namespace -eq 'norvia' -or $Target -like 'sql.*' }
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Target -like 'kube-dns.*' -or $Namespace -eq 'norvia' -or $Target -like 'sql.*' }
         { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } |
             Should -Throw '*sql.norvia.svc.cluster.local:1433*' -ExceptionType ([System.Management.Automation.RuntimeException])
     }
 
     It 'does not name a target the other namespace does not reach' {
-        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Namespace -eq 'norvia' -or $Target -like 'sql.*' }
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Target -like 'kube-dns.*' -or $Namespace -eq 'norvia' -or $Target -like 'sql.*' }
         $message = try { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } catch { $_.Exception.Message }
         $message | Should -Not -Match 'partner-api'
+    }
+
+    It 'cannot tell, and says so, when the probe does not start in the other namespace (a pull that fails there is not a refusal)' {
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Namespace -eq 'norvia' }
+        { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } | Should -Throw '*could not connect from the namespace elsewhere to kube-dns*'
+        Should -Invoke Test-CanConnect -ModuleName Norvia.Kubernetes -Times 0 -ParameterFilter { $Namespace -eq 'elsewhere' -and $Target -like 'sql.*' }
     }
 
     It 'cannot tell, and says so, when the probe does not connect from inside the namespace either' {

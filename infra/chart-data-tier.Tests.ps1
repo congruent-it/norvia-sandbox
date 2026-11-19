@@ -190,6 +190,7 @@ Describe 'the rendered chart' -Skip:$script:helmMissing {
 
     It 'is valid Kubernetes YAML (kubeconform)' -Skip:(-not (Get-Command kubeconform -ErrorAction SilentlyContinue)) {
         $manifests = & helm template norvia $script:chart --namespace norvia --set sql.saPassword=Test-Passw0rd --set edge.baseDomain=norvia.test
+        # Ignores kinds with no schema in the default catalogue (the Traefik Middleware of the internal-only ingress); the built-in kinds are still validated.
         $output = $manifests | & kubeconform -strict -ignore-missing-schemas -summary 2>&1
         $LASTEXITCODE | Should -Be 0 -Because ($output -join "`n")
     }

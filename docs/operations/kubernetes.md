@@ -92,4 +92,4 @@ A pass settles what the chart's README lists as not verified: that the ingress c
 - **A pod stays in `Init`.** Its init container waits for a migrations Job: `kubectl get jobs -n norvia`, then the Job's log.
 - **The dashboard's history is gone.** It keeps telemetry in memory and loses it on a restart. A rendered-without-lookup upgrade also changes its API key; restart the Integration console with it.
 - **Data is gone.** A lost SQL Server or Azurite volume is not backed up. Reinstall, and the seed file loads the Shippers, Carriers and Rate Cards again.
-- **The chart's template tests:** `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1'`. They run offline.
+- **The chart's template tests:** `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1'`. They run offline.

@@ -156,6 +156,7 @@ function Test-CanConnect {
         [ValidateRange(1, 300)][int] $TimeoutSeconds = 5
     )
     $name = "connect-probe-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    # kubectl directly, not Invoke-Kubectl: a non-zero exit is the answer here (cannot connect), not an error.
     $null = & kubectl run $name --namespace $Namespace --image $Image --restart=Never --rm -i --quiet --command -- /agnhost connect $Target "--timeout=${TimeoutSeconds}s" 2>&1
     $LASTEXITCODE -eq 0
 }
@@ -172,10 +173,15 @@ function Assert-Isolated {
         [Parameter(Mandatory)][string] $Namespace,
         [Parameter(Mandatory)][string] $ProbeNamespace,
         [Parameter(Mandatory)][string[]] $Target,
-        [Parameter(Mandatory)][string] $Image
+        [Parameter(Mandatory)][string] $Image,
+        # Reachable from every namespace (the cluster DNS, over TCP): a probe that connects here has run, so its refusals are the policy's.
+        [string] $ControlTarget = 'kube-dns.kube-system.svc.cluster.local:53'
     )
     if (-not (Test-CanConnect -Namespace $Namespace -Target $Target[0] -Image $Image)) {
-        throw "the probe pod could not connect from inside the namespace $Namespace to $($Target[0]), so a refusal from another namespace would prove nothing (is the image $Image pullable, and the application running?)"
+        throw "the probe pod could not connect from inside the namespace $Namespace to $($Target[0]), so a refusal from another namespace would prove nothing (is the image ${Image} pullable, and the application running?)"
+    }
+    if (-not (Test-CanConnect -Namespace $ProbeNamespace -Target $ControlTarget -Image $Image)) {
+        throw "the probe pod could not connect from the namespace $ProbeNamespace to $ControlTarget, which every namespace may reach, so its refusals prove nothing (can that namespace pull ${Image}?)"
     }
     $reached = @($Target | Where-Object { Test-CanConnect -Namespace $ProbeNamespace -Target $_ -Image $Image })
     if ($reached.Count -gt 0) { throw "a pod in the namespace $ProbeNamespace reached $($reached -join ', '): the namespace is not isolated (does the cluster's CNI enforce NetworkPolicy?)" }
