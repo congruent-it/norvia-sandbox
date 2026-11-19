@@ -6,7 +6,7 @@ In Azure the Driver app's screens sit behind Container Apps' built-in authentica
 
 The presenter panel in the Partner portal lists the seeded Drivers' test users and the one password they share. The password is a demo credential for users that can do nothing but sign in to the Driver app.
 
-Locally there is no Entra and no Easy Auth. The AppHost turns on a stand-in (`LocalSignIn:Enabled`): a sign-in page that lists the seeded Drivers and signs the chosen one in with a cookie holding the same `driverId` claim. The Driver app's own code is the same in both. The stand-in refuses to start outside Development, and while it is on, an Easy Auth header is not trusted, so the header can't be forged against a local run.
+Locally there is no Entra and no Easy Auth. The AppHost turns on a stand-in (`LocalSignIn:Enabled`): a sign-in page that lists the seeded Drivers and signs the chosen one in with a cookie holding the same `driverId` claim. The Driver app's own code is the same in both. The stand-in refuses to start outside Development unless `LocalAuth:Allowed` is set (ADR 0053), and while it is on, an Easy Auth header is not trusted, so the header can't be forged against a local run.
 
 ## Considered Options
 

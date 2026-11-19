@@ -54,11 +54,10 @@ public sealed class LocalAuthTests
         LocalAuth.Permits(Environment(environment), Configuration(allowed)).Should().Be(expected);
 
     [Fact]
-    public void Require_PassesInDevelopmentAndWhenAllowed()
-    {
-        LocalAuth.Require(Environment("Development"), Configuration(null), "The local operator");
-        LocalAuth.Require(Environment("Production"), Configuration("true"), "The local operator");
-    }
+    public void Require_PassesInDevelopment() => LocalAuth.Require(Environment("Development"), Configuration(null), "The local operator");
+
+    [Fact]
+    public void Require_PassesWhenAllowed() => LocalAuth.Require(Environment("Production"), Configuration("true"), "The local operator");
 
     [Fact]
     public void Require_RefusesOutsideDevelopmentUnlessSetExplicitly()

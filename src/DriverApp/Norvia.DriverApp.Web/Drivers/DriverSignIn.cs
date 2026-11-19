@@ -42,7 +42,7 @@ public static class DriverSignIn
                 $"The sign-in stand-in ({StandInSettingsSection}) and the Driver picker ({DriverPicker.SettingsSection}) are two ways to pick a Driver; turn on one.");
         }
 
-        LocalAuth.RequireLocalSignInWhenAllowed(builder.Configuration, builder.Configuration.IsStandIn() || builder.Configuration.IsPicker());
+        LocalAuth.RequireLocalSignInWhenAllowed(builder.Configuration, builder.Configuration.IsStandIn());
 
         if (builder.Configuration.IsStandIn())
         {

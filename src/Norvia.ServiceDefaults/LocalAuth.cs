@@ -68,7 +68,7 @@ public static class LocalAuth
 
         if (configuration.GetSection(SigningKeysSection).GetChildren().Any())
         {
-            Require(environment, configuration, "The local token signing key (Authentication:Schemes:Bearer:SigningKeys)");
+            Require(environment, configuration, $"The local token signing key ({SigningKeysSection})");
         }
     }
 }
