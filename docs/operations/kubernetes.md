@@ -10,9 +10,9 @@ The chart runs the **local topology**, not the Azure estate: no Azure account, E
 
 The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernetes.excalidraw), generated from [deployment.py](../architecture/diagrams/deployment.py).
 
-In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, and an Ingress per exposed application.
+In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, an Ingress per exposed application, and the namespace's protection ([below](#the-namespace-is-closed-to-the-others)): a default-deny `NetworkPolicy`, an internal-only ingress, Secrets read by name, requests and limits on every pod, and a `ResourceQuota` with a `LimitRange`.
 
-Not in the chart yet: the TMS API, the ERP, the UIs, the Integration console and the Driver app. The workers and the smoke script call them by name, so until they are deployed a worker starts and retries, and the smoke script fails at its first step that needs one, naming it. Two pieces of the namespace's protection, the default-deny `NetworkPolicy` with the internal-only ingress, and the `ResourceQuota`, are #938, and the `LocalAuth:Allowed` setting itself is #930; both are still open.
+Not in the chart yet: the TMS API, the ERP, the UIs, the Integration console and the Driver app. The workers and the smoke script call them by name, so until they are deployed a worker starts and retries, and the smoke script fails at its first step that needs one, naming it. The `LocalAuth:Allowed` setting itself is #930, and is still open.
 
 ## Before you deploy
 
@@ -48,6 +48,18 @@ The generated Secrets (`local-tokens`, `subscription-keys`, `endpoint-keys`, the
 
 The rest of `values.yaml` (the emulators' topics, the Personas, the token constants, the workers) repeats what the AppHost and the seed file hold, and the chart's template tests compare them: change one, change the other.
 
+## The namespace is closed to the others
+
+Everything Norvia deploys is in one namespace, on a cluster other applications share (#938). The chart protects both sides:
+
+- **Namespace.** Helm cannot make the namespace it stores its release in, so `--create-namespace` makes it. Label it once: `kubectl label namespace norvia app.kubernetes.io/part-of=norvia pod-security.kubernetes.io/enforce=baseline pod-security.kubernetes.io/warn=restricted`. A GitOps tool that applies what the chart renders can set `namespace.create=true` and `namespace.labels` instead. The chart puts nothing outside the namespace and installs nothing cluster-scoped: no ingress controller, issuer, storage class, CRD or cluster role.
+- **Network.** A `default-deny` `NetworkPolicy` selects every pod, in and out. The paths opened are: pods of the namespace to each other; DNS; the ingress controller to the applications that have an Ingress, on 8080; and the pods that wait for the migrations to the API server. No other namespace reaches the Partner API, SQL Server, the Service Bus emulators or a worker. Set `networkPolicy.ingressController.namespace` if your controller is not in `kube-system`, and narrow `networkPolicy.apiServer.cidrs` (on K3S, the node's address). **A CNI that does not enforce `NetworkPolicy` makes all of this a no-op**; the smoke script's isolation check is how you find out.
+- **Internal-only ingress.** Every Ingress is restricted to the LAN or VPN: with `edge.internal.controller=traefik` (the default) the chart renders a Traefik `Middleware` admitting `edge.internal.allowedCidrs` (the private ranges), with `nginx` it sets the `whitelist-source-range` annotation, and with `none` you give an internal ingress class (`edge.internal.className`) or your controller's annotations (`edge.internal.annotations`) and the chart does not render without one. An allow list sees the client's address only if the controller does (`externalTrafficPolicy: Local` on its Service, or the proxy protocol); behind a load balancer that rewrites it, use an internal ingress class.
+- **Secrets.** The pods run as the service account `norvia`, which has no API token mounted. A `Role` lets that account and the subjects in `rbac.secretReaders` `get` the chart's Secrets by name, with no `list` or `watch`. RBAC only adds, so the chart grants nothing else on Secrets; what other roles of the cluster can read is the cluster's. The operator who runs the smoke script needs to be a subject, or to hold their own rights.
+- **Requests and limits.** Every Deployment, StatefulSet and Job has CPU and memory requests and a memory limit (no CPU limits). SQL Server holds its own memory under its limit (`sql.memoryLimitMb`, as `MSSQL_MEMORY_LIMIT_MB` is under Aspire). A `LimitRange` gives an init container small defaults, and a `ResourceQuota` (`quota.hard`) caps the namespace's pods, requested CPU and memory, limited memory and volumes, sized for the chart and about ten more applications. A template test fails when the chart outgrows the quota. `quota.enabled=false` leaves both out on a cluster that sets its own.
+
+Not verified on a cluster: that a given CNI enforces the policies (the smoke script's isolation check), that Traefik admits only the allowed ranges, and the Pod Security `baseline` label against the images.
+
 ## `LocalAuth:Allowed`
 
 There is no identity provider on the cluster. The local operator sign-in ([ADR 0026](../adr/0026-the-integration-console-signs-operators-in-with-easy-auth-and-checks-their-app-role.md)), the Driver app's sign-in page ([ADR 0037](../adr/0037-drivers-sign-in-to-the-driver-app-with-entra-and-the-driver-id-is-their-app-role.md)) and the local token-signing key refuse to start outside Development. `LocalAuth:Allowed` is the named setting, independent of the environment name, that will let them run on Kubernetes. **It does not exist yet (#930):** until it lands, they refuse to start on the cluster, so the Integration console and the Driver app cannot be signed in to there. Once it lands it is off by default, and while it is on an Easy Auth header is not trusted.
@@ -58,7 +70,7 @@ Before you set it, check:
 
 1. The ingress controller that serves Norvia is reachable only from your LAN or VPN, not from the internet.
 2. The cluster's CNI enforces `NetworkPolicy`. On one that does not, the namespace's default-deny policy does nothing and the condition is not true. Do not set it there.
-3. The namespace has the default-deny policy and the internal-only ingress (#938). Until those land, you are the one making the condition true.
+3. The namespace has the default-deny policy and the internal-only ingress, which the chart gives it (below), and the smoke script's isolation check passes on your cluster. Do not turn off `edge.internal.enabled`, or leave `edge.internal.controller` as `traefik` or `nginx` behind a load balancer that hides the client's address, without an internal ingress class instead.
 
 ## Check a deployment
 
@@ -68,9 +80,9 @@ After every `helm upgrade --install`, from anywhere that reaches the ingress and
 pwsh infra/smoke-test-kubernetes.ps1 -BaseDomain norvia.example.org
 ```
 
-Pass `-Insecure` when the ingress is plain http, `-SkipCertificateCheck` for a self-signed certificate, `-Namespace` if it is not `norvia`, and `-TimeoutSeconds` (default 180) for each wait. Without `-BaseDomain` it takes `NORVIA_BASE_DOMAIN` from the environment, then the domain of the `partner-api` Ingress.
+Pass `-Insecure` when the ingress is plain http, `-SkipCertificateCheck` for a self-signed certificate, `-Namespace` if it is not `norvia`, and `-TimeoutSeconds` (default 180) for each wait. `-ProbeImage` sets the image of the isolation check's probe pods (`registry.k8s.io/e2e-test-images/agnhost`; use a mirror if the cluster cannot pull from there), and `-SkipIsolationCheck` leaves the check out, for an account that may not create a namespace. Without `-BaseDomain` it takes `NORVIA_BASE_DOMAIN` from the environment, then the domain of the `partner-api` Ingress.
 
-It drives one Shipment from booking to delivery through the ingress: Brouwer Dranken books, the Planner assigns and releases, Van Dijk Transport confirms, sends PU, DEP and POD tracking events and a Proof of delivery, and Brouwer Dranken reads the Proof of delivery, its file and the tracking events back. It signs the tokens itself with `local-tokens/signing-key` and takes the keys from `subscription-keys`, so it needs `get` on those Secrets. It stops at the first failing step, naming it, with the status the application answered and never a body, token or key. Each run leaves one Transport Order behind.
+First it checks the isolation: a throwaway pod in a namespace made for the run connects to the Partner API, SQL Server and the two emulators and must be refused (after the same pod, inside the sandbox's namespace, has connected, so a probe that cannot run is not mistaken for a refusal). The namespace is removed after. Then it drives one Shipment from booking to delivery through the ingress: Brouwer Dranken books, the Planner assigns and releases, Van Dijk Transport confirms, sends PU, DEP and POD tracking events and a Proof of delivery, and Brouwer Dranken reads the Proof of delivery, its file and the tracking events back. It signs the tokens itself with `local-tokens/signing-key` and takes the keys from `subscription-keys`, so it needs `get` on those Secrets. It stops at the first failing step, naming it, with the status the application answered and never a body, token or key. Each run leaves one Transport Order behind.
 
 A pass settles what the chart's README lists as not verified: that the ingress controller and cert-manager route to the Partner API, that two emulators share one SQL Server, and that the booking, tracking and Proof of delivery path works through the emulators and Azurite. It does not cover that the Aspire dashboard finds the run's trail, which waits for the Integration console.
 

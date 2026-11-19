@@ -1,0 +1,46 @@
+{{- /*
+  Who can read the Secrets (#938). RBAC only adds, so the chart grants nothing on Secrets but this: get, by name, to the service account
+  every pod runs as and to the subjects named in rbac.secretReaders (the operators who run the smoke script). No list, no watch, no wildcard.
+  The pods do not need the API, so the service account has no token mounted.
+*/ -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: norvia
+  labels:
+    {{- include "norvia.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-reader
+  labels:
+    {{- include "norvia.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - local-tokens
+      - subscription-keys
+      - endpoint-keys
+      - sql
+      - dashboard-api-key
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-reader
+  labels:
+    {{- include "norvia.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: norvia
+  {{- with .Values.rbac.secretReaders }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: secret-reader

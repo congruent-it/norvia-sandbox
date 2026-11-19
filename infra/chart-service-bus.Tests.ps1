@@ -213,7 +213,7 @@ Describe 'the rendered chart with the emulators' -Skip:$script:helmMissing {
 
     It 'is valid Kubernetes YAML (kubeconform)' -Skip:(-not (Get-Command kubeconform -ErrorAction SilentlyContinue)) {
         $manifests = & helm template norvia $script:chart --namespace norvia --set sql.saPassword=Test-Passw0rd --set edge.baseDomain=norvia.test
-        $output = $manifests | & kubeconform -strict -summary 2>&1
+        $output = $manifests | & kubeconform -strict -ignore-missing-schemas -summary 2>&1
         $LASTEXITCODE | Should -Be 0 -Because ($output -join "`n")
     }
 }

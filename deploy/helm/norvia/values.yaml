@@ -39,6 +39,11 @@ migrations:
   partner-portal: { database: partner-portal, image: partner-portal-migrations }
   simulator: { database: simulator, image: simulator-migrations }
 
+# The requests and limits of a migrations Job's container: it runs the migrations of one database and exits.
+migrationsResources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { memory: 512Mi }
+
 # The image of the initContainers that wait for the migrations Jobs. Any image with kubectl in it.
 kubectl:
   # Must have kubectl and need no shell (the waiter runs kubectl directly). Match it to the cluster's version.
@@ -100,6 +105,22 @@ edge:
     # Traefik on K3S is the tested default.
     className: traefik
     annotations: {}
+  # Internal only (#938). The local sign-in and the local token-signing key (LocalAuth:Allowed, #930) trust whoever reaches the ingress, so no Ingress
+  # of the chart may be reachable from the public internet through the cluster's shared ingress controller. Every Ingress is restricted to
+  # the LAN or VPN, one of three ways:
+  #   traefik (default): a Traefik Middleware of the chart (traefik.io/v1alpha1 ipAllowList; K3S ships Traefik v3 and its CRDs) on every Ingress.
+  #   nginx: the whitelist-source-range annotation of ingress-nginx.
+  #   none: the chart adds nothing, and the cluster provides the restriction: an ingress class bound to an internal load balancer (className),
+  #         or annotations of your controller. The chart does not render without one of the two.
+  # An allow list sees the client's address only when the controller does: externalTrafficPolicy: Local on its Service, or the proxy protocol.
+  # Behind an address-rewriting load balancer it admits everyone or no one; use an internal ingress class there.
+  internal:
+    enabled: true
+    controller: traefik
+    allowedCidrs: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+    # An ingress class for the internal applications only. Empty: edge.ingress.className.
+    className: ""
+    annotations: {}
   tls:
     enabled: true
     # The cert-manager ClusterIssuer that signs each hostname's certificate. Empty: the Ingress asks for none and expects a Secret named
@@ -119,6 +140,56 @@ telemetry:
     resources:
       requests: { cpu: 50m, memory: 256Mi }
       limits: { memory: 768Mi }
+
+# The namespace (#938). Helm cannot make the namespace it stores its release in, so install with --create-namespace and leave this off. On, the
+# chart renders the Namespace with these labels, for a GitOps tool that applies what the chart renders (the namespace must then not already
+# exist under another owner). Otherwise label it by hand (docs/operations/kubernetes.md). Everything the chart deploys is namespaced.
+namespace:
+  create: false
+  labels:
+    app.kubernetes.io/part-of: norvia
+    # SQL Server and the emulators run as non-root and need nothing the baseline forbids. Warn, do not block, on the restricted profile.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+
+# What Norvia may use of a cluster others share (#938): a ResourceQuota for the namespace, and a LimitRange that gives the containers that name
+# no requests or limit (the init containers) small ones, which a quota on requests needs. Sized for what the chart deploys, the migrations Jobs
+# running at once, and about ten more applications (the TMS, the ERP and the UIs, which are not in the chart yet); a template test fails
+# when the chart outgrows it. There are no CPU limits (a CPU limit throttles, and the chart sets none), so none in the quota. Off, a cluster
+# that sets its own quotas and limits is not given a second set.
+quota:
+  enabled: true
+  hard:
+    pods: 60
+    requests.cpu: "4"
+    requests.memory: 12Gi
+    limits.memory: 24Gi
+    persistentvolumeclaims: 10
+    requests.storage: 50Gi
+  containerDefaults:
+    requests: { cpu: 25m, memory: 64Mi }
+    limits: { memory: 256Mi }
+  # The most one container may ask for; SQL Server is the largest (limit 2Gi).
+  containerMax: { memory: 4Gi }
+
+# RBAC of the Secrets (#938). The chart's Role lets the pods' service account and these subjects get the chart's Secrets, by name. Each is a
+# subject of rbac.authorization.k8s.io/v1, e.g. { kind: Group, name: norvia-operators, apiGroup: rbac.authorization.k8s.io }.
+rbac:
+  secretReaders: []
+
+# The network policy of the namespace (#938): default-deny, then the paths that must work. The CNI has to enforce NetworkPolicy.
+networkPolicy:
+  ingressController:
+    # The namespace the ingress controller runs in (Traefik on K3S is in kube-system).
+    namespace: kube-system
+  dns:
+    namespace: kube-system
+    podLabel: { k8s-app: kube-dns }
+  apiServer:
+    # Where the pods that wait for the migrations (norvia.io/waits-for-migrations: "true") may reach the API server, on 443 and 6443. Narrow it
+    # to the API server's address: on K3S the node's IP, as 10.43.0.1:443 is translated to it before the policy applies.
+    cidrs: [0.0.0.0/0]
+    ports: [443, 6443]
 
 # Where the applications listen. Every Norvia image listens here, and each Service is reached as http://<name>:<port>.
 appPort: 8080

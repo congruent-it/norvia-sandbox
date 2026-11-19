@@ -20,6 +20,11 @@
          Shipment moves through Collected, In transit and Delivered (the tracking queue and the tracking worker);
       6. Van Dijk Transport sends a Proof of delivery, accepted (202 Accepted), and Brouwer Dranken reads it on its
          Transport Order, with its file, through the Partner API (Azurite, the queue and the Proof of delivery worker).
+    Before them, an isolation check (#938): a throwaway pod in a namespace it creates for the purpose connects to the Partner API, SQL
+    Server and the two Service Bus emulators of the sandbox and is refused. It first connects from inside the sandbox's namespace,
+    so a probe that cannot run is not taken for a refusal. A cluster whose CNI does not enforce NetworkPolicy fails here, and
+    LocalAuth:Allowed must not be set on it. It needs to create and delete a namespace and run pods in it; -SkipIsolationCheck
+    leaves it out, and the check then is yours.
     A step that needs an application the chart does not deploy yet (the TMS API, the Partner portal) fails with that
     application's own error until it is deployed; that is the check.
 
@@ -37,6 +42,11 @@
     The ingress is plain http (edge.tls.enabled=false).
 .PARAMETER SkipCertificateCheck
     Accept a certificate that does not verify (a self-signed one on a test cluster).
+.PARAMETER ProbeImage
+    The image of the isolation check's probe pods: one with /agnhost, the Kubernetes e2e test image. Set it to a mirror when the
+    cluster cannot pull from registry.k8s.io.
+.PARAMETER SkipIsolationCheck
+    Leave out the check that a pod in another namespace is refused.
 .PARAMETER TimeoutSeconds
     How long each wait for the sandbox to catch up may take. Defaults to 180.
 #>
@@ -46,6 +56,8 @@ param(
     [string] $Namespace = 'norvia',
     [switch] $Insecure,
     [switch] $SkipCertificateCheck,
+    [string] $ProbeImage = 'registry.k8s.io/e2e-test-images/agnhost:2.47',
+    [switch] $SkipIsolationCheck,
     [ValidateRange(5, 3600)][int] $TimeoutSeconds = 180
 )
 $ErrorActionPreference = 'Stop'
@@ -81,6 +93,17 @@ $subscriptionKeys = @{}
 Invoke-SmokeStep 'Read the signing key and the Personas'' subscription keys from the cluster' {
     $script:signingKey = Get-SecretValue -Secret 'local-tokens' -Key 'signing-key'
     foreach ($persona in $shipperPersona, $carrierPersona) { $script:subscriptionKeys[$persona] = Get-SecretValue -Secret 'subscription-keys' -Key "PartnerApi__SubscriptionKeys__$persona" }
+}
+
+# The namespace is closed to the others (#938). The probe's namespace is made for the run and removed after it, whatever the answer.
+if ($SkipIsolationCheck) { Write-Host 'Skipped: a pod in another namespace is refused (-SkipIsolationCheck)' }
+else {
+    $probeNamespace = "norvia-probe-$run".ToLowerInvariant()
+    Invoke-SmokeStep "A pod in another namespace ($probeNamespace) is refused by the Partner API, SQL Server and the Service Bus emulators" {
+        Invoke-Kubectl create namespace $probeNamespace | Out-Null
+        try { Assert-Isolated -Namespace $Namespace -ProbeNamespace $probeNamespace -Target (Get-IsolationTarget -Namespace $Namespace) -Image $ProbeImage }
+        finally { Invoke-Kubectl delete namespace $probeNamespace --wait=false | Out-Null }
+    } | Out-Null
 }
 
 # What src/Norvia.AppHost/LocalTokens.cs and values.yaml (localTokens, personas) hold; the chart's template tests compare those two.

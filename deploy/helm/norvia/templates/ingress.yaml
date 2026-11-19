@@ -3,9 +3,23 @@
   controller and no issuer (ADR 0053): TLS asks the cert-manager ClusterIssuer named in edge.tls.clusterIssuer. An application the chart
   deploys later is added to this list.
 */ -}}
-{{- $exposed := list "partner-api" }}
-{{- if .Values.agents.enabled }}{{ $exposed = append $exposed "agent-mcp" }}{{ end }}
-{{- range $name := $exposed }}
+{{- $internal := include "norvia.internalIngress" . | fromJson }}
+{{- if and .Values.edge.internal.enabled (eq .Values.edge.internal.controller "traefik") }}
+# Admits only the LAN or VPN (edge.internal.allowedCidrs). Traefik reads it from the Ingresses' router.middlewares annotation.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: internal-only
+  labels:
+    app.kubernetes.io/name: internal-only
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- toYaml .Values.edge.internal.allowedCidrs | nindent 6 }}
+---
+{{- end }}
+{{- range $name := include "norvia.exposedApplications" . | fromJsonArray }}
 {{- $host := include "norvia.host" (dict "root" $ "app" $name) }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -14,14 +28,14 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ $name }}
     {{- include "norvia.labels" $ | nindent 4 }}
-  {{- $annotations := deepCopy $.Values.edge.ingress.annotations }}
+  {{- $annotations := merge (deepCopy $.Values.edge.ingress.annotations) (deepCopy $internal.annotations) }}
   {{- if and $.Values.edge.tls.enabled $.Values.edge.tls.clusterIssuer }}{{ $_ := set $annotations "cert-manager.io/cluster-issuer" $.Values.edge.tls.clusterIssuer }}{{ end }}
   {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  ingressClassName: {{ $.Values.edge.ingress.className }}
+  ingressClassName: {{ $internal.className }}
   {{- if $.Values.edge.tls.enabled }}
   tls:
     - hosts:
