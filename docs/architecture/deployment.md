@@ -4,7 +4,7 @@ What is deployed to Azure, what owns each piece, and in what order it goes up. F
 
 ![Deployment view: one resource group holding the Container Apps environment and data owned by the Aspire AppHost, and the integration layer owned by the estate Bicep](diagrams/deployment.png)
 
-The editable source is [deployment.excalidraw](diagrams/deployment.excalidraw), generated from [deployment.py](diagrams/deployment.py) in the [graph style](diagrams/README.md#graph-style).
+The editable source is [deployment.excalidraw](diagrams/deployment.excalidraw), generated from [deployment.cs](diagrams/deployment.cs) in the [graph style](diagrams/README.md#graph-style).
 
 ## Two owners, one resource group
 
@@ -53,4 +53,4 @@ The Simulator sends orders into the estate, so it is a demo tool and the estate 
 
 ## Keeping it true
 
-A PR that adds a deployed piece, or moves one between the Bicep and the AppHost, updates the picture and this table in the same PR. Edit the spec in [deployment.py](diagrams/deployment.py) and run it.
+A PR that adds a deployed piece, or moves one between the Bicep and the AppHost, updates the picture and this table in the same PR. Edit the spec in [deployment.cs](diagrams/deployment.cs) and run it.

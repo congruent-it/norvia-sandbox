@@ -10,7 +10,7 @@ Subscriptions and subscribers marked *planned* are designed in a process doc but
 
 ![C4 level 3: the event topology, from publisher to topic, subscription and Logic App](diagrams/c4-l3-event-topology.png)
 
-*Editable source: [c4-l3-event-topology.excalidraw](diagrams/c4-l3-event-topology.excalidraw), generated from [c4.py](diagrams/c4.py). [EventTopologyDiagramTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/EventTopologyDiagramTests.cs) fails when its topics or subscriptions differ from the Bicep's. The arrows and filters are not checked.*
+*Editable source: [c4-l3-event-topology.excalidraw](diagrams/c4-l3-event-topology.excalidraw), generated from [c4.cs](diagrams/c4.cs). [EventTopologyDiagramTests](../../tests/Tms/Norvia.Tms.ArchitectureTests/EventTopologyDiagramTests.cs) fails when its topics or subscriptions differ from the Bicep's. The arrows and filters are not checked.*
 
 ## Catalogue
 

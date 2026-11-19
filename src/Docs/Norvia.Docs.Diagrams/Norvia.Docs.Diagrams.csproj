@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The drawing code behind docs/architecture/diagrams: the Excalidraw canvas and the matrix, graph, grid and sequence styles.
+       The generators there are file-based apps (dotnet run <file>.cs) that reference this project. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Norvia.Docs.Diagrams.UnitTests" />
+  </ItemGroup>
+</Project>

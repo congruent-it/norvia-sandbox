@@ -39,7 +39,7 @@ internal sealed class DocsGenerator(IReadOnlyList<DocumentedApplication> applica
 
     /// <summary>
     /// The ER diagrams that no longer draw the tables of their model: the Excalidraw file is missing, or draws other tables than <paramref name="files"/> holds.
-    /// The generator can't draw them; <c>docs/architecture/diagrams/entities.py</c> does.
+    /// The generator can't draw them; <c>docs/architecture/diagrams/entities.cs</c> does.
     /// </summary>
     public IReadOnlyList<string> StaleDiagrams(IEnumerable<GeneratedFile> files) =>
         [.. files.Where(file => EntityDiagram.IsModelPath(file.Path)).Where(file =>

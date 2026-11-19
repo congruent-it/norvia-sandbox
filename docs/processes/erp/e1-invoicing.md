@@ -14,7 +14,7 @@ Invoicing turns the Billable Transport Orders the TMS hands over into Shipper in
 
 ![E1 Invoicing as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-e1-invoicing.png)
 
-The model is [e1-invoicing.bpmn](e1-invoicing.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-e1-invoicing.excalidraw)).
+The model is [e1-invoicing.bpmn](e1-invoicing.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-e1-invoicing.excalidraw)).
 
 ## Billable lines
 
@@ -160,13 +160,13 @@ The Hops of E1, named as the [Integration console](../../operations/integration-
 
 ![Sequence diagram of the Hops: A Billable line](../../architecture/diagrams/message-trail-e1-1.png)
 
-*Editable source: [message-trail-e1-1.excalidraw](../../architecture/diagrams/message-trail-e1-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e1-1.excalidraw](../../architecture/diagrams/message-trail-e1-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **2. An invoice.** Finance's **Invoice now**, or the monthly Invoice run, starts a new trail for the invoice. Its correlation ID is the invoice's own, and every later hop carries it.
 
 ![Sequence diagram of the Hops: Invoice now](../../architecture/diagrams/message-trail-e1-2.png)
 
-*Editable source: [message-trail-e1-2.excalidraw](../../architecture/diagrams/message-trail-e1-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e1-2.excalidraw](../../architecture/diagrams/message-trail-e1-2.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **3. A Credit note** takes the same path from `IssueCreditNoteCommand`: it publishes `CreditNoteIssued` to the same subscription, and the Logic App sends it as a `CREDIT_NOTE` and reports it to `/v1/credit-notes/{number}/report-sent`.
 
@@ -174,7 +174,7 @@ The Hops of E1, named as the [Integration console](../../operations/integration-
 
 ![Sequence diagram of the Hops: An invoice the Shipper never got](../../architecture/diagrams/message-trail-e1-3.png)
 
-*Editable source: [message-trail-e1-3.excalidraw](../../architecture/diagrams/message-trail-e1-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-e1-3.excalidraw](../../architecture/diagrams/message-trail-e1-3.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 ### What is built
 

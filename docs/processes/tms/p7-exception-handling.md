@@ -14,7 +14,7 @@ Exception handling makes sure someone acts when a Shipment on its way goes wrong
 
 ![P7 Exception handling as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p7-exception-handling.png)
 
-The model is [p7-exception-handling.bpmn](p7-exception-handling.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p7-exception-handling.excalidraw)).
+The model is [p7-exception-handling.bpmn](p7-exception-handling.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p7-exception-handling.excalidraw)).
 
 ## Scope
 
@@ -306,19 +306,19 @@ P7 leaves several Message trails, one per cause or Planner action. Each is named
 
 ![Sequence diagram of the Hops: Opening](../../architecture/diagrams/message-trail-p7-1.png)
 
-*Editable source: [message-trail-p7-1.excalidraw](../../architecture/diagrams/message-trail-p7-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p7-1.excalidraw](../../architecture/diagrams/message-trail-p7-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **Notifying the Shipper.**
 
 ![Sequence diagram of the Hops: Notifying the Shipper](../../architecture/diagrams/message-trail-p7-2.png)
 
-*Editable source: [message-trail-p7-2.excalidraw](../../architecture/diagrams/message-trail-p7-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p7-2.excalidraw](../../architecture/diagrams/message-trail-p7-2.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **Cancelling a Carrier booking.**
 
 ![Sequence diagram of the Hops: Cancelling a Carrier booking](../../architecture/diagrams/message-trail-p7-3.png)
 
-*Editable source: [message-trail-p7-3.excalidraw](../../architecture/diagrams/message-trail-p7-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p7-3.excalidraw](../../architecture/diagrams/message-trail-p7-3.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - A note saved from the Planner agent's draft names the Agent and its run in the trace (`agentId` is `planner-exception-note`, next to `agentRunId`), edited or not; a note the Planner wrote themselves names none.
 - Agreeing a delivery window, adding a note and resolving each leave one short trail in the Flow `exception-handling`: `tms-web: Agree delivery window`, `tms-web: Add note` or `tms-web: Resolve Exception`, then the call. Only the first and the last publish, `ShipmentDeliveryWindowAgreed` and `ExceptionResolved`. A note publishes nothing, so its trail ends at the call.

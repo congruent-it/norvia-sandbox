@@ -95,7 +95,7 @@ The database's tables are generated from its EF Core model by `Norvia.Docs.Gener
 
 ### Entity relationships
 
-Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](../architecture/diagrams/er-erp.json) by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](../architecture/diagrams/er-erp.excalidraw) opens in Excalidraw.
+Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](../architecture/diagrams/er-erp.json) by `docs/architecture/diagrams/entities.cs`, and its [Excalidraw file](../architecture/diagrams/er-erp.excalidraw) opens in Excalidraw.
 
 ![erp entity relationships](../architecture/diagrams/er-erp.png)
 

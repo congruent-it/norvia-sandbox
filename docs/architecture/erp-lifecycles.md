@@ -32,4 +32,4 @@ How the ERP's aggregates move through their states, with the domain method behin
 
 ## Keeping it true
 
-The states and moves come from the status enums and transition methods in [src/Erp/Norvia.Erp.Domain](../../src/Erp/Norvia.Erp.Domain/). A PR that adds a status or a transition updates the picture and its table in the same PR. Edit the spec in [bounded_contexts.py](diagrams/bounded_contexts.py) and run it.
+The states and moves come from the status enums and transition methods in [src/Erp/Norvia.Erp.Domain](../../src/Erp/Norvia.Erp.Domain/). A PR that adds a status or a transition updates the picture and its table in the same PR. Edit the spec in [bounded-contexts.cs](diagrams/bounded-contexts.cs) and run it.

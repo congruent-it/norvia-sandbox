@@ -82,7 +82,7 @@ public sealed class DocsGeneratorTests
         generator.Stale(await generator.GenerateAsync()).Should().BeEmpty();
     }
 
-    // An Excalidraw file as entities.py writes it: each table is a title, then a subtitle that starts with its key columns.
+    // An Excalidraw file as entities.cs writes it: each table is a title, then a subtitle that starts with its key columns.
     private static string DiagramOf(params string[] tables) =>
         "{\"elements\":[" + string.Join(",", tables.SelectMany(table => new[] { table, "PK Id (int)" }).Select(text => $"{{\"type\":\"text\",\"text\":\"{text}\"}}")) + "]}";
 

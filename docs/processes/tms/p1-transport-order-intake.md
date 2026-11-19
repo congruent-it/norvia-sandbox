@@ -14,7 +14,7 @@ Transport Order intake takes a Shipper's booking into the TMS and accepts or rej
 
 ![P1 Transport Order intake as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p1-transport-order-intake.png)
 
-The model is [p1-transport-order-intake.bpmn](p1-transport-order-intake.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p1-transport-order-intake.excalidraw)).
+The model is [p1-transport-order-intake.bpmn](p1-transport-order-intake.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p1-transport-order-intake.excalidraw)).
 
 ## Channels
 
@@ -126,7 +126,7 @@ The Hops an accepted booking leaves on its Message trail, named as the [Integrat
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p1-1.png)
 
-*Editable source: [message-trail-p1-1.excalidraw](../../architecture/diagrams/message-trail-p1-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p1-1.excalidraw](../../architecture/diagrams/message-trail-p1-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - A rejected booking publishes `TransportOrderRejected` instead of `TransportOrderAccepted`. A repeat publishes nothing, so its trail ends at the TMS call.
 - A refused call stops at `apim-norvia`. A booking with a value the map can't read still reaches the TMS, which rejects it. One the map can't parse at all fails the run before the TMS call.

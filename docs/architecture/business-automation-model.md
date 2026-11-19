@@ -4,7 +4,7 @@ Which application performs each step of Norvia's business processes, and who or 
 
 ![Business automation model: process steps as columns, applications as rows](diagrams/business-automation-model.png)
 
-The editable source is [business-automation-model.excalidraw](diagrams/business-automation-model.excalidraw), generated from [a spec](diagrams/business-automation-model.py) in the [Excalidraw matrix style](diagrams/README.md). The PNG is rendered from the same spec.
+The editable source is [business-automation-model.excalidraw](diagrams/business-automation-model.excalidraw), generated from [a spec](diagrams/business-automation-model.cs) in the [Excalidraw matrix style](diagrams/README.md). The PNG is rendered from the same spec.
 
 ## How to read it
 
@@ -49,4 +49,4 @@ The **Simulator** plays the outside world and Norvia's people, as each Shipper, 
 
 ## Keeping it current
 
-Change a process, an application or a flow, and the spec changes with it: edit [business-automation-model.py](diagrams/business-automation-model.py), run it, and regenerate the PNG, as the [style guide](diagrams/README.md#regenerating) describes. Do it in the same PR as the change, like the other pages here.
+Change a process, an application or a flow, and the spec changes with it: edit [business-automation-model.cs](diagrams/business-automation-model.cs), run it, and regenerate the PNG, as the [style guide](diagrams/README.md#regenerating) describes. Do it in the same PR as the change, like the other pages here.

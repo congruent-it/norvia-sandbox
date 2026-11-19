@@ -14,7 +14,7 @@ Transport planning turns an accepted Transport Order into a Shipment and decides
 
 ![P3 Transport planning as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p3-transport-planning.png)
 
-The model is [p3-transport-planning.bpmn](p3-transport-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p3-transport-planning.excalidraw)).
+The model is [p3-transport-planning.bpmn](p3-transport-planning.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p3-transport-planning.excalidraw)).
 
 ## One Shipment per Transport Order
 
@@ -155,7 +155,7 @@ The Hops one Planner action leaves on the Message trail, named as the [Integrati
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p3-1.png)
 
-*Editable source: [message-trail-p3-1.excalidraw](../../architecture/diagrams/message-trail-p3-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p3-1.excalidraw](../../architecture/diagrams/message-trail-p3-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - The diagram shows an assignment. The other two actions have the same shape and differ only in their Hops:
 

@@ -14,7 +14,7 @@ Proof of delivery records the Consignee's confirmation that it received a Shipme
 
 ![P6 Proof of delivery as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p6-proof-of-delivery.png)
 
-The model is [p6-proof-of-delivery.bpmn](p6-proof-of-delivery.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p6-proof-of-delivery.excalidraw)).
+The model is [p6-proof-of-delivery.bpmn](p6-proof-of-delivery.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p6-proof-of-delivery.excalidraw)).
 
 ## Scope
 
@@ -218,7 +218,7 @@ The Hops a Carrier's Proof of delivery leaves on its Message trail, named as the
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p6-1.png)
 
-*Editable source: [message-trail-p6-1.excalidraw](../../architecture/diagrams/message-trail-p6-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p6-1.excalidraw](../../architecture/diagrams/message-trail-p6-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - The Carrier's reply ends at `202 Accepted`, or at `413` for a body over 25 MB. Everything after the queue is invisible to it ([ADR 0009](../../adr/0009-carrier-proofs-of-delivery-use-a-claim-check.md)).
 - The blob is written before the message is queued. When API Management can't store it the Hop is `Failed` with `ProofOfDeliveryNotStored`, and when it can't queue the reference, `ProofOfDeliveryNotQueued`. Both give the Carrier `503`, so it sends the Proof of delivery again, and the second leaves a blob behind until the inbound container's retention rule removes it.

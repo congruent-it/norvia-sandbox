@@ -30,7 +30,7 @@ if (args.Contains("--check"))
 
     if (staleDiagrams.Count > 0)
     {
-        Console.Error.WriteLine("Redraw with: python3 docs/architecture/diagrams/entities.py, then rsvg-convert as in docs/architecture/diagrams/README.md");
+        Console.Error.WriteLine("Redraw with: dotnet run docs/architecture/diagrams/entities.cs -- (it writes the PNG too, with rsvg-convert)");
     }
 
     return stale.Count == 0 && staleDiagrams.Count == 0 ? 0 : 1;
@@ -47,6 +47,6 @@ foreach (var file in files.Where(file => stale.Contains(file.Path)))
 Console.WriteLine(stale.Count == 0 ? "Everything is up to date." : $"Wrote {stale.Count} file(s).");
 foreach (var path in staleDiagrams)
 {
-    Console.WriteLine($"Redraw {path}: python3 docs/architecture/diagrams/entities.py");
+    Console.WriteLine($"Redraw {path}: dotnet run docs/architecture/diagrams/entities.cs --");
 }
 return 0;

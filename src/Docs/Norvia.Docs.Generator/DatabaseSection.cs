@@ -16,7 +16,7 @@ internal static class DatabaseSection
 
         var text = new StringBuilder();
         text.AppendLine("### Entity relationships").AppendLine();
-        text.AppendLine("Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](" + EntityDiagram.JsonPath(slug) + ") by `docs/architecture/diagrams/entities.py`, and its [Excalidraw file](" + EntityDiagram.ExcalidrawPath(slug) + ") opens in Excalidraw.").AppendLine();
+        text.AppendLine("Only the key columns are drawn; every column is in the tables below. The picture is drawn from [the model](" + EntityDiagram.JsonPath(slug) + ") by `docs/architecture/diagrams/entities.cs`, and its [Excalidraw file](" + EntityDiagram.ExcalidrawPath(slug) + ") opens in Excalidraw.").AppendLine();
         text.AppendLine(CultureInfo.InvariantCulture, $"![{slug} entity relationships]({EntityDiagram.PngPath(slug)})").AppendLine();
 
         text.AppendLine("### Tables").AppendLine();

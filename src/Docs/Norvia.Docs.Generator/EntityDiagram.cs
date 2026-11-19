@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace Norvia.Docs.Generator;
 
 /// <summary>
-/// An application's entities and relationships as JSON, which docs/architecture/diagrams/entities.py draws as an Excalidraw diagram.
+/// An application's entities and relationships as JSON, which docs/architecture/diagrams/entities.cs draws as an Excalidraw diagram.
 /// Only key columns are listed, as the picture only shows those.
 /// </summary>
 internal static class EntityDiagram

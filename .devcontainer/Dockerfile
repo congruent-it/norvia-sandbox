@@ -1,11 +1,11 @@
 # The dev container for the Kubernetes slices (#923): the .NET SDK, PowerShell 7 (ADR 0048), helm, kubectl, kubeconform and the
-# PowerShell modules the script gate needs. Versions: global.json (the SDK, through the image tag's feature band) and
+# PowerShell modules the script gate needs. librsvg2-bin is rsvg-convert, which turns the diagram generators' SVG into the PNGs of the docs. Versions: global.json (the SDK, through the image tag's feature band) and
 # infra/tool-versions.psd1 (everything else), which CI installs from too.
 # The build context is the repository root (devcontainer.json).
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl git tar sudo \
+    && apt-get install -y --no-install-recommends ca-certificates curl git librsvg2-bin tar sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # PowerShell comes first because the install script is PowerShell. Its version is the PowerShell line of the manifest.

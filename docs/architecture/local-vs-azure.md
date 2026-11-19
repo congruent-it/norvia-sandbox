@@ -8,7 +8,7 @@ Locally there is no Azure subscription, no API Management, no Logic Apps runtime
 
 ![Local versus Azure: each Azure piece and what plays it under Aspire](diagrams/local-vs-azure.png)
 
-The editable source is [local-vs-azure.excalidraw](diagrams/local-vs-azure.excalidraw), generated from [deployment.py](diagrams/deployment.py). The table below has the detail of each row.
+The editable source is [local-vs-azure.excalidraw](diagrams/local-vs-azure.excalidraw), generated from [deployment.cs](diagrams/deployment.cs). The table below has the detail of each row.
 
 | Azure piece | Under Aspire | On Kubernetes | Decided in |
 |---|---|---|---|

@@ -96,4 +96,4 @@ Each arrow is a hop that can fail, and [failure-behaviour.md](failure-behaviour.
 
 ## Keeping it true
 
-A PR that changes the flow of a process updates its own process doc and, if the change shows in these pictures, the pictures. Edit the spec in [order_lifecycle.py](diagrams/order_lifecycle.py) and run it.
+A PR that changes the flow of a process updates its own process doc and, if the change shows in these pictures, the pictures. Edit the spec in [order-lifecycle.cs](diagrams/order-lifecycle.cs) and run it.

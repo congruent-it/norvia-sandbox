@@ -14,7 +14,7 @@ Freight settlement makes sure Norvia is paid for each Transport Order it deliver
 
 ![P9 Freight settlement as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p9-freight-settlement.png)
 
-The model is [p9-freight-settlement.bpmn](p9-freight-settlement.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p9-freight-settlement.excalidraw)).
+The model is [p9-freight-settlement.bpmn](p9-freight-settlement.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p9-freight-settlement.excalidraw)).
 
 ## Scope
 
@@ -209,7 +209,7 @@ The Hops of the TMS half, named as the [Integration console](../../operations/in
 
 ![Sequence diagram of the Hops: Release with a Spot price](../../architecture/diagrams/message-trail-p9-1.png)
 
-*Editable source: [message-trail-p9-1.excalidraw](../../architecture/diagrams/message-trail-p9-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p9-1.excalidraw](../../architecture/diagrams/message-trail-p9-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 The Carrier then confirms or rejects in the Partner portal ([P4](p4-carrier-booking.md#message-trail)). A release the Carrier Rate Card can't price is refused in `tms-api: POST /v1/shipments/SH-0000042/release` (422, with the failure code) and publishes nothing. A Spot price release the Carrier Rate Card could have priced is refused with `CarrierRateCardPricesShipment` (409). The plain release's Hops are those of [P3](p3-transport-planning.md#message-trail).
 
@@ -217,7 +217,7 @@ The Carrier then confirms or rejects in the Partner portal ([P4](p4-carrier-book
 
 ![Sequence diagram of the Hops: The Delivered Tracking event](../../architecture/diagrams/message-trail-p9-2.png)
 
-*Editable source: [message-trail-p9-2.excalidraw](../../architecture/diagrams/message-trail-p9-2.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p9-2.excalidraw](../../architecture/diagrams/message-trail-p9-2.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 `publish CarrierCostIncurred` appears next to `publish ShipmentDelivered`, only for a Confirmed Carrier booking with a Carrier cost. An Own fleet Shipment publishes neither.
 
@@ -225,13 +225,13 @@ The Carrier then confirms or rejects in the Partner portal ([P4](p4-carrier-book
 
 ![Sequence diagram of the Hops: The Proof of delivery](../../architecture/diagrams/message-trail-p9-3.png)
 
-*Editable source: [message-trail-p9-3.excalidraw](../../architecture/diagrams/message-trail-p9-3.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p9-3.excalidraw](../../architecture/diagrams/message-trail-p9-3.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 **Customer service's release.** It starts a trail in the TMS UI, in Flow `billing` throughout, with a new correlation ID.
 
 ![Sequence diagram of the Hops: Customer service's release](../../architecture/diagrams/message-trail-p9-4.png)
 
-*Editable source: [message-trail-p9-4.excalidraw](../../architecture/diagrams/message-trail-p9-4.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p9-4.excalidraw](../../architecture/diagrams/message-trail-p9-4.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - The Billable check adds no Hop of its own. It runs in any call that can complete the last condition: the Tracking event and the Proof of delivery above, the rating or re-rate (`tms-api: Rate Transport Order`, Flow `transport-order-rating`, on the intake's trail, [P2](p2-rating.md#implementation)), the resolution of an Exception ([P7](p7-exception-handling.md#message-trail), Flow `exception-handling`) and Customer service's release.
 - A release that isn't allowed (the order isn't in billing state Not yet billable, or its Shipment isn't Delivered) is refused in the TMS call and publishes nothing. A release that leaves another condition unmet records the release and publishes nothing yet.

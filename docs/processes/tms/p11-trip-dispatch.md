@@ -14,7 +14,7 @@ Trip dispatch brings Released Own fleet Shipments together on Trips and sends ea
 
 ![P11 Trip dispatch as a BPMN model, in swimlanes](../../architecture/diagrams/bpmn-p11-trip-dispatch.png)
 
-The model is [p11-trip-dispatch.bpmn](p11-trip-dispatch.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.py](../../architecture/diagrams/bpmn.py), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p11-trip-dispatch.excalidraw)).
+The model is [p11-trip-dispatch.bpmn](p11-trip-dispatch.bpmn), which opens in any BPMN tool and is the source. The picture is drawn from it by [bpmn.cs](../../architecture/diagrams/bpmn.cs), so change the model and run the script, not the picture ([the editable file](../../architecture/diagrams/bpmn-p11-trip-dispatch.excalidraw)).
 
 ## What P11 decides, and what it doesn't
 
@@ -256,7 +256,7 @@ The Hops one dispatch leaves on the Message trail, named as the [Integration con
 
 ![Sequence diagram of the Hops on the Message trail](../../architecture/diagrams/message-trail-p11-1.png)
 
-*Editable source: [message-trail-p11-1.excalidraw](../../architecture/diagrams/message-trail-p11-1.excalidraw), generated from [message_trails.py](../../architecture/diagrams/message_trails.py).*
+*Editable source: [message-trail-p11-1.excalidraw](../../architecture/diagrams/message-trail-p11-1.excalidraw), generated from [message-trails.cs](../../architecture/diagrams/message-trails.cs).*
 
 - When the Driver app doesn't take the Trip, the `Send_to_the_Driver_app` Hop is `Failed` with `DriverAppUnavailable` or `DriverAppRefused`, and the Logic App calls `Report_the_version_not_delivered` instead. The TMS marks the version **Not delivered** and publishes `TripNotDelivered`, with the same correlation ID. The Planner's send again (`Send Trip again` in the TMS UI) starts a new trail.
 - A message the Logic App can't read is dead-lettered as `TripDispatchUnreadable` and the run fails; no send or report Hop appears.
