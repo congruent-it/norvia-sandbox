@@ -486,6 +486,10 @@ _Avoid_: frontends, portals, login (for the gate)
 Norvia's own message format: one schema per business event or document, named with the terms in this glossary. Partner formats are mapped to and from it at the edges.
 _Avoid_: common data model, standard format
 
+**Local auth**:
+The opt-in, the setting `LocalAuth:Allowed`, that lets the local sign-in (the local operator, the Driver app's sign-in stand-in) and the local token-signing key run outside Development, such as on Kubernetes, where there is no identity provider. Off by default. Setting it states that the ingress is not reachable from the public internet and no other namespace can reach Norvia's pods.
+_Avoid_: dev auth, auth bypass
+
 **Message trail**:
 Everything the integration layer did under one correlation ID: the call or event it started from, and every queue, subscription, Logic App run and application call that followed from it, fan-out included. An action by a Norvia employee in an application starts a new trail, except a re-rate: it continues the trail of its Transport Order's intake, so the order's whole rating is found by one correlation ID.
 _Avoid_: integration message, message flow, transaction

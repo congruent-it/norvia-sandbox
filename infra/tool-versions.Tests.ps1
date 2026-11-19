@@ -9,8 +9,12 @@ BeforeAll {
 }
 
 Describe 'tool-versions.psd1' {
-    It 'pins <_> to an exact version' -ForEach 'PowerShell', 'Helm', 'Kubectl', 'Kubeconform', 'PSScriptAnalyzer', 'Pester' {
+    It 'pins <_> to an exact version' -ForEach 'PowerShell', 'Helm', 'Kubectl', 'Kubeconform', 'Bicep', 'PSScriptAnalyzer', 'Pester' {
         $script:versions[$_] | Should -Match '^\d+\.\d+\.\d+$'
+    }
+
+    It 'pins a SHA-256 for the <_> Bicep binary' -ForEach 'amd64', 'arm64' {
+        $script:versions.BicepSha256[$_] | Should -Match '^[0-9a-f]{64}$'
     }
 
     It 'pins a PowerShell the scripts accept (#Requires -Version 7.4)' {

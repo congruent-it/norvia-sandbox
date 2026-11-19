@@ -16,10 +16,13 @@ using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
 using Norvia.ServiceDefaults.Faults;
+using Norvia.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+// The AppHost's local signing key is trusted only in Development, or where LocalAuth:Allowed is set (ADR 0053).
+LocalAuth.RequireForSigningKeys(builder.Environment, builder.Configuration);
 builder.AddDriverAppInfrastructure();
 builder.AddDriverAppSeedDrivers();
 // The API stores no file, but its mediator holds every handler of the Application, so it has the port the Deliver handler needs.

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
 using Norvia.Simulator.Application.Operators;
+using Norvia.ServiceDefaults;
 
 namespace Norvia.Simulator.Web.Operators;
 
@@ -21,14 +22,11 @@ public static class OperatorSignIn
         ArgumentNullException.ThrowIfNull(builder);
 
         var localOperator = builder.Configuration.GetSection(LocalOperatorOptions.SectionName);
+        LocalAuth.RequireLocalSignInWhenAllowed(builder.Configuration, localOperator.Exists());
         if (localOperator.Exists())
         {
-            // Anywhere else, a configured operator would let anyone in with the roles it names.
-            if (!builder.Environment.IsDevelopment())
-            {
-                throw new InvalidOperationException(
-                    $"A local operator ({LocalOperatorOptions.SectionName}) signs in only in Development; in Azure Easy Auth signs operators in.");
-            }
+            // Outside Development and LocalAuth:Allowed, a configured operator would let anyone in with the roles it names.
+            LocalAuth.Require(builder.Environment, builder.Configuration, $"A local operator ({LocalOperatorOptions.SectionName})");
 
             builder.Services.AddOptions<LocalOperatorOptions>().Bind(localOperator).ValidateDataAnnotations().ValidateOnStart();
             builder.Services.AddAuthentication(LocalOperatorHandler.SchemeName)

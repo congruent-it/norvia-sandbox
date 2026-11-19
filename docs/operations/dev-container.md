@@ -9,6 +9,7 @@ A dev container (`.devcontainer/`) carries the tools the Kubernetes slices of [A
 | PSScriptAnalyzer, Pester | `tool-versions.psd1` | `pwsh infra/test-scripts.ps1` |
 | `helm` | `tool-versions.psd1` | the chart's template tests (`helm template`, `helm lint`), which are offline |
 | `kubeconform` | `tool-versions.psd1` | validating the rendered manifests |
+| `bicep` | `tool-versions.psd1`, with its SHA-256 | the estate's architecture tests (`bicep snapshot`) |
 | `kubectl` | `tool-versions.psd1` | the smoke script (#932) |
 
 ## Run the checks
