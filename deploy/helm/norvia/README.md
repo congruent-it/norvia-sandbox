@@ -74,7 +74,7 @@ Every worker signs its tokens with `local-tokens/signing-key`. The workers call 
 | OTLP settings | `norvia.deployment` gives every application `OTEL_EXPORTER_OTLP_ENDPOINT` (`http://aspire-dashboard:18889`, which `ServiceDefaults` exports to over gRPC) and `OTEL_SERVICE_NAME`, so an application the chart deploys later sends its telemetry without asking. |
 | `norvia.localTelemetryEnv` | `LocalTelemetry__DashboardUrl` and `LocalTelemetry__ApiKey`, which make the Integration console search the dashboard with `DashboardTrailSource` (ADR 0027). The console is not in the chart yet: its Deployment includes this helper when it is added. |
 
-Not verified on a cluster: that the dashboard takes its settings as environment variables of this spelling, and that a search finds a trail written by a running application. The smoke script (#932) covers both.
+Not verified on a cluster: that the dashboard takes its settings as environment variables of this spelling, and that a search finds a trail written by a running application. The smoke script (#932) does not cover either yet: a search for the run's trail waits for the Integration console, which is not in the chart yet.
 
 ## The smoke script (#932)
 
