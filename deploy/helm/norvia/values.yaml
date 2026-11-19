@@ -148,6 +148,20 @@ localTokens:
   IntakeLogicAppClientId: norvia-local-intake-logic-app
   AnswerLogicAppClientId: norvia-local-answer-logic-app
   ApiManagementClientId: norvia-local-api-management
+  BookingLogicAppClientId: norvia-local-booking-logic-app
+  ShipperNotificationLogicAppClientId: norvia-local-shipper-notification-logic-app
+  CarrierCancellationLogicAppClientId: norvia-local-carrier-cancellation-logic-app
+  TripDispatchLogicAppClientId: norvia-local-trip-dispatch-logic-app
+  BillingLogicAppClientId: norvia-local-billing-logic-app
+  MasterDataSyncLogicAppClientId: norvia-local-master-data-sync-logic-app
+  CarrierCostLogicAppClientId: norvia-local-carrier-cost-logic-app
+  ShipperInvoiceLogicAppClientId: norvia-local-shipper-invoice-logic-app
+  CarrierInvoiceOutcomeLogicAppClientId: norvia-local-carrier-invoice-outcome-logic-app
+  CarrierInvoiceLogicAppClientId: norvia-local-carrier-invoice-logic-app
+  DriverReportsLogicAppClientId: norvia-local-driver-reports-logic-app
+  TrackingLogicAppClientId: norvia-local-tracking-logic-app
+  ProofOfDeliveryLogicAppClientId: norvia-local-proof-of-delivery-logic-app
+  DriverAppAudience: api://norvia-driver-app
   AgentAudience: api://norvia-integration-console-agent
   ConsoleAgentApiAudience: api://norvia-integration-console-agent-api
   HealthCheckAgentAudience: api://norvia-health-check-agent
@@ -171,3 +185,27 @@ agentMcpServers:
   - { section: PlannerNotification, audience: PlannerNotificationAgentAudience, service: tms-api, path: "v1/agent/planner-notification", apiAudience: TmsAudience }
   - { section: FinanceMatching, audience: FinanceAgentAudience, service: erp-api, path: "v1/agent/finance", apiAudience: ErpAudience }
   - { section: FinanceRejectionReason, audience: FinanceRejectionReasonAgentAudience, service: erp-api, path: "v1/agent/finance-rejection-reason", apiAudience: ErpAudience }
+
+# The Logic App workers (#929): each plays one Logic App as a Deployment of one replica, as under Aspire (ADR 0030 onwards). A worker is a
+# plain generic host, so it has no port and no probes unless it has an `http` entry. section is the prefix of its settings, upstream the
+# application it calls (tms or erp, whose Service is <upstream>-api), emulator the Service Bus emulator it reads (an app asks for either as
+# "messaging"), clientId the localTokens constant its token identity is, blobs the connection string it reads Azurite as, and endpoints the
+# Persona endpoints it calls: the Persona type, the settings section holding them, and the path under /<type>/v1/<party>/.
+workerResources:
+  requests: { cpu: 25m, memory: 96Mi }
+  limits: { memory: 256Mi }
+workers:
+  booking-worker: { section: Booking, upstream: tms, emulator: messaging, clientId: BookingLogicAppClientId, endpoints: { type: Carrier, setting: Carriers, path: bookings } }
+  shipper-notification-worker: { section: ShipperNotification, upstream: tms, emulator: messaging, clientId: ShipperNotificationLogicAppClientId, endpoints: { type: Shipper, setting: Shippers, path: notifications } }
+  carrier-cancellation-worker: { section: CarrierCancellation, upstream: tms, emulator: messaging, clientId: CarrierCancellationLogicAppClientId, endpoints: { type: Carrier, setting: Carriers, path: cancellations } }
+  trip-dispatch-worker: { section: TripDispatch, upstream: tms, emulator: messaging, clientId: TripDispatchLogicAppClientId }
+  billing-worker: { section: Billing, upstream: erp, emulator: messaging, clientId: BillingLogicAppClientId }
+  master-data-sync-worker: { section: MasterDataSync, upstream: tms, emulator: messaging-2, clientId: MasterDataSyncLogicAppClientId }
+  carrier-cost-worker: { section: CarrierCost, upstream: erp, emulator: messaging, clientId: CarrierCostLogicAppClientId }
+  shipper-invoice-worker: { section: ShipperInvoice, upstream: erp, emulator: messaging-2, clientId: ShipperInvoiceLogicAppClientId, endpoints: { type: Shipper, setting: Shippers, path: invoices } }
+  carrier-invoice-outcome-worker: { section: CarrierInvoiceOutcome, upstream: erp, emulator: messaging-2, clientId: CarrierInvoiceOutcomeLogicAppClientId, endpoints: { type: Carrier, setting: Carriers, path: invoice-outcomes } }
+  # Behind the HTTP trigger only the Partner API may call, so it has a Service and the probes.
+  carrier-invoice-worker: { section: CarrierInvoice, upstream: erp, clientId: CarrierInvoiceLogicAppClientId, http: true }
+  driver-reports-worker: { section: DriverReports, upstream: tms, emulator: messaging-2, clientId: DriverReportsLogicAppClientId, blobs: driver-app-blobs }
+  tracking-worker: { section: Tracking, upstream: tms, emulator: messaging-2, clientId: TrackingLogicAppClientId }
+  proof-of-delivery-worker: { section: ProofOfDelivery, upstream: tms, emulator: messaging-2, clientId: ProofOfDeliveryLogicAppClientId, blobs: blobs }

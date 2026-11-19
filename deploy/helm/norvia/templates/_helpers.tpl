@@ -128,6 +128,7 @@ spec:
 {{- define "norvia.appContainer" -}}
 image: {{ include "norvia.image" (dict "root" .root "name" .app.image) }}
 imagePullPolicy: {{ .root.Values.image.pullPolicy }}
+{{- if ternary .http true (hasKey . "http") }}
 ports:
   - name: http
     containerPort: {{ .root.Values.appPort }}
@@ -142,6 +143,7 @@ livenessProbe:
     port: http
   initialDelaySeconds: 20
   periodSeconds: 15
+{{- end }}
 resources:
   {{- toYaml .app.resources | nindent 2 }}
 {{- end }}
@@ -167,9 +169,12 @@ resources:
   A one-replica Deployment of an application, with the shared container parts. env is the rendered list of its environment
   variables; secrets names the Secrets it takes as envFrom:
     {{ include "norvia.deployment" (dict "root" . "name" "partner-api" "env" $env "secrets" (list "subscription-keys")) }}
+  A worker passes its own settings as "app" (image, resources), and "http" false when it serves nothing (a plain generic host: no
+  port, no probes).
 */}}
 {{- define "norvia.deployment" -}}
-{{- $app := index .root.Values.apps .name -}}
+{{- $app := .app | default (index .root.Values.apps .name) -}}
+{{- $http := ternary .http true (hasKey . "http") -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -193,14 +198,21 @@ spec:
       {{- end }}
       containers:
         - name: {{ .name }}
-          {{- include "norvia.appContainer" (dict "root" .root "app" $app) | nindent 10 }}
+          {{- include "norvia.appContainer" (dict "root" .root "app" $app "http" $http) | nindent 10 }}
           {{- range .secrets | default list }}
           envFrom:
             - secretRef:
                 name: {{ . }}
           {{- end }}
           env:
+            {{- if $http }}
             - name: ASPNETCORE_HTTP_PORTS
               value: {{ .root.Values.appPort | quote }}
+            {{- end }}
             {{- .env | nindent 12 }}
+{{- end }}
+
+{{/* The key of a Persona in the Secret endpoint-keys, which is the setting the Partner portal reads it as: {{ include "norvia.endpointKeyName" . }} for a Persona of values.yaml. */}}
+{{- define "norvia.endpointKeyName" -}}
+{{ .type }}Endpoint__ApiKeys__{{ .party }}
 {{- end }}
