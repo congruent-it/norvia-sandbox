@@ -1,5 +1,4 @@
 using Ardalis.SharedKernel;
-using NSubstitute;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.ConsigneeNotifications;
 using Norvia.Tms.Application.IntegrationEvents;
@@ -10,6 +9,7 @@ using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
+using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.ConsigneeNotifications;
 
