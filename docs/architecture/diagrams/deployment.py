@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from excalidraw_graph import render_all
-from excalidraw_matrix import PALETTE, PERSON
+from excalidraw_matrix import PALETTE, PERSON, PLANNED
 
 OUT = Path(__file__).parent
 L = lambda label, key: (label, PALETTE[key][2], PALETTE[key][3], False)
@@ -89,6 +89,38 @@ SPECS["local-vs-azure"] = dict(
     footnote="Source of truth: docs/architecture/local-vs-azure.md and the ADRs it cites. The applications themselves are the same code in both places and need no row.",
     legend=[L("In Azure", AZ), L("Under Aspire, on a developer's machine", LOC)],
     cell=(420, 118), nodes=nodes, groups=[], edges=edges,
+)
+
+# ------------------------------------------------------------------ the sandbox on Kubernetes
+CL, VI, BL = "gray", "violet", "blue"
+SPECS["kubernetes"] = dict(
+    title="Kubernetes · The local topology as pods",
+    subtitle="One namespace, norvia, on a shared cluster. The chart installs no ingress controller, issuer or storage class, and nothing in it reaches Azure (ADR 0053).",
+    footnote="Source of truth: deploy/helm/norvia/ (values.yaml and templates) and docs/adr/0053-kubernetes-runs-the-local-topology.md. Dashed: not in the chart yet.",
+    legend=[L("Owned by the cluster", CL), L("Integration layer, as under Aspire", VI), L("Data", BL), L("Telemetry and keys", "teal"), ("Not in the chart yet", *PLANNED, True)],
+    cell=(390, 120),
+    nodes=[
+        dict(id="person", col=0, row=0.4, kind="person", w=240, title="Operator", sub="helm upgrade --install, the smoke script, a browser on the LAN or VPN"),
+        dict(id="ingress", col=0, row=1.8, palette=CL, w=240, title="Ingress controller", sub="[Traefik on K3S] An Ingress per application at <host>.<baseDomain>"),
+        dict(id="issuer", col=0, row=3.1, palette=CL, w=240, title="cert-manager issuer", sub="[edge.tls.clusterIssuer] Certificate into <application>-tls"),
+        dict(id="storage", col=0, row=4.4, palette=CL, w=240, title="Storage class", sub="[persistence.storageClass] Empty: the cluster default"),
+        dict(id="api", col=1.3, row=0.4, palette=VI, w=270, title="partner-api", sub="[Deployment, 1 replica] LocalPartnerApi: plays API Management and the intake and answer Logic Apps"),
+        dict(id="mcp", col=1.3, row=1.5, palette=VI, w=270, title="agent-mcp", sub="[Deployment] Only when agents.enabled. The Agents are scripted fakes"),
+        dict(id="workers", col=1.3, row=2.6, palette=VI, w=270, title="13 Local*Worker", sub="[Deployments, 1 replica each] One per Logic App. carrier-invoice-worker alone has a Service and probes"),
+        dict(id="dash", col=1.3, row=3.8, palette="teal", w=270, title="aspire-dashboard", sub="[Deployment] OTLP on 18889, in memory. The UI has no Ingress: kubectl port-forward"),
+        dict(id="apps", col=1.3, row=5.0, kind="planned", w=270, title="TMS, ERP, Driver app, Partner portal, Simulator, Integration console", sub="The workers and the smoke script call them by name"),
+        dict(id="bus1", col=2.9, row=2.0, palette=VI, w=290, title="messaging", sub="[Deployment, Service, ConfigMap] Service Bus emulator, 10 connections"),
+        dict(id="bus2", col=2.9, row=0.4, palette=VI, w=290, title="messaging-2", sub="[Deployment, Service, ConfigMap] The Driver app, ERP and Carrier tracking path topics and queues"),
+        dict(id="sql", col=2.9, row=3.3, palette=BL, w=290, title="sql", sub="[StatefulSet, PVC on the storage class] Five databases, and the emulators' state. No backup, no HA"),
+        dict(id="azurite", col=2.9, row=5.5, palette=BL, w=290, title="azurite", sub="[StatefulSet, PVC on the storage class] Blob service only, the claim-check files"),
+        dict(id="jobs", col=2.9, row=4.4, palette=BL, w=290, title="Migration Jobs ×5", sub="One per database, named with the release revision. Applications wait for them in an init container"),
+        dict(id="secrets", col=2.9, row=6.6, palette="teal", w=290, title="Secrets", sub="local-tokens, subscription-keys, endpoint-keys, the SA password, the dashboard key. Generated at install, kept on upgrade"),
+    ],
+    groups=[dict(id="ns", title="Namespace norvia", palette="orange", members=["api", "mcp", "workers", "dash", "apps", "bus1", "bus2", "sql", "azurite", "jobs", "secrets"])],
+    edges=[
+        ("person", "ingress", "HTTPS"), ("issuer", "ingress", "certificates"), ("ingress", "api", "partner-api host"),
+        ("api", "bus2", "queues"), ("workers", "bus1", "reads"), ("jobs", "sql", "migrations"),
+    ],
 )
 
 if __name__ == "__main__":
