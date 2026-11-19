@@ -7,7 +7,7 @@
 {{- range $name, $worker := .Values.workers }}
 {{- $env := include "worker.env" (dict "root" $ "name" $name "worker" $worker) }}
 ---
-{{ include "norvia.deployment" (dict "root" $ "name" $name "app" (dict "image" $name "resources" $.Values.workerResources) "env" $env "http" (hasKey $worker "http")) }}
+{{ include "norvia.deployment" (dict "root" $ "name" $name "app" (dict "image" $name "resources" $.Values.workerResources) "env" $env "http" ($worker.http | default false)) }}
 {{- if $worker.http }}
 ---
 {{ include "norvia.service" (dict "root" $ "name" $name) }}
