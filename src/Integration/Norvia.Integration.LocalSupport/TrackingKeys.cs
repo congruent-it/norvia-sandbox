@@ -33,6 +33,9 @@ public static class TrackingKeys
     /// <summary>The <see cref="Flow"/> of a Shipper notification, from the request to the report to the TMS.</summary>
     public const string ShipperNotification = "shipper-notification";
 
+    /// <summary>The <see cref="Flow"/> of telling a Consignee where to track the goods, from the request to the email. It holds no party and no address.</summary>
+    public const string ConsigneeNotification = "consignee-notification";
+
     /// <summary>The <see cref="Flow"/> of a Carrier cancellation or withdrawal, from the event to the report to the TMS.</summary>
     public const string CarrierCancellation = "carrier-cancellation";
 

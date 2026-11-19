@@ -34,6 +34,10 @@ There is no Entra locally. The TMS trusts JWTs signed with the AppHost's secret 
 
 Set `NORVIA_TEST_LOG_FILE` to a path to keep the TMS's own logs from an integration test run.
 
+## Consignee emails
+
+The Consignee notification ([P7](../processes/tms/p7-exception-handling.md#tell-the-consignee)) sends nothing off the machine. Give a Transport Order a Consignee email, collect its Shipment (or agree a delivery window), and the `consignee-notification-worker` writes the email as an `.eml` file to `norvia-consignee-mail` in the system's temp folder, or to `ConsigneeNotification:Mail:PickupDirectory`. Open it in any mail program: it holds the tracking link `/track/{code}` and nothing else. Set `ConsigneeNotification:Mail:Host` (and `Port`) to send it to an SMTP server such as a mail catcher instead.
+
 ## Applications
 
 What each application does locally is in its page in [applications/](../applications/README.md) and in [local-vs-azure.md](../architecture/local-vs-azure.md). Only what those pages do not say is here.

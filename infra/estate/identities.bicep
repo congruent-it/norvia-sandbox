@@ -44,6 +44,8 @@ var reportRole = 'CarrierBookings.Report'
 var reportRoleId = guid('norvia-tms-api', environmentName, reportRole)
 var shipperNotificationReportRole = 'ShipperNotifications.Report'
 var shipperNotificationReportRoleId = guid('norvia-tms-api', environmentName, shipperNotificationReportRole)
+var consigneeNotificationReadRole = 'ConsigneeNotifications.Read'
+var consigneeNotificationReadRoleId = guid('norvia-tms-api', environmentName, consigneeNotificationReadRole)
 var tripReportDeliveryRole = 'Trips.ReportDelivery'
 var tripReportDeliveryRoleId = guid('norvia-tms-api', environmentName, tripReportDeliveryRole)
 var tripStartRole = 'Trips.Start'
@@ -233,6 +235,16 @@ resource tmsApi 'Microsoft.Graph/applications@v1.0' = {
       isEnabled: true
     }
     {
+      id: consigneeNotificationReadRoleId
+      value: consigneeNotificationReadRole
+      displayName: 'Read Consignee notifications'
+      description: 'Read the Consignee\'s email address and the tracking code of a Transport Order, to tell the Consignee where to track the goods (P7, ADR 0052). Only the P7 Consignee notification Logic App holds it.'
+      allowedMemberTypes: [
+        'Application'
+      ]
+      isEnabled: true
+    }
+    {
       id: tripStartRoleId
       value: tripStartRole
       displayName: 'Start a Trip'
@@ -357,6 +369,20 @@ resource shipperNotificationReportRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v
   resourceId: tmsApiPrincipal.id
   appRoleId: shipperNotificationReportRoleId
   principalId: shipperNotificationIdentity.properties.principalId
+}
+
+// The P7 Consignee notification Logic App's identity, which it runs as. It is the one principal holding the Consignee notification read
+// role, so nothing but the integration layer is given a Consignee's address together with the tracking code. It holds no other role on the TMS.
+resource consigneeNotificationIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  name: 'id-consignee-notification-${uniqueString(resourceGroup().id)}'
+  location: location
+  tags: tags
+}
+
+resource consigneeNotificationReadRoleGrant 'Microsoft.Graph/appRoleAssignedTo@v1.0' = {
+  resourceId: tmsApiPrincipal.id
+  appRoleId: consigneeNotificationReadRoleId
+  principalId: consigneeNotificationIdentity.properties.principalId
 }
 
 // The P11 Trip dispatch Logic App's identity, which it runs as. It is the one principal holding the Trip delivery report role, so
@@ -1450,7 +1476,11 @@ output bookingIdentityName string = bookingIdentity.name
 output bookingPrincipalId string = bookingIdentity.properties.principalId
 output shipperNotificationIdentityName string = shipperNotificationIdentity.name
 output shipperNotificationPrincipalId string = shipperNotificationIdentity.properties.principalId
-output shipperNotificationClientId string = shipperNotificationIdentity.properties.clientId
+// One object, because a module may have at most 64 outputs.
+output consigneeNotification object = {
+  name: consigneeNotificationIdentity.name
+  principalId: consigneeNotificationIdentity.properties.principalId
+}
 output carrierCancellationIdentityName string = carrierCancellationIdentity.name
 output carrierCancellationPrincipalId string = carrierCancellationIdentity.properties.principalId
 output carrierCancellationClientId string = carrierCancellationIdentity.properties.clientId

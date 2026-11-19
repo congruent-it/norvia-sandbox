@@ -30,7 +30,7 @@ The booking never names the Shipper. API Management takes it from the token and 
 | `bookingRef` | `shipperReference` | Copies it |
 | `pickupStreet`, `pickupPostalCode`, `pickupCity`, `pickupCountry` | `collection.address` | Nests the flat fields |
 | `pickupFrom`, `pickupUntil`: `dd-MM-yyyy HH:mm`, local to the pickup address | `collection.window.earliest`, `latest`: UTC with offset | Converts from the time zone of the pickup country, daylight saving time included |
-| `receiverName`, `receiverContact`, `receiverPhone`, `receiverEmail` | `delivery.consignee` | Nests the flat fields |
+| `receiverName`, `receiverContact`, `receiverPhone`, `receiverEmail` | `delivery.consignee` | Nests the flat fields. `receiverEmail` is optional: when it is given the TMS checks that it is one plain address (`ConsigneeEmailInvalid`), and it is where the Consignee is told the tracking link ([P7](../../docs/processes/tms/p7-exception-handling.md#tell-the-consignee)) |
 | `receiverStreet`, `receiverPostalCode`, `receiverCity`, `receiverCountry` | `delivery.address` | Nests the flat fields |
 | `deliverFrom`, `deliverUntil`: local to the receiver's address | `delivery.window` | Converts from the time zone of the receiver's country |
 | Countries by English name (`Netherlands`, `United Kingdom`), their own name (`Nederland`, `Österreich`), a common variant (`Holland`, `UK`) or code | ISO 3166-1 alpha-2 (`NL`, `GB`) | Translates the name, for every country in Europe. It doesn't decide where Norvia carries goods: that is for the TMS, and for Rating once it exists |

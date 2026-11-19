@@ -41,7 +41,7 @@ internal static partial class CustomerServiceAgentMapping
             RejectionCode.ShipperReferenceMissing or RejectionCode.ShipperReferenceReused or RejectionCode.ShipperReferenceTooLong => "shipperReference",
             RejectionCode.CollectionAddressMissing or RejectionCode.CollectionAddressIncomplete => "collection.address",
             RejectionCode.DeliveryAddressMissing or RejectionCode.DeliveryAddressIncomplete => "delivery.address",
-            RejectionCode.ConsigneeNameMissing => "delivery.consignee",
+            RejectionCode.ConsigneeNameMissing or RejectionCode.ConsigneeEmailInvalid => "delivery.consignee",
             RejectionCode.CollectionWindowMissing or RejectionCode.CollectionWindowInPast or RejectionCode.CollectionWindowReversed => "collection.window",
             RejectionCode.DeliveryWindowIncomplete or RejectionCode.DeliveryWindowReversed => "delivery.window",
             RejectionCode.DeliveryWindowBeforeCollection => "delivery.window",

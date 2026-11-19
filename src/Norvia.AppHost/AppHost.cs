@@ -545,6 +545,8 @@ else
     shipmentEvents.AddServiceBusSubscription("carrier-booking");
     // The P7 Shipper notification Logic App's subscription: ShipperNotificationRequested only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("shipper-notification");
+    // The P7 Consignee notification Logic App's subscription: ConsigneeNotificationRequested only (see ResubmitAwareFilters).
+    shipmentEvents.AddServiceBusSubscription("consignee-notification");
     // The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only (see ResubmitAwareFilters).
     shipmentEvents.AddServiceBusSubscription("carrier-cancellation");
     // The P9 Carrier cost Logic App's subscription: CarrierCostIncurred only (see ResubmitAwareFilters).
@@ -707,6 +709,17 @@ else
         .WithEnvironment("ShipperNotification__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("ShipperNotification__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("ShipperNotification__TmsTokens__ClientId", LocalTokens.ShipperNotificationLogicAppClientId);
+    // Locally a worker plays the P7 Consignee notification Logic App as well (ADR 0033, ADR 0054). It reads its subscription, asks the TMS for the
+    // Consignee's address and tracking code as the identity holding the read role, and writes the email with the link to a folder of .eml files
+    // (nothing leaves the machine), standing in for Azure Communication Services.
+    var consigneeNotificationWorker = builder.AddProject<Projects.Norvia_Integration_LocalConsigneeNotificationWorker>("consignee-notification-worker")
+        .WithReference(messaging).WaitFor(messaging)
+        .WithReference(tmsApi).WaitFor(tmsApi)
+        .WithEnvironment("ConsigneeNotification__TmsBaseAddress", tmsApi.GetEndpoint("http"))
+        .WithEnvironment("ConsigneeNotification__PartnerPortalBaseAddress", partnerPortal.GetEndpoint("http"))
+        .WithEnvironment("ConsigneeNotification__TmsTokens__Issuer", LocalTokens.Issuer)
+        .WithEnvironment("ConsigneeNotification__TmsTokens__Audience", LocalTokens.TmsAudience)
+        .WithEnvironment("ConsigneeNotification__TmsTokens__ClientId", LocalTokens.ConsigneeNotificationLogicAppClientId);
     // Locally a worker plays the P7 Carrier cancellation Logic App too (ADR 0034). It reads its subscription, sends each Carrier
     // Persona's cancellation or withdrawal to the Persona's cancellation endpoint in the Partner portal with the credential for the
     // run, and reports it told or not delivered to the TMS as the identity holding the Carrier booking report role.
@@ -989,6 +1002,7 @@ else
         (partnerApi.Resource, "Tms__Tokens__SigningKey"),
         (bookingWorker.Resource, "Booking__TmsTokens__SigningKey"),
         (shipperNotificationWorker.Resource, "ShipperNotification__TmsTokens__SigningKey"),
+        (consigneeNotificationWorker.Resource, "ConsigneeNotification__TmsTokens__SigningKey"),
         (carrierCancellationWorker.Resource, "CarrierCancellation__TmsTokens__SigningKey"),
         (tripDispatchWorker.Resource, "TripDispatch__TmsTokens__SigningKey"),
         (billingWorker.Resource, "Billing__ErpTokens__SigningKey"),

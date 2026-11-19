@@ -36,7 +36,14 @@ public sealed record Address(string? Street, string? Postcode, string? City, str
 
 public sealed record TimeWindow(DateTimeOffset? Earliest, DateTimeOffset? Latest);
 
-public sealed record Consignee(string? Name, string? ContactName, string? Phone, string? Email);
+/// <summary>
+/// Who receives the goods. Name, contact, phone and email are personal data, so <see cref="ToString"/> prints none of them: a log line or an
+/// exception message that holds a Consignee can't leak them. The TMS never logs the Consignee.
+/// </summary>
+public sealed record Consignee(string? Name, string? ContactName, string? Phone, string? Email)
+{
+    public override string ToString() => nameof(Consignee);
+}
 
 /// <param name="WeightKg">Weight of the whole line in kilograms.</param>
 public sealed record GoodsLine(string? PackageType, int? Quantity, decimal? WeightKg, Dimensions? DimensionsCm);

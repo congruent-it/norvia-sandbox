@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.5.0' }
 
-# Template tests for the chart's Logic App workers (#929): the 13 Local*Worker hosts as Deployments, and the endpoint keys they and the Partner
+# Template tests for the chart's Logic App workers (#929): the 14 Local*Worker hosts as Deployments, and the endpoint keys they and the Partner
 # portal share. The seam is the output of `helm template`, so nothing here needs a cluster. What the chart repeats from the AppHost (each
 # worker's settings, token constants, emulator and signing keys) is compared with the AppHost's source.
 BeforeDiscovery {
@@ -64,8 +64,8 @@ BeforeAll {
 }
 
 Describe 'the workers' -Skip:$script:helmMissing {
-    It 'are the AppHost''s 13 Local*Worker hosts, one Deployment each' {
-        $workerNames.Count | Should -Be 13
+    It 'are the AppHost''s 14 Local*Worker hosts, one Deployment each' {
+        $workerNames.Count | Should -Be 14
         $deployed = $docs | Where-Object { $_.Kind -eq 'Deployment' -and $_.Name -like '*-worker' } | ForEach-Object Name
         $deployed | Sort-Object | Should -Be ($workerNames | Sort-Object)
     }
@@ -133,7 +133,7 @@ Describe 'the workers' -Skip:$script:helmMissing {
 
     It 'takes the key of the install from a Secret for every token it signs, as the AppHost gives it' {
         $signed = [regex]::Matches($appHost, '\((\w+Worker)\.Resource, "([A-Za-z_]+__SigningKey)"\)')
-        $signed.Count | Should -Be 15
+        $signed.Count | Should -Be 16
         foreach ($m in $signed) {
             $resource = [regex]::Match($appHost, "var $($m.Groups[1].Value) = builder\.AddProject<[^>]+>\(""([^""]+)""\)").Groups[1].Value
             (Get-Env (Get-Doc $docs 'Deployment' $resource))[$m.Groups[2].Value] | Should -Be 'secret:local-tokens/signing-key' -Because "$resource $($m.Groups[2].Value)"

@@ -29,7 +29,7 @@ A Consignee is not a party with a system, a contract or a sign-in. It is whoever
 - The Partner portal now has anonymous routes. ADR 0024's text, [identity-and-access.md](../architecture/identity-and-access.md) and the C4 page must say so, and the gate's exception list is `/health`, `/alive`, each Carrier's booking endpoint and `/track/{code}`.
 - A leaked link shows a Consignee's view of one Transport Order to whoever has it, until it expires or is replaced. It has no names or phone numbers (the projection has no Consignee personal data), no Carrier and no price, so what leaks is a Tracking status and two cities.
 - The Transport Order gains a tracking code and a replace-code action for the Planner, and a Canonical Model field. The ADR leaves the Planner's screen for #982.
-- The Consignee notification (#983) sends the link and nothing else, so a lost email leaks no more than the link.
+- The Consignee notification (#983, [ADR 0054](0054-the-consignee-is-told-by-email-from-its-own-logic-app-and-locally-the-email-is-a-file.md)) sends the link and nothing else, so a lost email leaks no more than the link. It gets the address and the code from the TMS and not from an event, so neither is in a message.
 - #982 and #984 say "revoked": it means replaced here, since there is no separate revocation. Both change to say so.
 - The Consignee page is a plain HTML page with a small inline style, not Fluent UI: everything the portal serves except `/track/*` is behind the Entra gate, so a script or stylesheet would not load for a Consignee. It has no scripts, and so no interactive components.
 - The two abuse limits are per end-user client IP, which the Partner portal passes on in `X-Client-IP`, since API Management sees only the portal as its caller.

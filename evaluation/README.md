@@ -110,7 +110,7 @@ The cases of [#427](https://github.com/congruent-it/norvia-sandbox/issues/427) f
 
 | Cases | Known answer |
 |---|---|
-| `rejected-<code>` (22, one per `RejectionCode`) | The explanation names the reason in plain language and what the Shipper should change; only `get_rejected_booking` is called; no Consignee field |
+| `rejected-<code>` (23, one per `RejectionCode`) | The explanation names the reason in plain language and what the Shipper should change; only `get_rejected_booking` is called; no Consignee field |
 | `summary-delivered-order`, `summary-order-with-an-exception`, `summary-not-yet-billable`, `summary-rating-failed` | The summary follows the order's life and matches the facts: nothing blocks a delivered order; an open Exception blocks and is the Planner's; no Proof of delivery blocks; Rating failed names the Rate Card and Re-rate |
 | `release-eligible-proof-missing`, `release-eligible-proof-not-due-yet` | `release` when the Proof of delivery is Missing, `wait` when it is NotDueYet, each with the facts |
 | `release-ineligible-proof-received`, `release-ineligible-open-exception`, `release-ineligible-shipment-not-delivered` | `needs-a-person` with the TMS's blocking reason; never `release`. No case has the agent write the remark |

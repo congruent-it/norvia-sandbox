@@ -1,0 +1,332 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "triggers": {
+      "When_a_Consignee_notification_is_requested": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
+          },
+          "method": "get",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('consignee-notification')}/messages/head/peek",
+          "queries": {
+            "subscriptionType": "Main",
+            "sessionId": "None"
+          }
+        },
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 1
+        },
+        "correlation": {
+          "clientTrackingId": "@{coalesce(if(equals(length(string(coalesce(triggerBody(), ''))), 0), json('{}'), triggerBody())?['Properties']?['correlationId'], '00000000-0000-0000-0000-000000000000')}"
+        }
+      }
+    },
+    "actions": {
+      "Track_the_notification": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@json(base64ToString(triggerBody()?['ContentData']))?['correlationId']",
+          "transportOrderNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['transportOrderNumber']",
+          "shipmentNumber": "@json(base64ToString(triggerBody()?['ContentData']))?['shipmentNumber']",
+          "sourceMessageId": "@json(base64ToString(triggerBody()?['ContentData']))?['eventId']"
+        },
+        "runAfter": {},
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "consignee-notification",
+          "shipmentNumber": "@action()?['inputs']?['shipmentNumber']",
+          "transportOrderNumber": "@action()?['inputs']?['transportOrderNumber']",
+          "sourceMessageId": "@action()?['inputs']?['sourceMessageId']"
+        }
+      },
+      "Read_the_notification": {
+        "type": "InvokeFunction",
+        "inputs": {
+          "functionName": "ReadConsigneeNotificationRequested",
+          "parameters": {
+            "consigneeNotificationRequested": "@{triggerBody()?['ContentData']}"
+          }
+        },
+        "runAfter": {
+          "Track_the_notification": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "flow": "consignee-notification",
+          "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
+          "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ConsigneeNotificationRequestedUnreadable', null)"
+        }
+      },
+      "Dead_letter_the_unreadable_notification": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
+          },
+          "method": "post",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('consignee-notification')}/messages/deadletter",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "sessionId": "",
+            "deadLetterReason": "ConsigneeNotificationRequestedUnreadable",
+            "deadLetterErrorDescription": "The message isn't a notification the Consignee can be told of, so nothing was sent to the Consignee."
+          }
+        },
+        "runAfter": {
+          "Read_the_notification": [
+            "Failed"
+          ]
+        },
+        "trackedProperties": {
+          "flow": "consignee-notification",
+          "outcome": "DeadLettered",
+          "failureCode": "ConsigneeNotificationRequestedUnreadable"
+        }
+      },
+      "Fail_the_run_on_the_unreadable_notification": {
+        "type": "Terminate",
+        "inputs": {
+          "runStatus": "Failed",
+          "runError": {
+            "code": "ConsigneeNotificationRequestedUnreadable",
+            "message": "The message isn't a notification the Consignee can be told of, so it was dead-lettered."
+          }
+        },
+        "runAfter": {
+          "Dead_letter_the_unreadable_notification": [
+            "Succeeded",
+            "Failed"
+          ]
+        }
+      },
+      "Complete_the_message": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "referenceName": "servicebus"
+            }
+          },
+          "method": "delete",
+          "path": "/@{encodeURIComponent(encodeURIComponent('shipment-events'))}/subscriptions/@{encodeURIComponent('consignee-notification')}/messages/complete",
+          "queries": {
+            "lockToken": "@triggerBody()?['LockToken']",
+            "subscriptionType": "Main",
+            "sessionId": ""
+          }
+        },
+        "runAfter": {
+          "Read_the_notification": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_the_Consignee_address_and_link": {
+        "type": "Http",
+        "inputs": {
+          "method": "GET",
+          "uri": "@{parameters('tmsBaseUrl')}/v1/consignee-notifications/@{encodeURIComponent(json(body('Read_the_notification'))?['transportOrderNumber'])}",
+          "headers": {
+            "X-Correlation-ID": "@{outputs('Track_the_notification')?['correlationId']}"
+          },
+          "authentication": {
+            "type": "ManagedServiceIdentity",
+            "identity": "@parameters('consigneeNotificationIdentityId')",
+            "audience": "@parameters('tmsAudience')"
+          },
+          "retryPolicy": {
+            "type": "exponential",
+            "count": 3,
+            "interval": "PT5S",
+            "minimumInterval": "PT5S",
+            "maximumInterval": "PT20S"
+          }
+        },
+        "runAfter": {
+          "Complete_the_message": [
+            "Succeeded"
+          ]
+        },
+        "runtimeConfiguration": {
+          "secureData": {
+            "properties": [
+              "outputs"
+            ]
+          }
+        },
+        "trackedProperties": {
+          "flow": "consignee-notification"
+        }
+      },
+      "Read_the_TMS_answer": {
+        "type": "Compose",
+        "inputs": {
+          "statusCode": "@coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0)",
+          "somethingToSend": "@and(greaterOrEquals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 300))",
+          "nothingToSend": "@equals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 404)",
+          "failureCode": "@if(or(and(greaterOrEquals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 300)), equals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 404)), null, if(or(equals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Get_the_Consignee_address_and_link')?['outputs']?['statusCode'], 0), 500)), 'TmsUnavailable', 'TmsCallRefused'))"
+        },
+        "runAfter": {
+          "Get_the_Consignee_address_and_link": [
+            "Succeeded",
+            "Failed",
+            "TimedOut"
+          ]
+        }
+      },
+      "Track_the_TMS_answer": {
+        "type": "Compose",
+        "inputs": {
+          "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+          "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']",
+          "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
+          "outcome": "@if(empty(outputs('Read_the_TMS_answer')?['failureCode']), 'Succeeded', 'Failed')",
+          "failureCode": "@outputs('Read_the_TMS_answer')?['failureCode']"
+        },
+        "runAfter": {
+          "Read_the_TMS_answer": [
+            "Succeeded"
+          ]
+        },
+        "trackedProperties": {
+          "correlationId": "@action()?['inputs']?['correlationId']",
+          "flow": "consignee-notification",
+          "shipmentNumber": "@action()?['inputs']?['shipmentNumber']",
+          "transportOrderNumber": "@action()?['inputs']?['transportOrderNumber']",
+          "outcome": "@action()?['inputs']?['outcome']",
+          "failureCode": "@action()?['inputs']?['failureCode']"
+        }
+      },
+      "Send_the_email_if_there_is_one_to_send": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@outputs('Read_the_TMS_answer')?['somethingToSend']",
+            true
+          ]
+        },
+        "actions": {
+          "Map_the_email": {
+            "type": "InvokeFunction",
+            "inputs": {
+              "functionName": "MapConsigneeEmail",
+              "parameters": {
+                "consigneeNotificationRequested": "@{triggerBody()?['ContentData']}",
+                "consigneeNotificationContent": "@{string(body('Get_the_Consignee_address_and_link'))}",
+                "trackingBaseUrl": "@{parameters('partnerPortalBaseUrl')}"
+              }
+            },
+            "runAfter": {},
+            "runtimeConfiguration": {
+              "secureData": {
+                "properties": [
+                  "inputs",
+                  "outputs"
+                ]
+              }
+            },
+            "trackedProperties": {
+              "flow": "consignee-notification",
+              "outcome": "@if(equals(action()?['status'], 'Failed'), 'Failed', null)",
+              "failureCode": "@if(equals(action()?['status'], 'Failed'), 'ConsigneeEmailUnusable', null)"
+            }
+          },
+          "Send_the_email": {
+            "type": "Http",
+            "inputs": {
+              "method": "POST",
+              "uri": "@{parameters('emailEndpoint')}/emails:send?api-version=2023-03-31",
+              "headers": {
+                "Content-Type": "application/json",
+                "X-Correlation-ID": "@{outputs('Track_the_notification')?['correlationId']}"
+              },
+              "body": {
+                "senderAddress": "@parameters('emailSenderAddress')",
+                "recipients": {
+                  "to": [
+                    {
+                      "address": "@json(body('Map_the_email'))?['to']"
+                    }
+                  ]
+                },
+                "content": {
+                  "subject": "@json(body('Map_the_email'))?['subject']",
+                  "plainText": "@json(body('Map_the_email'))?['plainText']"
+                }
+              },
+              "authentication": {
+                "type": "ManagedServiceIdentity",
+                "identity": "@parameters('consigneeNotificationIdentityId')",
+                "audience": "https://communication.azure.com/"
+              },
+              "retryPolicy": {
+                "type": "exponential",
+                "count": 3,
+                "interval": "PT5S",
+                "minimumInterval": "PT5S",
+                "maximumInterval": "PT20S"
+              }
+            },
+            "runAfter": {
+              "Map_the_email": [
+                "Succeeded"
+              ]
+            },
+            "runtimeConfiguration": {
+              "secureData": {
+                "properties": [
+                  "inputs",
+                  "outputs"
+                ]
+              }
+            },
+            "trackedProperties": {
+              "flow": "consignee-notification"
+            }
+          },
+          "Track_the_email": {
+            "type": "Compose",
+            "inputs": {
+              "correlationId": "@outputs('Track_the_notification')?['correlationId']",
+              "transportOrderNumber": "@outputs('Track_the_notification')?['transportOrderNumber']",
+              "shipmentNumber": "@outputs('Track_the_notification')?['shipmentNumber']",
+              "outcome": "@if(and(greaterOrEquals(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 300)), 'Succeeded', 'Failed')",
+              "failureCode": "@if(and(greaterOrEquals(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 200), less(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 300)), null, if(or(equals(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 0), equals(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 408), equals(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 429), greaterOrEquals(coalesce(actions('Send_the_email')?['outputs']?['statusCode'], 0), 500)), 'EmailServiceUnavailable', 'EmailRefused'))"
+            },
+            "runAfter": {
+              "Send_the_email": [
+                "Succeeded",
+                "Failed",
+                "TimedOut"
+              ]
+            },
+            "trackedProperties": {
+              "correlationId": "@action()?['inputs']?['correlationId']",
+              "flow": "consignee-notification",
+              "shipmentNumber": "@action()?['inputs']?['shipmentNumber']",
+              "transportOrderNumber": "@action()?['inputs']?['transportOrderNumber']",
+              "outcome": "@action()?['inputs']?['outcome']",
+              "failureCode": "@action()?['inputs']?['failureCode']"
+            }
+          }
+        },
+        "runAfter": {
+          "Track_the_TMS_answer": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "Stateful"
+}

@@ -106,7 +106,7 @@ Describe 'the topology of messaging' -Skip:$script:helmMissing {
         $subs = Get-Subscriptions $messaging | ForEach-Object { "$($_.Topic)/$($_.Name)" } | Sort-Object
         $subs | Should -Be @(
             'shipment-events/carrier-booking', 'shipment-events/carrier-cancellation', 'shipment-events/carrier-cost',
-            'shipment-events/monitoring', 'shipment-events/shipper-notification',
+            'shipment-events/consignee-notification', 'shipment-events/monitoring', 'shipment-events/shipper-notification',
             'transport-order-events/billing', 'transport-order-events/monitoring',
             'trip-events/monitoring', 'trip-events/trip-dispatch')
     }
@@ -157,7 +157,7 @@ Describe 'the subscription filters' -Skip:$script:helmMissing {
     It 'matches the Bicep expression of every subscription, character for character' {
         # Every rule in the Bicep, in the form name -> expression, per subscription resource.
         $expected = [regex]::Matches($script:bicep, "(?s)resource \w+Filter '[^']+' = \{\s+parent: (\w+)\s+name: 'resubmit-aware'.*?sqlExpression: '((?:[^'\\]|\\.)*)'")
-        $expected.Count | Should -Be 15
+        $expected.Count | Should -Be 16
         $bicepExpressions = $expected | ForEach-Object { ($_.Groups[2].Value -replace "\\'", "'") } | Sort-Object
         $chartExpressions = $all | ForEach-Object { $_.Rules[0].Properties.SqlFilter.SqlExpression } | Sort-Object
         $chartExpressions | Should -Be $bicepExpressions
@@ -165,7 +165,7 @@ Describe 'the subscription filters' -Skip:$script:helmMissing {
 
     It 'matches the conditions the AppHost gives the local emulator' {
         $expected = [regex]::Matches($script:filters, '\["([a-z-]+)"\] = "([^"]+)"')
-        $expected.Count | Should -Be 10
+        $expected.Count | Should -Be 11
         foreach ($m in $expected) {
             $name = $m.Groups[1].Value
             $condition = $m.Groups[2].Value

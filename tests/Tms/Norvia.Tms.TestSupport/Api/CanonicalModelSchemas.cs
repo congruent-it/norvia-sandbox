@@ -115,6 +115,10 @@ public static class CanonicalModelSchemas
 
     public static EvaluationResults ValidateShipperNotificationNotDelivered(JsonNode body) => Validate(ShipperNotificationNotDeliveredSchema.Value, body);
 
+    private static readonly Lazy<JsonSchema> ConsigneeNotificationRequestedSchema = new(() => Load("consignee-notification-requested.v1.schema.json"));
+
+    public static EvaluationResults ValidateConsigneeNotificationRequested(JsonNode body) => Validate(ConsigneeNotificationRequestedSchema.Value, body);
+
     private static readonly Lazy<JsonSchema> ShipmentDeliveryWindowAgreedSchema = new(() => Load("shipment-delivery-window-agreed.v1.schema.json"));
 
     public static EvaluationResults ValidateShipmentDeliveryWindowAgreed(JsonNode body) => Validate(ShipmentDeliveryWindowAgreedSchema.Value, body);

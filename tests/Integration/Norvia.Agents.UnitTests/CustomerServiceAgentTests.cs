@@ -104,6 +104,7 @@ public sealed class CustomerServiceAgentTests
     [InlineData("CollectionAddressIncomplete")]
     [InlineData("DeliveryAddressMissing")]
     [InlineData("ConsigneeNameMissing")]
+    [InlineData("ConsigneeEmailInvalid")]
     [InlineData("CollectionWindowMissing")]
     [InlineData("CollectionWindowInPast")]
     [InlineData("CollectionWindowReversed")]

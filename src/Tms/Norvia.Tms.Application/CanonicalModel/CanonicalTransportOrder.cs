@@ -73,8 +73,11 @@ public sealed record CanonicalTimeWindow(DateTimeOffset? Earliest, DateTimeOffse
     public TimeWindow ToDomain() => new(Earliest, Latest);
 }
 
+/// <summary>The Consignee as the Canonical Model has it. Its personal data is never printed, as for the domain's <see cref="Consignee"/>.</summary>
 public sealed record CanonicalConsignee(string? Name, string? ContactName, string? Phone, string? Email)
 {
+    public override string ToString() => nameof(CanonicalConsignee);
+
     public static CanonicalConsignee? From(Consignee? consignee) =>
         consignee is null ? null : new(consignee.Name, consignee.ContactName, consignee.Phone, consignee.Email);
 

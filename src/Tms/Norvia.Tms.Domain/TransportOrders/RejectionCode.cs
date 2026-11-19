@@ -27,4 +27,5 @@ public enum RejectionCode
     TotalWeightOverLimit,
     ShipperReferenceReused,
     ShipperReferenceTooLong,
+    ConsigneeEmailInvalid,
 }

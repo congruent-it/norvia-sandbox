@@ -1,0 +1,10 @@
+{
+  "eventId": "0192f7a2-6d1e-7c3a-9b54-3f1c8a2e5d70",
+  "eventType": "ConsigneeNotificationRequested",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-05T07:40:00Z",
+  "correlationId": "5b1f6a52-0c87-4e43-8a0e-6a3d3f7f9c11",
+  "transportOrderNumber": "TO-0000007",
+  "shipmentNumber": "SH-0000012",
+  "reason": "Collected"
+}

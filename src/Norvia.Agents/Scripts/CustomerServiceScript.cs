@@ -83,6 +83,7 @@ public static class CustomerServiceScript
         "CollectionAddressMissing" or "CollectionAddressIncomplete" => ("The collection address is missing or incomplete.", "Give the full collection address: street, postcode, city and country."),
         "DeliveryAddressMissing" or "DeliveryAddressIncomplete" => ("The delivery address is missing or incomplete.", "Give the full delivery address: street, postcode, city and country."),
         "ConsigneeNameMissing" => ("The booking does not name who the goods are delivered to.", "Name the Consignee."),
+        "ConsigneeEmailInvalid" => ("The Consignee's email address is not an email address.", "Correct the Consignee's email address, or leave it out."),
         "CollectionWindowMissing" => ("The booking has no collection window.", "Give the earliest and latest time for collection."),
         "CollectionWindowInPast" => ("The collection window has already passed.", "Choose a collection window in the future."),
         "CollectionWindowReversed" => ("The collection window ends before it starts.", "Swap the earliest and latest collection times."),

@@ -11,6 +11,9 @@ param bookingPrincipalId string
 @description('The P7 Shipper notification Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param shipperNotificationPrincipalId string
 
+@description('The P7 Consignee notification Logic App\'s identity, which receives from its own subscription and from nothing else.')
+param consigneeNotificationPrincipalId string
+
 @description('The P7 Carrier cancellation Logic App\'s identity, which receives from its own subscription and from nothing else.')
 param carrierCancellationPrincipalId string
 
@@ -245,6 +248,25 @@ resource shipperNotificationFilter 'Microsoft.ServiceBus/namespaces/topics/subsc
   }
 }
 
+// The P7 Consignee notification Logic App's subscription: ConsigneeNotificationRequested only, as the message's eventType property
+// says. Its filter also routes resubmits from the console, like every subscription's (coding guidelines §7). The AppHost's
+// emulator gives the same subscription the same condition (ResubmitAwareFilters).
+resource consigneeNotification 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2024-01-01' = {
+  parent: shipmentEvents
+  name: 'consignee-notification'
+}
+
+resource consigneeNotificationFilter 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2024-01-01' = {
+  parent: consigneeNotification
+  name: 'resubmit-aware'
+  properties: {
+    filterType: 'SqlFilter'
+    sqlFilter: {
+      sqlExpression: '(eventType = \'ConsigneeNotificationRequested\' AND resubmitTo IS NULL) OR resubmitTo = \'consignee-notification\''
+    }
+  }
+}
+
 // The P7 Carrier cancellation Logic App's subscription: CarrierBookingCancelled and CarrierBookingWithdrawn only, as the message's
 // eventType property says. Its filter also routes resubmits from the console, like every subscription's (coding guidelines §7). The
 // AppHost's emulator gives the same subscription the same condition (ResubmitAwareFilters).
@@ -358,6 +380,17 @@ resource shipperNotificationReceivesItsMessages 'Microsoft.Authorization/roleAss
   scope: shipperNotification
   properties: {
     principalId: shipperNotificationPrincipalId
+    roleDefinitionId: serviceBusDataReceiver
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Scoped to the subscription, so the Consignee notification Logic App reads notification requests and no other message.
+resource consigneeNotificationReceivesItsMessages 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(consigneeNotification.id, consigneeNotificationPrincipalId, serviceBusDataReceiver)
+  scope: consigneeNotification
+  properties: {
+    principalId: consigneeNotificationPrincipalId
     roleDefinitionId: serviceBusDataReceiver
     principalType: 'ServicePrincipal'
   }

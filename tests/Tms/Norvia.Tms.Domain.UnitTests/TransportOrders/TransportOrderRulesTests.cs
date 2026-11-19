@@ -172,6 +172,53 @@ public sealed class TransportOrderRulesTests
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("wareneingang@getraenke-schmitz.example")]
+    [InlineData(" inkoop@dezwaan.example ")]
+    public void Check_ConsigneeEmailGivenAndValidOrNotGivenAtAll_FindsNothingWrong(string? email)
+    {
+        var booking = WithConsigneeEmail(email);
+
+        var reasons = _rules.Check(BrouwerDranken, booking, Now);
+
+        reasons.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("not an email")]
+    [InlineData("no-at-sign.example")]
+    [InlineData("two@@signs.example")]
+    [InlineData("@no-local-part.example")]
+    [InlineData("no-domain@")]
+    [InlineData("no-dot@localhost")]
+    [InlineData("Anna <anna@example.com>")]
+    [InlineData("a@example.com, b@example.com")]
+    public void Check_ConsigneeEmailGivenButInvalid_RejectsWithConsigneeEmailInvalid(string email)
+    {
+        var booking = WithConsigneeEmail(email);
+
+        var reasons = _rules.Check(BrouwerDranken, booking, Now);
+
+        CodesOf(reasons).Should().Equal(RejectionCode.ConsigneeEmailInvalid);
+    }
+
+    [Fact]
+    public void Check_ConsigneeEmailInvalid_MessageDoesNotRepeatTheAddress()
+    {
+        var reasons = _rules.Check(BrouwerDranken, WithConsigneeEmail("secret person@"), Now);
+
+        reasons.Single().Message.Should().Be("The Consignee email is not an email address.").And.NotContain("secret");
+    }
+
+    private static TransportOrderDetails WithConsigneeEmail(string? email)
+    {
+        var booking = CompleteBooking();
+        return booking with { Delivery = booking.Delivery! with { Consignee = booking.Delivery.Consignee! with { Email = email } } };
+    }
+
+    [Theory]
     [MemberData(nameof(IncompleteWindows))]
     public void Check_NoCompleteCollectionWindow_RejectsWithCollectionWindowMissing(TimeWindow? window)
     {

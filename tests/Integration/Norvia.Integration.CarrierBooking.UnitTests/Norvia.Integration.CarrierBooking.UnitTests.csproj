@@ -55,6 +55,8 @@
     <EmbeddedResource Include="..\..\..\src\Integration\BookingLogicApp\carrier-booking\workflow.json" LogicalName="BookingLogicApp/carrier-booking/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\ShipperNotificationLogicApp\*.json" LogicalName="ShipperNotificationLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\ShipperNotificationLogicApp\shipper-notification\workflow.json" LogicalName="ShipperNotificationLogicApp/shipper-notification/workflow.json" />
+    <EmbeddedResource Include="..\..\..\src\Integration\ConsigneeNotificationLogicApp\*.json" LogicalName="ConsigneeNotificationLogicApp/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\src\Integration\ConsigneeNotificationLogicApp\consignee-notification\workflow.json" LogicalName="ConsigneeNotificationLogicApp/consignee-notification/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCancellationLogicApp\*.json" LogicalName="CarrierCancellationLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCancellationLogicApp\carrier-cancellation\workflow.json" LogicalName="CarrierCancellationLogicApp/carrier-cancellation/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\TripDispatchLogicApp\*.json" LogicalName="TripDispatchLogicApp/%(Filename)%(Extension)" />
@@ -67,6 +69,7 @@
     <EmbeddedResource Include="..\..\..\src\Integration\MasterDataSyncLogicApp\master-data-sync\workflow.json" LogicalName="MasterDataSyncLogicApp/master-data-sync/workflow.json" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCostLogicApp\*.json" LogicalName="CarrierCostLogicApp/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\src\Integration\CarrierCostLogicApp\carrier-cost\workflow.json" LogicalName="CarrierCostLogicApp/carrier-cost/workflow.json" />
+    <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\consignee-notification-requested\*.json" LogicalName="CanonicalModel/samples/consignee-notification-requested/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\carrier-cost-incurred\*.json" LogicalName="CanonicalModel/samples/carrier-cost-incurred/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\transport-order-billable\*.json" LogicalName="CanonicalModel/samples/transport-order-billable/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\..\contracts\canonical-model\samples\shipper-invoice-issued\*.json" LogicalName="CanonicalModel/samples/shipper-invoice-issued/%(Filename)%(Extension)" />

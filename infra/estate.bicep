@@ -111,6 +111,14 @@ param carrierEndpointKeySeed string
 booking, Shipper notification and Carrier cancellation Logic Apps keep it when the estate is deployed again.''')
 param partnerPortalBaseUrl string = ''
 
+@description('''The email resource's endpoint (Azure Communication Services Email, such as https://<name>.communication.azure.com), which the
+Consignee notification Logic App posts the email to. The sandbox provisions none: an operator creates one, verifies a sender domain and stores
+the values in the azd environment. Empty, the Logic App is deployed and its run fails at the send, which is tracked as such.''')
+param consigneeEmailEndpoint string = ''
+
+@description('The sender address the email resource has verified, such as DoNotReply@<domain>.')
+param consigneeEmailSenderAddress string = ''
+
 @description('''The Driver app API's address, empty before the apps are first deployed. azd's postdeploy hook stores it, so the Trip dispatch
 Logic App keeps it when the estate is deployed again.''')
 param driverAppBaseUrl string = ''
@@ -239,6 +247,7 @@ module alerts 'estate/alerts.bicep' = {
       { name: 'carrier-invoice', logicAppName: carrierInvoiceLogicApp.outputs.logicAppName, workflowName: 'carrier-invoice' }
       { name: 'carrier-booking', logicAppName: bookingLogicApp.outputs.logicAppName, workflowName: 'carrier-booking' }
       { name: 'shipper-notification', logicAppName: shipperNotificationLogicApp.outputs.logicAppName, workflowName: 'shipper-notification' }
+      { name: 'consignee-notification', logicAppName: consigneeNotificationLogicApp.outputs.logicAppName, workflowName: 'consignee-notification' }
       { name: 'carrier-cancellation', logicAppName: carrierCancellationLogicApp.outputs.logicAppName, workflowName: 'carrier-cancellation' }
       { name: 'trip-dispatch', logicAppName: tripDispatchLogicApp.outputs.logicAppName, workflowName: 'trip-dispatch' }
       { name: 'driver-reports', logicAppName: driverReportsLogicApp.outputs.logicAppName, workflowName: 'driver-reports' }
@@ -258,6 +267,7 @@ module alerts 'estate/alerts.bicep' = {
       'carrier-proof-of-delivery'
       'carrier-booking'
       'shipper-notification'
+      'consignee-notification'
       'carrier-cancellation'
       'carrier-cost'
       'trip-dispatch'
@@ -278,6 +288,7 @@ module messaging 'estate/messaging.bicep' = {
     presenterPrincipalId: presenterPrincipalId
     bookingPrincipalId: identities.outputs.bookingPrincipalId
     shipperNotificationPrincipalId: identities.outputs.shipperNotificationPrincipalId
+    consigneeNotificationPrincipalId: identities.outputs.consigneeNotification.principalId
     carrierCancellationPrincipalId: identities.outputs.carrierCancellationPrincipalId
     tripDispatchPrincipalId: identities.outputs.tripDispatchPrincipalId
     driverReportsPrincipalId: identities.outputs.driverReportsPrincipalId
@@ -404,6 +415,26 @@ module shipperNotificationLogicApp 'estate/shipper-notification-logic-app.bicep'
     planName: intakeLogicApp.outputs.planName
     contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
     shipperKeyVaultName: partnerApi.outputs.partnerPortalKeyVaultName
+    integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
+  }
+}
+
+module consigneeNotificationLogicApp 'estate/consignee-notification-logic-app.bicep' = {
+  scope: resourceGroup
+  params: {
+    location: location
+    tags: tags
+    integrationRetentionDays: integrationRetentionDays
+    consigneeNotificationIdentityName: identities.outputs.consigneeNotification.name
+    tmsApiClientId: identities.outputs.tmsApiClientId
+    tmsBaseUrl: tmsBaseUrl
+    partnerPortalBaseUrl: partnerPortalBaseUrl
+    emailEndpoint: consigneeEmailEndpoint
+    emailSenderAddress: consigneeEmailSenderAddress
+    applicationInsightsName: monitoring.outputs.applicationInsightsName
+    serviceBusName: messaging.outputs.namespaceName
+    planName: intakeLogicApp.outputs.planName
+    contentKeyVaultName: intakeLogicApp.outputs.keyVaultName
     integrationConsolePrincipalId: identities.outputs.integrationConsolePrincipalId
   }
 }
@@ -858,7 +889,6 @@ output ESTATE_TMS_API_CLIENT_ID string = identities.outputs.tmsApiClientId
 output ESTATE_INTAKE_CLIENT_ID string = identities.outputs.intakeClientId
 output ESTATE_INTAKE_IDENTITY_ID string = identities.outputs.intakeIdentityId
 output ESTATE_SHIPPER_NOTIFICATION_IDENTITY_NAME string = identities.outputs.shipperNotificationIdentityName
-output ESTATE_SHIPPER_NOTIFICATION_CLIENT_ID string = identities.outputs.shipperNotificationClientId
 output ESTATE_CARRIER_CANCELLATION_IDENTITY_NAME string = identities.outputs.carrierCancellationIdentityName
 output ESTATE_CARRIER_CANCELLATION_CLIENT_ID string = identities.outputs.carrierCancellationClientId
 output ESTATE_TRIP_DISPATCH_IDENTITY_NAME string = identities.outputs.tripDispatchIdentityName
@@ -873,6 +903,7 @@ output ESTATE_TMS_UI_CLIENT_ID string = identities.outputs.tmsUiClientId
 output ESTATE_INTAKE_LOGIC_APP string = intakeLogicApp.outputs.logicAppName
 output ESTATE_BOOKING_LOGIC_APP string = bookingLogicApp.outputs.logicAppName
 output ESTATE_SHIPPER_NOTIFICATION_LOGIC_APP string = shipperNotificationLogicApp.outputs.logicAppName
+output ESTATE_CONSIGNEE_NOTIFICATION_LOGIC_APP string = consigneeNotificationLogicApp.outputs.logicAppName
 output ESTATE_CARRIER_CANCELLATION_LOGIC_APP string = carrierCancellationLogicApp.outputs.logicAppName
 output ESTATE_TRIP_DISPATCH_LOGIC_APP string = tripDispatchLogicApp.outputs.logicAppName
 output ESTATE_DRIVER_REPORTS_LOGIC_APP string = driverReportsLogicApp.outputs.logicAppName

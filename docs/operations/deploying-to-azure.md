@@ -43,6 +43,8 @@ The intake smoke test runs the intake identity's calls from a throwaway Containe
 
 ## Secrets and identities
 
+**The Consignee's email.** The Consignee notification Logic App ([P7](../processes/tms/p7-exception-handling.md#tell-the-consignee)) posts its email to an Azure Communication Services Email resource, as its managed identity (which needs the role to send through it). The sandbox doesn't create the resource: an operator creates one, verifies a sender and sets `azd env set ESTATE_CONSIGNEE_EMAIL_ENDPOINT https://<name>.communication.azure.com` and `ESTATE_CONSIGNEE_EMAIL_SENDER_ADDRESS DoNotReply@<domain>`, then deploys the estate again. Until then the Logic App is deployed and each run fails at the send, tracked as `Failed`, and the Consignee isn't told.
+
 The applications hold no secrets. The TMS reaches SQL and Service Bus with its managed identity, and Service Bus accepts no keys. The intake Logic App reaches its storage and the TMS with managed identities too. Only its content share, which Logic Apps Standard still reaches with a storage key, needs one: the estate puts that connection string in Key Vault, and the app reads it through a Key Vault reference. The Application Insights connection string only says where telemetry goes. Retention of Application Insights, Log Analytics and the Logic App's run history is the estate parameter `integrationRetentionDays`, 90 days by default (run history keeps 365 days at most). To change it, set it in [infra/estate.bicepparam](../../infra/estate.bicepparam).
 
 ## Tear down

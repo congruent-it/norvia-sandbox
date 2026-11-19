@@ -3081,6 +3081,58 @@
         }
       }
     },
+    "/v1/consignee-notifications/{transportOrderNumber}": {
+      "get": {
+        "tags": [
+          "ConsigneeNotifications"
+        ],
+        "summary": "Read the Consignee's email address and the tracking code for a Transport Order, for the Consignee notification Logic App.",
+        "description": "A X-Correlation-ID is required; otherwise the call is a 400. The ConsigneeNotificationRequested event names only the Transport Order, because the address is personal data and the tracking code is a credential (ADR 0052), so the Logic App asks for both here when it sends the email. A Transport Order with no usable email or no tracking code, or an unknown one, is a 404: there is nothing to send, and that is not an error. Neither the address nor the code is ever logged.",
+        "operationId": "GetConsigneeNotification",
+        "parameters": [
+          {
+            "name": "transportOrderNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsigneeNotificationContent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/v1/agent/customer-service/rejected-bookings/{id}": {
       "get": {
         "tags": [
@@ -5782,6 +5834,26 @@
               "string"
             ],
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConsigneeNotificationContent": {
+        "required": [
+          "transportOrderNumber",
+          "email",
+          "trackingCode"
+        ],
+        "type": "object",
+        "properties": {
+          "transportOrderNumber": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "trackingCode": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -11063,6 +11135,9 @@
     },
     {
       "name": "ConsigneeTracking"
+    },
+    {
+      "name": "ConsigneeNotifications"
     },
     {
       "name": "CustomerServiceAgent"

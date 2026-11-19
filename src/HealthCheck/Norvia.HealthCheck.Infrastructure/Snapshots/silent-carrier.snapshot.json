@@ -19,6 +19,10 @@
       "hasDeadLetterAlert": true
     },
     {
+      "name": "consignee-notification",
+      "hasDeadLetterAlert": true
+    },
+    {
       "name": "carrier-cancellation",
       "hasDeadLetterAlert": true
     },
@@ -74,6 +78,11 @@
     },
     {
       "name": "shipper-notification",
+      "hasFailedRunAlert": true,
+      "recordsTrackedProperties": true
+    },
+    {
+      "name": "consignee-notification",
       "hasFailedRunAlert": true,
       "recordsTrackedProperties": true
     },

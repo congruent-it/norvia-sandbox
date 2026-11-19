@@ -79,6 +79,12 @@ public sealed class TransportOrderRules(decimal maxTotalWeightKg)
         {
             reasons.Add(new(RejectionCode.ConsigneeNameMissing, "The booking has no Consignee name."));
         }
+
+        // The email is optional, and personal data: when it is given and wrong, the reason does not repeat it.
+        if (details.Delivery?.Consignee?.Email is { } email && !IsBlank(email) && !ConsigneeEmail.IsValid(email))
+        {
+            reasons.Add(new(RejectionCode.ConsigneeEmailInvalid, "The Consignee email is not an email address."));
+        }
     }
 
     private static void CheckAddress(Address? address, string which, RejectionCode missing, RejectionCode incomplete, List<RejectionReason> reasons)

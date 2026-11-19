@@ -16,6 +16,10 @@ param tmsBaseUrl = readEnvironmentVariable('ESTATE_TMS_BASE_URL', '')
 // The postdeploy hook stores the Partner portal's address once Aspire has deployed it.
 param partnerPortalBaseUrl = readEnvironmentVariable('ESTATE_PARTNER_PORTAL_BASE_URL', '')
 
+// An operator stores the email resource's endpoint and verified sender for the Consignee notification Logic App; the sandbox provisions none.
+param consigneeEmailEndpoint = readEnvironmentVariable('ESTATE_CONSIGNEE_EMAIL_ENDPOINT', '')
+param consigneeEmailSenderAddress = readEnvironmentVariable('ESTATE_CONSIGNEE_EMAIL_SENDER_ADDRESS', '')
+
 // The postdeploy hook stores the Driver app API's address once Aspire has deployed it.
 param driverAppBaseUrl = readEnvironmentVariable('ESTATE_DRIVER_APP_BASE_URL', '')
 
