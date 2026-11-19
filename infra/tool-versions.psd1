@@ -7,6 +7,8 @@
     Helm              = '4.3.2'
     Kubectl           = '1.37.2'
     Kubeconform       = '0.8.0'
+    # Node runs the Tailwind stylesheet build of the web apps (Node 20 or later, docs/operations/running-locally.md). The SHA-256 comes from nodejs.org's SHASUMS256.txt.
+    Node              = '22.23.5'
     # Bicep publishes no checksum file, so the SHA-256 of each binary (the digest GitHub shows for the release asset) is pinned here with it.
     # The estate's architecture tests run `bicep snapshot`. CI's job for them gets the CLI from `az bicep install`, which the Bicep tests also find.
     Bicep             = '0.49.2'

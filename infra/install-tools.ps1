@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 <#
 .SYNOPSIS
-    Installs the pinned Kubernetes tools (helm, kubectl, kubeconform, bicep) and the PowerShell modules the script gate needs.
+    Installs the pinned tools (helm, kubectl, kubeconform, bicep, node) and the PowerShell modules the script gate needs.
 .DESCRIPTION
     The versions come from infra/tool-versions.psd1. The dev container's image build and the CI workflow both run this script, so
     the two have the same tools. Linux only (amd64 or arm64). Each download is checked against the checksum its publisher posts.
@@ -9,13 +9,13 @@
 .PARAMETER BinDir
     Where the binaries go. Default /usr/local/bin (needs write access there; CI uses a directory on the PATH).
 .PARAMETER Tool
-    Which to install: Helm, Kubectl, Kubeconform, Bicep, Modules. Default: all.
+    Which to install: Helm, Kubectl, Kubeconform, Bicep, Node, Modules. Default: all.
 #>
 [CmdletBinding()]
 param(
     [string] $BinDir = '/usr/local/bin',
-    [ValidateSet('Helm', 'Kubectl', 'Kubeconform', 'Bicep', 'Modules')]
-    [string[]] $Tool = @('Helm', 'Kubectl', 'Kubeconform', 'Bicep', 'Modules')
+    [ValidateSet('Helm', 'Kubectl', 'Kubeconform', 'Bicep', 'Node', 'Modules')]
+    [string[]] $Tool = @('Helm', 'Kubectl', 'Kubeconform', 'Bicep', 'Node', 'Modules')
 )
 $ErrorActionPreference = 'Stop'
 
@@ -91,6 +91,14 @@ try {
         Install-Binary $file 'bicep'
     }
 
+    if ($Tool -contains 'Node' -and -not (Test-InstalledVersion 'node' @('--version') $versions.Node)) {
+        # The whole tree (bin, lib, include) goes under the parent of BinDir, so npm finds its modules next to node.
+        $name = "node-v$($versions.Node)-linux-$($arch -eq 'amd64' ? 'x64' : $arch).tar.xz"
+        $release = "https://nodejs.org/dist/v$($versions.Node)"
+        $file = Save-Download "$release/$name" "$release/SHASUMS256.txt" $name
+        tar -xJf $file -C (Split-Path $BinDir -Parent) --strip-components=1 --no-same-owner --exclude='*/CHANGELOG.md' --exclude='*/LICENSE' --exclude='*/README.md'
+    }
+
     if ($Tool -contains 'Modules') {
         $scope = (id -u) -eq '0' ? 'AllUsers' : 'CurrentUser'
         Set-PSResourceRepository -Name PSGallery -Trusted
@@ -104,5 +112,5 @@ finally {
 
 foreach ($t in $Tool | Where-Object { $_ -ne 'Modules' }) {
     $cmd = $t.ToLowerInvariant()
-    Write-Host "$cmd $(& (Join-Path $BinDir $cmd) $(if ($cmd -eq 'kubeconform') { '-v' } elseif ($cmd -eq 'bicep') { '--version' } elseif ($cmd -eq 'helm') { 'version', '--short' } else { 'version', '--client' }) 2>&1 | Select-Object -First 1)"
+    Write-Host "$cmd $(& (Join-Path $BinDir $cmd) $(if ($cmd -eq 'kubeconform') { '-v' } elseif ($cmd -in 'bicep', 'node') { '--version' } elseif ($cmd -eq 'helm') { 'version', '--short' } else { 'version', '--client' }) 2>&1 | Select-Object -First 1)"
 }
