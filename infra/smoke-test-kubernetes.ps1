@@ -122,10 +122,9 @@ function Get-Shipment([string] $ShipmentNumber) {
 # 1. The ingress routes to both applications.
 Invoke-SmokeStep 'The Partner API and the TMS API answer on their ingress hostnames' {
     foreach ($app in @(@{ Name = 'Partner API'; Url = $partnerApi }, @{ Name = 'TMS API'; Url = $tms })) {
-        $health = Wait-ForValue -Description "the $($app.Name) to answer /health at $($app.Url)" -Attempts $attempts -IntervalSeconds $interval -Condition {
+        $null = Wait-ForValue -Description "the $($app.Name) to answer /health at $($app.Url)" -Attempts $attempts -IntervalSeconds $interval -Condition {
             try { $answer = Invoke-Call GET "$($app.Url)/health"; if ($answer.Status -eq 200) { $answer } } catch { $script:lastError = $_.Exception.Message }
         } -Describe { $script:lastError }
-        $null = $health
     }
 } | Out-Null
 
