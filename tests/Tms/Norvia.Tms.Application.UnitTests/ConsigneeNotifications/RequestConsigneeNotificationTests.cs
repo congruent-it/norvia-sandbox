@@ -1,15 +1,15 @@
 using Ardalis.SharedKernel;
+using NSubstitute;
 using Norvia.Tms.Application.CanonicalModel;
 using Norvia.Tms.Application.ConsigneeNotifications;
 using Norvia.Tms.Application.IntegrationEvents;
-using Norvia.Tms.Application.UnitTests.Trips;
 using Norvia.Tms.Application.UnitTests.TransportOrders;
+using Norvia.Tms.Application.UnitTests.Trips;
 using Norvia.Tms.Domain.Carriers;
 using Norvia.Tms.Domain.Exceptions;
 using Norvia.Tms.Domain.Shipments;
 using Norvia.Tms.Domain.TrackingEvents;
 using Norvia.Tms.Domain.TransportOrders;
-using NSubstitute;
 
 namespace Norvia.Tms.Application.UnitTests.ConsigneeNotifications;
 
@@ -24,7 +24,7 @@ public sealed class RequestConsigneeNotificationTests
     private readonly IReadRepository<TransportOrder> _orders = Substitute.For<IReadRepository<TransportOrder>>();
     private readonly RequestConsigneeNotification _handler;
 
-    public RequestConsigneeNotificationTests() => _handler = new(_outbox, _orders);
+    public RequestConsigneeNotificationTests() => _handler = new(_outbox, _orders, Microsoft.Extensions.Logging.Abstractions.NullLogger<RequestConsigneeNotification>.Instance);
 
     [Fact]
     public async Task Handle_CollectedAndTheOrderHasAnEmail_RequestsANotificationOnTheTrailOfTheTrackingEvent()
@@ -81,6 +81,29 @@ public sealed class RequestConsigneeNotificationTests
         await _handler.Handle(agreed, CancellationToken.None);
 
         _outbox.DidNotReceiveWithAnyArgs().Add(default!);
+    }
+
+    [Fact]
+    public async Task Handle_TheOrderCantBeRead_SendsNothing_AndNeverFailsTheCollectedOrTheAgreement()
+    {
+        var (collected, _) = Collected();
+        _orders.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns<TransportOrder?>(_ => throw new InvalidOperationException("database down"));
+
+        var handle = async () => await _handler.Handle(collected, CancellationToken.None);
+
+        await handle.Should().NotThrowAsync();
+        _outbox.DidNotReceiveWithAnyArgs().Add(default!);
+    }
+
+    [Fact]
+    public async Task Handle_Canceled_StillCancels()
+    {
+        var (collected, _) = Collected();
+        _orders.FirstOrDefaultAsync(Arg.Any<TransportOrderByNumberSpec>(), Arg.Any<CancellationToken>()).Returns<TransportOrder?>(_ => throw new OperationCanceledException());
+
+        var handle = async () => await _handler.Handle(collected, new CancellationToken(true));
+
+        await handle.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact]
