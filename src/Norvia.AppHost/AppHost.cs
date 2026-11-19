@@ -716,7 +716,14 @@ else
         .WithReference(messaging).WaitFor(messaging)
         .WithReference(tmsApi).WaitFor(tmsApi)
         .WithEnvironment("ConsigneeNotification__TmsBaseAddress", tmsApi.GetEndpoint("http"))
-        .WithEnvironment("ConsigneeNotification__PartnerPortalBaseAddress", partnerPortal.GetEndpoint("http"))
+        // The link in the email opens on the Partner portal. A run without it (the Consignee notification's integration tests) gives the worker an address of its own.
+        .WithEnvironment(context =>
+        {
+            if (builder.Resources.Contains(partnerPortal.Resource))
+            {
+                context.EnvironmentVariables["ConsigneeNotification__PartnerPortalBaseAddress"] = partnerPortal.GetEndpoint("http");
+            }
+        })
         .WithEnvironment("ConsigneeNotification__TmsTokens__Issuer", LocalTokens.Issuer)
         .WithEnvironment("ConsigneeNotification__TmsTokens__Audience", LocalTokens.TmsAudience)
         .WithEnvironment("ConsigneeNotification__TmsTokens__ClientId", LocalTokens.ConsigneeNotificationLogicAppClientId);

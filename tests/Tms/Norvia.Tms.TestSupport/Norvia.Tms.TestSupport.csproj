@@ -34,6 +34,7 @@
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.TrackingEvents" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.TransportOrders" />
     <InternalsVisibleTo Include="Norvia.Tms.Api.IntegrationTests.Trips" />
+    <InternalsVisibleTo Include="Norvia.Integration.ConsigneeNotification.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\contracts\canonical-model\*.json" Link="CanonicalModel\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
