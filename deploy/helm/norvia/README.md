@@ -1,6 +1,6 @@
 # The Norvia chart
 
-Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1'`.
+Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1'`.
 
 ## The data tier (#926)
 
@@ -64,3 +64,14 @@ helm upgrade --install norvia deploy/helm/norvia -n norvia \
 | `endpoint-keys` | Generated at install and kept on upgrade, like `subscription-keys`: the credential each Shipper's and Carrier's endpoint in the Partner portal asks its caller for, and the Driver app's Trip endpoint asks the Trip dispatch worker for. The keys are named as the settings that read them (`CarrierEndpoint__ApiKeys__CAR-0001`, `ShipperEndpoint__ApiKeys__SHP-0001`, `DriverEndpoint__ApiKey`), so the Partner portal and the Driver app take the Secret as `envFrom` and a worker reads its key with `secretKeyRef`. |
 
 Every worker signs its tokens with `local-tokens/signing-key`. The workers call `tms-api`, `erp-api`, `driver-app-api` and `partner-portal-web` by the AppHost's resource names; those applications are not in the chart yet, so until they are a worker starts and retries. Not in this slice: the Driver reports worker's disabled flag (`DriverReports__DisabledFlagPath`), a file the Partner portal's fault page creates in the AppHost's temp directory. It is unset here, so the worker never reads as disabled; it needs a volume shared with the Partner portal, which comes with that application.
+
+## Telemetry phase 1: the standalone Aspire dashboard (#931)
+
+| Piece | What it is |
+|---|---|
+| `aspire-dashboard` | The Aspire dashboard (`telemetry.dashboard.image`, the major.minor of the Aspire packages) as a Deployment of one replica, with a Service on 18888 (UI and telemetry API), 18889 (OTLP over gRPC) and 18890 (OTLP over HTTP). No volume: it keeps its telemetry in memory, up to `telemetry.dashboard.maxLogCount` log records, so history does not survive a restart (retention is a separate issue). Only the log count is capped: a burst of traces or metrics can OOM-kill the pod at its memory limit and drop the history. The telemetry API key is kept through `lookup`; rendering without cluster access (`helm template`, client-side GitOps) generates a new key, which restarts the dashboard (checksum annotation), so restart the Integration console with it. OTLP takes no key and is reachable only inside the cluster. The UI has no Ingress and keeps the dashboard's browser token (in the pod's log): `kubectl port-forward svc/aspire-dashboard 18888`. |
+| `dashboard-api-key` | The key the telemetry API asks for in the `x-api-key` header, generated at install and kept on upgrade, like the other keys. |
+| OTLP settings | `norvia.deployment` gives every application `OTEL_EXPORTER_OTLP_ENDPOINT` (`http://aspire-dashboard:18889`, which `ServiceDefaults` exports to over gRPC) and `OTEL_SERVICE_NAME`, so an application the chart deploys later sends its telemetry without asking. |
+| `norvia.localTelemetryEnv` | `LocalTelemetry__DashboardUrl` and `LocalTelemetry__ApiKey`, which make the Integration console search the dashboard with `DashboardTrailSource` (ADR 0027). The console is not in the chart yet: its Deployment includes this helper when it is added. |
+
+Not verified on a cluster: that the dashboard takes its settings as environment variables of this spelling, and that a search finds a trail written by a running application. The smoke script (#932) covers both.

@@ -205,6 +205,7 @@ spec:
                 name: {{ . }}
           {{- end }}
           env:
+            {{- include "norvia.otlpEnv" (dict "root" .root "name" .name) | nindent 12 }}
             {{- if $http }}
             - name: ASPNETCORE_HTTP_PORTS
               value: {{ .root.Values.appPort | quote }}
@@ -215,4 +216,32 @@ spec:
 {{/* The key of a Persona in the Secret endpoint-keys, which is the setting the Partner portal reads it as: {{ include "norvia.endpointKeyName" . }} for a Persona of values.yaml. */}}
 {{- define "norvia.endpointKeyName" -}}
 {{ .type }}Endpoint__ApiKeys__{{ .party }}
+{{- end }}
+
+{{/* The address applications send OTLP to (gRPC, which ServiceDefaults' UseOtlpExporter speaks by default). */}}
+{{- define "norvia.otlpEndpoint" -}}
+http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.otlpGrpc }}
+{{- end }}
+
+{{/* The settings that make an application send its telemetry to the dashboard, as the AppHost does: {{ include "norvia.otlpEnv" (dict "root" . "name" "tms-api") }}. norvia.deployment includes it, so every application the chart deploys has it. */}}
+{{- define "norvia.otlpEnv" -}}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ include "norvia.otlpEndpoint" .root | quote }}
+- name: OTEL_SERVICE_NAME
+  value: {{ .name | quote }}
+{{- end }}
+
+{{/*
+  The settings that make the Integration console search the dashboard (LocalTelemetry, ADR 0027); their presence is what selects
+  DashboardTrailSource. For the Deployment of integration-console-web when the chart deploys it:
+    {{- include "norvia.localTelemetryEnv" . | nindent 12 }}
+*/}}
+{{- define "norvia.localTelemetryEnv" -}}
+- name: LocalTelemetry__DashboardUrl
+  value: http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.ui }}
+- name: LocalTelemetry__ApiKey
+  valueFrom:
+    secretKeyRef:
+      name: dashboard-api-key
+      key: api-key
 {{- end }}
