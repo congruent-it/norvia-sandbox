@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
@@ -24,11 +26,11 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
     public const string TrackingBaseAddress = "https://track.example.test/";
 
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan Settle = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan Pause = TimeSpan.FromSeconds(3);
 
     private readonly string _mailFolder = Path.Combine(Path.GetTempPath(), $"norvia-consignee-mail-{Guid.NewGuid():N}");
     private readonly ConcurrentQueue<TmsLog> _workerLogs = new();
-    private ServiceBusClient? _edge;
+    private ServiceBusClient? _bus;
 
     /// <summary>What the worker has logged, in the order it was written, as the JSON console formatter wrote it with the keys of its scopes.</summary>
     public IEnumerable<TmsLog> WorkerLogs => _workerLogs;
@@ -40,14 +42,14 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
         WatchWorkerLogs();
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
         await App.ResourceNotifications.WaitForResourceAsync(WorkerName, KnownResourceStates.Running, timeout.Token);
-        _edge = new ServiceBusClient(await ConnectionStringAsync("messaging", timeout.Token));
+        _bus = new ServiceBusClient(await ConnectionStringAsync("messaging", timeout.Token));
     }
 
     public override async ValueTask DisposeAsync()
     {
-        if (_edge is not null)
+        if (_bus is not null)
         {
-            await _edge.DisposeAsync();
+            await _bus.DisposeAsync();
         }
 
         await base.DisposeAsync();
@@ -143,7 +145,7 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
             ["shipmentNumber"] = "SH-0000001",
             ["reason"] = "Collected",
         };
-        await using var sender = _edge!.CreateSender(ShipmentEventsTopic);
+        await using var sender = _bus!.CreateSender(ShipmentEventsTopic);
         var message = new ServiceBusMessage(BinaryData.FromString(body.ToJsonString()))
         {
             MessageId = body["eventId"]!.GetValue<string>(),
@@ -159,12 +161,12 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
     /// <summary>What the Consignee notification subscription holds as dead-lettered.</summary>
     public async Task<int> DeadLetteredAsync(CancellationToken cancellationToken)
     {
-        await using var receiver = _edge!.CreateReceiver(ShipmentEventsTopic, Subscription, new ServiceBusReceiverOptions { SubQueue = SubQueue.DeadLetter });
+        await using var receiver = _bus!.CreateReceiver(ShipmentEventsTopic, Subscription, new ServiceBusReceiverOptions { SubQueue = SubQueue.DeadLetter });
         return (await receiver.PeekMessagesAsync(500, cancellationToken: cancellationToken)).Count;
     }
 
     /// <summary>Gives the worker time to do what it would, so an email or a failure it should not have made shows. A test uses it only after a positive control has proved the path works.</summary>
-    public static Task SettleAsync(CancellationToken cancellationToken) => Task.Delay(Settle, cancellationToken);
+    public static Task PauseAsync(CancellationToken cancellationToken) => Task.Delay(Pause, cancellationToken);
 
     /// <summary>Waits until the probe finds something, polling; fails the test with what it waited for when it doesn't.</summary>
     public async Task<T> WaitForAsync<T>(Func<Task<T?>> probe, string what, CancellationToken cancellationToken)
@@ -191,14 +193,39 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
         }
     }
 
-    // The worker sends through SmtpClient's pickup folder, which writes the message quoted-printable when it has to: a soft line break is "=" at the end of a line, and "=3D" is an "=".
+    // The worker sends through SmtpClient's pickup folder, which picks the body's encoding by its content: 7bit, quoted-printable (a soft line break is "=" at the end of a line, and "=XX" is a byte)
+    // or base64. The tests read the body as the Consignee's mail program shows it, with the headers kept as they are.
     private static string? ReadEmail(string path)
     {
         try
         {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var reader = new StreamReader(stream);
-            return reader.ReadToEnd().Replace("=\r\n", string.Empty, StringComparison.Ordinal).Replace("=\n", string.Empty, StringComparison.Ordinal).Replace("=3D", "=", StringComparison.Ordinal);
+            var raw = reader.ReadToEnd();
+            var split = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal) is var crlf and >= 0 ? (crlf, 4) : (raw.IndexOf("\n\n", StringComparison.Ordinal), 2);
+            if (split.Item1 < 0)
+            {
+                return raw;
+            }
+
+            var headers = raw[..split.Item1];
+            var body = raw[(split.Item1 + split.Item2)..];
+            if (Regex.IsMatch(headers, @"^Content-Transfer-Encoding:\s*base64", RegexOptions.IgnoreCase | RegexOptions.Multiline, TimeSpan.FromSeconds(1)))
+            {
+                body = Encoding.UTF8.GetString(Convert.FromBase64String(string.Concat(body.Where(c => !char.IsWhiteSpace(c)))));
+            }
+            else if (Regex.IsMatch(headers, @"^Content-Transfer-Encoding:\s*quoted-printable", RegexOptions.IgnoreCase | RegexOptions.Multiline, TimeSpan.FromSeconds(1)))
+            {
+                body = Regex.Replace(body, @"=\r?\n", string.Empty, RegexOptions.None, TimeSpan.FromSeconds(1));
+                body = Regex.Replace(body, "=([0-9A-F]{2})", match => ((char)Convert.ToInt32(match.Groups[1].Value, 16)).ToString(), RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
+            }
+
+            return headers + "\r\n\r\n" + body;
+        }
+        catch (Exception exception) when (exception is IOException or FormatException)
+        {
+            // Being written (a body cut short is not yet valid): the next poll reads it whole.
+            return null;
         }
         catch (IOException)
         {

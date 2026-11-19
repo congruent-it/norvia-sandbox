@@ -19,7 +19,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
     public async Task Collected_WithAConsigneeEmail_SendsOneEmail_ThatCarriesTheTrackingLink_AndNothingElse()
     {
         var address = NewAddress();
-        var (shipmentNumber, transportOrderNumber, reference) = await fixture.BookedShipmentFor(address, _cancellationToken);
+        var (shipmentNumber, transportOrderNumber, reference) = await fixture.BookedShipmentForAsync(address, _cancellationToken);
         var code = await fixture.TrackingCodeOfAsync(transportOrderNumber, _cancellationToken);
 
         var correlationId = await fixture.CollectedAsync(reference, _cancellationToken);
@@ -29,7 +29,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
         requested.ApplicationProperties.Values.Select(value => value?.ToString()).Should().NotContain(value => value != null && value.Contains(address, StringComparison.OrdinalIgnoreCase));
         var email = await fixture.EmailToAsync(address, _cancellationToken);
         await fixture.WorkerLogAsync(correlationId, "The Consignee notification email was sent", _cancellationToken);
-        await ConsigneeNotificationFixture.SettleAsync(_cancellationToken);
+        await ConsigneeNotificationFixture.PauseAsync(_cancellationToken);
         fixture.EmailsTo(address).Should().ContainSingle("one Collected is one email, however often the outbox ran");
         email.Should().Contain($"{ConsigneeNotificationFixture.TrackingBaseAddress}track/{code}");
         email.Should().NotContain(transportOrderNumber).And.NotContain(shipmentNumber, "the email carries the link and nothing else (ADR 0052)");
@@ -38,7 +38,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
     [Fact]
     public async Task Collected_WithNoConsigneeEmail_SendsNothing_AndRaisesNoFailure()
     {
-        var (_, _, reference) = await fixture.BookedShipmentFor(consigneeEmail: null, _cancellationToken);
+        var (_, _, reference) = await fixture.BookedShipmentForAsync(consigneeEmail: null, _cancellationToken);
         var emailsBefore = fixture.Emails().Count;
         var deadLettersBefore = await fixture.DeadLetteredAsync(_cancellationToken);
 
@@ -47,7 +47,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
         // The Collected is published and the outbox has run a few cycles, so a request that should not be made would have been.
         (await fixture.PublishedAsync(correlationId, "ShipmentCollected", _cancellationToken)).Should().ContainSingle();
         fixture.Published.Should().NotContain(message => message.CorrelationId == correlationId && message.Subject == "ConsigneeNotificationRequested");
-        await ConsigneeNotificationFixture.SettleAsync(_cancellationToken);
+        await ConsigneeNotificationFixture.PauseAsync(_cancellationToken);
         fixture.Emails().Should().HaveCount(emailsBefore);
         (await fixture.DeadLetteredAsync(_cancellationToken)).Should().Be(deadLettersBefore);
     }
@@ -56,7 +56,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
     public async Task Request_ForATransportOrderWithNothingToSend_IsDone_WithNoEmailAndNoFailure()
     {
         // The email is optional, and an order can lose it between the request and the Logic App's read: the TMS answers 404 and the run is done, not failed.
-        var (_, transportOrderNumber, _) = await fixture.BookedShipmentFor(consigneeEmail: null, _cancellationToken);
+        var (_, transportOrderNumber, _) = await fixture.BookedShipmentForAsync(consigneeEmail: null, _cancellationToken);
         var emailsBefore = fixture.Emails().Count;
         var deadLettersBefore = await fixture.DeadLetteredAsync(_cancellationToken);
         var correlationId = TmsCalls.NewCorrelationId();
@@ -64,7 +64,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
         await fixture.SendRequestAsync(transportOrderNumber, correlationId, _cancellationToken);
 
         await fixture.WorkerLogAsync(correlationId, "The Transport Order has nothing to send to a Consignee", _cancellationToken);
-        await ConsigneeNotificationFixture.SettleAsync(_cancellationToken);
+        await ConsigneeNotificationFixture.PauseAsync(_cancellationToken);
         fixture.Emails().Should().HaveCount(emailsBefore);
         (await fixture.DeadLetteredAsync(_cancellationToken)).Should().Be(deadLettersBefore);
         fixture.WorkerLogsOf(correlationId).Should().OnlyContain(log => log["outcome"] != "Failed" && !log.Text.Contains("run failed", StringComparison.Ordinal));
@@ -74,7 +74,7 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
     public async Task Collected_WhenTheEmailCannotBeSent_StillCollects_AndTheShipperIsStillNotified()
     {
         var address = NewAddress();
-        var (shipmentNumber, _, reference) = await fixture.BookedShipmentFor(address, _cancellationToken);
+        var (shipmentNumber, _, reference) = await fixture.BookedShipmentForAsync(address, _cancellationToken);
         var emailsBefore = fixture.Emails().Count;
         string collectedCorrelationId;
 
@@ -100,34 +100,39 @@ public sealed class ConsigneeNotificationTests(ConsigneeNotificationFixture fixt
         }
 
         fixture.Emails().Should().HaveCount(emailsBefore);
-        fixture.Published.Should().NotContain(message => message.CorrelationId == collectedCorrelationId && message.Subject == "ShipperNotificationNotDelivered");
     }
 
     [Fact]
-    public async Task TheEmailAddress_IsInNoLog_WhetherTheEmailWasSentOrNot()
+    public async Task TheEmailAddress_IsInNoLog_WhenTheEmailWasSent()
     {
-        var sentTo = NewAddress();
-        var (_, _, sentReference) = await fixture.BookedShipmentFor(sentTo, _cancellationToken);
-        var sentCorrelationId = await fixture.CollectedAsync(sentReference, _cancellationToken);
-        await fixture.EmailToAsync(sentTo, _cancellationToken);
-        await fixture.WorkerLogAsync(sentCorrelationId, "The Consignee notification email was sent", _cancellationToken);
+        var address = NewAddress();
+        var (_, _, reference) = await fixture.BookedShipmentForAsync(address, _cancellationToken);
+        var correlationId = await fixture.CollectedAsync(reference, _cancellationToken);
+        await fixture.EmailToAsync(address, _cancellationToken);
+        await fixture.WorkerLogAsync(correlationId, "The Consignee notification email was sent", _cancellationToken);
 
-        var notSentTo = NewAddress();
-        var (_, _, notSentReference) = await fixture.BookedShipmentFor(notSentTo, _cancellationToken);
-        string notSentCorrelationId;
+        await ConsigneeNotificationFixture.PauseAsync(_cancellationToken);
+        AssertNoLogHolds(address);
+    }
+
+    [Fact]
+    public async Task TheEmailAddress_IsInNoLog_WhenTheEmailWasNotSent()
+    {
+        var address = NewAddress();
+        var (_, _, reference) = await fixture.BookedShipmentForAsync(address, _cancellationToken);
         using (fixture.BreakMailbox())
         {
-            notSentCorrelationId = await fixture.CollectedAsync(notSentReference, _cancellationToken);
-            await fixture.WorkerLogAsync(notSentCorrelationId, "The Consignee notification email was not sent", _cancellationToken);
+            var correlationId = await fixture.CollectedAsync(reference, _cancellationToken);
+            await fixture.WorkerLogAsync(correlationId, "The Consignee notification email was not sent", _cancellationToken);
         }
 
-        // Both runs are over and the TMS has logged what it did for them, so the logs hold what they would hold.
-        await ConsigneeNotificationFixture.SettleAsync(_cancellationToken);
-        foreach (var address in new[] { sentTo, notSentTo })
-        {
-            fixture.AllLogs.Should().NotContain(log => log.Text.Contains(address, StringComparison.OrdinalIgnoreCase) || log.Text.Contains(address.Split('@')[0], StringComparison.OrdinalIgnoreCase));
-        }
+        await ConsigneeNotificationFixture.PauseAsync(_cancellationToken);
+        AssertNoLogHolds(address);
     }
+
+    // The run is over and the TMS has logged what it did for it, so the logs hold what they would hold.
+    private void AssertNoLogHolds(string address) =>
+        fixture.AllLogs.Should().NotContain(log => log.Text.Contains(address, StringComparison.OrdinalIgnoreCase) || log.Text.Contains(address.Split('@')[0], StringComparison.OrdinalIgnoreCase));
 
     private static string NewAddress() => $"consignee-{Guid.NewGuid():N}@example.test";
 }

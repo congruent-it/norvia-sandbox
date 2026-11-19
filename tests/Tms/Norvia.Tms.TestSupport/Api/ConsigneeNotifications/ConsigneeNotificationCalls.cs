@@ -20,7 +20,7 @@ internal static class ConsigneeNotificationCalls
     /// A Booked Carrier Shipment of a Transport Order the Consignee's email is on (or no email when it is null): the TMS accepts and rates the order, the Planner plans and releases
     /// it, and the Carrier confirms the booking. It is not Collected yet.
     /// </summary>
-    public static async Task<(string ShipmentNumber, string TransportOrderNumber, string CarrierBookingReference)> BookedShipmentFor(
+    public static async Task<(string ShipmentNumber, string TransportOrderNumber, string CarrierBookingReference)> BookedShipmentForAsync(
         this TmsFixture tms, string? consigneeEmail, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(tms);
