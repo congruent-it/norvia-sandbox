@@ -106,6 +106,20 @@ edge:
     # <application>-tls to exist.
     clusterIssuer: ""
 
+# Telemetry phase 1 (#931, ADR 0027, ADR 0053): the standalone Aspire dashboard. Every application sends OTLP to it, and the Integration
+# console searches Message trails through its telemetry API (DashboardTrailSource), as under Aspire. It holds its telemetry in memory, so
+# history does not survive a restart; retention is a separate issue. The UI has no Ingress: reach it with kubectl port-forward.
+telemetry:
+  dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6
+    # The image's ports: the UI and telemetry API, OTLP over gRPC (what ServiceDefaults exports), OTLP over HTTP.
+    ports: { ui: 18888, otlpGrpc: 18889, otlpHttp: 18890 }
+    # What it keeps (Dashboard:TelemetryLimits:MaxLogCount; the image's default is 10000).
+    maxLogCount: 10000
+    resources:
+      requests: { cpu: 50m, memory: 256Mi }
+      limits: { memory: 768Mi }
+
 # Where the applications listen. Every Norvia image listens here, and each Service is reached as http://<name>:<port>.
 appPort: 8080
 

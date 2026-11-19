@@ -1,0 +1,112 @@
+{{- /*
+  The standalone Aspire dashboard (#931, ADR 0027): the OTLP endpoint every application exports to, and the telemetry API the Integration
+  console's DashboardTrailSource searches Message trails through. One replica, and no volume: it keeps its telemetry in memory, so
+  history does not survive a restart (retention is a separate issue). OTLP is unauthenticated, reachable only inside the cluster; the
+  telemetry API takes an API key, generated at install and kept on upgrade like the other keys. The UI keeps the dashboard's browser
+  token (it is in the pod's log) and has no Ingress.
+*/ -}}
+{{- $dashboard := .Values.telemetry.dashboard -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace "dashboard-api-key" -}}
+{{- $apiKey := "" -}}
+{{- if $existing }}{{ $apiKey = (get ($existing.data | default dict) "api-key") | default "" | b64dec }}{{ end -}}
+{{- if not $apiKey }}{{ $apiKey = randAlphaNum 32 | lower }}{{ end -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dashboard-api-key
+  labels:
+    app.kubernetes.io/name: dashboard-api-key
+    {{- include "norvia.labels" . | nindent 4 }}
+type: Opaque
+data:
+  api-key: {{ $apiKey | b64enc }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aspire-dashboard
+  labels:
+    app.kubernetes.io/name: aspire-dashboard
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: aspire-dashboard
+  ports:
+    - name: ui
+      port: {{ $dashboard.ports.ui }}
+      targetPort: ui
+    - name: otlp-grpc
+      port: {{ $dashboard.ports.otlpGrpc }}
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: {{ $dashboard.ports.otlpHttp }}
+      targetPort: otlp-http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aspire-dashboard
+  labels:
+    app.kubernetes.io/name: aspire-dashboard
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aspire-dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aspire-dashboard
+      annotations:
+        checksum/api-key: {{ $apiKey | sha256sum }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: aspire-dashboard
+          image: {{ $dashboard.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: ui
+              containerPort: {{ $dashboard.ports.ui }}
+            - name: otlp-grpc
+              containerPort: {{ $dashboard.ports.otlpGrpc }}
+            - name: otlp-http
+              containerPort: {{ $dashboard.ports.otlpHttp }}
+          env:
+            - name: ASPIRE_ALLOW_UNSECURED_TRANSPORT
+              value: "true"
+            - name: ASPNETCORE_URLS
+              value: http://+:{{ $dashboard.ports.ui }}
+            - name: DASHBOARD__OTLP__GRPCENDPOINTURL
+              value: http://+:{{ $dashboard.ports.otlpGrpc }}
+            - name: DASHBOARD__OTLP__HTTPENDPOINTURL
+              value: http://+:{{ $dashboard.ports.otlpHttp }}
+            - name: DASHBOARD__OTLP__AUTHMODE
+              value: Unsecured
+            - name: DASHBOARD__API__ENABLED
+              value: "true"
+            - name: DASHBOARD__API__AUTHMODE
+              value: ApiKey
+            - name: DASHBOARD__API__PRIMARYAPIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: dashboard-api-key
+                  key: api-key
+            - name: DASHBOARD__TELEMETRYLIMITS__MAXLOGCOUNT
+              value: {{ $dashboard.maxLogCount | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: ui
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: ui
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml $dashboard.resources | nindent 12 }}
