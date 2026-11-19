@@ -20,6 +20,7 @@ How Norvia's estate is put together, for engineers and coding agents working on 
 | [failure-behaviour.md](failure-behaviour.md) | The five failure patterns and who finds out, then what happens when each hop of each Flow fails: its retry policy, dead-letter destination and `failureCode`s, the alert (or its absence), what the Integration console can resubmit or discard, and the as-found toggle that breaks it. Also the as-found backlog, since what is not built is marked *planned* |
 | [business-automation-model.md](business-automation-model.md) | Which application performs each TMS and ERP process step, and whether a person, the application or an integration flow does it: processes as columns, applications as rows. The diagram is an [Excalidraw file](diagrams/business-automation-model.excalidraw) in the [matrix style](diagrams/README.md) |
 | [local-vs-azure.md](local-vs-azure.md) | What plays each Azure piece under Aspire, the ADR that decided it, and where the two can differ |
+| [diagrams/kubernetes.png](diagrams/kubernetes.png) | The sandbox on Kubernetes: the pods of the norvia namespace, what the cluster owns and what is not in the chart yet (shown in [operations/kubernetes.md](../operations/kubernetes.md)) |
 
 ## Conventions
 

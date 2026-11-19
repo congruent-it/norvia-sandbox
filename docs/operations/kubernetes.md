@@ -6,6 +6,10 @@ The chart runs the **local topology**, not the Azure estate: no Azure account, E
 
 ## What is in the chart today
 
+![Kubernetes: the local topology as pods in the norvia namespace](../architecture/diagrams/kubernetes.png)
+
+The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernetes.excalidraw), generated from [deployment.py](../architecture/diagrams/deployment.py).
+
 In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, and an Ingress per exposed application.
 
 Not in the chart yet: the TMS API, the ERP, the UIs, the Integration console and the Driver app. The workers and the smoke script call them by name, so until they are deployed a worker starts and retries, and the smoke script fails at its first step that needs one, naming it. Two pieces of the namespace's protection, the default-deny `NetworkPolicy` with the internal-only ingress, and the `ResourceQuota`, are #938, and the `LocalAuth:Allowed` setting itself is #930; both are still open.
