@@ -47,7 +47,7 @@ spec:
       labels:
         app.kubernetes.io/name: sql
     spec:
-      {{- include "norvia.podAccount" . | nindent 6 }}
+      {{- include "norvia.podAccount" (dict) | nindent 6 }}
       # The mssql user (10001) must be able to write to the volume.
       securityContext:
         fsGroup: 10001

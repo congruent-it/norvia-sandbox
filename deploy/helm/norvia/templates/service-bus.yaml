@@ -56,10 +56,12 @@ spec:
       annotations:
         checksum/config: {{ $config | sha256sum }}
     spec:
-      {{- include "norvia.podAccount" $ | nindent 6 }}
+      {{- include "norvia.podAccount" (dict) | nindent 6 }}
       initContainers:
         - name: wait-for-sql
           image: {{ $.Values.sql.image }}
+          resources:
+            {{- toYaml $.Values.initContainerResources | nindent 12 }}
           env:
             - name: MSSQL_SA_PASSWORD
               valueFrom:

@@ -101,7 +101,7 @@ else {
     $probeNamespace = "norvia-probe-$run".ToLowerInvariant()
     Invoke-SmokeStep "A pod in another namespace ($probeNamespace) is refused by the Partner API, SQL Server and the Service Bus emulators" {
         Invoke-Kubectl create namespace $probeNamespace | Out-Null
-        try { Assert-Isolated -Namespace $Namespace -ProbeNamespace $probeNamespace -Target (Get-IsolationTarget -Namespace $Namespace) -Image $ProbeImage }
+        try { Assert-Isolated -Namespace $Namespace -ProbeNamespace $probeNamespace -Target (Get-IsolationTargets -Namespace $Namespace) -Image $ProbeImage }
         finally { Invoke-Kubectl delete namespace $probeNamespace --wait=false | Out-Null }
     } | Out-Null
 }

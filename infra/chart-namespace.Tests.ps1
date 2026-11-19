@@ -302,3 +302,33 @@ Describe 'the namespace and what is cluster-scoped' -Skip:$script:helmMissing {
         (Get-Doc $custom 'Namespace' 'norvia').Text | Should -Match 'team: platform'
     }
 }
+
+Describe 'init containers and the pods that wait for the migrations' -Skip:$script:helmMissing {
+    It 'gives every init container requests and a memory limit of its own, so none runs unbounded when the LimitRange is off' {
+        $withInit = $script:docs | Where-Object { $_.Text -match '(?m)^\s+initContainers:' }
+        $withInit | Should -Not -BeNullOrEmpty
+        foreach ($doc in $withInit) {
+            $section = ($doc.Text -split '(?m)^\s+initContainers:\s*$', 2)[1]
+            $section = ($section -split '(?m)^\s+containers:\s*$', 2)[0]
+            $images = [regex]::Matches($section, '(?m)^\s+image: ').Count
+            [regex]::Matches($section, '(?m)^\s+resources:\s*$').Count | Should -Be $images -Because "$($doc.Kind) $($doc.Name) has $images init containers"
+            $section | Should -Match '(?s)limits:\s+memory: \S+\s+requests:\s+cpu: \S+\s+memory: \S+'
+        }
+    }
+
+    It 'labels the pod of an application that waits for the migrations, which allow-api-server selects, and keeps its token' {
+        # No application of the chart waits yet: render one through a copy of the chart with a template that includes the helper as one will.
+        $copy = Join-Path $TestDrive 'norvia'
+        Copy-Item $script:chart $copy -Recurse
+        Set-Content (Join-Path $copy 'templates/zz-waiter.yaml') '{{ include "norvia.deployment" (dict "root" . "name" "partner-api" "env" "" "waitsForMigrations" true) }}'
+        $output = & helm template norvia $copy --namespace norvia --set sql.saPassword=x --set edge.baseDomain=norvia.test --show-only templates/zz-waiter.yaml 2>&1
+        $LASTEXITCODE | Should -Be 0 -Because ($output -join "`
+")
+        $text = $output -join "`
+"
+        $text | Should -Match '(?m)^\s+serviceAccountName: migrations-waiter$'
+        $text | Should -Match 'norvia\.io/waits-for-migrations: "true"'
+        $text | Should -Not -Match 'automountServiceAccountToken'
+        (Get-Doc $docs 'Deployment' 'partner-api').Text | Should -Not -Match 'waits-for-migrations'
+    }
+}

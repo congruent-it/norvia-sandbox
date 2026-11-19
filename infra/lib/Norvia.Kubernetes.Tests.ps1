@@ -195,9 +195,9 @@ Describe 'Get-SecretValue' {
     }
 }
 
-Describe 'Get-IsolationTarget' {
+Describe 'Get-IsolationTargets' {
     It 'names the Partner API, SQL Server and the two Service Bus emulators by their address from another namespace' {
-        Get-IsolationTarget -Namespace 'norvia' | Should -Be @(
+        Get-IsolationTargets -Namespace 'norvia' | Should -Be @(
             'partner-api.norvia.svc.cluster.local:8080'
             'sql.norvia.svc.cluster.local:1433'
             'messaging.norvia.svc.cluster.local:5672'
@@ -206,7 +206,7 @@ Describe 'Get-IsolationTarget' {
     }
 
     It 'follows the namespace' {
-        Get-IsolationTarget -Namespace 'sandbox-2' | Select-Object -First 1 | Should -Be 'partner-api.sandbox-2.svc.cluster.local:8080'
+        Get-IsolationTargets -Namespace 'sandbox-2' | Select-Object -First 1 | Should -Be 'partner-api.sandbox-2.svc.cluster.local:8080'
     }
 }
 

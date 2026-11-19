@@ -138,7 +138,7 @@ function Assert-Accepted {
     if ($RequireCorrelationId -and -not $Answer.CorrelationId) { throw "$What accepted the call but it carries no X-Correlation-ID" }
 }
 
-function Get-IsolationTarget {
+function Get-IsolationTargets {
     <# .SYNOPSIS What no other namespace may reach (#938): the Partner API, SQL Server and the two Service Bus emulators, as host:port from another namespace. #>
     param([Parameter(Mandatory)][string] $Namespace)
     foreach ($target in @(@('partner-api', 8080), @('sql', 1433), @('messaging', 5672), @('messaging-2', 5672))) { "$($target[0]).$Namespace.svc.cluster.local:$($target[1])" }
@@ -187,4 +187,4 @@ function Assert-Isolated {
     if ($reached.Count -gt 0) { throw "a pod in the namespace $ProbeNamespace reached $($reached -join ', '): the namespace is not isolated (does the cluster's CNI enforce NetworkPolicy?)" }
 }
 
-Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted, Get-IsolationTarget, Test-CanConnect, Assert-Isolated
+Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted, Get-IsolationTargets, Test-CanConnect, Assert-Isolated

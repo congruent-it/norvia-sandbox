@@ -44,6 +44,11 @@ migrationsResources:
   requests: { cpu: 50m, memory: 128Mi }
   limits: { memory: 512Mi }
 
+# The requests and limits of an init container (the waiters for SQL Server and the migrations): a shell or kubectl polling.
+initContainerResources:
+  requests: { cpu: 10m, memory: 32Mi }
+  limits: { memory: 128Mi }
+
 # The image of the initContainers that wait for the migrations Jobs. Any image with kubectl in it.
 kubectl:
   # Must have kubectl and need no shell (the waiter runs kubectl directly). Match it to the cluster's version.

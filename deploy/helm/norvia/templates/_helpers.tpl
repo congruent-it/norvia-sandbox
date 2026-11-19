@@ -14,8 +14,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   initContainers that hold a pod until the named migrations Jobs have completed:
     initContainers:
       {{- include "norvia.waitForMigrations" (dict "root" . "names" (list "tms")) | nindent 6 }}
-  The pod must run as the service account migrations-waiter (include "norvia.podAccount" with it) and carry the label
-  norvia.io/waits-for-migrations: "true", which the network policy allow-api-server selects: kubectl needs the API server.
+  A Deployment that waits passes "waitsForMigrations" true to norvia.deployment, which runs it as the service account migrations-waiter and
+  labels it norvia.io/waits-for-migrations: "true", which the network policy allow-api-server selects: kubectl needs the API server.
 */}}
 {{- define "norvia.waitForMigrations" -}}
 {{- range .names }}
@@ -23,6 +23,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   image: {{ $.root.Values.kubectl.image }}
   # No shell: the kubectl image has none. kubectl fails while the Job does not exist yet or has not completed, and the kubelet
   # retries the init container with a back-off, so the pod waits, and a Job that exhausts its retries keeps the pod from starting.
+  resources:
+    {{- toYaml $.root.Values.initContainerResources | nindent 4 }}
   command:
     - kubectl
     - wait
@@ -192,8 +194,12 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .name }}
+        {{- if .waitsForMigrations }}
+        # What the network policy allow-api-server selects: the waiter's kubectl needs the API server.
+        norvia.io/waits-for-migrations: "true"
+        {{- end }}
     spec:
-      {{- include "norvia.podAccount" (dict "serviceAccount" .serviceAccount) | nindent 6 }}
+      {{- include "norvia.podAccount" (dict "waitsForMigrations" .waitsForMigrations) | nindent 6 }}
       {{- if .root.Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml .root.Values.image.pullSecrets | nindent 8 }}
@@ -281,14 +287,15 @@ http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.otlpGrpc }}
 {{- end }}
 
 {{/*
-  The service account every pod runs as (#938): norvia, which has no API token mounted. A pod that needs the API (the one that waits for
-  the migrations) names migrations-waiter and keeps its token: {{ include "norvia.podAccount" (dict "serviceAccount" "migrations-waiter") }}.
-  Called with a dict without serviceAccount, or with any other context, it is norvia.
+  The service account every pod runs as (#938): norvia, which has no API token mounted. A pod that needs the API (one that waits for the
+  migrations) keeps its token and runs as migrations-waiter: {{ include "norvia.podAccount" (dict "waitsForMigrations" true) }}.
+  Every other pod: {{ include "norvia.podAccount" (dict) }}.
 */}}
 {{- define "norvia.podAccount" -}}
-{{- $waiter := eq (default "" .serviceAccount) "migrations-waiter" -}}
-serviceAccountName: {{ ternary "migrations-waiter" "norvia" $waiter }}
-{{- if not $waiter }}
+{{- if .waitsForMigrations -}}
+serviceAccountName: migrations-waiter
+{{- else -}}
+serviceAccountName: norvia
 automountServiceAccountToken: false
 {{- end }}
 {{- end }}
