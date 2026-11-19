@@ -31,6 +31,7 @@ spec:
       labels:
         app.kubernetes.io/name: azurite
     spec:
+      {{- include "norvia.podAccount" (dict) | nindent 6 }}
       containers:
         - name: azurite
           image: {{ .Values.azurite.image }}

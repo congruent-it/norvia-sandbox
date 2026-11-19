@@ -1,0 +1,35 @@
+{{- /*
+  The namespace's share of a cluster others use (#938): a quota so Norvia cannot starve the other applications, and a limit range so a
+  container that names no requests (an init container) still fits the quota, and one container cannot take it all.
+*/ -}}
+{{- if .Values.quota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: norvia
+  labels:
+    app.kubernetes.io/name: norvia-quota
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  hard:
+    {{- range $name, $value := .Values.quota.hard }}
+    {{ $name }}: {{ $value | quote }}
+    {{- end }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: defaults
+  labels:
+    app.kubernetes.io/name: norvia-limits
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        {{- toYaml .Values.quota.containerDefaults.requests | nindent 8 }}
+      default:
+        {{- toYaml .Values.quota.containerDefaults.limits | nindent 8 }}
+      max:
+        {{- toYaml .Values.quota.containerMax | nindent 8 }}
+{{- end }}

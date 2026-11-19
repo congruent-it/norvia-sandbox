@@ -194,3 +194,76 @@ Describe 'Get-SecretValue' {
         { Invoke-Kubectl get secret x } | Should -Throw '*Forbidden*'
     }
 }
+
+Describe 'Get-IsolationTargets' {
+    It 'names the Partner API, SQL Server and the two Service Bus emulators by their address from another namespace' {
+        Get-IsolationTargets -Namespace 'norvia' | Should -Be @(
+            'partner-api.norvia.svc.cluster.local:8080'
+            'sql.norvia.svc.cluster.local:1433'
+            'messaging.norvia.svc.cluster.local:5672'
+            'messaging-2.norvia.svc.cluster.local:5672'
+        )
+    }
+
+    It 'follows the namespace' {
+        Get-IsolationTargets -Namespace 'sandbox-2' | Select-Object -First 1 | Should -Be 'partner-api.sandbox-2.svc.cluster.local:8080'
+    }
+}
+
+Describe 'Assert-Isolated' {
+    BeforeAll {
+        $script:targets = 'partner-api.norvia.svc.cluster.local:8080', 'sql.norvia.svc.cluster.local:1433'
+    }
+
+    It 'passes when a pod of the namespace connects and a pod of the other namespace does not' {
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Target -like 'kube-dns.*' -or $Namespace -eq 'norvia' }
+        { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } | Should -Not -Throw
+        Should -Invoke Test-CanConnect -ModuleName Norvia.Kubernetes -ParameterFilter { $Namespace -eq 'elsewhere' -and $Target -eq 'sql.norvia.svc.cluster.local:1433' }
+    }
+
+    It 'fails naming every target the other namespace reaches' {
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Target -like 'kube-dns.*' -or $Namespace -eq 'norvia' -or $Target -like 'sql.*' }
+        { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } |
+            Should -Throw '*sql.norvia.svc.cluster.local:1433*' -ExceptionType ([System.Management.Automation.RuntimeException])
+    }
+
+    It 'does not name a target the other namespace does not reach' {
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Target -like 'kube-dns.*' -or $Namespace -eq 'norvia' -or $Target -like 'sql.*' }
+        $message = try { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } catch { $_.Exception.Message }
+        $message | Should -Not -Match 'partner-api'
+    }
+
+    It 'cannot tell, and says so, when the probe does not start in the other namespace (a pull that fails there is not a refusal)' {
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $Namespace -eq 'norvia' }
+        { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } | Should -Throw '*could not connect from the namespace elsewhere to kube-dns*'
+        Should -Invoke Test-CanConnect -ModuleName Norvia.Kubernetes -Times 0 -ParameterFilter { $Namespace -eq 'elsewhere' -and $Target -like 'sql.*' }
+    }
+
+    It 'cannot tell, and says so, when the probe does not connect from inside the namespace either' {
+        Mock Test-CanConnect -ModuleName Norvia.Kubernetes { $false }
+        { Assert-Isolated -Namespace 'norvia' -ProbeNamespace 'elsewhere' -Target $targets -Image 'probe:1' } | Should -Throw '*could not connect from inside the namespace*'
+        Should -Invoke Test-CanConnect -ModuleName Norvia.Kubernetes -Times 0 -ParameterFilter { $Namespace -eq 'elsewhere' }
+    }
+}
+
+Describe 'Test-CanConnect' {
+    BeforeAll {
+        $script:kubectlStub = -not (Get-Command kubectl -ErrorAction SilentlyContinue)
+        if ($script:kubectlStub) { function global:kubectl { throw 'kubectl is a stub for the Pester mocks' } }
+    }
+    AfterAll { if ($script:kubectlStub) { Remove-Item Function:\kubectl -ErrorAction SilentlyContinue } }
+
+    It 'runs a throwaway pod of the image in the namespace, which dials the target' {
+        Mock kubectl -ModuleName Norvia.Kubernetes { $global:LASTEXITCODE = 0 }
+        Test-CanConnect -Namespace 'elsewhere' -Target 'sql.norvia.svc.cluster.local:1433' -Image 'probe:1' -TimeoutSeconds 4 | Should -BeTrue
+        Should -Invoke kubectl -ModuleName Norvia.Kubernetes -ParameterFilter {
+            $line = $args -join ' '
+            $line -match '^run connect-probe-\w+ --namespace elsewhere --image probe:1 --restart=Never --rm -i --quiet' -and $line -match '/agnhost connect sql\.norvia\.svc\.cluster\.local:1433 --timeout=4s$'
+        }
+    }
+
+    It 'is false when the dial fails' {
+        Mock kubectl -ModuleName Norvia.Kubernetes { $global:LASTEXITCODE = 1; 'TIMEOUT' }
+        Test-CanConnect -Namespace 'elsewhere' -Target 'sql.norvia.svc.cluster.local:1433' -Image 'probe:1' | Should -BeFalse
+    }
+}

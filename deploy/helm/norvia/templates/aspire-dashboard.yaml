@@ -61,6 +61,7 @@ spec:
       annotations:
         checksum/api-key: {{ $apiKey | sha256sum }}
     spec:
+      {{- include "norvia.podAccount" (dict) | nindent 6 }}
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml .Values.image.pullSecrets | nindent 8 }}

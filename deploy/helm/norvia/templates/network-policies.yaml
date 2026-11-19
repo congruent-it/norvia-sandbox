@@ -1,0 +1,115 @@
+{{- /*
+  The namespace's network policy (#938). NetworkPolicies add up, so one that selects every pod and allows nothing is the floor, and each
+  policy after it opens one path. Enforcement is the CNI's: on one that has none these do nothing (docs/operations/kubernetes.md).
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  labels:
+    app.kubernetes.io/name: default-deny
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# The pods of the namespace talk to each other: the applications, the workers, the emulators and SQL Server. Nothing outside it comes in.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  labels:
+    app.kubernetes.io/name: allow-same-namespace
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  labels:
+    app.kubernetes.io/name: allow-dns
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.dns.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.dns.podLabel | nindent 14 }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# The ingress controller reaches the applications that have an Ingress, on the app port, and nothing else.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  labels:
+    app.kubernetes.io/name: allow-ingress-controller
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          {{- range include "norvia.exposedApplications" . | fromJsonArray }}
+          - {{ . }}
+          {{- end }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressController.namespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.appPort }}
+---
+# The pods that wait for the migrations run kubectl, which needs the API server.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-server
+  labels:
+    app.kubernetes.io/name: allow-api-server
+    {{- include "norvia.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      norvia.io/waits-for-migrations: "true"
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        {{- range .Values.networkPolicy.apiServer.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        {{- range .Values.networkPolicy.apiServer.ports }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}

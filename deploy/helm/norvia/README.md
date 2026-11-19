@@ -1,6 +1,6 @@
 # The Norvia chart
 
-Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1'`.
+Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1'`.
 
 ## The data tier (#926)
 
@@ -76,6 +76,18 @@ Every worker signs its tokens with `local-tokens/signing-key`. The workers call 
 
 Not verified on a cluster: that the dashboard takes its settings as environment variables of this spelling, and that a search finds a trail written by a running application. The smoke script (#932) does not cover either yet: a search for the run's trail waits for the Integration console, which is not in the chart yet.
 
+## The namespace: network, ingress, Secrets and quota (#938)
+
+| Piece | What it is |
+|---|---|
+| `default-deny`, `allow-*` | `templates/network-policies.yaml`. A policy that selects every pod and allows nothing, then one policy per path: `allow-same-namespace` (pods of the namespace to each other; the pairs are not enumerated, as the applications are still being added), `allow-dns`, `allow-ingress-controller` (the controller's namespace, `networkPolicy.ingressController.namespace`, to the applications of `norvia.exposedApplications`, on `appPort`) and `allow-api-server` (egress on 443 and 6443 to `networkPolicy.apiServer.cidrs`, for pods labelled `norvia.io/waits-for-migrations: "true"`: `norvia.deployment` given `"waitsForMigrations" true` sets the label and runs the pod as `migrations-waiter`, which keeps its API token; a pod that includes `norvia.waitForMigrations` otherwise needs both, or its init container cannot reach the API server). |
+| `internal-only` | A Traefik `Middleware` (`edge.internal`) that every Ingress names; with `nginx` an annotation instead, with `none` the class or annotations you give. See `values.yaml` for the caveat about the client's address. |
+| `norvia`, `secret-reader` | The service account every pod runs as (no token mounted; `norvia.podAccount` sets it, `migrations-waiter` aside), and a Role and RoleBinding that let it and `rbac.secretReaders` `get` the chart's five Secrets by name. The template test compares the Role's names with the Secrets the chart renders. |
+| `norvia` ResourceQuota, `defaults` LimitRange | `templates/quota.yaml`, from `quota` in `values.yaml`. Every Deployment, StatefulSet and Job has requests and a memory limit in `values.yaml`; the init containers have `initContainerResources`, and the LimitRange covers any container that names none. The template test sums what the chart asks for, the Jobs included, and fails when it exceeds the quota. |
+| `Namespace` | Only with `namespace.create=true`; see `values.yaml` for why Helm's own `--create-namespace` is the default. |
+
+The chart installs nothing cluster-scoped (a template test lists the kinds). Not verified on a cluster: that the CNI enforces the policies, which the smoke script's isolation check settles, and the Pod Security `baseline` label.
+
 ## The smoke script (#932)
 
 `infra/smoke-test-kubernetes.ps1` (PowerShell 7, ADR 0048) is the check after every `helm upgrade --install`. Run it from anywhere that reaches the ingress, with `kubectl` pointed at the cluster:
@@ -85,5 +97,7 @@ pwsh infra/smoke-test-kubernetes.ps1 -BaseDomain norvia.example.org   # -Insecur
 ```
 
 It drives one Shipment through the ingress hostnames: Brouwer Dranken books, the Planner assigns and releases (as the TMS UI would), Van Dijk Transport confirms, sends PU, DEP and POD tracking events and a Proof of delivery, and Brouwer Dranken reads the Proof of delivery, its file and the tracking events back. It signs the tokens itself with `local-tokens/signing-key` and takes the keys from `subscription-keys`, so it needs `get` on those Secrets. It stops at the first step that fails, naming it, with the status the application answered and never a body, token or key. Each run leaves one Transport Order behind.
+
+Before the Shipment, it runs the isolation check of #938: a pod in a namespace it makes and removes must be refused by the Partner API, SQL Server and the two emulators (`-SkipIsolationCheck` leaves it out, `-ProbeImage` sets the image).
 
 What it settles for the "not verified on a cluster" notes above: that Traefik and cert-manager route to the Partner API, that two Service Bus emulators share one SQL Server, and the worker path (booking, tracking and Proof of delivery) through the emulators and Azurite. It needs the TMS API on `tms-api.<baseDomain>`, and until that application is in the chart the script fails at its first step, naming it. Not covered yet: that the Aspire dashboard's search finds the run's trail, which waits for the Integration console.

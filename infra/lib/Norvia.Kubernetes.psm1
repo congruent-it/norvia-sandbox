@@ -138,4 +138,53 @@ function Assert-Accepted {
     if ($RequireCorrelationId -and -not $Answer.CorrelationId) { throw "$What accepted the call but it carries no X-Correlation-ID" }
 }
 
-Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted
+function Get-IsolationTargets {
+    <# .SYNOPSIS What no other namespace may reach (#938): the Partner API, SQL Server and the two Service Bus emulators, as host:port from another namespace. #>
+    param([Parameter(Mandatory)][string] $Namespace)
+    foreach ($target in @(@('partner-api', 8080), @('sql', 1433), @('messaging', 5672), @('messaging-2', 5672))) { "$($target[0]).$Namespace.svc.cluster.local:$($target[1])" }
+}
+
+function Test-CanConnect {
+    <#
+    .SYNOPSIS Whether a throwaway pod in a namespace can open a TCP connection to host:port. A pod that cannot start (no image, no rights) is also false.
+    .PARAMETER Image An image with /agnhost, whose connect command exits non-zero when it cannot connect (registry.k8s.io/e2e-test-images/agnhost).
+    #>
+    param(
+        [Parameter(Mandatory)][string] $Namespace,
+        [Parameter(Mandatory)][string] $Target,
+        [Parameter(Mandatory)][string] $Image,
+        [ValidateRange(1, 300)][int] $TimeoutSeconds = 5
+    )
+    $name = "connect-probe-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    # kubectl directly, not Invoke-Kubectl: a non-zero exit is the answer here (cannot connect), not an error.
+    $null = & kubectl run $name --namespace $Namespace --image $Image --restart=Never --rm -i --quiet --command -- /agnhost connect $Target "--timeout=${TimeoutSeconds}s" 2>&1
+    $LASTEXITCODE -eq 0
+}
+
+function Assert-Isolated {
+    <#
+    .SYNOPSIS Throws unless a pod of the namespace reaches the targets and a pod of another namespace reaches none of them.
+    .DESCRIPTION
+        The default-deny NetworkPolicy of the chart (#938) is only as good as the cluster's CNI, so the smoke script asks the cluster. The pod
+        inside the namespace comes first: if it cannot connect either, the probe (its image, the cluster's pull rights) is what failed, and a
+        refusal from the other namespace would prove nothing.
+    #>
+    param(
+        [Parameter(Mandatory)][string] $Namespace,
+        [Parameter(Mandatory)][string] $ProbeNamespace,
+        [Parameter(Mandatory)][string[]] $Target,
+        [Parameter(Mandatory)][string] $Image,
+        # Reachable from every namespace (the cluster DNS, over TCP): a probe that connects here has run, so its refusals are the policy's.
+        [string] $ControlTarget = 'kube-dns.kube-system.svc.cluster.local:53'
+    )
+    if (-not (Test-CanConnect -Namespace $Namespace -Target $Target[0] -Image $Image)) {
+        throw "the probe pod could not connect from inside the namespace $Namespace to $($Target[0]), so a refusal from another namespace would prove nothing (is the image ${Image} pullable, and the application running?)"
+    }
+    if (-not (Test-CanConnect -Namespace $ProbeNamespace -Target $ControlTarget -Image $Image)) {
+        throw "the probe pod could not connect from the namespace $ProbeNamespace to $ControlTarget, which every namespace may reach, so its refusals prove nothing (can that namespace pull ${Image}?)"
+    }
+    $reached = @($Target | Where-Object { Test-CanConnect -Namespace $ProbeNamespace -Target $_ -Image $Image })
+    if ($reached.Count -gt 0) { throw "a pod in the namespace $ProbeNamespace reached $($reached -join ', '): the namespace is not isolated (does the cluster's CNI enforce NetworkPolicy?)" }
+}
+
+Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted, Get-IsolationTargets, Test-CanConnect, Assert-Isolated

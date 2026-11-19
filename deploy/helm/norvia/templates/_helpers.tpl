@@ -14,7 +14,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   initContainers that hold a pod until the named migrations Jobs have completed:
     initContainers:
       {{- include "norvia.waitForMigrations" (dict "root" . "names" (list "tms")) | nindent 6 }}
-  The pod must run as the service account migrations-waiter.
+  A Deployment that waits passes "waitsForMigrations" true to norvia.deployment, which runs it as the service account migrations-waiter and
+  labels it norvia.io/waits-for-migrations: "true", which the network policy allow-api-server selects: kubectl needs the API server.
 */}}
 {{- define "norvia.waitForMigrations" -}}
 {{- range .names }}
@@ -22,6 +23,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   image: {{ $.root.Values.kubectl.image }}
   # No shell: the kubectl image has none. kubectl fails while the Job does not exist yet or has not completed, and the kubelet
   # retries the init container with a back-off, so the pod waits, and a Job that exhausts its retries keeps the pod from starting.
+  resources:
+    {{- toYaml $.root.Values.initContainerResources | nindent 4 }}
   command:
     - kubectl
     - wait
@@ -191,7 +194,12 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .name }}
+        {{- if .waitsForMigrations }}
+        # What the network policy allow-api-server selects: the waiter's kubectl needs the API server.
+        norvia.io/waits-for-migrations: "true"
+        {{- end }}
     spec:
+      {{- include "norvia.podAccount" (dict "waitsForMigrations" .waitsForMigrations) | nindent 6 }}
       {{- if .root.Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml .root.Values.image.pullSecrets | nindent 8 }}
@@ -244,4 +252,50 @@ http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.otlpGrpc }}
     secretKeyRef:
       name: dashboard-api-key
       key: api-key
+{{- end }}
+
+{{/* The applications that get an Ingress, as a JSON array: {{ range include "norvia.exposedApplications" . | fromJsonArray }}. An application the chart deploys later is added here, and so is let through by the network policy. */}}
+{{- define "norvia.exposedApplications" -}}
+{{- $exposed := list "partner-api" -}}
+{{- if .Values.agents.enabled }}{{ $exposed = append $exposed "agent-mcp" }}{{ end -}}
+{{ toJson $exposed }}
+{{- end }}
+
+{{/*
+  What keeps an Ingress internal (#938): the ingress class and the annotations, as a JSON object {"className": ..., "annotations": {...}}.
+  Fails when edge.internal.controller is none and the operator gave neither a class nor annotations, as nothing would keep it internal.
+*/}}
+{{- define "norvia.internalIngress" -}}
+{{- $edge := .Values.edge -}}
+{{- $internal := $edge.internal -}}
+{{- $className := $edge.ingress.className -}}
+{{- $annotations := dict -}}
+{{- if $internal.enabled -}}
+  {{- if $internal.className }}{{ $className = $internal.className }}{{ end -}}
+  {{- if eq $internal.controller "traefik" -}}
+    {{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.middlewares" (printf "%s-internal-only@kubernetescrd" .Release.Namespace) -}}
+  {{- else if eq $internal.controller "nginx" -}}
+    {{- $_ := set $annotations "nginx.ingress.kubernetes.io/whitelist-source-range" (join "," $internal.allowedCidrs) -}}
+  {{- else if eq $internal.controller "none" -}}
+    {{- if not (or $internal.className $internal.annotations) }}{{ fail "edge.internal.controller is none, so edge.internal.className or edge.internal.annotations must say what keeps the Ingress internal (or set edge.internal.enabled=false)" }}{{ end -}}
+  {{- else -}}
+    {{- fail (printf "edge.internal.controller must be traefik, nginx or none, not %q" $internal.controller) -}}
+  {{- end -}}
+  {{- $annotations = merge $annotations (deepCopy $internal.annotations) -}}
+{{- end -}}
+{{ dict "className" $className "annotations" $annotations | toJson }}
+{{- end }}
+
+{{/*
+  The service account every pod runs as (#938): norvia, which has no API token mounted. A pod that needs the API (one that waits for the
+  migrations) keeps its token and runs as migrations-waiter: {{ include "norvia.podAccount" (dict "waitsForMigrations" true) }}.
+  Every other pod: {{ include "norvia.podAccount" (dict) }}.
+*/}}
+{{- define "norvia.podAccount" -}}
+{{- if .waitsForMigrations -}}
+serviceAccountName: migrations-waiter
+{{- else -}}
+serviceAccountName: norvia
+automountServiceAccountToken: false
+{{- end }}
 {{- end }}
