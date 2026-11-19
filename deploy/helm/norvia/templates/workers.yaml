@@ -1,0 +1,63 @@
+{{- /*
+  The Logic App workers (#929, ADR 0030 onwards): one Deployment of one replica each, with the settings, credentials and token key the
+  AppHost gives it under Aspire. A worker is a plain generic host, so it is not probed and has no Service; carrier-invoice-worker is the
+  exception, as the Partner API calls its HTTP trigger. They call the applications by Service name (tms-api, erp-api, driver-app-api,
+  partner-portal-web), which the chart's later slices deploy; until then a worker retries.
+*/ -}}
+{{- range $name, $worker := .Values.workers }}
+{{- $env := include "worker.env" (dict "root" $ "name" $name "worker" $worker) }}
+---
+{{ include "norvia.deployment" (dict "root" $ "name" $name "app" (dict "image" $name "resources" $.Values.workerResources) "env" $env "http" (hasKey $worker "http")) }}
+{{- if $worker.http }}
+---
+{{ include "norvia.service" (dict "root" $ "name" $name) }}
+{{- end }}
+{{- end }}
+{{- define "worker.env" -}}
+{{- $root := .root -}}
+{{- $worker := .worker -}}
+{{- $section := $worker.section -}}
+{{- $upstream := title $worker.upstream -}}
+{{- if $worker.emulator }}
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" $root "name" $worker.emulator) | quote }}
+{{- end }}
+{{- if $worker.blobs }}
+- name: ConnectionStrings__{{ $worker.blobs }}
+  value: {{ include "norvia.azuriteConnectionString" $root | quote }}
+{{- end }}
+- name: {{ $section }}__{{ $upstream }}BaseAddress
+  value: {{ include "norvia.url" (dict "root" $root "name" (printf "%s-api" $worker.upstream)) | quote }}
+{{ include "norvia.tokenEnv" (dict "root" $root "prefix" (printf "%s__%sTokens" $section $upstream) "audience" (printf "%sAudience" $upstream) "clientId" $worker.clientId) }}
+{{- if eq .name "carrier-invoice-worker" }}
+{{ include "norvia.tokenEnv" (dict "root" $root "prefix" "CarrierInvoice__Trigger" "audience" "CarrierInvoiceTriggerAudience" "clientId" "ApiManagementClientId") }}
+{{- end }}
+{{- if eq .name "trip-dispatch-worker" }}
+- name: TripDispatch__DriverApp__Address
+  value: {{ include "norvia.url" (dict "root" $root "name" "driver-app-api") }}/v1/trips
+- name: TripDispatch__DriverApp__ApiKey
+  valueFrom:
+    secretKeyRef:
+      name: endpoint-keys
+      key: DriverEndpoint__ApiKey
+{{- end }}
+{{- if eq .name "driver-reports-worker" }}
+- name: DriverReports__DriverApp__BaseAddress
+  value: {{ include "norvia.url" (dict "root" $root "name" "driver-app-api") | quote }}
+{{ include "norvia.tokenEnv" (dict "root" $root "prefix" "DriverReports__DriverApp__Tokens" "audience" "DriverAppAudience" "clientId" $worker.clientId) }}
+{{- end }}
+{{- with $worker.endpoints }}
+{{- $endpoints := . }}
+{{- range $root.Values.personas }}
+{{- if eq .type $endpoints.type }}
+- name: {{ $section }}__{{ $endpoints.setting }}__{{ .party }}__Address
+  value: {{ include "norvia.url" (dict "root" $root "name" "partner-portal-web") }}/{{ lower .type }}/v1/{{ .party }}/{{ $endpoints.path }}
+- name: {{ $section }}__{{ $endpoints.setting }}__{{ .party }}__ApiKey
+  valueFrom:
+    secretKeyRef:
+      name: endpoint-keys
+      key: {{ include "norvia.endpointKeyName" . }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

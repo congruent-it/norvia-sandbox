@@ -1,6 +1,6 @@
 # The Norvia chart
 
-Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1'`.
+Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1'`.
 
 ## The data tier (#926)
 
@@ -55,3 +55,12 @@ helm upgrade --install norvia deploy/helm/norvia -n norvia \
 ```
 
 `localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. The other UIs and APIs (the TMS, the ERP, the console and the rest) are not in the chart yet: each joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (#932) covers.
+
+## The Logic App workers (#929)
+
+| Piece | What it is |
+|---|---|
+| `workers` in `values.yaml` | The 13 `Local*Worker` hosts, each a Deployment of one replica (`templates/workers.yaml`): its settings, the Service Bus emulator it reads (`messaging` or `messaging-2`, as the AppHost's `messaging` and `messagingEdge`), the application it calls (`tms` or `erp`), the client ID of its token identity and, for the five that call a Shipper's or Carrier's endpoint, the Persona endpoints. They are plain generic hosts, so they have no port and no probes; `carrier-invoice-worker` is the exception (the Partner API calls its HTTP trigger), with a Service and the `/health` and `/alive` probes. `workerResources` holds their requests and limits. |
+| `endpoint-keys` | Generated at install and kept on upgrade, like `subscription-keys`: the credential each Shipper's and Carrier's endpoint in the Partner portal asks its caller for, and the Driver app's Trip endpoint asks the Trip dispatch worker for. The keys are named as the settings that read them (`CarrierEndpoint__ApiKeys__CAR-0001`, `ShipperEndpoint__ApiKeys__SHP-0001`, `DriverEndpoint__ApiKey`), so the Partner portal and the Driver app take the Secret as `envFrom` and a worker reads its key with `secretKeyRef`. |
+
+Every worker signs its tokens with `local-tokens/signing-key`. The workers call `tms-api`, `erp-api`, `driver-app-api` and `partner-portal-web` by the AppHost's resource names; those applications are not in the chart yet, so until they are a worker starts and retries. Not in this slice: the Driver reports worker's disabled flag (`DriverReports__DisabledFlagPath`), a file the Partner portal's fault page creates in the AppHost's temp directory. It is unset here, so the worker never reads as disabled; it needs a volume shared with the Partner portal, which comes with that application.
