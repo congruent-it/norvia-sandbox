@@ -54,7 +54,7 @@ helm upgrade --install norvia deploy/helm/norvia -n norvia \
   --set image.registry=registry.example.org/norvia
 ```
 
-`localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. The other UIs and APIs (the TMS, the ERP, the console and the rest) are not in the chart yet: each joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (#932) covers.
+`localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. The other UIs and APIs (the TMS, the ERP, the console and the rest) are not in the chart yet: each joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (below) covers.
 
 ## The Logic App workers (#929)
 
@@ -75,3 +75,15 @@ Every worker signs its tokens with `local-tokens/signing-key`. The workers call 
 | `norvia.localTelemetryEnv` | `LocalTelemetry__DashboardUrl` and `LocalTelemetry__ApiKey`, which make the Integration console search the dashboard with `DashboardTrailSource` (ADR 0027). The console is not in the chart yet: its Deployment includes this helper when it is added. |
 
 Not verified on a cluster: that the dashboard takes its settings as environment variables of this spelling, and that a search finds a trail written by a running application. The smoke script (#932) covers both.
+
+## The smoke script (#932)
+
+`infra/smoke-test-kubernetes.ps1` (PowerShell 7, ADR 0048) is the check after every `helm upgrade --install`. Run it from anywhere that reaches the ingress, with `kubectl` pointed at the cluster:
+
+```
+pwsh infra/smoke-test-kubernetes.ps1 -BaseDomain norvia.example.org   # -Insecure for plain http, -SkipCertificateCheck for a self-signed certificate
+```
+
+It drives one Shipment through the ingress hostnames: Brouwer Dranken books, the Planner assigns and releases (as the TMS UI would), Van Dijk Transport confirms, sends PU, DEP and POD tracking events and a Proof of delivery, and Brouwer Dranken reads the Proof of delivery, its file and the tracking events back. It signs the tokens itself with `local-tokens/signing-key` and takes the keys from `subscription-keys`, so it needs `get` on those Secrets. It stops at the first step that fails, naming it, with the status the application answered and never a body, token or key. Each run leaves one Transport Order behind.
+
+What it settles for the "not verified on a cluster" notes above: that Traefik and cert-manager route to the Partner API, that two Service Bus emulators share one SQL Server, and the worker path (booking, tracking and Proof of delivery) through the emulators and Azurite. It needs the TMS API on `tms-api.<baseDomain>`, and until that application is in the chart the script fails at its first step, naming it. Not covered yet: that the Aspire dashboard's search finds the run's trail, which waits for the Integration console.
