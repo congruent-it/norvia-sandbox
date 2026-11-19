@@ -1,0 +1,10 @@
+{
+  "eventId": "0192f7a8-91b2-7a60-8d1c-52f4e7b0a9c3",
+  "eventType": "ConsigneeNotificationRequested",
+  "eventVersion": 1,
+  "occurredAt": "2026-10-06T09:15:00Z",
+  "correlationId": "c2d41e7b-3a90-4f6c-b0d2-91e5a8a47f20",
+  "transportOrderNumber": "TO-0000007",
+  "shipmentNumber": "SH-0000012",
+  "reason": "DeliveryWindowAgreed"
+}

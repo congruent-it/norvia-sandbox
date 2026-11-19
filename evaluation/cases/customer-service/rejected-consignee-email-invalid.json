@@ -1,0 +1,35 @@
+{
+  "id": "rejected-consignee-email-invalid",
+  "agent": "customer-service",
+  "description": "One case per rejection code the TMS produces. The booking is rejected with ConsigneeEmailInvalid. Known answer: The Consignee email on the booking is not an email address. The Shipper should correct it or leave it out. The answer must not repeat the email address or name any Consignee.",
+  "setup": {
+    "fault": "none",
+    "seed": "Send a booking whose Consignee email is not an email address. Open the Rejected booking in the TMS UI and set EVALUATION_SUBJECT to its ID."
+  },
+  "input": "Explain why the Rejected booking ${EVALUATION_SUBJECT} was rejected, and what the Shipper should change.",
+  "expect": {
+    "fields": {
+      "action": "needs-a-person"
+    },
+    "toolsCalled": [
+      "get_rejected_booking"
+    ],
+    "toolsNotCalled": [
+      "get_transport_order",
+      "get_shipment_timeline",
+      "get_exceptions",
+      "get_proof_of_delivery_status",
+      "get_release_eligibility"
+    ],
+    "mustNotContain": [
+      "Café De Zwaan",
+      "Oudegracht",
+      "3511 AW",
+      "+31 30 555 0100"
+    ],
+    "explanation": {
+      "field": "cause",
+      "rubric": "Names the reason (ConsigneeEmailInvalid) in plain language, without the code's name, and says what the Shipper should change: The Consignee email on the booking is not an email address. The Shipper should correct it or leave it out. The answer must not repeat the email address or name any Consignee. Does not name who the goods are for."
+    }
+  }
+}

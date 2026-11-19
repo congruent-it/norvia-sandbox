@@ -17,6 +17,7 @@
     <ProjectReference Include="..\DriverApp\Norvia.DriverApp.Web\Norvia.DriverApp.Web.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalBookingWorker\Norvia.Integration.LocalBookingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalShipperNotificationWorker\Norvia.Integration.LocalShipperNotificationWorker.csproj" />
+    <ProjectReference Include="..\Integration\Norvia.Integration.LocalConsigneeNotificationWorker\Norvia.Integration.LocalConsigneeNotificationWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalCarrierCancellationWorker\Norvia.Integration.LocalCarrierCancellationWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalBillingWorker\Norvia.Integration.LocalBillingWorker.csproj" />
     <ProjectReference Include="..\Integration\Norvia.Integration.LocalMasterDataSyncWorker\Norvia.Integration.LocalMasterDataSyncWorker.csproj" />

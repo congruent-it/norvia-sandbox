@@ -32,6 +32,11 @@
 {{- if eq .name "carrier-invoice-worker" }}
 {{ include "norvia.tokenEnv" (dict "root" $root "prefix" "CarrierInvoice__Trigger" "audience" "CarrierInvoiceTriggerAudience" "clientId" "ApiManagementClientId") }}
 {{- end }}
+{{- if eq .name "consignee-notification-worker" }}
+{{- /* The link in the email is on the Partner portal. The chart has no ingress for the portal yet, so it is the in-cluster address until it has. */}}
+- name: ConsigneeNotification__PartnerPortalBaseAddress
+  value: {{ include "norvia.url" (dict "root" $root "name" "partner-portal-web") | quote }}
+{{- end }}
 {{- if eq .name "trip-dispatch-worker" }}
 - name: TripDispatch__DriverApp__Address
   value: {{ include "norvia.url" (dict "root" $root "name" "driver-app-api") }}/v1/trips

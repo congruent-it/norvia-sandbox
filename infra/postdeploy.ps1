@@ -29,6 +29,7 @@ Invoke-Step migrate.ps1 erp-migrations, "the ERP's database"
 Invoke-Step deploy-intake-logic-app.ps1
 Invoke-Step deploy-booking-logic-app.ps1
 Invoke-Step deploy-shipper-notification-logic-app.ps1
+Invoke-Step deploy-consignee-notification-logic-app.ps1
 Invoke-Step deploy-carrier-cancellation-logic-app.ps1
 Invoke-Step deploy-trip-dispatch-logic-app.ps1
 Invoke-Step deploy-driver-reports-logic-app.ps1

@@ -54,6 +54,12 @@ public static class Flows
     public const string ConsigneeTracking = "consignee-tracking";
 
     /// <summary>
+    /// Telling the Consignee where to track the goods (#983), which continues the Message trail of the Collected or the agreed delivery
+    /// window that asked for it. The Consignee's email address and the tracking code are never in a log.
+    /// </summary>
+    public const string ConsigneeNotification = "consignee-notification";
+
+    /// <summary>
     /// Deciding that a Transport Order is Billable (P9), on the Message trail of the transaction that completed its last condition.
     /// </summary>
     public const string Billing = "billing";

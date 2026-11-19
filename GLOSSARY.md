@@ -13,7 +13,7 @@ An organization that pays Norvia to store, move or deliver its goods. Norvia's c
 _Avoid_: customer, client, brand
 
 **Consignee**:
-The party that receives the goods at the end of a transport. It may be a business or an end consumer.
+The party that receives the goods at the end of a transport. It may be a business or an end consumer. The booking may give its name, a contact, a phone number and an email, all personal data the TMS never logs.
 _Avoid_: customer, recipient, end user
 
 **Carrier**:
@@ -199,6 +199,10 @@ _Avoid_: status event, status update, scan, milestone
 **Tracking status**:
 What a Shipper is shown of where its Transport Order stands: Received, Scheduled, Collected, In transit or Delivered. It is derived from the Transport Order and its Shipment, and it hides how Norvia carries the goods, so a Shipment that goes back to planning before collection stays Scheduled. It never moves backwards.
 _Avoid_: Shipment status (that is Norvia's own, finer view), tracking state, milestone
+
+**Consignee notification**:
+The email that tells a Consignee where to track the goods, sent to the Consignee email on the Transport Order when the Shipment is Collected and when the Planner agrees a delivery window. It carries the tracking link and nothing else, and a Transport Order with no Consignee email sends none. The Consignee notification Logic App sends it, apart from the Shipper notification, so one failing never holds up the other ([ADR 0054](docs/adr/0054-the-consignee-is-told-by-email-from-its-own-logic-app-and-locally-the-email-is-a-file.md)).
+_Avoid_: Consignee alert, delivery notification (that is the Shipper notification's business)
 
 **Tracking code**:
 A random code the TMS gives each Transport Order, carried in the Consignee's tracking link. Whoever holds it can read that one Transport Order's Consignee view, with no token and no Persona. It expires after delivery and can be replaced by the Planner, and it is never logged ([ADR 0052](docs/adr/0052-consignees-track-with-a-tracking-code-in-a-link-and-no-token.md)).

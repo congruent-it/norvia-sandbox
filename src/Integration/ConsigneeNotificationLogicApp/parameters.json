@@ -1,0 +1,26 @@
+{
+  "tmsBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('TMS_BASE_URL')"
+  },
+  "tmsAudience": {
+    "type": "String",
+    "value": "@appsetting('TMS_API_CLIENT_ID')"
+  },
+  "consigneeNotificationIdentityId": {
+    "type": "String",
+    "value": "@appsetting('CONSIGNEE_NOTIFICATION_IDENTITY_ID')"
+  },
+  "partnerPortalBaseUrl": {
+    "type": "String",
+    "value": "@appsetting('PARTNER_PORTAL_BASE_URL')"
+  },
+  "emailEndpoint": {
+    "type": "String",
+    "value": "@appsetting('EMAIL_ENDPOINT')"
+  },
+  "emailSenderAddress": {
+    "type": "String",
+    "value": "@appsetting('EMAIL_SENDER_ADDRESS')"
+  }
+}

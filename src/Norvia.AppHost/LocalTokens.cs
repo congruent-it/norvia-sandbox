@@ -42,6 +42,7 @@ public static class LocalTokens
     public const string CarrierInvoiceTriggerAudience = "api://norvia-carrier-invoice-logic-app";
     public const string CarrierInvoiceOutcomeLogicAppClientId = "norvia-local-carrier-invoice-outcome-logic-app";
     public const string ShipperNotificationLogicAppClientId = "norvia-local-shipper-notification-logic-app";
+    public const string ConsigneeNotificationLogicAppClientId = "norvia-local-consignee-notification-logic-app";
     public const string CarrierCancellationLogicAppClientId = "norvia-local-carrier-cancellation-logic-app";
     public const string TripDispatchLogicAppClientId = "norvia-local-trip-dispatch-logic-app";
     public const string DriverReportsLogicAppClientId = "norvia-local-driver-reports-logic-app";

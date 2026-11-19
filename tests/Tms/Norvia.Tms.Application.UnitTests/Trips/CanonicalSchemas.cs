@@ -22,7 +22,18 @@ internal static class CanonicalSchemas
 
     private static readonly Lazy<JsonSchema> ShipmentTakenOffTripSchema = new(() => Load("shipment-taken-off-trip.v1.schema.json"));
 
+    private static readonly Lazy<JsonSchema> ConsigneeNotificationRequestedSchema = new(() => Load("consignee-notification-requested.v1.schema.json"));
+
     private static readonly Lazy<JsonSchema> ProofOfDeliverySchema = new(() => Load("proof-of-delivery.v1.schema.json"));
+
+    public static IEnumerable<string> ConsigneeNotificationRequestedSamples() =>
+        Assembly.GetExecutingAssembly().GetManifestResourceNames()
+            .Where(name => name.StartsWith("CanonicalModel/samples/consignee-notification-requested/", StringComparison.Ordinal));
+
+    public static EvaluationResults ValidateConsigneeNotificationRequested(JsonNode body) =>
+        ConsigneeNotificationRequestedSchema.Value.Evaluate(
+            JsonSerializer.SerializeToElement(body),
+            new EvaluationOptions { OutputFormat = OutputFormat.List, RequireFormatValidation = true });
 
     public static IEnumerable<string> ProofOfDeliverySamples() =>
         Assembly.GetExecutingAssembly().GetManifestResourceNames()

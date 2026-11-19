@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://norvia.example/canonical-model/consignee-notification-requested.v1.schema.json",
+  "title": "ConsigneeNotificationRequested",
+  "description": "The Consignee is to be told where to track the goods (Canonical Model event, version 1): a Shipment of a Transport Order with a Consignee email was Collected (P5), or the Planner agreed a delivery window for it (P7). It names the Transport Order and nothing about the Consignee: the email address is personal data and the tracking code is a credential (ADR 0052), so the Consignee notification Logic App reads both from the TMS when it sends the email, which carries the link and nothing else (the tracking page shows the agreed window), and a Transport Order with no email sends nothing. Published on the Shipment events topic through the TMS's transactional outbox, in the transaction of the Collected or the agreement and under its correlation ID, so the Message trail continues. A failed notification never undoes either, and the Shipper's own notification path is separate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "occurredAt",
+    "correlationId",
+    "transportOrderNumber",
+    "shipmentNumber",
+    "reason"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "eventType": {
+      "const": "ConsigneeNotificationRequested"
+    },
+    "eventVersion": {
+      "const": 1
+    },
+    "occurredAt": {
+      "description": "When the TMS recorded the Collected or the agreement.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationId": {
+      "description": "The correlation ID of the Tracking event that collected the Shipment, or of the Planner's agreement.",
+      "type": "string",
+      "minLength": 1
+    },
+    "transportOrderNumber": {
+      "description": "The Transport Order whose Consignee is told.",
+      "type": "string",
+      "pattern": "^TO-[0-9]{7}$"
+    },
+    "shipmentNumber": {
+      "type": "string",
+      "pattern": "^SH-[0-9]{7}$"
+    },
+    "reason": {
+      "description": "Why the Consignee is told: the Shipment was Collected, or the Planner agreed a delivery window with it.",
+      "enum": [
+        "Collected",
+        "DeliveryWindowAgreed"
+      ]
+    }
+  }
+}

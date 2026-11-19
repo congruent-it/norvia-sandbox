@@ -14,6 +14,7 @@ src/Integration/IntakeLogicApp/lib/
 src/Integration/BookingLogicApp/lib/
 # The Shipper notification Logic App's local functions, written there by building their project.
 src/Integration/ShipperNotificationLogicApp/lib/
+src/Integration/ConsigneeNotificationLogicApp/lib/
 # The Carrier cancellation Logic App's local functions, written there by building their project.
 src/Integration/CarrierCancellationLogicApp/lib/
 # The Carrier-answer Logic App's local functions, written there by building their project.

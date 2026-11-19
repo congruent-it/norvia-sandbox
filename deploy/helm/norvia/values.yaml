@@ -68,6 +68,7 @@ serviceBus:
   conditions:
     carrier-booking: "assignedTo = 'Carrier'"
     shipper-notification: "eventType = 'ShipperNotificationRequested'"
+    consignee-notification: "eventType = 'ConsigneeNotificationRequested'"
     carrier-cancellation: "eventType = 'CarrierBookingCancelled' OR eventType = 'CarrierBookingWithdrawn'"
     carrier-invoice-outcome: "eventType = 'CarrierInvoiceApproved'"
     shipper-invoice: "eventType IN ('ShipperInvoiceIssued', 'CreditNoteIssued')"
@@ -80,7 +81,7 @@ serviceBus:
     messaging:
       topics:
         transport-order-events: [monitoring, billing]
-        shipment-events: [monitoring, carrier-booking, shipper-notification, carrier-cancellation, carrier-cost]
+        shipment-events: [monitoring, carrier-booking, shipper-notification, consignee-notification, carrier-cancellation, carrier-cost]
         trip-events: [monitoring, trip-dispatch]
       queues: []
     messaging-2:
@@ -240,6 +241,7 @@ localTokens:
   ApiManagementClientId: norvia-local-api-management
   BookingLogicAppClientId: norvia-local-booking-logic-app
   ShipperNotificationLogicAppClientId: norvia-local-shipper-notification-logic-app
+  ConsigneeNotificationLogicAppClientId: norvia-local-consignee-notification-logic-app
   CarrierCancellationLogicAppClientId: norvia-local-carrier-cancellation-logic-app
   TripDispatchLogicAppClientId: norvia-local-trip-dispatch-logic-app
   BillingLogicAppClientId: norvia-local-billing-logic-app
@@ -287,6 +289,7 @@ workerResources:
 workers:
   booking-worker: { section: Booking, upstream: tms, emulator: messaging, clientId: BookingLogicAppClientId, endpoints: { type: Carrier, setting: Carriers, path: bookings } }
   shipper-notification-worker: { section: ShipperNotification, upstream: tms, emulator: messaging, clientId: ShipperNotificationLogicAppClientId, endpoints: { type: Shipper, setting: Shippers, path: notifications } }
+  consignee-notification-worker: { section: ConsigneeNotification, upstream: tms, emulator: messaging, clientId: ConsigneeNotificationLogicAppClientId }
   carrier-cancellation-worker: { section: CarrierCancellation, upstream: tms, emulator: messaging, clientId: CarrierCancellationLogicAppClientId, endpoints: { type: Carrier, setting: Carriers, path: cancellations } }
   trip-dispatch-worker: { section: TripDispatch, upstream: tms, emulator: messaging, clientId: TripDispatchLogicAppClientId }
   billing-worker: { section: Billing, upstream: erp, emulator: messaging, clientId: BillingLogicAppClientId }
