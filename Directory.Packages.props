@@ -82,7 +82,7 @@
   </ItemGroup>
   <ItemGroup Label="Tests">
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
-    <PackageVersion Include="bunit" Version="2.11.3" />
+    <PackageVersion Include="bunit" Version="2.15.2" />
     <PackageVersion Include="coverlet.msbuild" Version="10.0.1" />
     <PackageVersion Include="DotLiquid" Version="2.0.361" />
     <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
