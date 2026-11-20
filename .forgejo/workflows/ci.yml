@@ -9,6 +9,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# NUGET_PACKAGES comes from the runner image: a volume the runner mounts, so restored packages survive between runs (.forgejo/runner/config.yaml).
+env:
+  CONFIGURATION: Release
+
 jobs:
   skeleton:
     runs-on: norvia-ci
@@ -71,5 +75,97 @@ jobs:
         uses: ./.forgejo/actions/report-status
         with:
           job: powershell
+          state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+  # Restore, a warnings-as-errors build, formatting, the estate's Bicep, vulnerable packages, and the unit tests of the projects no test leg runs. The same
+  # steps as the `build` job of .github/workflows/ci.yml, which stays until the removal issue (#1030), so the two can be compared.
+  build:
+    runs-on: norvia-ci
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: build
+          state: pending
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+      - uses: ./.forgejo/actions/setup
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore Norvia.slnx
+
+      # Warnings are errors (Directory.Build.props), so a clean build is also the "no warnings" gate.
+      - name: Build
+        run: dotnet build Norvia.slnx --no-restore --configuration "$CONFIGURATION"
+
+      - name: Check formatting
+        run: dotnet format Norvia.slnx --no-restore --verify-no-changes
+
+      # The estate is deployed by azd, not CI (ADR 0004); CI checks that it builds and passes the Bicep linter. The CLI is the pinned one of the runner image
+      # (infra/tool-versions.psd1, checked by the setup action), the one the dev container and the estate's architecture tests use, not `az bicep install`.
+      - name: Build and lint the estate Bicep
+        run: |
+          bicep build infra/estate.bicep --stdout > /dev/null
+          bicep lint infra/estate.bicep
+
+      - name: Check for vulnerable packages
+        run: |
+          dotnet package list --project Norvia.slnx --vulnerable --include-transitive --format json > vulnerable-packages.json
+          vulnerable=$(jq -r '[.projects[].frameworks[]? | (.topLevelPackages // [])[], (.transitivePackages // [])[]
+            | "\(.id) \(.resolvedVersion): \([.vulnerabilities[].severity] | join(", "))"] | unique | .[]' vulnerable-packages.json)
+          if [ -n "$vulnerable" ]; then
+            echo "::error::Vulnerable packages found"
+            echo "$vulnerable"
+            exit 1
+          fi
+
+      # Every application's tests run in its leg of the integration job. A test project outside every leg would run nowhere, so a new application's tests
+      # either join a leg (or tests/Integration) or fail here. The matrix is not ported yet, so this reads GITHUB's (.github/workflows/ci.yml); the issue that
+      # ports the matrix switches it to this file.
+      - name: Check that every test project is claimed by a leg
+        run: |
+          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .github/workflows/ci.yml; echo Integration; echo Branding; echo Docs; echo ServiceDefaults)
+          unclaimed=$(find tests -name '*.csproj' | cut -d/ -f2 | sort -u | grep -vxF "$claimed" || true)
+          if [ -n "$unclaimed" ]; then
+            echo "::error::Test projects under tests/ that no integration leg runs: $unclaimed"
+            exit 1
+          fi
+
+      # The Integration functions have unit tests only, so they run here. Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
+      - name: Unit tests of the Integration functions and the shared Branding library, ServiceDefaults' faults and the docs generator
+        run: |
+          failed=0
+          for project in $(find tests/Integration tests/Branding tests/Docs tests/ServiceDefaults -name '*.UnitTests.csproj' | sort); do
+            dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
+              --logger trx --results-directory TestResults || failed=1
+          done
+          exit $failed
+
+      # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
+      - name: Coverage summary
+        if: always()
+        run: |
+          if find tests/Integration tests/Branding tests/Docs tests/ServiceDefaults -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/Integration/**/coverage.cobertura.xml;tests/Branding/**/coverage.cobertura.xml;tests/Docs/**/coverage.cobertura.xml;tests/ServiceDefaults/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+              -reporttypes:"MarkdownSummaryGithub;Cobertura"
+            cat TestResults/coverage/SummaryGithub.md
+          fi
+
+      # v4 of the action needs GitHub's artifact service, which Forgejo does not have; v3 is the one Forgejo runs.
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: unit-test-results
+          path: TestResults/
+          if-no-files-found: ignore
+
+      - if: always()
+        uses: ./.forgejo/actions/report-status
+        with:
+          job: build
           state: ${{ job.status }}
           token: ${{ secrets.GH_STATUS_TOKEN }}

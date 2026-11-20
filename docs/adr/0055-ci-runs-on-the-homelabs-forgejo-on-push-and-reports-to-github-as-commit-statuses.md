@@ -10,6 +10,7 @@
 - **A gate that cannot report is not green.** The call is not retried silently or ignored: a failed call fails the job.
 - **A newer push cancels the older run** (`concurrency: ci-${{ github.ref }}`, `cancel-in-progress`). Not yet verified on the homelab: that Forgejo runs the `if: always()` step of a cancelled job (forgejo.md, "CI"); if it does not, the old commit keeps its `pending`, which is harmless as below. The last step of a job runs `if: always()` and reports `job.status`; a `cancelled` is posted as `error` with "superseded". The status of the older commit is not shown on the PR, which shows the head commit, so a `pending` the runner failed to replace (a run killed before its last step) is harmless to the PR and stays on that old commit only.
 - **`evaluate-agent.yml` stays on GitHub.** It is manual (`workflow_dispatch`), needs the presenter's Azure identity and never gates a merge ([ADR 0040](0040-agents-read-the-estate-through-api-management-have-no-write-tools-and-their-own-identity.md), [agent-evaluation.md](../operations/agent-evaluation.md)).
+- **Artifacts use `upload-artifact@v3`, and step summaries go to the log** (#1041). Forgejo has no GitHub artifact service for `@v4` and no `$GITHUB_STEP_SUMMARY` page. Not yet run on the homelab.
 - **The script is PowerShell 7** with a Pester test ([ADR 0048](0048-scripts-are-powershell-7-not-bash.md)).
 
 ## Considered Options
