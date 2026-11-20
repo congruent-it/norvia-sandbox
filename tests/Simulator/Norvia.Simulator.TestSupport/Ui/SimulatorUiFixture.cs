@@ -300,7 +300,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     // Another Simulator on the same database, with the same settings and waits as the first, and the given settings changed.
     private static void AddVariant(IDistributedApplicationTestingBuilder builder, IResource simulator, string name, params (string Name, string Value)[] changes)
     {
-        var variant = builder.AddDotnetProject(name, Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "Simulator", "Norvia.Simulator.Web", "Norvia.Simulator.Web.csproj"))).WithHttpHealthCheck("/health");
+        var variant = builder.AddDotnetProject(name, ((DotnetProjectResource)simulator).GetProjectMetadata().ProjectPath).WithHttpHealthCheck("/health");
         // Annotations can't be shared between resources (the first would lose its settings), so each one is made again. The changes come last, to win over the copied settings.
         foreach (var annotation in simulator.Annotations.ToList())
         {

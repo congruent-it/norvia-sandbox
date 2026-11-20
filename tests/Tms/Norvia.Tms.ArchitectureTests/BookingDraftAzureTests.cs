@@ -122,7 +122,7 @@ public sealed class BookingDraftAzureTests
         block.Should().Contain("Agents__Foundry__ProjectEndpoint\", estate.FoundryIntakeProjectEndpoint").And.NotContain("estate.FoundryProjectEndpoint");
         block.Should().Contain("Agents__Api__Audience\", estate.BookingDraftApiClientId").And.Contain("Agents__Api__GatewayClientId\", estate.ApiManagementClientId");
         block.Should().NotContain("EntraSignIn", "the host is no browser's: it takes API Management's token and checks the role itself");
-        host.IndexOf("Norvia.Integration.BookingDraft.Api", StringComparison.Ordinal).Should().BeGreaterThan(host.IndexOf("if (builder.ExecutionContext.IsPublishMode)", StringComparison.Ordinal), "locally the stand-in plays the operation");
+        host.IndexOf("AddDotnetProject(\"booking-draft-api\"", StringComparison.Ordinal).Should().BeGreaterThan(host.IndexOf("if (builder.ExecutionContext.IsPublishMode)", StringComparison.Ordinal), "locally the stand-in plays the operation");
     }
 
     [Fact]
