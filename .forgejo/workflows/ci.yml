@@ -49,13 +49,13 @@ jobs:
         shell: pwsh
         run: |
           $versions = Import-PowerShellDataFile ./infra/tool-versions.psd1
-          $found = [ordered]@{
-              PowerShell       = $PSVersionTable.PSVersion.ToString()
-              PSScriptAnalyzer = (Get-Module -ListAvailable PSScriptAnalyzer | Sort-Object Version -Descending | Select-Object -First 1).Version.ToString()
-              Pester           = (Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1).Version.ToString()
+          $found = [ordered]@{ PowerShell = $PSVersionTable.PSVersion.ToString() }
+          foreach ($name in 'PSScriptAnalyzer', 'Pester') {
+              $module = Get-Module -ListAvailable $name | Sort-Object Version -Descending | Select-Object -First 1
+              $found[$name] = $module ? $module.Version.ToString() : 'missing'
           }
-          $stale = $found.Keys | Where-Object { $found[$_] -ne $versions[$_] }
           $found.Keys | ForEach-Object { Write-Host "$_ $($found[$_]) (pinned $($versions[$_]))" }
+          $stale = $found.Keys | Where-Object { $found[$_] -ne $versions[$_] }
           if ($stale) { throw "The runner image is stale for $($stale -join ', '): rebuild it (docs/operations/forgejo.md, Runner for CI)." }
 
       - name: Parse, analyze and test the scripts
