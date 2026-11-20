@@ -11,7 +11,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 var seedFile = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "seed", "norvia.seed.json"));
 
 // AddDotnetProject takes the path of a project, where AddProject<T> took the generated Projects type. Every project is src/<Area>/<Project>/<Project>.csproj.
-string ProjectPath(string project) => Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", project.Split('.')[1], project, project + ".csproj"));
+// A name that breaks the convention fails here, not when the resource starts.
+string ProjectPath(string project)
+{
+    var path = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", project.Split('.')[1], project, project + ".csproj"));
+    return File.Exists(path) ? path : throw new FileNotFoundException($"No project {project} at the path the AppHost derives for it.", path);
+}
 
 // Locally SQL Server runs in a container. In Azure it is Azure SQL, and each database gets Aspire's default SKU:
 // serverless (GP_S_Gen5_2) on the free offer. Once a month's free allowance is used, a database bills for what it uses
