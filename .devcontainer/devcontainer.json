@@ -10,7 +10,8 @@
   },
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
-    "GH_TOKEN": "${localEnv:GH_TOKEN}"
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "FORGEJO_TOKEN": "${localEnv:FORGEJO_TOKEN}"
   },
   "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude /workspaces/norvia-sandbox",
   "customizations": {
