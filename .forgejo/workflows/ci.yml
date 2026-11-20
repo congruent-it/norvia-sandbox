@@ -66,6 +66,17 @@ jobs:
         shell: pwsh
         run: ./infra/test-scripts.ps1
 
+      # While both CI systems run the tests, a leg in one matrix and not the other fails here (infra/compare-ci-matrices.ps1). It reads the workflows with yq,
+      # which the image has (a stale image fails here with the version it has, not inside the script).
+      - name: Compare the test matrix with GitHub's
+        shell: pwsh
+        run: |
+          $pinned = (Import-PowerShellDataFile ./infra/tool-versions.psd1).Yq
+          $found = (yq --version) -replace '.*version v', ''
+          Write-Host "yq $found (pinned $pinned)"
+          if ($found -ne $pinned) { throw "The runner image is stale for yq: rebuild it (docs/operations/forgejo.md, Runner for CI)." }
+          ./infra/compare-ci-matrices.ps1
+
       # Every process doc under docs/processes is in its catalogue's table and in docs/status.md.
       - name: Check that every process doc is catalogued
         shell: pwsh
@@ -124,11 +135,10 @@ jobs:
           fi
 
       # Every application's tests run in its leg of the integration job. A test project outside every leg would run nowhere, so a new application's tests
-      # either join a leg (or tests/Integration) or fail here. The matrix is only partly ported (#1042 has one leg), so this still reads GITHUB's (.github/workflows/ci.yml);
-      # the issue that ports the last leg switches it to this file.
+      # either join a leg (or tests/Integration) or fail here. It reads this file's matrix (the whole of GitHub's is ported, #1043).
       - name: Check that every test project is claimed by a leg
         run: |
-          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .github/workflows/ci.yml; echo Integration; echo Branding; echo Docs; echo ServiceDefaults)
+          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .forgejo/workflows/ci.yml; echo Integration; echo Branding; echo Docs; echo ServiceDefaults)
           unclaimed=$(find tests -name '*.csproj' | cut -d/ -f2 | sort -u | grep -vxF "$claimed" || true)
           if [ -n "$unclaimed" ]; then
             echo "::error::Test projects under tests/ that no integration leg runs: $unclaimed"
@@ -172,8 +182,10 @@ jobs:
 
   # The test matrix (#1042): one leg per application and kind of test, each in its own job container with its own Docker daemon (start-dockerd), so the
   # AppHosts of parallel legs cannot clash on container names or ports. The same steps as the `integration` job of .github/workflows/ci.yml, which stays
-  # until the removal issue (#1030), so the two can be compared. This issue ports the smallest application; the issues that follow add the other legs
-  # to `matrix.include`, copied from GitHub's matrix, which is the only thing a leg needs.
+  # until the removal issue (#1030), so the two can be compared. Every leg of GitHub's matrix is here with the same application, directory and kinds, and
+  # infra/compare-ci-matrices.ps1 (the `powershell` job) fails when the two matrices differ, so a leg added to one goes into the other in the same change.
+  # The runner runs `capacity` jobs at once (.forgejo/runner/config.yaml) and the other legs queue; the timeout of a job counts from when it starts,
+  # so `timeout-minutes` stays what one leg needs, not what the whole matrix takes.
   # Each leg reports its own status, forgejo/tests (<application>), so each can become required by itself; the `tests` job below rolls them up.
   integration:
     runs-on: norvia-ci
@@ -182,6 +194,135 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - application: TMS
+            directory: Tms
+            kinds: UnitTests ArchitectureTests
+          - application: TMS (Billing)
+            directory: Tms
+            kinds: IntegrationTests.Billing
+          - application: TMS (Capacity)
+            directory: Tms
+            kinds: IntegrationTests.Capacity
+          - application: TMS (Carrier bookings)
+            directory: Tms
+            kinds: IntegrationTests.CarrierBookings
+          - application: TMS (Customer service agent)
+            directory: Tms
+            kinds: IntegrationTests.CustomerServiceAgent
+          - application: TMS (Faults)
+            directory: Tms
+            kinds: IntegrationTests.Faults
+          - application: TMS (Planning)
+            directory: Tms
+            kinds: IntegrationTests.Planning
+          - application: TMS (Planner agent)
+            directory: Tms
+            kinds: IntegrationTests.PlannerAgent
+          - application: TMS (Trips)
+            directory: Tms
+            kinds: IntegrationTests.Trips
+          - application: TMS (Consignee tracking)
+            directory: Tms
+            kinds: IntegrationTests.ConsigneeTracking
+          - application: TMS (Exceptions)
+            directory: Tms
+            kinds: IntegrationTests.Exceptions
+          - application: TMS (Proofs of delivery)
+            directory: Tms
+            kinds: IntegrationTests.ProofsOfDelivery
+          - application: TMS (Reset)
+            directory: Tms
+            kinds: IntegrationTests.Reset
+          - application: TMS (Shipper tracking)
+            directory: Tms
+            kinds: IntegrationTests.ShipperTracking
+          - application: TMS (Tracking events)
+            directory: Tms
+            kinds: IntegrationTests.TrackingEvents
+          - application: TMS (Transport Orders)
+            directory: Tms
+            kinds: IntegrationTests.TransportOrders
+          - application: TMS (API reference, seeds and AppHost model)
+            directory: Tms
+            kinds: IntegrationTests
+          - application: TMS (UI, Customer service agent)
+            directory: Tms
+            kinds: UiTests.CustomerServiceAgent
+          - application: TMS (UI, Planner agent)
+            directory: Tms
+            kinds: UiTests.PlannerAgent
+          - application: TMS (UI, Planner agent, Plan the list)
+            directory: Tms
+            kinds: UiTests.PlannerAgentPlan
+          - application: TMS (UI, Faults)
+            directory: Tms
+            kinds: UiTests.Faults
+          - application: TMS (UI, Shipments)
+            directory: Tms
+            kinds: UiTests.Shipments
+          - application: TMS (UI, Transport Orders)
+            directory: Tms
+            kinds: UiTests.TransportOrders
+          - application: TMS (UI, other components)
+            directory: Tms
+            kinds: UiTests.Remaining
+          - application: Partner portal
+            directory: PartnerPortal
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Partner portal (Carrier and Shipper faults)
+            directory: PartnerPortal
+            kinds: IntegrationTests.Faults
+          - application: Partner portal (Shipper tracking assistant)
+            directory: PartnerPortal
+            kinds: IntegrationTests.TrackingAssistant
+          - application: Partner portal (UI, Intake agent)
+            directory: PartnerPortal
+            kinds: UiTests.IntakeAgent
+          - application: Partner portal (UI, Shipper tracking assistant)
+            directory: PartnerPortal
+            kinds: UiTests.TrackingAssistant
+          - application: ERP
+            directory: Erp
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: ERP (Carrier invoice matching agent)
+            directory: Erp
+            kinds: IntegrationTests.FinanceAgent
+          - application: ERP (UI, Carrier invoice matching agent)
+            directory: Erp
+            kinds: UiTests.FinanceAgent
+          - application: Driver app
+            directory: DriverApp
+            kinds: UnitTests ArchitectureTests IntegrationTests
+          - application: Simulator
+            directory: Simulator
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: Simulator (Invoicing)
+            directory: Simulator
+            kinds: IntegrationTests.Invoicing
+          - application: Simulator (Personas)
+            directory: Simulator
+            kinds: IntegrationTests.Personas
+          - application: Simulator (Reset)
+            directory: Simulator
+            kinds: IntegrationTests.Reset
+          - application: Simulator (UI, Personas)
+            directory: Simulator
+            kinds: UiTests.Personas
+          - application: Simulator (UI, Reset)
+            directory: Simulator
+            kinds: UiTests.Reset
+          - application: Simulator (UI, Consignee tracking)
+            directory: Simulator
+            kinds: UiTests.ConsigneeTracking
+          - application: Integration console
+            directory: IntegrationConsole
+            kinds: UnitTests ArchitectureTests IntegrationTests IntegrationTests.LocalTelemetry UiTests
+          - application: Integration
+            directory: Integration
+            kinds: IntegrationTests
+          - application: Integration (UI, master-data sync)
+            directory: Integration
+            kinds: UiTests
           - application: Estate health check
             directory: HealthCheck
             kinds: UnitTests ArchitectureTests IntegrationTests UiTests
