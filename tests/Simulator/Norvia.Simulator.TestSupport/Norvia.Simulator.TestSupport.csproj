@@ -2,6 +2,7 @@
   <!-- The fixture and helpers the Simulator integration test projects share: the AppHost the Simulator books into, and a Simulator started in the test process. Each test project registers SimulatorFixture as its assembly fixture. -->
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="Aspire.Hosting.Dotnet" />
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Azure.Messaging.ServiceBus" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

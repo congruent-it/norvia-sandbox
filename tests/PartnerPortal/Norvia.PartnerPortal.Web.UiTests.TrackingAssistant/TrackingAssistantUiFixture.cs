@@ -2,6 +2,7 @@ extern alias PortalWeb;
 
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -55,7 +56,7 @@ public sealed class TrackingAssistantUiFixture : IAsyncLifetime
 
         // The AppHost's portal stays stopped: each test runs its own, with the same settings, so it reaches the portal's own seams.
         var portal = builder.Resources.Single(resource => resource.Name == "partner-portal-web");
-        builder.CreateResourceBuilder((ProjectResource)portal).WithExplicitStart();
+        builder.CreateResourceBuilder((DotnetProjectResource)portal).WithExplicitStart();
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);

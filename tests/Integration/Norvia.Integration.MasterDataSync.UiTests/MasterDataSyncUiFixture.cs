@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
@@ -96,11 +97,11 @@ public sealed class MasterDataSyncUiFixture : TmsFixture
         builder.RemoveWhatTheMasterDataSyncUiTestsDontUse();
 
         // The worker's retry waits are the workflow's 5 s up to 20 s; a test waits for them, so they are short here. The count stays the workflow's three.
-        var worker = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "master-data-sync-worker"));
+        var worker = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "master-data-sync-worker"));
         worker.WithEnvironment("MasterDataSync__TmsBaseAddress", Proxy.Address.ToString())
             .WithEnvironment("MasterDataSync__Retry__Interval", "00:00:00.200")
             .WithEnvironment("MasterDataSync__Retry__MaximumInterval", "00:00:00.800");
-        var erp = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "erp-web");
+        var erp = builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "erp-web");
         builder.CreateResourceBuilder(erp)
             .WithEnvironment("Outbox__PollingInterval", "00:00:00.100")
             .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", string.Empty);
@@ -112,9 +113,9 @@ public sealed class MasterDataSyncUiFixture : TmsFixture
     /// A second ERP UI on the same database, set up as the first is but for who it signs in: a user with an app role that isn't Finance. It publishes nothing: its outbox looks only
     /// once a minute, so the first one's outbox alone sends what Finance saves.
     /// </summary>
-    private static void AddErpUiOfAReader(IDistributedApplicationTestingBuilder builder, ProjectResource erp)
+    private static void AddErpUiOfAReader(IDistributedApplicationTestingBuilder builder, DotnetProjectResource erp)
     {
-        var reader = builder.AddProject(ReaderHost, erp.GetProjectMetadata().ProjectPath);
+        var reader = builder.AddDotnetProject(ReaderHost, erp.GetProjectMetadata().ProjectPath);
         var database = builder.Resources.OfType<IResourceWithConnectionString>().Single(resource => resource.Name == "erp");
         var edge = builder.Resources.OfType<IResourceWithConnectionString>().Single(resource => resource.Name == "messaging-2");
         reader.WithReference(builder.CreateResourceBuilder(database))

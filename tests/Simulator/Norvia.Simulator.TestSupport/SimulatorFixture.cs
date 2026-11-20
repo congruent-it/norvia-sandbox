@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -68,7 +69,7 @@ public sealed class SimulatorFixture : IAsyncLifetime
 
         // The AppHost's Simulator stays stopped: the tests run their own, with the same settings, so they reach what its pages ask of it.
         var simulator = builder.Resources.Single(resource => resource.Name == "simulator-web");
-        builder.CreateResourceBuilder((ProjectResource)simulator).WithExplicitStart();
+        builder.CreateResourceBuilder((DotnetProjectResource)simulator).WithExplicitStart();
 
         _app = await builder.BuildAsync(startup.Token);
         await _app.StartAsync(startup.Token);

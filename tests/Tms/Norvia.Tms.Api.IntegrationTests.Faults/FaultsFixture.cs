@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
 using Norvia.AppHost;
@@ -119,10 +120,10 @@ public sealed class FaultsFixture : TmsFixture
     {
         builder.RemoveWhatTheTmsFaultTestsDontUse();
 
-        var tracking = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "tracking-worker"));
+        var tracking = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "tracking-worker"));
         tracking.WithEnvironment("Tracking__RedeliveryDelay", RetryInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture));
 
-        var driverReports = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "driver-reports-worker"));
+        var driverReports = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "driver-reports-worker"));
         driverReports.WithEnvironment("DriverReports__Retry__Count", "10")
             .WithEnvironment("DriverReports__Retry__Interval", RetryInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture))
             .WithEnvironment("DriverReports__Retry__MaximumInterval", RetryInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture));

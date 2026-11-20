@@ -3,6 +3,7 @@ extern alias PortalWeb;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -79,7 +80,7 @@ public sealed class PartnerPortalFixture : IAsyncLifetime
 
     private static bool IsUnneeded(IResource resource) =>
         resource.Name is "dbgate" or "partner-portal-web"
-        || resource is ProjectResource && resource.Name != "partner-portal-migrations"
+        || resource is DotnetProjectResource && resource.Name != "partner-portal-migrations"
         || resource.GetType().Name.Contains("ServiceBus", StringComparison.Ordinal)
         || resource.GetType().Name.Contains("Storage", StringComparison.Ordinal)
         || resource.GetType().Name.Contains("Blob", StringComparison.Ordinal);

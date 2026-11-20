@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -77,12 +78,12 @@ public sealed class FinanceAgentFixture : IAsyncLifetime
         foreach (var name in new[] { "agent-mcp", "erp-api" })
         {
             // The applications write their logs as JSON with their scopes, so a test can follow a Message trail through them.
-            builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == name))
+            builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == name))
                 .WithEnvironment("LOGGING__CONSOLE__FORMATTERNAME", "json")
                 .WithEnvironment("Logging__Console__FormatterOptions__IncludeScopes", "true");
         }
 
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "agent-mcp"))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "agent-mcp"))
             .WithEnvironment("AgentMcp__RateLimitCalls", RateLimitCalls.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         _app = await builder.BuildAsync(startup.Token);

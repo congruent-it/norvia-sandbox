@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
@@ -231,7 +232,7 @@ public class TmsFixture : IAsyncLifetime
             builder.CreateResourceBuilder(topic).AddServiceBusSubscription($"{topicName}-{TestSubscription}", TestSubscription);
         }
 
-        var tmsApi = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
+        var tmsApi = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(r => r.Name == "tms-api"))
             // Aspire sets the formatter under this exact name, and environment names are case-sensitive on Linux.
             .WithEnvironment("LOGGING__CONSOLE__FORMATTERNAME", "json")
             .WithEnvironment("Logging__Console__FormatterOptions__IncludeScopes", "true");

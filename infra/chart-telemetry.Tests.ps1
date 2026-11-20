@@ -52,11 +52,14 @@ Describe 'the dashboard' -Skip:$script:helmMissing {
         $dashboard.Text | Should -Not -Match 'volumeMounts|persistentVolumeClaim'
     }
 
-    It 'uses the major.minor of the Aspire packages the AppHost is built with' {
+    It 'uses a major.minor no newer than the Aspire packages the AppHost is built with' {
+        # MCR has no 17.x dashboard image yet (#1057), so the tag may trail the packages; it must never be ahead of them.
         $packages = Get-Content (Join-Path $root 'Directory.Packages.props') -Raw
         $aspire = [regex]::Match($packages, 'Include="Aspire\.Hosting\.Testing" Version="(\d+\.\d+)').Groups[1].Value
         $aspire | Should -Not -BeNullOrEmpty
-        $dashboard.Text | Should -Match "aspire-dashboard:$([regex]::Escape($aspire))"
+        $tag = [regex]::Match($dashboard.Text, 'aspire-dashboard:(\d+\.\d+)').Groups[1].Value
+        $tag | Should -Not -BeNullOrEmpty
+        [version]$tag | Should -BeLessOrEqual ([version]$aspire)
     }
 
     It 'serves the UI and telemetry API, OTLP over gRPC and OTLP over HTTP on a Service' {

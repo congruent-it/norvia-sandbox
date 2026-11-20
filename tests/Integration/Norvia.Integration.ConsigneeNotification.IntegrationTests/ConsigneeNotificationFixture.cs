@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,7 +65,7 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
         builder.RemoveWhatTheConsigneeNotificationTestsDontUse();
 
         // The worker's retry waits are the workflow's 5 s up to 20 s, and a test waits for them, so they are short here. The count stays the workflow's three.
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == WorkerName))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == WorkerName))
             .WithEnvironment("ConsigneeNotification__Mail__PickupDirectory", _mailFolder)
             .WithEnvironment("ConsigneeNotification__PartnerPortalBaseAddress", TrackingBaseAddress)
             .WithEnvironment("ConsigneeNotification__Retry__Interval", "00:00:00.200")
