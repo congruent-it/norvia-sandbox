@@ -22,13 +22,13 @@ runs:
 
         # The pinned tools by exact version, which the image installs from the same manifest.
         $tools = @(
-            @{ Name = 'Node'; Command = 'node'; Argument = '--version'; Pin = $versions.Node }
-            @{ Name = 'Bicep'; Command = 'bicep'; Argument = '--version'; Pin = $versions.Bicep }
-            @{ Name = 'Yq'; Command = 'yq'; Argument = '--version'; Pin = $versions.Yq }
+            @{ Name = 'Node'; Command = 'node'; Pin = $versions.Node }
+            @{ Name = 'Bicep'; Command = 'bicep'; Pin = $versions.Bicep }
+            @{ Name = 'Yq'; Command = 'yq'; Pin = $versions.Yq }
         )
         foreach ($tool in $tools) {
             $output = 'missing'
-            if (Get-Command $tool.Command -ErrorAction SilentlyContinue) { $output = (& $tool.Command $tool.Argument 2>&1 | Out-String).Trim() }
+            if (Get-Command $tool.Command -ErrorAction SilentlyContinue) { $output = (& $tool.Command --version 2>&1 | Out-String).Trim() }
             Write-Host "$($tool.Name): $output (pinned $($tool.Pin))"
             if ($output -notmatch [regex]::Escape($tool.Pin)) { $stale += $tool.Name }
         }
