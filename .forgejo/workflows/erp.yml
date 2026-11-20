@@ -1,0 +1,87 @@
+# ERP: the tests of one deployable (#1079). Part of the gates of CI (#1030): Forgejo pull-mirrors GitHub and a sync triggers `push` (ADR 0055).
+# It always runs and reports forgejo/erp, so the commit never lacks the status: the `scope` job asks .forgejo/ci-scope.psd1 whether the change affects
+# this application, and a change that does not skips the legs and reports "Not affected" as a pass. forgejo/ci (ci.yml) waits for all of them.
+# Needs the Forgejo secret GH_STATUS_TOKEN (docs/operations/forgejo.md, "The GitHub status token").
+name: erp
+on:
+  push:
+    branches: ['**']
+
+concurrency:
+  group: erp-${{ github.ref }}
+  cancel-in-progress: true
+
+# NUGET_PACKAGES is not set here: the runner image sets it to a volume the runner mounts, so restored packages survive between runs (.forgejo/runner/config.yaml).
+env:
+  CONFIGURATION: Release
+
+jobs:
+  scope:
+    runs-on: norvia-ci
+    timeout-minutes: 5
+    outputs:
+      affected: ${{ steps.scope.outputs.affected }}
+    steps:
+      # All history, for the merge-base with main.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        uses: ./.forgejo/actions/scope
+        with:
+          application: erp
+
+  # One leg per kind of test of the application, each in its own job container with its own Docker daemon (start-dockerd), so the AppHosts of parallel legs
+  # cannot clash on container names or ports. The runner runs `capacity` jobs at once (.forgejo/runner/config.yaml) and the other legs queue; the timeout
+  # of a job counts from when it starts. Each leg reports its own status, forgejo/tests (<application>), so each can become required by itself.
+  integration:
+    needs: scope
+    if: needs.scope.outputs.affected == 'true'
+    runs-on: norvia-ci
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - application: ERP
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+          - application: ERP (Carrier invoice matching agent)
+            kinds: IntegrationTests.FinanceAgent
+          - application: ERP (UI, Carrier invoice matching agent)
+            kinds: UiTests.FinanceAgent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: tests (${{ matrix.application }})
+          state: pending
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+      - uses: ./.forgejo/actions/test-leg
+        with:
+          directory: Erp
+          kinds: ${{ matrix.kinds }}
+          artifact: test-results-erp-${{ strategy.job-index }}
+
+      - if: always()
+        uses: ./.forgejo/actions/report-status
+        with:
+          job: tests (${{ matrix.application }})
+          state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+  # forgejo/erp: green when every leg is, or when the change does not affect the application. It runs when the legs are done, so it has no `pending` of its
+  # own; until then forgejo/ci waits for it. A failed scope job is an error, not a pass.
+  result:
+    needs: [scope, integration]
+    if: always()
+    runs-on: norvia-ci
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: erp
+          state: ${{ needs.scope.result != 'success' && 'error' || (needs.integration.result == 'skipped' && 'success' || needs.integration.result) }}
+          description: ${{ needs.scope.result != 'success' && 'The scope job did not pass' || (needs.integration.result == 'skipped' && 'Not affected by this change' || '') }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}

@@ -52,4 +52,4 @@ The TMS database's migrations are a deployment step, not something the TMS does 
 
 ## CI
 
-CI (Forgejo, [.forgejo/workflows/ci.yml](../../.forgejo/workflows/ci.yml)) runs the pull request gates of the coding guidelines on every PR and on `main`: a warning-free build, `dotnet format`, the vulnerable-package check, unit and architecture tests with the coverage gate, and the integration tests.
+CI (Forgejo, [.forgejo/workflows/ci.yml](../../.forgejo/workflows/ci.yml) and one workflow per deployable, [forgejo.md](forgejo.md#one-workflow-per-deployable)) runs the pull request gates of the coding guidelines on every PR and on `main`, the tests of an application only when the change affects it: a warning-free build, `dotnet format`, the vulnerable-package check, unit and architecture tests with the coverage gate, and the integration tests.

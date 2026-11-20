@@ -1,0 +1,25 @@
+# The first step of every application workflow (#1079): does this change affect the application? The rules are in scope.ps1 and the paths in
+# .forgejo/ci-scope.psd1. The checkout before it must have all history (fetch-depth: 0) so the merge-base with main exists; without it everything runs.
+name: scope
+description: Says whether the change affects an application's workflow.
+inputs:
+  application:
+    description: The key of the application in .forgejo/ci-scope.psd1, which is also the name of its workflow file
+    required: true
+outputs:
+  affected:
+    description: 'true when the workflow must run its tests, otherwise false'
+    value: ${{ steps.scope.outputs.affected }}
+runs:
+  using: composite
+  steps:
+    - id: scope
+      shell: pwsh
+      env:
+        APPLICATION: ${{ inputs.application }}
+        REF: ${{ github.ref }}
+      run: |
+        # Every workflow runs on main: it is what a cross-application change merged to, and the net for what the path lists do not see.
+        $affected = & "$env:GITHUB_ACTION_PATH/scope.ps1" -Application $env:APPLICATION -RunAll:($env:REF -eq 'refs/heads/main')
+        Write-Host "$env:APPLICATION affected: $affected"
+        "affected=$("$affected".ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
