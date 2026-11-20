@@ -40,7 +40,7 @@ runs:
     - name: Unit, architecture, integration and UI tests
       shell: bash
       env:
-        NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
+        NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/${{ inputs.directory }}.log
         NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
         # DCP, which Aspire starts the resources with, writes its own log: for an AppHost that stalls as it starts.
         DCP_DIAGNOSTICS_LOG_LEVEL: debug
