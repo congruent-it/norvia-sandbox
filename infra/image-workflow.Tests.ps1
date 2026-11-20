@@ -80,7 +80,7 @@ Describe 'the images of the APIs and the migrations' {
         foreach ($api in 'tms-api', 'erp-api', 'driver-app-api') { $callers.Name | Should -Contain $api }
     }
     It 'reads every caller of images.yml, so a changed key order cannot hide one from these tests' {
-        # tms-api plus the eight of #1045 and the seven of #1046; the regex above drops a caller whose keys are in another order.
+        # tms-api plus those of #1045 and #1046; the regex above drops a caller whose keys are in another order.
         $callers.Count | Should -Be ([regex]::Matches($caller, '(?m)^    uses: \./\.forgejo/workflows/build-image\.yml').Count)
     }
 
