@@ -93,6 +93,18 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 
 Set up, and it already holds container images: the packages are listed at <https://git.home.arpa/smirking_squiggly/-/packages>. Pushing to it needs a token with the `write:package` scope (listing needs `read:package`); its address becomes `image.registry` in the chart ([kubernetes.md](kubernetes.md)). Not checked here: how the existing images are named and tagged, and that the cluster's nodes can pull from it. Decided in #1016.
 
+### The registry push token
+
+[runner-image.yml](../../.forgejo/workflows/runner-image.yml) pushes the `norvia-ci` job image with these settings on the mirror (Settings → Actions):
+
+| Name | Kind | Value |
+|---|---|---|
+| `REGISTRY` | Variable | `git.home.arpa/smirking_squiggly`, the image prefix (host and owner); the workflow logs in to the host part only |
+| `REGISTRY_USER` | Secret | `smirking_squiggly` |
+| `REGISTRY_TOKEN` | Secret | The value of the Forgejo access token **`docker-registry-push`** (scope `write:package`) |
+
+`REGISTRY_TOKEN` is a copy of that token, not a separate credential. When `docker-registry-push` is rotated or expires, paste the new value into `REGISTRY_TOKEN` too, or the workflow's `docker login` fails. The same token serves a manual push (`docker login git.home.arpa -u smirking_squiggly`).
+
 ## The API token
 
 Scopes used above, and nothing else (each was not tried on its own, so this is a working set, not a proven minimum):
