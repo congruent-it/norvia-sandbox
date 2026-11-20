@@ -6,6 +6,14 @@ BeforeAll {
     $script:root = (git -C $PSScriptRoot rev-parse --show-toplevel)
     $script:reusable = Get-Content (Join-Path $root '.forgejo/workflows/build-image.yml') -Raw
     $script:caller = Get-Content (Join-Path $root '.forgejo/workflows/images.yml') -Raw
+    # One block per caller, so every key is read from the caller it belongs to, in any key order.
+    $script:callers = [regex]::Matches($caller, '(?ms)^  [\w-]+:\r?\n    uses: .+?(?=^  [\w-]+:\r?\n    uses: |\z)') | ForEach-Object {
+        [pscustomobject]@{
+            Name = [regex]::Match($_.Value, '(?m)^      name: (\S+)').Groups[1].Value
+            Project = [regex]::Match($_.Value, '(?m)^      project: (\S+)').Groups[1].Value
+            NeedsNode = $_.Value -match '(?m)^      needs-node: true\s*$'
+        }
+    }
 }
 
 Describe 'the image workflows' {
@@ -55,9 +63,6 @@ Describe 'the image workflows' {
 
 Describe 'the images of the APIs and the migrations' {
     BeforeAll {
-        # One caller per image: name and project, read from images.yml.
-        $script:callers = [regex]::Matches($caller, '(?m)^  [\w-]+:\r?\n    uses: .+\r?\n    with:\r?\n      project: (?<project>\S+)\r?\n      name: (?<name>\S+)') |
-            ForEach-Object { [pscustomobject]@{ Name = $_.Groups['name'].Value; Project = $_.Groups['project'].Value } }
         $script:chartMigrations = [regex]::Matches((Get-Content (Join-Path $root 'deploy/helm/norvia/values.yaml') -Raw), 'image: (?<image>[\w-]+-migrations)\b') | ForEach-Object { $_.Groups['image'].Value }
     }
 
@@ -100,30 +105,22 @@ Describe 'the images of the APIs and the migrations' {
 
 Describe 'the images of the Blazor web apps' {
     BeforeAll {
-        # One block per caller, so the flag is read from the caller it belongs to.
-        $script:webs = [regex]::Matches($caller, '(?ms)^  [\w-]+:\r?\n    uses: .+?(?=^  [\w-]+:\r?\n    uses: |\z)') |
-            ForEach-Object {
-                [pscustomobject]@{
-                    Name = [regex]::Match($_.Value, 'name: (\S+)').Groups[1].Value
-                    Project = [regex]::Match($_.Value, 'project: (\S+)').Groups[1].Value
-                    NeedsNode = $_.Value -match '(?m)^      needs-node: true\s*$'
-                }
-            } | Where-Object { $_.Project -match '\.Web\.csproj$' }
+        $script:webCallers = @($callers | Where-Object { $_.Project -match '\.Web\.csproj$' })
     }
 
     It 'has a caller for every Web project of the repository' {
         $onDisk = @(Get-ChildItem (Join-Path $root 'src') -Recurse -Filter 'Norvia.*.Web.csproj' | ForEach-Object { [IO.Path]::GetRelativePath($root, $_.FullName) -replace '\\', '/' } | Sort-Object)
         $onDisk.Count | Should -BeGreaterThan 0
-        @($webs.Project | Sort-Object) | Should -Be $onDisk -Because 'a Web project without a caller has no image'
+        @($webCallers.Project | Sort-Object) | Should -Be $onDisk -Because 'a Web project without a caller has no image'
     }
 
     It 'names the web images the way the chart calls its Services' {
         # The chart reaches partner-portal-web, integration-console-web and health-check-web by these names (workers.yaml, agent-mcp.yaml, values.yaml).
-        foreach ($name in 'partner-portal-web', 'integration-console-web', 'health-check-web') { $webs.Name | Should -Contain $name }
+        foreach ($name in 'partner-portal-web', 'integration-console-web', 'health-check-web') { $webCallers.Name | Should -Contain $name }
     }
 
     It 'turns Node on for exactly the Web projects that build a Tailwind stylesheet' {
-        foreach ($w in $webs) {
+        foreach ($w in $webCallers) {
             $package = Join-Path (Split-Path (Join-Path $root $w.Project)) 'package.json'
             $tailwind = (Test-Path $package) -and ((Get-Content $package -Raw) -match '"build:css"')
             $w.NeedsNode | Should -Be $tailwind -Because "$($w.Name) $(if ($tailwind) { 'builds' } else { 'does not build' }) a stylesheet with npm"
@@ -131,7 +128,7 @@ Describe 'the images of the Blazor web apps' {
     }
 
     It 'keeps node_modules out of the published content of the projects that build a stylesheet' {
-        foreach ($w in $webs | Where-Object NeedsNode) {
+        foreach ($w in $webCallers | Where-Object NeedsNode) {
             (Get-Content (Join-Path $root $w.Project) -Raw) | Should -Match 'Content Remove="node_modules/\*\*' -Because "$($w.Name) must not ship node_modules"
         }
     }
