@@ -9,7 +9,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# NUGET_PACKAGES comes from the runner image: a volume the runner mounts, so restored packages survive between runs (.forgejo/runner/config.yaml).
+# NUGET_PACKAGES is not set here: the runner image sets it to a volume the runner mounts, so restored packages survive between runs (.forgejo/runner/config.yaml).
 env:
   CONFIGURATION: Release
 

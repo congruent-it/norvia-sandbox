@@ -96,6 +96,12 @@ The gates are moving here and will report to GitHub; today `ci.yml` has the `ske
 
 **Add a gate:** add a job to `ci.yml` with `runs-on: norvia-ci` and the same two `report-status` steps, with its own `job:` name.
 
+**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (up to about 20 minutes after the push, see [How soon a commit arrives](#how-soon-a-commit-arrives); Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. A `pending` that is never replaced stays on the old commit only, and the PR does not show it ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md#consequences)).
+
+**Known limits of the gates.** `pending` is posted after `actions/checkout`, because the action is read from the checkout; a failed checkout posts nothing at all (seen: both `report-status` steps were skipped), so the commit shows no `forgejo/<job>` (`skeleton`, `powershell`, `build`) rather than a failure. Missing is not green, but only a required-status rule (a later issue) would make it block a merge. Not yet checked against a real run: that `target_url` (`<server>/<repo>/actions/runs/<run_number>`) opens the Forgejo run.
+
+**Check it end to end.** Push a branch to GitHub and open a PR, then Sync now (or wait). Expect `forgejo/skeleton`, `forgejo/powershell` and `forgejo/build` `pending` and then `success` on the commit and in the PR. Then push twice in a row to see the first run cancelled. **Status: not run yet on the homelab**; record here whether Forgejo runs the `if: always()` step of a cancelled job.
+
 ### The build job
 
 `build` ([#1041](https://github.com/congruent-it/norvia-sandbox/issues/1041)) has the steps of the GitHub job of the same name: restore, a warnings-as-errors build, `dotnet format --verify-no-changes`, the estate's Bicep build and lint, the vulnerable-package check, the check that every test project is claimed by a leg, the unit tests of the Integration functions, Branding, Docs and ServiceDefaults, the coverage summary and the test artifacts. It differs where Forgejo or the runner image does:
@@ -107,12 +113,6 @@ The gates are moving here and will report to GitHub; today `ci.yml` has the `ske
 - **Artifacts and summary.** `actions/upload-artifact@v4` needs GitHub's artifact service, which Forgejo does not offer, so the job uses `@v3`. Forgejo has no `$GITHUB_STEP_SUMMARY` page, so the coverage Markdown summary goes to the log, and `TestResults/coverage` stays in the artifact. Not yet run on the homelab: that `@v3` uploads and that the artifact opens in the Forgejo run.
 
 **Check it end to end.** On a branch, add one of each: a compiler warning, a formatting error, a Bicep lint error, a vulnerable package and a test project outside every leg. Expect `forgejo/build` to fail on each, with the same message as `CI / Build, format, Bicep and vulnerable packages` on GitHub, and to pass without them. **Status: not run yet on the homelab.**
-
-**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (up to about 20 minutes after the push, see [How soon a commit arrives](#how-soon-a-commit-arrives); Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. A `pending` that is never replaced stays on the old commit only, and the PR does not show it ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md#consequences)).
-
-**Known limits of the gates.** `pending` is posted after `actions/checkout`, because the action is read from the checkout; a failed checkout posts nothing at all (seen: both `report-status` steps were skipped), so the commit shows no `forgejo/<job>` (`skeleton`, `powershell`) rather than a failure. Missing is not green, but only a required-status rule (a later issue) would make it block a merge. Not yet checked against a real run: that `target_url` (`<server>/<repo>/actions/runs/<run_number>`) opens the Forgejo run.
-
-**Check it end to end.** Push a branch to GitHub and open a PR, then Sync now (or wait). Expect `forgejo/skeleton` and `forgejo/powershell` `pending` and then `success` on the commit and in the PR. Then push twice in a row to see the first run cancelled. **Status: not run yet on the homelab**; record here whether Forgejo runs the `if: always()` step of a cancelled job.
 
 ## The registry
 

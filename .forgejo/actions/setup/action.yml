@@ -11,12 +11,14 @@ runs:
     - shell: pwsh
       run: |
         $versions = Import-PowerShellDataFile ./infra/tool-versions.psd1
+        $ErrorActionPreference = 'Stop'
         $stale = @()
 
         # `dotnet --version` resolves the SDK global.json asks for (10.0.400 or a later feature band) and fails when the image has none.
-        $sdk = (& dotnet --version 2>&1 | Out-String).Trim()
+        $sdk = "missing"
+        if (Get-Command dotnet -ErrorAction SilentlyContinue) { $sdk = (& dotnet --version 2>&1 | Out-String).Trim() }
         Write-Host "dotnet $sdk (global.json $((Get-Content ./global.json -Raw | ConvertFrom-Json).sdk.version))"
-        if ($LASTEXITCODE -ne 0) { $stale += 'dotnet' }
+        if ($sdk -notmatch "^\d+\.\d+\.\d+") { $stale += "dotnet" }
 
         # The pinned tools by exact version, which the image installs from the same manifest.
         $tools = @(
