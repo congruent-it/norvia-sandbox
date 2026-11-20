@@ -18,7 +18,7 @@ Not in the chart yet: the TMS API, the ERP, the UIs, the Integration console and
 
 - **A cluster** with an ingress controller (Traefik on K3S is the tested default), a default storage class or one you name, and, if you want certificates, cert-manager with a `ClusterIssuer`. The chart installs none of these.
 - **DNS:** a wildcard record for the base domain, pointing at the ingress controller. Each application is reached at `<host>.<baseDomain>`.
-- **The images**, built and pushed to a registry the cluster can pull from (`image.registry`, `image.tag`).
+- **The images**, built and pushed to a registry the cluster can pull from (`image.registry`, `image.tag`). Forgejo builds them and tags them with the short commit SHA ([forgejo.md](forgejo.md#the-images)).
 - **Tools:** `helm`, `kubectl` and PowerShell 7.4 or later. The [dev container](dev-container.md) has them.
 
 ## Deploy

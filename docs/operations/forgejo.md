@@ -133,7 +133,7 @@ The gates are moving here and will report to GitHub; today `ci.yml` has the `ske
 
 ## The registry
 
-Set up, and it already holds container images: the packages are listed at <https://git.home.arpa/smirking_squiggly/-/packages>. Pushing to it needs a token with the `write:package` scope (listing needs `read:package`); its address becomes `image.registry` in the chart ([kubernetes.md](kubernetes.md)). Not checked here: how the existing images are named and tagged, and that the cluster's nodes can pull from it. Decided in #1016.
+Set up, and it already holds container images (the application images of [The images](#the-images) go there too): the packages are listed at <https://git.home.arpa/smirking_squiggly/-/packages>. Pushing to it needs a token with the `write:package` scope (listing needs `read:package`); its address becomes `image.registry` in the chart ([kubernetes.md](kubernetes.md)). Not checked here: how the existing images are named and tagged, and that the cluster's nodes can pull from it. Decided in #1016.
 
 ### The registry push token
 
@@ -145,7 +145,28 @@ Set up, and it already holds container images: the packages are listed at <https
 | `REGISTRY_USER` | Secret | `smirking_squiggly` |
 | `REGISTRY_TOKEN` | Secret | The value of the Forgejo access token **`docker-registry-push`** (scope `write:package`) |
 
-`REGISTRY_TOKEN` is a copy of that token, not a separate credential. When `docker-registry-push` is rotated or expires, paste the new value into `REGISTRY_TOKEN` too, or the workflow's `docker login` fails. The same token serves a manual push (`docker login git.home.arpa -u smirking_squiggly`).
+`REGISTRY_TOKEN` is a copy of that token, not a separate credential. When `docker-registry-push` is rotated or expires, paste the new value into `REGISTRY_TOKEN` too, or the `docker login` of runner-image.yml fails (the image workflows below log in with it through the SDK, and fail the same way). The same token serves a manual push (`docker login git.home.arpa -u smirking_squiggly`).
+
+## The images
+
+[images.yml](../../.forgejo/workflows/images.yml) builds the applications' images and pushes them to the registry, with the reusable [build-image.yml](../../.forgejo/workflows/build-image.yml) ([#1044](https://github.com/congruent-it/norvia-sandbox/issues/1044), [ADR 0056](../adr/0056-images-are-built-with-publishcontainer-on-the-homelabs-forgejo-and-tagged-by-commit.md)). **Status: nothing here has been run on the homelab yet, and how the images already in the registry are named and tagged was not checked (the names follow `norvia-ci`: `<REGISTRY>/<name>`).** The first image is the TMS API, `<REGISTRY>/tms-api`; each later image is one more `uses:` in `images.yml`.
+
+| Ref pushed | Tags |
+|---|---|
+| `main` | the 7-character commit SHA and `latest` |
+| a `v*` tag | the SHA and the tag name |
+| a branch named `image/*` | the SHA only |
+| any other branch | no image |
+
+The job reports `forgejo/image (tms-api)` to the commit on GitHub. It uses the settings of [the registry push token](#the-registry-push-token) and the status token. `dotnet publish /t:PublishContainer` logs in with them directly, so there is no `docker login`.
+
+**Check it.** Push a branch named `image/check-tms-api`, then:
+
+1. `forgejo/image (tms-api)` goes to `success` on the commit. A certificate error at `Publish the image` means the job image does not trust `git.home.arpa`.
+2. The package `tms-api`, tagged with the first 7 characters of the commit, is listed on the registry's packages page.
+3. From a node of the cluster: `docker pull git.home.arpa/smirking_squiggly/tms-api:<sha>` (or `crictl pull`), and the image is `linux/amd64`.
+4. `helm template norvia deploy/helm/norvia --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=<sha> --set edge.baseDomain=norvia.test` names `git.home.arpa/smirking_squiggly/<name>:<sha>` for the images that are built (`infra/image-workflow.Tests.ps1` checks the shape).
+5. Push the same SHA again from a clean checkout and run the image: it starts. The digest differs between builds; the inputs are the same.
 
 ## The API token
 

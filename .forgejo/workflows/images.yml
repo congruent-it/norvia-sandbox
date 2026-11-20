@@ -1,0 +1,25 @@
+# Builds the application images and pushes them to the Forgejo registry (#1044, ADR 0056). Each image is one `uses:` of build-image.yml.
+# Runs on push to main (tagged with the short SHA and latest), on v* tags (the SHA and the version) and on a branch named image/* (the SHA only):
+# every branch would fill the registry, and workflow_dispatch is not available on a mirror's push (infra/image-tags.ps1 holds the rule).
+# Needs the Forgejo variable REGISTRY and the secrets REGISTRY_USER, REGISTRY_TOKEN and GH_STATUS_TOKEN (docs/operations/forgejo.md, "The registry").
+name: images
+on:
+  push:
+    branches: [main, 'image/**']
+    tags: ['v*']
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tms-api:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj
+      name: tms-api
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}

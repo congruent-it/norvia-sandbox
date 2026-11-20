@@ -1,0 +1,88 @@
+# Builds one application's image and pushes it to the Forgejo registry (#1044, ADR 0056). Called by images.yml, one `uses:` per image.
+# `dotnet publish /t:PublishContainer` builds the image from the project, with no Dockerfile and no Docker daemon, and pushes it straight to the registry.
+# It reports `forgejo/image (<name>)` to the GitHub commit like a gate (ADR 0055).
+name: build-image
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: The project to publish, relative to the repository root (a web or worker project that SDK container support can containerize)
+        type: string
+        required: true
+      name:
+        description: The image name, the one the chart's values give (tms-api, partner-api, ...)
+        type: string
+        required: true
+      registry:
+        description: The image prefix, host and owner, e.g. git.home.arpa/smirking_squiggly (the Forgejo variable REGISTRY)
+        type: string
+        required: true
+      needs-node:
+        description: The project builds a Tailwind stylesheet (the Web projects), so the build needs Node. The runner image has it; the job fails clearly if it does not.
+        type: boolean
+        default: false
+      base-image:
+        description: The runtime base image, pinned by digest. A newer one is a reviewed change (see "Images" in docs/operations/forgejo.md).
+        type: string
+        default: mcr.microsoft.com/dotnet/aspnet:10.0@sha256:12b1135f5f8b3c0a214f2a680ff2033dff4f684f445d6c697d9524ceeb303586
+    secrets:
+      GH_STATUS_TOKEN:
+        required: true
+      REGISTRY_USER:
+        required: true
+      REGISTRY_TOKEN:
+        required: true
+
+jobs:
+  image:
+    name: image (${{ inputs.name }})
+    runs-on: norvia-ci
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: image (${{ inputs.name }})
+          state: pending
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+      # The runner image has the .NET SDK and Node, and fails here, with the versions it found, when it is stale.
+      - uses: ./.forgejo/actions/setup
+
+      - name: Check that Node is there for the stylesheet
+        if: ${{ inputs.needs-node }}
+        run: node --version
+
+      - name: Choose the tags
+        id: tags
+        shell: pwsh
+        run: |
+          $tags = @(./infra/image-tags.ps1 -Ref $env:GITHUB_REF -Sha $env:GITHUB_SHA)
+          if (-not $tags) { throw "$env:GITHUB_REF builds no image (main, v* tags and image/* branches do); images.yml should not have started." }
+          Write-Host "Tags: $($tags -join ', ')"
+          "tags=$($tags -join ';')" | Out-File -Append $env:GITHUB_OUTPUT
+
+      # linux-x64: the cluster's nodes are amd64 (ADR 0053). The SDK logs in with the SDK_CONTAINER_REGISTRY_* variables, so there is no login step.
+      # The repository is <owner>/<name> and the registry is the host, so the image is <REGISTRY>/<name>, the path of the chart's image.registry.
+      - name: Publish the image
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          IMAGE_NAME: ${{ inputs.name }}
+          PROJECT: ${{ inputs.project }}
+          BASE_IMAGE: ${{ inputs.base-image }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+          SDK_CONTAINER_REGISTRY_UNAME: ${{ secrets.REGISTRY_USER }}
+          SDK_CONTAINER_REGISTRY_PWORD: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          dotnet publish "$PROJECT" -c Release -r linux-x64 --self-contained false /t:PublishContainer \
+            -p:ContainerRegistry="${REGISTRY%%/*}" \
+            -p:ContainerRepository="${REGISTRY#*/}/$IMAGE_NAME" \
+            -p:ContainerBaseImage="$BASE_IMAGE" \
+            -p:ContainerImageTags="\"$TAGS\""
+
+      - if: always()
+        uses: ./.forgejo/actions/report-status
+        with:
+          job: image (${{ inputs.name }})
+          state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}
