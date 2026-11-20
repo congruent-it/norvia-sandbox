@@ -124,8 +124,8 @@ jobs:
           fi
 
       # Every application's tests run in its leg of the integration job. A test project outside every leg would run nowhere, so a new application's tests
-      # either join a leg (or tests/Integration) or fail here. The matrix is not ported yet, so this reads GITHUB's (.github/workflows/ci.yml); the issue that
-      # ports the matrix switches it to this file.
+      # either join a leg (or tests/Integration) or fail here. The matrix is only partly ported (#1042 has one leg), so this still reads GITHUB's (.github/workflows/ci.yml);
+      # the issue that ports the last leg switches it to this file.
       - name: Check that every test project is claimed by a leg
         run: |
           claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .github/workflows/ci.yml; echo Integration; echo Branding; echo Docs; echo ServiceDefaults)
@@ -168,4 +168,105 @@ jobs:
         with:
           job: build
           state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+  # The test matrix (#1042): one leg per application and kind of test, each in its own job container with its own Docker daemon (start-dockerd), so the
+  # AppHosts of parallel legs cannot clash on container names or ports. The same steps as the `integration` job of .github/workflows/ci.yml, which stays
+  # until the removal issue (#1030), so the two can be compared. This issue ports the smallest application; the issues that follow add the other legs
+  # to `matrix.include`, copied from GitHub's matrix, which is the only thing a leg needs.
+  # Each leg reports its own status, forgejo/tests (<application>), so each can become required by itself; the `tests` job below rolls them up.
+  integration:
+    runs-on: norvia-ci
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - application: Estate health check
+            directory: HealthCheck
+            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: tests (${{ matrix.application }})
+          state: pending
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+      # The AppHost runs SQL Server and the Service Bus emulator in Docker. The job container is privileged and has no host socket, so this starts the
+      # daemon the leg alone uses (docs/operations/forgejo.md, "Runner for CI").
+      - name: Start Docker
+        run: start-dockerd
+
+      - uses: ./.forgejo/actions/setup
+
+      - name: Build
+        run: |
+          dotnet tool restore
+          dotnet build Norvia.slnx --configuration "$CONFIGURATION"
+
+      # Chromium's system libraries need root. The job runs as root, the job image's default user (the Dockerfile sets no USER), so `--with-deps`
+      # works here as it does on GitHub's runner. Every UI test project uses the same Playwright version, so the leg's own project's script serves.
+      - name: Install Playwright's Chromium
+        if: contains(matrix.kinds, 'UiTests')
+        run: pwsh "$(find tests/${{ matrix.directory }} -path "*/bin/$CONFIGURATION/net10.0/playwright.ps1" -print -quit)" install --with-deps chromium
+
+      # UI tests keep a Playwright trace and video of every failed test. Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
+      - name: Unit, architecture, integration and UI tests
+        env:
+          NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
+          NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
+          # DCP, which Aspire starts the resources with, writes its own log: for an AppHost that stalls as it starts.
+          DCP_DIAGNOSTICS_LOG_LEVEL: debug
+          DCP_DIAGNOSTICS_LOG_FOLDER: ${{ github.workspace }}/TestResults/dcp
+        run: |
+          mkdir -p TestResults
+          failed=0
+          for kind in ${{ matrix.kinds }}; do
+            for project in $(find tests/${{ matrix.directory }} -name "*.$kind.csproj" | sort); do
+              dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
+                --logger trx --results-directory TestResults || failed=1
+            done
+          done
+          exit $failed
+
+      # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
+      - name: Coverage summary
+        if: always()
+        run: |
+          if find tests/${{ matrix.directory }} -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/${{ matrix.directory }}/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+              -reporttypes:"MarkdownSummaryGithub;Cobertura"
+            cat TestResults/coverage/SummaryGithub.md
+          fi
+
+      # v3, as in the build job: v4 needs GitHub's artifact service.
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results-${{ matrix.directory }}-${{ strategy.job-index }}
+          path: TestResults/
+          if-no-files-found: ignore
+
+      - if: always()
+        uses: ./.forgejo/actions/report-status
+        with:
+          job: tests (${{ matrix.application }})
+          state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+  # One name for branch protection to require instead of one per leg: forgejo/tests is green when every leg is. It runs when the legs are done, so it has
+  # no `pending` of its own; until then the commit has no forgejo/tests, which a required-status rule reads as not yet passed.
+  tests:
+    needs: integration
+    if: always()
+    runs-on: norvia-ci
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      # `needs.integration.result` is success, failure, cancelled or skipped; any leg that failed fails it.
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: tests
+          state: ${{ needs.integration.result }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
