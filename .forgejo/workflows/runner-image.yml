@@ -1,0 +1,31 @@
+# Builds the job image of the Forgejo CI runner and pushes it to the registry (#1038). Runs when what goes into the image changes.
+# Needs the Forgejo secrets REGISTRY_USER and REGISTRY_TOKEN (a token with the write:package scope) and the variable REGISTRY (the registry host).
+name: runner-image
+on:
+  push:
+    paths:
+      - .forgejo/runner-image/**
+      - infra/tool-versions.psd1
+      - infra/install-powershell.sh
+      - infra/install-tools.ps1
+      - global.json
+      - .forgejo/workflows/runner-image.yml
+
+jobs:
+  build:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start Docker
+        run: start-dockerd
+      - name: Build and push
+        env:
+          REGISTRY: ${{ vars.REGISTRY }}
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          image="$REGISTRY/norvia-ci"
+          echo "$REGISTRY_TOKEN" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
+          docker build -f .forgejo/runner-image/Dockerfile -t "$image:${GITHUB_SHA}" -t "$image:latest" .
+          docker push "$image:${GITHUB_SHA}"
+          docker push "$image:latest"

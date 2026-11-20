@@ -1,0 +1,29 @@
+# Config of the Forgejo runner for CI (#1038), used with `forgejo-runner daemon --config config.yaml`. docs/operations/forgejo.md "Runner for CI"
+# says how to register the runner and start it. Only the keys this setup changes are here; the rest keep the runner's defaults
+# (`forgejo-runner generate-config` prints them all).
+log:
+  level: info
+
+runner:
+  file: .runner
+  # Jobs this runner runs at once. Each runs in its own container with its own Docker daemon, so the limit is CPU, memory and disk, not names or ports.
+  # Set from the machine's capacity; the doc records the number and what the matrix costs.
+  capacity: 4
+  timeout: 3h
+  labels:
+    # The label of #1030: `runs-on: docker`. The job image is the one .forgejo/workflows/runner-image.yml builds. Replace <registry> with the registry of the doc.
+    - "docker:docker://<registry>/norvia-ci:latest"
+
+cache:
+  enabled: true
+
+container:
+  # Privileged, so the job can start its own dockerd (start-dockerd). The jobs run code from the mirrored repository only.
+  privileged: true
+  # "-": find the host Docker for the runner itself, but do not mount its socket into the job (empty would mount it), so a job cannot touch the
+  # containers of other jobs and start-dockerd starts a daemon of its own.
+  docker_host: "-"
+  # The NuGet cache of the job image (NUGET_PACKAGES), kept between runs in a named volume.
+  options: "-v norvia-nuget:/nuget-cache"
+  valid_volumes:
+    - norvia-nuget
