@@ -10,16 +10,16 @@
     <PackageVersion Include="MessagePack" Version="2.5.307" />
   </ItemGroup>
   <ItemGroup Label="Aspire">
-    <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Azure.KeyVault" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Azure.ApplicationInsights" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.AppContainers" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.Azure.KeyVault" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.Azure.ApplicationInsights" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Azure.ServiceBus" Version="13.6.4" />
     <PackageVersion Include="Aspire.Hosting.Azure.Sql" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.6.4" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.4" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.SqlServer.Extensions" Version="13.6.0" />
-    <PackageVersion Include="Aspire.Azure.Messaging.ServiceBus" Version="17.0.0" />
-    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Azure.Messaging.ServiceBus" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.6.5" />
     <PackageVersion Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="13.6.4" />
   </ItemGroup>
   <ItemGroup Label="Service defaults">
