@@ -1,5 +1,5 @@
 # Builds the job image of the Forgejo CI runner and pushes it to the registry (#1038). Runs when what goes into the image changes.
-# Needs the Forgejo secrets REGISTRY_USER and REGISTRY_TOKEN (a token with the write:package scope) and the variable REGISTRY (the registry host).
+# Needs the Forgejo secrets REGISTRY_USER and REGISTRY_TOKEN (a token with the write:package scope) and the variable REGISTRY (the image prefix: the registry host, plus the owner for Forgejo, e.g. git.home.arpa/smirking_squiggly). Login uses the host part only.
 name: runner-image
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
           image="$REGISTRY/norvia-ci"
-          echo "$REGISTRY_TOKEN" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin
+          echo "$REGISTRY_TOKEN" | docker login "${REGISTRY%%/*}" -u "$REGISTRY_USER" --password-stdin
           docker build -f .forgejo/runner-image/Dockerfile -t "$image:${GITHUB_SHA}" -t "$image:latest" .
           docker push "$image:${GITHUB_SHA}"
           docker push "$image:latest"
