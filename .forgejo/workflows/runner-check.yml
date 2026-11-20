@@ -1,0 +1,29 @@
+# The throwaway check of the runner for CI (#1038): the tools are in the image, Docker works, and an Aspire test project runs on one leg.
+# Runs when this file changes, or by hand. Delete it once the runner is checked, or keep it as the runner's health check.
+name: runner-check
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .forgejo/workflows/runner-check.yml
+
+jobs:
+  check:
+    runs-on: norvia-ci
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tools
+        run: |
+          dotnet --version
+          pwsh --version
+          node --version
+          jq --version
+          yq --version
+          git --version
+          helm version --short
+      - name: Docker
+        run: |
+          start-dockerd
+          docker run --rm hello-world
+      - name: Aspire test project
+        run: dotnet test tests/Tms/Norvia.Tms.Api.IntegrationTests.Trips --configuration Release

@@ -1,0 +1,36 @@
+# The settings the Forgejo runner for CI needs (#1038): a reference, not a deployment. The runner itself is installed by the homelab's K3s setup, which
+# carries these keys in its own config. docs/operations/forgejo.md "Runner for CI" says what the runner must provide. Only the keys this setup changes are
+# here; the rest keep the runner's defaults (`forgejo-runner generate-config` prints them all). Forgejo runner 13 or later (`register` is deprecated).
+log:
+  level: info
+
+server:
+  connections:
+    norvia-ci:
+      url: https://git.home.arpa/
+      # From Forgejo, Settings, Actions, Runners, Create new runner: the runner's UUID, and its token from a secret (never in git).
+      uuid: <uuid>
+      token_url: file:/secrets/token
+
+runner:
+  # Jobs this runner runs at once. Each runs in its own container with its own Docker daemon, so the limit is CPU, memory and disk, not names or ports.
+  # Set from the machine's capacity; the doc records the number and what the matrix costs.
+  capacity: 4
+  timeout: 3h
+  labels:
+    # The label is `norvia-ci`, so jobs use `runs-on: norvia-ci` (#1030 had chosen `docker`; the old runner of #1024 keeps that one). The job image is the one .forgejo/workflows/runner-image.yml builds. Replace <registry> with the registry of the doc.
+    - "norvia-ci:docker://<registry>/norvia-ci:latest"
+
+cache:
+  enabled: true
+
+container:
+  # Privileged, so the job can start its own dockerd (start-dockerd). The jobs run code from the mirrored repository only.
+  privileged: true
+  # "-" (or empty): mount no Docker socket into the job, so a job cannot touch the containers of other jobs and start-dockerd starts a daemon of its own.
+  # ("automount" would mount the host's socket, and start-dockerd would then find it and share it.)
+  docker_host: "-"
+  # The NuGet cache of the job image (NUGET_PACKAGES), kept between runs in a named volume.
+  options: "-v norvia-nuget:/nuget-cache"
+  valid_volumes:
+    - norvia-nuget
