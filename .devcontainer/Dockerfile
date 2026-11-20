@@ -30,7 +30,9 @@ COPY infra/install-tools.ps1 /tmp/install-tools.ps1
 RUN pwsh -NoProfile -File /tmp/install-tools.ps1 && rm /tmp/install-tools.ps1 /tmp/tool-versions.psd1
 
 ARG USERNAME=vscode
-RUN useradd --create-home --shell /bin/bash "$USERNAME" \
+# The base image ships an "ubuntu" user at UID/GID 1000, the same UID as the usual host user, so the workspace bind mount is writable. Rename it instead of adding a second one.
+RUN groupmod --new-name "$USERNAME" ubuntu \
+    && usermod --login "$USERNAME" --home "/home/$USERNAME" --move-home ubuntu \
     && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 USER $USERNAME
