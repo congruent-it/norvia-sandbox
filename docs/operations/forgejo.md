@@ -54,7 +54,7 @@ Not yet checked: that the runner can build a container image (Docker or Buildah)
 
 ## The registry
 
-Not set up yet. Pushing to the Forgejo container registry needs a token with the `write:package` scope; the result becomes `image.registry` in the chart ([kubernetes.md](kubernetes.md)). Decided in #1016.
+Set up, and it already holds container images: the packages are listed at <https://git.home.arpa/smirking_squiggly/-/packages>. Pushing to it needs a token with the `write:package` scope (listing needs `read:package`); its address becomes `image.registry` in the chart ([kubernetes.md](kubernetes.md)). Not checked here: how the existing images are named and tagged, and that the cluster's nodes can pull from it. Decided in #1016.
 
 ## The API token
 
