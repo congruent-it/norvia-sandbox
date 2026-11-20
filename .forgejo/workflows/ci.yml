@@ -1,5 +1,7 @@
-# The gates of CI (#1030). Forgejo pull-mirrors GitHub and a sync triggers `push` (ADR 0055); each job reports to the GitHub commit as the status forgejo/<job>.
-# Needs the Forgejo secret GH_STATUS_TOKEN (docs/operations/forgejo.md, "The GitHub status token"). Each later gate adds a job like `skeleton`.
+# The repo-level gates of CI (#1030): what is not one application's, so it runs on every push. Forgejo pull-mirrors GitHub and a sync triggers `push` (ADR 0055);
+# each job reports to the GitHub commit as the status forgejo/<job>. The tests of each deployable are in a workflow of their own (#1079): tms.yml, erp.yml, ...,
+# one per key of .forgejo/ci-scope.psd1. The `gate` job below is forgejo/ci, the one status for branch protection to require.
+# Needs the Forgejo secret GH_STATUS_TOKEN (docs/operations/forgejo.md, "The GitHub status token"). Each later repo-level gate adds a job like `skeleton`.
 name: ci
 on:
   push:
@@ -77,7 +79,7 @@ jobs:
           state: ${{ job.status }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
 
-  # Restore, a warnings-as-errors build, formatting, the estate's Bicep, vulnerable packages, and the unit tests of the projects no test leg runs.
+  # Restore, a warnings-as-errors build, formatting, the estate's Bicep, vulnerable packages, and the unit tests of the shared libraries and the docs generator.
   build:
     runs-on: norvia-ci
     timeout-minutes: 15
@@ -121,33 +123,32 @@ jobs:
             exit 1
           fi
 
-      # Every application's tests run in its leg of the integration job. A test project outside every leg would run nowhere, so a new application's tests
-      # either join a leg (or tests/Integration) or fail here. It reads this file's matrix (the whole of GitHub's is ported, #1043).
-      - name: Check that every test project is claimed by a leg
+      # Every application's tests run in a leg of its workflow (.forgejo/workflows/<application>.yml). A test project outside every workflow would run
+      # nowhere, so a new application's tests either join a workflow (and .forgejo/ci-scope.psd1) or fail here. Branding, Docs and ServiceDefaults run below.
+      - name: Check that every test project is claimed by a workflow
         run: |
-          claimed=$(yq '.jobs.integration.strategy.matrix.include[].directory' .forgejo/workflows/ci.yml; echo Integration; echo Branding; echo Docs; echo ServiceDefaults)
+          claimed=$(yq '.jobs.integration.steps[] | select(.uses == "./.forgejo/actions/test-leg") | .with.directory' .forgejo/workflows/*.yml; echo Branding; echo Docs; echo ServiceDefaults)
           unclaimed=$(find tests -name '*.csproj' | cut -d/ -f2 | sort -u | grep -vxF "$claimed" || true)
           if [ -n "$unclaimed" ]; then
-            echo "::error::Test projects under tests/ that no integration leg runs: $unclaimed"
+            echo "::error::Test projects under tests/ that no application workflow runs: $unclaimed"
             exit 1
           fi
 
-      # The Integration functions have unit tests only, so they run here. Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
-      - name: Unit tests of the Integration functions and the shared Branding library, ServiceDefaults' faults and the docs generator
+      # Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
+      - name: Unit tests of the shared Branding library, ServiceDefaults' faults and the docs generator
         run: |
           failed=0
-          for project in $(find tests/Integration tests/Branding tests/Docs tests/ServiceDefaults -name '*.UnitTests.csproj' | sort); do
+          for project in $(find tests/Branding tests/Docs tests/ServiceDefaults -name '*.UnitTests.csproj' | sort); do
             dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
               --logger trx --results-directory TestResults || failed=1
           done
           exit $failed
-
       # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
       - name: Coverage summary
         if: always()
         run: |
-          if find tests/Integration tests/Branding tests/Docs tests/ServiceDefaults -name coverage.cobertura.xml | grep -q .; then
-            dotnet reportgenerator -reports:"tests/Integration/**/coverage.cobertura.xml;tests/Branding/**/coverage.cobertura.xml;tests/Docs/**/coverage.cobertura.xml;tests/ServiceDefaults/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+          if find tests/Branding tests/Docs tests/ServiceDefaults -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/Branding/**/coverage.cobertura.xml;tests/Docs/**/coverage.cobertura.xml;tests/ServiceDefaults/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
               -reporttypes:"MarkdownSummaryGithub;Cobertura"
             cat TestResults/coverage/SummaryGithub.md
           fi
@@ -167,233 +168,29 @@ jobs:
           state: ${{ job.status }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
 
-  # The test matrix (#1042): one leg per application and kind of test, each in its own job container with its own Docker daemon (start-dockerd), so the
-  # AppHosts of parallel legs cannot clash on container names or ports.
-  # The runner runs `capacity` jobs at once (.forgejo/runner/config.yaml) and the other legs queue; the timeout of a job counts from when it starts,
-  # so `timeout-minutes` stays what one leg needs, not what the whole matrix takes.
-  # Each leg reports its own status, forgejo/tests (<application>), so each can become required by itself; the `tests` job below rolls them up.
-  integration:
+  # forgejo/ci (#1079): the one status for branch protection to require. Every application workflow reports forgejo/<application> on every push, a pass
+  # when the change does not affect it, so a path filter never leaves a status missing. This job waits for them and for build and powershell, and reports
+  # success, or failure as soon as one fails. It holds a runner slot while it waits (capacity 4, .forgejo/runner/config.yaml). A new application needs no
+  # change here: the workflows are the keys of .forgejo/ci-scope.psd1.
+  gate:
     runs-on: norvia-ci
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - application: TMS
-            directory: Tms
-            kinds: UnitTests ArchitectureTests
-          - application: TMS (Billing)
-            directory: Tms
-            kinds: IntegrationTests.Billing
-          - application: TMS (Capacity)
-            directory: Tms
-            kinds: IntegrationTests.Capacity
-          - application: TMS (Carrier bookings)
-            directory: Tms
-            kinds: IntegrationTests.CarrierBookings
-          - application: TMS (Customer service agent)
-            directory: Tms
-            kinds: IntegrationTests.CustomerServiceAgent
-          - application: TMS (Faults)
-            directory: Tms
-            kinds: IntegrationTests.Faults
-          - application: TMS (Planning)
-            directory: Tms
-            kinds: IntegrationTests.Planning
-          - application: TMS (Planner agent)
-            directory: Tms
-            kinds: IntegrationTests.PlannerAgent
-          - application: TMS (Trips)
-            directory: Tms
-            kinds: IntegrationTests.Trips
-          - application: TMS (Consignee tracking)
-            directory: Tms
-            kinds: IntegrationTests.ConsigneeTracking
-          - application: TMS (Exceptions)
-            directory: Tms
-            kinds: IntegrationTests.Exceptions
-          - application: TMS (Proofs of delivery)
-            directory: Tms
-            kinds: IntegrationTests.ProofsOfDelivery
-          - application: TMS (Reset)
-            directory: Tms
-            kinds: IntegrationTests.Reset
-          - application: TMS (Shipper tracking)
-            directory: Tms
-            kinds: IntegrationTests.ShipperTracking
-          - application: TMS (Tracking events)
-            directory: Tms
-            kinds: IntegrationTests.TrackingEvents
-          - application: TMS (Transport Orders)
-            directory: Tms
-            kinds: IntegrationTests.TransportOrders
-          - application: TMS (API reference, seeds and AppHost model)
-            directory: Tms
-            kinds: IntegrationTests
-          - application: TMS (UI, Customer service agent)
-            directory: Tms
-            kinds: UiTests.CustomerServiceAgent
-          - application: TMS (UI, Planner agent)
-            directory: Tms
-            kinds: UiTests.PlannerAgent
-          - application: TMS (UI, Planner agent, Plan the list)
-            directory: Tms
-            kinds: UiTests.PlannerAgentPlan
-          - application: TMS (UI, Faults)
-            directory: Tms
-            kinds: UiTests.Faults
-          - application: TMS (UI, Shipments)
-            directory: Tms
-            kinds: UiTests.Shipments
-          - application: TMS (UI, Transport Orders)
-            directory: Tms
-            kinds: UiTests.TransportOrders
-          - application: TMS (UI, other components)
-            directory: Tms
-            kinds: UiTests.Remaining
-          - application: Partner portal
-            directory: PartnerPortal
-            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
-          - application: Partner portal (Carrier and Shipper faults)
-            directory: PartnerPortal
-            kinds: IntegrationTests.Faults
-          - application: Partner portal (Shipper tracking assistant)
-            directory: PartnerPortal
-            kinds: IntegrationTests.TrackingAssistant
-          - application: Partner portal (UI, Intake agent)
-            directory: PartnerPortal
-            kinds: UiTests.IntakeAgent
-          - application: Partner portal (UI, Shipper tracking assistant)
-            directory: PartnerPortal
-            kinds: UiTests.TrackingAssistant
-          - application: ERP
-            directory: Erp
-            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
-          - application: ERP (Carrier invoice matching agent)
-            directory: Erp
-            kinds: IntegrationTests.FinanceAgent
-          - application: ERP (UI, Carrier invoice matching agent)
-            directory: Erp
-            kinds: UiTests.FinanceAgent
-          - application: Driver app
-            directory: DriverApp
-            kinds: UnitTests ArchitectureTests IntegrationTests
-          - application: Simulator
-            directory: Simulator
-            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
-          - application: Simulator (Invoicing)
-            directory: Simulator
-            kinds: IntegrationTests.Invoicing
-          - application: Simulator (Personas)
-            directory: Simulator
-            kinds: IntegrationTests.Personas
-          - application: Simulator (Reset)
-            directory: Simulator
-            kinds: IntegrationTests.Reset
-          - application: Simulator (UI, Personas)
-            directory: Simulator
-            kinds: UiTests.Personas
-          - application: Simulator (UI, Reset)
-            directory: Simulator
-            kinds: UiTests.Reset
-          - application: Simulator (UI, Consignee tracking)
-            directory: Simulator
-            kinds: UiTests.ConsigneeTracking
-          - application: Integration console
-            directory: IntegrationConsole
-            kinds: UnitTests ArchitectureTests IntegrationTests IntegrationTests.LocalTelemetry UiTests
-          - application: Integration
-            directory: Integration
-            kinds: IntegrationTests
-          - application: Integration (UI, master-data sync)
-            directory: Integration
-            kinds: UiTests
-          - application: Estate health check
-            directory: HealthCheck
-            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: ./.forgejo/actions/report-status
         with:
-          job: tests (${{ matrix.application }})
+          job: ci
           state: pending
           token: ${{ secrets.GH_STATUS_TOKEN }}
-
-      # The AppHost runs SQL Server and the Service Bus emulator in Docker. The job container is privileged and has no host socket, so this starts the
-      # daemon the leg alone uses (docs/operations/forgejo.md, "Runner for CI").
-      - name: Start Docker
-        run: start-dockerd
-
-      - uses: ./.forgejo/actions/setup
-
-      - name: Build
-        run: |
-          dotnet tool restore
-          dotnet build Norvia.slnx --configuration "$CONFIGURATION"
-
-      # Chromium's system libraries need root. The job runs as root, the job image's default user (the Dockerfile sets no USER), so `--with-deps`
-      # works here as it does on GitHub's runner. Every UI test project uses the same Playwright version, so the leg's own project's script serves.
-      - name: Install Playwright's Chromium
-        if: contains(matrix.kinds, 'UiTests')
-        run: pwsh "$(find tests/${{ matrix.directory }} -path "*/bin/$CONFIGURATION/net10.0/playwright.ps1" -print -quit)" install --with-deps chromium
-
-      # UI tests keep a Playwright trace and video of every failed test. Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
-      - name: Unit, architecture, integration and UI tests
-        env:
-          NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/tms-api.log
-          NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
-          # DCP, which Aspire starts the resources with, writes its own log: for an AppHost that stalls as it starts.
-          DCP_DIAGNOSTICS_LOG_LEVEL: debug
-          DCP_DIAGNOSTICS_LOG_FOLDER: ${{ github.workspace }}/TestResults/dcp
-        run: |
-          mkdir -p TestResults
-          failed=0
-          for kind in ${{ matrix.kinds }}; do
-            for project in $(find tests/${{ matrix.directory }} -name "*.$kind.csproj" | sort); do
-              dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
-                --logger trx --results-directory TestResults || failed=1
-            done
-          done
-          exit $failed
-
-      # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
-      - name: Coverage summary
-        if: always()
-        run: |
-          if find tests/${{ matrix.directory }} -name coverage.cobertura.xml | grep -q .; then
-            dotnet reportgenerator -reports:"tests/${{ matrix.directory }}/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
-              -reporttypes:"MarkdownSummaryGithub;Cobertura"
-            cat TestResults/coverage/SummaryGithub.md
-          fi
-
-      # v3, as in the build job: v4 needs GitHub's artifact service.
-      - uses: actions/upload-artifact@v3
-        if: always()
+      - id: gate
+        uses: ./.forgejo/actions/gate
         with:
-          name: integration-test-results-${{ matrix.directory }}-${{ strategy.job-index }}
-          path: TestResults/
-          if-no-files-found: ignore
-
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+      # A timeout or a cancelled run (a newer push superseded this one) is an error; the gate's own state is what it reports otherwise.
       - if: always()
         uses: ./.forgejo/actions/report-status
         with:
-          job: tests (${{ matrix.application }})
-          state: ${{ job.status }}
-          token: ${{ secrets.GH_STATUS_TOKEN }}
-
-  # One name for branch protection to require instead of one per leg: forgejo/tests is green when every leg is. It runs when the legs are done, so it has
-  # no `pending` of its own; until then the commit has no forgejo/tests, which a required-status rule reads as not yet passed.
-  tests:
-    needs: integration
-    if: always()
-    runs-on: norvia-ci
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      # `needs.integration.result` is success, failure, cancelled or skipped; any leg that failed fails it. report-status takes no `skipped`, so a
-      # skipped matrix is reported as an error, not left to throw.
-      - uses: ./.forgejo/actions/report-status
-        with:
-          job: tests
-          state: ${{ needs.integration.result == 'skipped' && 'error' || needs.integration.result }}
+          job: ci
+          state: ${{ steps.gate.outputs.state || (job.status == 'success' && 'error' || job.status) }}
+          description: ${{ steps.gate.outputs.description }}
           token: ${{ secrets.GH_STATUS_TOKEN }}

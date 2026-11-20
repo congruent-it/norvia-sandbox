@@ -1,0 +1,32 @@
+# Waits for the statuses of the other workflows of the push and returns the state of forgejo/ci (#1079). See gate.ps1.
+name: gate
+description: Rolls up the statuses of the workflows of a push.
+inputs:
+  token:
+    description: The GitHub token that may read and write commit statuses (the secret GH_STATUS_TOKEN)
+    required: true
+  github-repository:
+    description: The repository on GitHub. github.repository is the Forgejo mirror's name, so this is not derived from it.
+    required: false
+    default: congruent-it/norvia-sandbox
+outputs:
+  state:
+    description: success, failure or error
+    value: ${{ steps.gate.outputs.state }}
+  description:
+    description: Which workflows failed or did not report
+    value: ${{ steps.gate.outputs.description }}
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: pwsh
+      env:
+        TOKEN: ${{ inputs.token }}
+        GH_REPOSITORY: ${{ inputs.github-repository }}
+        SHA: ${{ github.sha }}
+      run: |
+        $result = & "$env:GITHUB_ACTION_PATH/gate.ps1" -Sha $env:SHA -Repository $env:GH_REPOSITORY -Token $env:TOKEN
+        Write-Host "$($result.State): $($result.Description)"
+        "state=$($result.State)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        "description=$($result.Description)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
