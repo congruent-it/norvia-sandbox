@@ -9,7 +9,7 @@ server:
     norvia-ci:
       url: https://git.home.arpa/
       # From Forgejo, Settings, Actions, Runners, Create new runner: the runner's UUID, and its token from a secret (never in git).
-      uuid: <uuid>
+      uuid: 6fdde73a-e60e-467d-8927-3796831abd4b
       token_url: file:/secrets/token
 
 runner:
@@ -19,7 +19,7 @@ runner:
   timeout: 3h
   labels:
     # The label is `norvia-ci`, so jobs use `runs-on: norvia-ci` (#1030 had chosen `docker`; the old runner of #1024 keeps that one). The job image is the one .forgejo/workflows/runner-image.yml builds. Replace <registry> with the registry of the doc.
-    - "norvia-ci:docker://<registry>/norvia-ci:latest"
+    - "norvia-ci:docker://git.home.arpa/smirking_squiggly/norvia-ci:latest"
 
 cache:
   enabled: true
