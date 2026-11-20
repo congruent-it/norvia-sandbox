@@ -166,7 +166,7 @@ Describe 'the images of the integration workers and the local stand-ins' {
     }
 
     It 'builds them from one matrix job, not one job each' {
-        # "One matrix entry each, not 14 workflows" (#1047).
+        # One matrix entry per project, not a workflow each (#1047).
         $matrixJob = [regex]::Match($caller, '(?ms)^  [\w-]+:\r?\n    uses: [^\r\n]+\r?\n    strategy:.+?(?=^  [\w-]+:\r?\n|\z)').Value
         $matrixJob | Should -Not -BeNullOrEmpty
         $matrixJob | Should -Match 'fail-fast: false' -Because 'one worker that does not build must not cancel the others'
