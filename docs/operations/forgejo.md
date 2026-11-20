@@ -73,13 +73,13 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 **Set up the runner.** Installing and running it belongs to the homelab's K3s setup, not to this repository. What that setup must give the runner:
 
 - **A runner of Forgejo runner 13 or later**, created in Forgejo (the mirror's Settings, Actions, Runners, **Create new runner**, named `norvia-ci`). Runner 13 deprecates `register`; the runner is declared as a connection in its config, with the UUID and token Forgejo shows. Keep the token in a secret, not in git.
-- **The settings of [.forgejo/runner/config.yaml](../../.forgejo/runner/config.yaml):** the label `docker:docker://<registry>/norvia-ci:latest`, `capacity`, privileged job containers, `docker_host: "-"` and the `norvia-nuget` volume.
+- **The settings of [.forgejo/runner/config.yaml](../../.forgejo/runner/config.yaml):** the label `norvia-ci:docker://<registry>/norvia-ci:latest` (jobs say `runs-on: norvia-ci`; #1030 had chosen `docker`, which the older runner of #1024 keeps), `capacity`, privileged job containers, `docker_host: "-"` and the `norvia-nuget` volume.
 - **A Docker daemon for the runner to start job containers in**, trust for the `git.home.arpa` certificate (to reach Forgejo and to pull `norvia-ci`), and persistent storage for the daemon, so images and `norvia-nuget` survive restarts.
 - **The first image in the registry**, pushed by hand, because the label points at it.
 
 **Check it.** Run the `runner-check` workflow (Actions, runner-check, Run workflow). It prints the versions of `dotnet`, `pwsh`, `node`, `jq`, `yq`, git and helm, runs `docker run hello-world` and runs `dotnet test` on the Trips integration test project. Not yet run.
 
-**Add a second runner.** Create another runner in Forgejo (its own UUID and token) in the K3s setup, with the same label and its own `norvia-nuget` volume. Jobs go to whichever runner is free; total capacity is the sum of the runners' `capacity`.
+**Add a second runner.** Create another runner in Forgejo (its own UUID and token) in the K3s setup, with the same `norvia-ci` label and its own `norvia-nuget` volume. Jobs go to whichever runner is free; total capacity is the sum of the runners' `capacity`.
 
 **Capacity.** Not yet measured. To fill in: the host's CPU, memory and disk; the `capacity` it runs at; the wall-clock time of one integration leg and one UI leg; and the time of the whole matrix of about 50 legs (legs times leg time, divided by capacity, plus image pulls).
 

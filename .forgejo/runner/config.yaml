@@ -18,8 +18,8 @@ runner:
   capacity: 4
   timeout: 3h
   labels:
-    # The label of #1030: `runs-on: docker`. The job image is the one .forgejo/workflows/runner-image.yml builds. Replace <registry> with the registry of the doc.
-    - "docker:docker://<registry>/norvia-ci:latest"
+    # The label is `norvia-ci`, so jobs use `runs-on: norvia-ci` (#1030 had chosen `docker`; the old runner of #1024 keeps that one). The job image is the one .forgejo/workflows/runner-image.yml builds. Replace <registry> with the registry of the doc.
+    - "norvia-ci:docker://<registry>/norvia-ci:latest"
 
 cache:
   enabled: true

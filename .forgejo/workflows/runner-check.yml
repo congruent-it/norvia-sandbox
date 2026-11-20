@@ -9,7 +9,7 @@ on:
 
 jobs:
   check:
-    runs-on: docker
+    runs-on: norvia-ci
     steps:
       - uses: actions/checkout@v5
       - name: Tools
