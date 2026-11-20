@@ -4,6 +4,9 @@
 # The image workflows (#1044) cannot run here, so these pin what the design decided and what the chart needs.
 BeforeAll {
     $script:root = (git -C $PSScriptRoot rev-parse --show-toplevel)
+    # The chart rendered with the registry and a SHA, as the pull check does, with the agents on so agent-mcp is in it too.
+    $script:registry = 'git.home.arpa/smirking_squiggly'
+    $script:renderChart = { helm template norvia (Join-Path $root 'deploy/helm/norvia') --set image.registry=$registry --set image.tag=0123456 --set edge.baseDomain=norvia.test --set agents.enabled=true 2>&1 | Out-String }
     $script:reusable = Get-Content (Join-Path $root '.forgejo/workflows/build-image.yml') -Raw
     $script:caller = Get-Content (Join-Path $root '.forgejo/workflows/images.yml') -Raw
     # One block per caller, so every key is read from the caller it belongs to, in any key order. A job with a matrix is one block with an `include` entry per image.
@@ -108,8 +111,8 @@ Describe 'the images of the APIs and the migrations' {
     }
 
     It 'names every migrations image of the chart under the registry' -Skip:(-not (Get-Command helm -ErrorAction SilentlyContinue)) {
-        $out = helm template norvia (Join-Path $root 'deploy/helm/norvia') --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=0123456 --set edge.baseDomain=norvia.test 2>&1 | Out-String
-        foreach ($image in $chartMigrations) { $out | Should -Match "image: git\.home\.arpa/smirking_squiggly/$image`:0123456" }
+        $out = & $renderChart
+        foreach ($image in $chartMigrations) { $out | Should -Match "image: $([regex]::Escape($registry))/$image`:0123456" }
     }
 }
 
@@ -146,13 +149,12 @@ Describe 'the images of the Blazor web apps' {
 
 Describe 'the images of the integration workers and the local stand-ins' {
     BeforeAll {
-        $script:chartDir = Join-Path $root 'deploy/helm/norvia'
         # Every Local*Worker, and the two stand-ins the chart runs from partner-api.yaml and agent-mcp.yaml. LocalSupport is a library.
         $script:integrationOnDisk = @(Get-ChildItem (Join-Path $root 'src/Integration') -Directory -Filter 'Norvia.Integration.Local*' |
             Where-Object { $_.Name -match 'Worker$|LocalPartnerApi$|LocalAgentMcp$' } |
             ForEach-Object { "src/Integration/$($_.Name)/$($_.Name).csproj" } | Sort-Object)
         $script:integrationCallers = @($callers | Where-Object { $_.Project -like 'src/Integration/*' })
-        $script:chartWorkers = [regex]::Matches((Get-Content (Join-Path $chartDir 'values.yaml') -Raw), '(?m)^  (?<name>[\w-]+-worker): \{ section:') | ForEach-Object { $_.Groups['name'].Value }
+        $script:chartWorkers = [regex]::Matches((Get-Content (Join-Path $root 'deploy/helm/norvia/values.yaml') -Raw), '(?m)^  (?<name>[\w-]+-worker): \{ section:') | ForEach-Object { $_.Groups['name'].Value }
     }
 
     It 'has a caller for every worker and stand-in project of src/Integration' {
@@ -175,18 +177,14 @@ Describe 'the images of the integration workers and the local stand-ins' {
     }
 
     It 'builds every image the chart names under the registry, so a new worker without an image fails' -Skip:(-not (Get-Command helm -ErrorAction SilentlyContinue)) {
-        $out = helm template norvia $chartDir --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=0123456 --set edge.baseDomain=norvia.test --set agents.enabled=true 2>&1 | Out-String
-        $named = @([regex]::Matches($out, 'image: git\.home\.arpa/smirking_squiggly/(?<name>[\w-]+):0123456') | ForEach-Object { $_.Groups['name'].Value } | Sort-Object -Unique)
-        $named | Should -Contain 'booking-worker'
-        $named | Should -Contain 'agent-mcp'
+        $named = @([regex]::Matches((& $renderChart), "image: $([regex]::Escape($registry))/(?<name>[\w-]+):0123456") | ForEach-Object { $_.Groups['name'].Value } | Sort-Object -Unique)
+        foreach ($name in $chartWorkers + 'partner-api' + 'agent-mcp') { $named | Should -Contain $name -Because "the chart runs $name" }
         foreach ($image in $named) { $callers.Name | Should -Contain $image -Because "the chart names $image and nothing builds it" }
     }
 }
 
 Describe 'the chart naming the image' {
     It 'names <registry>/<name>:<sha> for a chart image when helm is given the registry and the SHA' -Skip:(-not (Get-Command helm -ErrorAction SilentlyContinue)) {
-        $chart = Join-Path $root 'deploy/helm/norvia'
-        $out = helm template norvia $chart --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=0123456 --set edge.baseDomain=norvia.test 2>&1 | Out-String
-        $out | Should -Match 'image: git\.home\.arpa/smirking_squiggly/partner-api:0123456'
+        (& $renderChart) | Should -Match "image: $([regex]::Escape($registry))/partner-api:0123456"
     }
 }
