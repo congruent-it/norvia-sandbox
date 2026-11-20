@@ -42,10 +42,10 @@ foreach ($name in $githubByName.Keys | Sort-Object) {
         $failures.Add("Leg '$name' is missing from the Forgejo matrix ($Forgejo)")
         continue
     }
-    $g = $githubByName[$name][0]
-    $f = $forgejoByName[$name][0]
-    if ($g.directory -ne $f.directory -or $g.kinds -ne $f.kinds) {
-        $failures.Add("Leg '$name' differs: GitHub has directory '$($g.directory)', kinds '$($g.kinds)'; Forgejo has directory '$($f.directory)', kinds '$($f.kinds)'")
+    $onGithub = $githubByName[$name][0]
+    $onForgejo = $forgejoByName[$name][0]
+    if ($onGithub.directory -ne $onForgejo.directory -or $onGithub.kinds -ne $onForgejo.kinds) {
+        $failures.Add("Leg '$name' differs: GitHub has directory '$($onGithub.directory)', kinds '$($onGithub.kinds)'; Forgejo has directory '$($onForgejo.directory)', kinds '$($onForgejo.kinds)'")
     }
 }
 foreach ($name in $forgejoByName.Keys | Sort-Object) {

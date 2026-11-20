@@ -4,11 +4,12 @@
 BeforeAll {
     $script:script = Join-Path $PSScriptRoot 'compare-ci-matrices.ps1'
 
-    function New-Workflow([string] $Dir, [string] $Name, [string[]] $Legs) {
+    # A leg is a hashtable of application, directory and kinds; -Raw is the include block as written, for the malformed cases.
+    function New-Workflow([string] $Dir, [string] $Name, [hashtable[]] $Legs, [string] $Raw = '') {
         $path = Join-Path $Dir $Name
-        $include = ($Legs | ForEach-Object { $_ -split ';' | ForEach-Object -Begin { $first = $true } -Process {
-                    ($first ? '          - ' : '            ') + $_; $first = $false } }) -join "`n"
-        Set-Content $path "jobs:`n  integration:`n    strategy:`n      matrix:`n        include:`n$include"
+        $include = $Raw ? $Raw : ($Legs | ForEach-Object {
+                "          - application: $($_.application)`n            directory: $($_.directory)`n            kinds: $($_.kinds)" }) -join "`n"
+        Set-Content $path "jobs:`n  integration:`n    strategy:`n      matrix:`n        include:$($include ? "`n$include" : ' []')"
         $path
     }
 
@@ -17,8 +18,8 @@ BeforeAll {
         [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = $output }
     }
 
-    $script:tms = 'application: TMS;directory: Tms;kinds: UnitTests ArchitectureTests'
-    $script:billing = 'application: TMS (Billing);directory: Tms;kinds: IntegrationTests.Billing'
+    $script:tms = @{ application = 'TMS'; directory = 'Tms'; kinds = 'UnitTests ArchitectureTests' }
+    $script:billing = @{ application = 'TMS (Billing)'; directory = 'Tms'; kinds = 'IntegrationTests.Billing' }
 }
 
 Describe 'compare-ci-matrices' {
@@ -52,7 +53,7 @@ Describe 'compare-ci-matrices' {
 
     It 'fails when a leg has different kinds or directory on the two sides' {
         $github = New-Workflow $dir 'github.yml' $tms
-        $forgejo = New-Workflow $dir 'forgejo.yml' 'application: TMS;directory: Tms;kinds: UnitTests'
+        $forgejo = New-Workflow $dir 'forgejo.yml' @(@{ application = 'TMS'; directory = 'Tms'; kinds = 'UnitTests' })
         $result = Invoke-Compare $github $forgejo
         $result.ExitCode | Should -Be 1
         $result.Output | Should -Match 'TMS.*differs'
@@ -68,6 +69,20 @@ Describe 'compare-ci-matrices' {
         $github = New-Workflow $dir 'github.yml' $tms, $tms
         $forgejo = New-Workflow $dir 'forgejo.yml' $tms
         (Invoke-Compare $github $forgejo).ExitCode | Should -Be 1
+    }
+
+    It 'fails when a matrix has no legs, instead of passing on two empty matrices' {
+        $empty = New-Workflow $dir 'empty.yml' @()
+        $result = Invoke-Compare $empty $empty
+        $result.ExitCode | Should -Not -Be 0
+        $result.Output | Should -Match 'has no matrix.include'
+    }
+
+    It 'fails when the job has no matrix at all' {
+        $path = Join-Path $dir 'no-matrix.yml'
+        Set-Content $path "jobs:`n  integration:`n    runs-on: x"
+        $result = Invoke-Compare $path $path
+        $result.ExitCode | Should -Not -Be 0
     }
 
     It 'passes on the repo itself' {
