@@ -64,7 +64,7 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 | Image rebuild | [.forgejo/workflows/runner-image.yml](../../.forgejo/workflows/runner-image.yml) |
 | Check | [.forgejo/workflows/runner-check.yml](../../.forgejo/workflows/runner-check.yml) |
 
-**Each job has its own Docker daemon.** The runner starts the job container privileged and without the host's Docker socket (`docker_host: "-"`; an empty value would mount it, and `start-dockerd` would then find the host daemon and share it). A job that needs Docker runs `start-dockerd` as its first step, which starts a `dockerd` inside the job container. The containers, networks and ports of one leg are invisible to another, so parallel AppHosts cannot clash on names or ports, and the daemon goes away with the job. `/var/lib/docker` is a volume of the job image, so `dockerd` can use overlay2 and not fall back to the slow vfs driver. The cost: every job pulls its images (SQL Server, the Service Bus emulator) into an empty daemon.
+**Each job has its own Docker daemon.** The runner starts the job container privileged and without the host's Docker socket (`docker_host: "-"`; `automount` would mount it, and `start-dockerd` would then find the host daemon and share it). A job that needs Docker runs `start-dockerd` as its first step, which starts a `dockerd` inside the job container. The containers, networks and ports of one leg are invisible to another, so parallel AppHosts cannot clash on names or ports, and the daemon goes away with the job. `/var/lib/docker` is a volume of the job image, so `dockerd` can use overlay2 and not fall back to the slow vfs driver. The cost: every job pulls its images (SQL Server, the Service Bus emulator) into an empty daemon.
 
 **The job image** is the .NET SDK image (the floating `10.0` tag: `global.json` allows any 10.0 feature band from 10.0.400, and a rebuild takes the current one), PowerShell and the tools of [tool-versions.psd1](../../infra/tool-versions.psd1) (`yq` among them; installed as the dev container does, with `infra/install-powershell.sh` and `infra/install-tools.ps1`), `jq`, git and Docker. `runner-image.yml` builds it on the homelab and pushes it to `<registry>/norvia-ci`, tagged with the commit and `latest`. It runs when the image folder, `tool-versions.psd1`, the two install scripts or `global.json` changes, so a bumped tool version rebuilds the image. It needs the Forgejo variable `REGISTRY` (the image prefix, host and owner, e.g. `git.home.arpa/smirking_squiggly`) and the secrets `REGISTRY_USER` and `REGISTRY_TOKEN` (`write:package`). The first image is built by hand (`docker build -f .forgejo/runner-image/Dockerfile -t <registry>/norvia-ci:latest .` from the repository root, then `docker push`), because the runner's label points at it.
 
@@ -72,13 +72,13 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 
 **Set up the runner**
 
-1. Edit `.forgejo/runner/config.yaml`: replace `<registry>` in the label and set `capacity`.
-2. Register it with a registration token from Forgejo: `forgejo-runner register --no-interactive --instance "$FORGEJO_URL" --token <token> --name norvia-ci --labels "docker:docker://<registry>/norvia-ci:latest"`.
-3. Run `forgejo-runner daemon --config .forgejo/runner/config.yaml` under systemd or as a container.
+1. In Forgejo (the mirror's Settings, Actions, Runners), choose **Create new runner**, name it `norvia-ci` and copy the **UUID** and the **token** it shows. (Runner 13 deprecates `register` and `create-runner-file`; a runner is declared in the config instead.) The token is a secret: save it to `/etc/forgejo-runner/norvia-ci.token` (mode 0600), not to git.
+2. Edit `.forgejo/runner/config.yaml`: replace `<uuid>` and `<registry>` (the label is `docker:docker://<registry>/norvia-ci:latest`) and set `capacity`. Check the `url` and the `token_url` path.
+3. Run `forgejo-runner daemon --config .forgejo/runner/config.yaml` under systemd or as a container. The runner appears as idle in the Runners list once it connects.
 
 **Check it.** Run the `runner-check` workflow (Actions, runner-check, Run workflow). It prints the versions of `dotnet`, `pwsh`, `node`, `jq`, `yq`, git and helm, runs `docker run hello-world` and runs `dotnet test` on the Trips integration test project. Not yet run.
 
-**Add a second runner.** Repeat the three steps on another host with a different `--name`, the same label and its own `norvia-nuget` volume. Jobs go to whichever runner is free; total capacity is the sum of the runners' `capacity`.
+**Add a second runner.** Repeat the three steps on another host with a new runner (its own UUID and token), the same label and its own `norvia-nuget` volume. Jobs go to whichever runner is free; total capacity is the sum of the runners' `capacity`.
 
 **Capacity.** Not yet measured. To fill in: the host's CPU, memory and disk; the `capacity` it runs at; the wall-clock time of one integration leg and one UI leg; and the time of the whole matrix of about 50 legs (legs times leg time, divided by capacity, plus image pulls).
 
