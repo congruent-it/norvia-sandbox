@@ -33,7 +33,7 @@ foreach ($file in $files) {
     }
 }
 
-$tests = Invoke-Pester -Path (Join-Path $PSScriptRoot '*') -PassThru -Output Detailed
+$tests = Invoke-Pester -Path (Join-Path $PSScriptRoot '*'), (Join-Path $root '.forgejo/actions/*') -PassThru -Output Detailed
 if ($tests.FailedCount -gt 0) { $failed = $true }
 
 if ($failed) { throw 'The PowerShell checks failed' }

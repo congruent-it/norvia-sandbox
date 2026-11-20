@@ -90,6 +90,16 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 - Where `uses: actions/checkout@v5` resolves from. Forgejo's default is `data.forgejo.org`. Check that `actions/checkout`, `actions/setup-dotnet`, `actions/setup-node`, `actions/cache` and `actions/upload-artifact` are there, and at which versions.
 - That the Playwright Chromium install (`playwright.ps1 install --with-deps chromium`) works in the job image.
 
+## CI
+
+The gates run here and report to GitHub ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md), [#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)). The workflow is [.forgejo/workflows/ci.yml](../../.forgejo/workflows/ci.yml): `on: push` for all branches, `concurrency: ci-${{ github.ref }}` with `cancel-in-progress`, one job per gate. Each job brackets its work with the composite action [report-status](../../.forgejo/actions/report-status/action.yml): `pending` first, then `job.status` last under `if: always()`. It posts `forgejo/<job>` to the commit on GitHub with a link to the Forgejo run, using the secret `GH_STATUS_TOKEN` ([the token](#the-github-status-token)). A failed call fails the job.
+
+**Add a gate:** add a job to `ci.yml` with `runs-on: norvia-ci` and the same two `report-status` steps, with its own `job:` name.
+
+**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (0 to 10 minutes after the push; Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. If the runner is killed before that step, the old commit keeps a `pending` for good; the PR does not show it, because it shows the head.
+
+**Check it end to end.** Push a branch to GitHub and open a PR, then Sync now (or wait). Expect `forgejo/skeleton` `pending` and then `success` on the commit and in the PR. Then push twice in a row to see the first run cancelled. **Status: not run yet on the homelab**; record here whether Forgejo runs the `if: always()` step of a cancelled job.
+
 ## The registry
 
 Set up, and it already holds container images: the packages are listed at <https://git.home.arpa/smirking_squiggly/-/packages>. Pushing to it needs a token with the `write:package` scope (listing needs `read:package`); its address becomes `image.registry` in the chart ([kubernetes.md](kubernetes.md)). Not checked here: how the existing images are named and tagged, and that the cluster's nodes can pull from it. Decided in #1016.
