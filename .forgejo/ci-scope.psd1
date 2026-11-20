@@ -35,7 +35,7 @@
         @{ Paths = @('src/Erp/*', 'src/Tms/*', 'tests/Erp/*', 'tests/Tms/*', 'src/Norvia.Branding/*'); Applications = @('integration') }
 
         # Documents the architecture and evaluation tests read.
-        @{ Paths = @('docs/architecture/*'); Applications = @('tms') }
+        @{ Paths = @('docs/architecture/*', 'docs/processes/*'); Applications = @('tms') }
         @{ Paths = @('docs/operations/agent-evaluation.md'); Applications = @('tms', 'erp', 'integration', 'simulator') }
     )
 
