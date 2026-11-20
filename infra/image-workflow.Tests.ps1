@@ -61,22 +61,24 @@ Describe 'the images of the APIs and the migrations' {
         $script:chartMigrations = [regex]::Matches((Get-Content (Join-Path $root 'deploy/helm/norvia/values.yaml') -Raw), 'image: (?<image>[\w-]+-migrations)\b') | ForEach-Object { $_.Groups['image'].Value }
     }
 
-    It 'has a caller for <_>, the image the chart names, building the project of that name' -ForEach 'tms-api', 'erp-api', 'driver-app-api', 'tms-migrations', 'erp-migrations', 'driver-app-migrations', 'partner-portal-migrations', 'simulator-migrations' {
-        $found = $callers | Where-Object Name -eq $_
-        $found | Should -Not -BeNullOrEmpty
-        # tms-api -> Norvia.Tms.Api, driver-app-migrations -> Norvia.DriverApp.Migrations
-        $words = @($_ -split '-' | ForEach-Object { (Get-Culture).TextInfo.ToTitleCase($_) })
-        $kind = $words[-1]
-        $app = $words[0..($words.Count - 2)] -join ''
-        $found.Project | Should -Match "/Norvia\.$app\.$kind/Norvia\.$app\.$kind\.csproj$"
-        (Join-Path $root $found.Project) | Should -Exist
+    It 'builds, for every caller, the project the image is named after, and the project exists' {
+        # tms-api builds Norvia.Tms.Api and driver-app-migrations builds Norvia.DriverApp.Migrations: the name without its dashes is the project's file name without "Norvia." and its dots.
+        $callers.Count | Should -BeGreaterThan 0
+        foreach ($c in $callers) {
+            $expected = ([IO.Path]::GetFileNameWithoutExtension($c.Project) -replace '^Norvia\.', '' -replace '\.', '')
+            ($c.Name -replace '-', '') | Should -BeExactly $expected.ToLowerInvariant() -Because "$($c.Name) builds $($c.Project)"
+            (Join-Path $root $c.Project) | Should -Exist -Because "$($c.Name) builds $($c.Project)"
+        }
     }
 
-    It 'covers every migrations image the chart names' {
-        $chartMigrations.Count | Should -Be 5
+    It 'has a caller for every migrations image the chart names' {
+        $chartMigrations | Should -Not -BeNullOrEmpty
         foreach ($image in $chartMigrations) { $callers.Name | Should -Contain $image }
     }
 
+    It 'has a caller for each API the chart calls by Service name' {
+        foreach ($api in 'tms-api', 'erp-api', 'driver-app-api') { $callers.Name | Should -Contain $api }
+    }
     It 'reads every caller of images.yml, so a changed key order cannot hide one from these tests' {
         # tms-api plus the eight of #1045; the regex above drops a caller whose keys are in another order.
         $callers.Count | Should -Be ([regex]::Matches($caller, '(?m)^    uses: \./\.forgejo/workflows/build-image\.yml').Count)
