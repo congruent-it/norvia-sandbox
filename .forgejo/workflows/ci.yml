@@ -13,7 +13,7 @@ jobs:
   skeleton:
     runs-on: norvia-ci
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
       - uses: ./.forgejo/actions/report-status
         with:
           job: skeleton

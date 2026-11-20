@@ -87,7 +87,7 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 
 - Whether `Aspire.Hosting.Testing` starts on this runner. DCP needs the daemon socket and a way to reach published ports (`host.docker.internal` or an equivalent). If the Aspire test fails in `runner-check`, write what is missing.
 - Whether `dockerd` starts in the privileged job container, and that its storage driver is overlay2 (the "Storage Driver" line of `docker info`), not vfs.
-- Where `uses: actions/checkout@v5` resolves from. Forgejo's default is `data.forgejo.org`. Check that `actions/checkout`, `actions/setup-dotnet`, `actions/setup-node`, `actions/cache` and `actions/upload-artifact` are there, and at which versions.
+- **Resolved: `actions/checkout` resolves from `data.forgejo.org`, but `v5` does not run.** Runner v6.4.0 accepts `node12`, `node16`, `node20` and others up to `node20`, and `v5` declares `node24` ("The runs.using key in action.yml must be one of: [composite docker node12 node16 node20 go sh], got node24"). The workflows use `actions/checkout@v4` (`v4.4.0` declares `node20`). Use `@v4` for the other `actions/*` too, and check each declares `node20` or lower. Still to check that `setup-dotnet`, `setup-node`, `cache` and `upload-artifact` exist there.
 - That the Playwright Chromium install (`playwright.ps1 install --with-deps chromium`) works in the job image.
 
 ## CI
@@ -98,7 +98,7 @@ The gates are moving here and will report to GitHub; today `ci.yml` has only a `
 
 **What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (up to about 20 minutes after the push, see [How soon a commit arrives](#how-soon-a-commit-arrives); Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. A `pending` that is never replaced stays on the old commit only, and the PR does not show it ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md#consequences)).
 
-**Known limits of the skeleton.** `pending` is posted after `actions/checkout`, because the action is read from the checkout; a failed checkout posts only the closing `failure`. Not yet checked against a real run: that `target_url` (`<server>/<repo>/actions/runs/<run_number>`) opens the Forgejo run, and that `actions/checkout@v5` resolves.
+**Known limits of the skeleton.** `pending` is posted after `actions/checkout`, because the action is read from the checkout; a failed checkout posts only the closing `failure`. Not yet checked against a real run: that `target_url` (`<server>/<repo>/actions/runs/<run_number>`) opens the Forgejo run.
 
 **Check it end to end.** Push a branch to GitHub and open a PR, then Sync now (or wait). Expect `forgejo/skeleton` `pending` and then `success` on the commit and in the PR. Then push twice in a row to see the first run cancelled. **Status: not run yet on the homelab**; record here whether Forgejo runs the `if: always()` step of a cancelled job.
 
