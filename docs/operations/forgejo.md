@@ -149,7 +149,7 @@ Set up, and it already holds container images (the application images of [The im
 
 ## The images
 
-[images.yml](../../.forgejo/workflows/images.yml) builds the applications' images and pushes them to the registry, with the reusable [build-image.yml](../../.forgejo/workflows/build-image.yml) ([#1044](https://github.com/congruent-it/norvia-sandbox/issues/1044), [ADR 0056](../adr/0056-images-are-built-with-publishcontainer-on-the-homelabs-forgejo-and-tagged-by-commit.md)). **Status: nothing here has been run on the homelab yet, and how the images already in the registry are named and tagged was not checked (the names follow `norvia-ci`: `<REGISTRY>/<name>`).** The first image is the TMS API, `<REGISTRY>/tms-api`; each later image is one more `uses:` in `images.yml`.
+[images.yml](../../.forgejo/workflows/images.yml) builds the applications' images and pushes them to the registry, with the reusable [build-image.yml](../../.forgejo/workflows/build-image.yml) ([#1044](https://github.com/congruent-it/norvia-sandbox/issues/1044), [ADR 0056](../adr/0056-images-are-built-with-publishcontainer-on-the-homelabs-forgejo-and-tagged-by-commit.md)). **Status: nothing here has been run on the homelab yet, and how the images already in the registry are named and tagged was not checked (the names follow `norvia-ci`: `<REGISTRY>/<name>`).** Nine images, each one `uses:` in `images.yml` ([#1045](https://github.com/congruent-it/norvia-sandbox/issues/1045)): the APIs `tms-api`, `erp-api` and `driver-app-api`, and the migrations `tms-migrations`, `erp-migrations`, `driver-app-migrations`, `partner-portal-migrations` and `simulator-migrations`, the names `migrations.yaml` and the other chart templates use (`infra/image-workflow.Tests.ps1` compares them with `values.yaml` and the project folders). The migrations projects use the Worker SDK, so `build-image.yml` passes `EnableSdkContainerSupport=true`; the image is still the ASP.NET base image. A later image is one more `uses:`.
 
 | Ref pushed | Tags |
 |---|---|
@@ -160,13 +160,13 @@ Set up, and it already holds container images (the application images of [The im
 
 The job reports `forgejo/image (tms-api)` to the commit on GitHub. It uses the settings of [the registry push token](#the-registry-push-token) and the status token. `dotnet publish /t:PublishContainer` logs in with them directly, so there is no `docker login`.
 
-**Check it.** Push a branch named `image/check-tms-api`, then:
+**Check it.** Push a branch named `image/check-images`, then:
 
-1. `forgejo/image (tms-api)` goes to `success` on the commit. A certificate error at `Publish the image` means the job image does not trust `git.home.arpa`.
-2. The package `tms-api`, tagged with the first 7 characters of the commit, is listed on the registry's packages page.
+1. `forgejo/image (<name>)` goes to `success` on the commit, for each of the nine names. A certificate error at `Publish the image` means the job image does not trust `git.home.arpa`.
+2. Each package, tagged with the first 7 characters of the commit, is listed on the registry's packages page.
 3. From a node of the cluster: `docker pull git.home.arpa/smirking_squiggly/tms-api:<sha>` (or `crictl pull`), and the image is `linux/amd64`.
-4. `helm template norvia deploy/helm/norvia --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=<sha> --set edge.baseDomain=norvia.test` names `git.home.arpa/smirking_squiggly/<name>:<sha>` for the images that are built (`infra/image-workflow.Tests.ps1` checks the shape).
-5. Push the same SHA again from a clean checkout and run the image: it starts. The digest differs between builds; the inputs are the same.
+4. `helm template norvia deploy/helm/norvia --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=<sha> --set edge.baseDomain=norvia.test` names `git.home.arpa/smirking_squiggly/<name>:<sha>` for the five migrations images, which are the only built images the chart deploys so far; the three API images join it when #1017, #1018 and #1019 add them (`infra/image-workflow.Tests.ps1` checks the shape and the migrations names).
+5. Push the same SHA again from a clean checkout and run the images: an API answers its health endpoint (`/health`) without a database; a migrations image starts and, with no SQL Server to reach, fails on the connection, not on a missing file (a migrations image has no `--help`: it is a host that migrates, then exits). The digest differs between builds; the inputs are the same.
 
 ## The API token
 

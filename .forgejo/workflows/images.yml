@@ -1,4 +1,4 @@
-# Builds the application images and pushes them to the Forgejo registry (#1044, ADR 0056). Each image is one `uses:` of build-image.yml.
+# Builds the application images and pushes them to the Forgejo registry (#1044, #1045, ADR 0056). Each image is one `uses:` of build-image.yml.
 # Runs on push to main (tagged with the short SHA and latest), on v* tags (the SHA and the version) and on a branch named image/* (the SHA only):
 # every branch would fill the registry, and workflow_dispatch is not available on a mirror's push (infra/image-tags.ps1 holds the rule).
 # Needs the Forgejo variable REGISTRY and the secrets REGISTRY_USER, REGISTRY_TOKEN and GH_STATUS_TOKEN (docs/operations/forgejo.md, "The registry").
@@ -18,6 +18,83 @@ jobs:
     with:
       project: src/Tms/Norvia.Tms.Api/Norvia.Tms.Api.csproj
       name: tms-api
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  erp-api:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Erp/Norvia.Erp.Api/Norvia.Erp.Api.csproj
+      name: erp-api
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  driver-app-api:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/DriverApp/Norvia.DriverApp.Api/Norvia.DriverApp.Api.csproj
+      name: driver-app-api
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  tms-migrations:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Tms/Norvia.Tms.Migrations/Norvia.Tms.Migrations.csproj
+      name: tms-migrations
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  erp-migrations:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Erp/Norvia.Erp.Migrations/Norvia.Erp.Migrations.csproj
+      name: erp-migrations
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  driver-app-migrations:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/DriverApp/Norvia.DriverApp.Migrations/Norvia.DriverApp.Migrations.csproj
+      name: driver-app-migrations
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  partner-portal-migrations:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/PartnerPortal/Norvia.PartnerPortal.Migrations/Norvia.PartnerPortal.Migrations.csproj
+      name: partner-portal-migrations
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  simulator-migrations:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Simulator/Norvia.Simulator.Migrations/Norvia.Simulator.Migrations.csproj
+      name: simulator-migrations
       registry: ${{ vars.REGISTRY }}
     secrets:
       GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}

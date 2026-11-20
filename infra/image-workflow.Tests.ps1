@@ -53,6 +53,49 @@ Describe 'the image workflows' {
     }
 }
 
+Describe 'the images of the APIs and the migrations' {
+    BeforeAll {
+        # One caller per image: name and project, read from images.yml.
+        $script:callers = [regex]::Matches($caller, '(?m)^  [\w-]+:\r?\n    uses: .+\r?\n    with:\r?\n      project: (?<project>\S+)\r?\n      name: (?<name>\S+)') |
+            ForEach-Object { [pscustomobject]@{ Name = $_.Groups['name'].Value; Project = $_.Groups['project'].Value } }
+        $script:chartMigrations = [regex]::Matches((Get-Content (Join-Path $root 'deploy/helm/norvia/values.yaml') -Raw), 'image: (?<image>[\w-]+-migrations)\b') | ForEach-Object { $_.Groups['image'].Value }
+    }
+
+    It 'has a caller for <_>, the image the chart names, building the project of that name' -ForEach 'tms-api', 'erp-api', 'driver-app-api', 'tms-migrations', 'erp-migrations', 'driver-app-migrations', 'partner-portal-migrations', 'simulator-migrations' {
+        $found = $callers | Where-Object Name -eq $_
+        $found | Should -Not -BeNullOrEmpty
+        # tms-api -> Norvia.Tms.Api, driver-app-migrations -> Norvia.DriverApp.Migrations
+        $words = @($_ -split '-' | ForEach-Object { (Get-Culture).TextInfo.ToTitleCase($_) })
+        $kind = $words[-1]
+        $app = $words[0..($words.Count - 2)] -join ''
+        $found.Project | Should -Match "/Norvia\.$app\.$kind/Norvia\.$app\.$kind\.csproj$"
+        (Join-Path $root $found.Project) | Should -Exist
+    }
+
+    It 'covers every migrations image the chart names' {
+        $chartMigrations.Count | Should -Be 5
+        foreach ($image in $chartMigrations) { $callers.Name | Should -Contain $image }
+    }
+
+    It 'reads every caller of images.yml, so a changed key order cannot hide one from these tests' {
+        # tms-api plus the eight of #1045; the regex above drops a caller whose keys are in another order.
+        $callers.Count | Should -Be ([regex]::Matches($caller, '(?m)^    uses: \./\.forgejo/workflows/build-image\.yml').Count)
+    }
+
+    It 'has no two callers with one name' {
+        ($callers.Name | Select-Object -Unique).Count | Should -Be $callers.Count
+    }
+
+    It 'containerizes Worker projects too, which the SDK does not do by itself' {
+        $reusable | Should -Match '-p:EnableSdkContainerSupport=true'
+    }
+
+    It 'names every migrations image of the chart under the registry' -Skip:(-not (Get-Command helm -ErrorAction SilentlyContinue)) {
+        $out = helm template norvia (Join-Path $root 'deploy/helm/norvia') --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=0123456 --set edge.baseDomain=norvia.test 2>&1 | Out-String
+        foreach ($image in $chartMigrations) { $out | Should -Match "image: git\.home\.arpa/smirking_squiggly/$image`:0123456" }
+    }
+}
+
 Describe 'the chart naming the image' {
     It 'names <registry>/<name>:<sha> for a chart image when helm is given the registry and the SHA' -Skip:(-not (Get-Command helm -ErrorAction SilentlyContinue)) {
         $chart = Join-Path $root 'deploy/helm/norvia'
