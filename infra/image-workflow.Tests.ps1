@@ -35,6 +35,18 @@ Describe 'the image workflows' {
         }
     }
 
+    It 'start on exactly the refs that image-tags.ps1 gives a tag' {
+        # The triggers of images.yml are the filter and the script is the rule; a ref one accepts and the other refuses is a silent miss or a failed run.
+        $tagsScript = Join-Path $root 'infra/image-tags.ps1'
+        $sha = '0123456789abcdef0123456789abcdef01234567'
+        $branches = [regex]::Match($caller, 'branches: \[(.+?)\]').Groups[1].Value -split ',\s*' | ForEach-Object { $_.Trim("'") }
+        $tags = [regex]::Match($caller, 'tags: \[(.+?)\]').Groups[1].Value -split ',\s*' | ForEach-Object { $_.Trim("'") }
+        $refs = @($branches | ForEach-Object { 'refs/heads/' + ($_ -replace '\*\*', 'x/y') }) + @($tags | ForEach-Object { 'refs/tags/' + ($_ -replace '\*', '1.0') })
+        $refs.Count | Should -Be 3
+        foreach ($ref in $refs) { @(& $tagsScript -Ref $ref -Sha $sha).Count | Should -BeGreaterThan 0 -Because "$ref starts images.yml" }
+        foreach ($ref in 'refs/heads/other', 'refs/heads/imagery', 'refs/tags/release-1') { @(& $tagsScript -Ref $ref -Sha $sha).Count | Should -Be 0 }
+    }
+
     It 'name the TMS API image after the Service the chart calls it by' {
         $caller | Should -Match 'name: tms-api'
         (Get-Content (Join-Path $root 'deploy/helm/norvia/templates/partner-api.yaml') -Raw) | Should -Match '"name" "tms-api"'

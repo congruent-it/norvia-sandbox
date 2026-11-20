@@ -74,6 +74,7 @@ jobs:
           SDK_CONTAINER_REGISTRY_UNAME: ${{ secrets.REGISTRY_USER }}
           SDK_CONTAINER_REGISTRY_PWORD: ${{ secrets.REGISTRY_TOKEN }}
         run: |
+          case "$REGISTRY" in */*) ;; *) echo "REGISTRY must be <host>/<owner>, got '$REGISTRY'" >&2; exit 1 ;; esac
           dotnet publish "$PROJECT" -c Release -r linux-x64 --self-contained false /t:PublishContainer \
             -p:ContainerRegistry="${REGISTRY%%/*}" \
             -p:ContainerRepository="${REGISTRY#*/}/$IMAGE_NAME" \
