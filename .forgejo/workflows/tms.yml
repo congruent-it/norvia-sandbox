@@ -141,6 +141,14 @@ jobs:
           done
           exit $failed
 
+      # When the AppHost does not start (Aspire's startup timeout), these say whether the daemon pulled its images and which container is stuck.
+      - name: Docker diagnostics
+        if: failure()
+        run: |
+          docker info || true
+          docker images || true
+          docker ps -a || true
+          for log in TestResults/dcp/*; do [ -f "$log" ] && { echo "== $log"; tail -n 50 "$log"; }; done || true
       # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
       - name: Coverage summary
         if: always()
