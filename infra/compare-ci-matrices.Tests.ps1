@@ -64,6 +64,12 @@ Describe 'compare-ci-matrices' {
         (Invoke-Compare $github $forgejo).ExitCode | Should -Be 1
     }
 
+    It 'fails when GitHub has two legs of one name' {
+        $github = New-Workflow $dir 'github.yml' $tms, $tms
+        $forgejo = New-Workflow $dir 'forgejo.yml' $tms
+        (Invoke-Compare $github $forgejo).ExitCode | Should -Be 1
+    }
+
     It 'passes on the repo itself' {
         $root = git -C $PSScriptRoot rev-parse --show-toplevel
         (Invoke-Compare "$root/.github/workflows/ci.yml" "$root/.forgejo/workflows/ci.yml").ExitCode | Should -Be 0

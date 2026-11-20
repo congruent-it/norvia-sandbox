@@ -28,8 +28,10 @@ $githubLegs = Get-Legs $Github
 $forgejoLegs = Get-Legs $Forgejo
 $failures = [Collections.Generic.List[string]]::new()
 
-foreach ($duplicate in $forgejoLegs | Group-Object application | Where-Object Count -gt 1) {
-    $failures.Add("Forgejo has $($duplicate.Count) legs named '$($duplicate.Name)' ($Forgejo); they would share one status")
+foreach ($side in @(@{ Name = 'GitHub'; Path = $Github; Legs = $githubLegs }, @{ Name = 'Forgejo'; Path = $Forgejo; Legs = $forgejoLegs })) {
+    foreach ($duplicate in $side.Legs | Group-Object application | Where-Object Count -gt 1) {
+        $failures.Add("$($side.Name) has $($duplicate.Count) legs named '$($duplicate.Name)' ($($side.Path)); they would share one status")
+    }
 }
 
 $githubByName = $githubLegs | Group-Object application -AsHashTable -AsString
