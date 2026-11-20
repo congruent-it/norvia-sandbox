@@ -28,3 +28,48 @@ jobs:
           job: skeleton
           state: ${{ job.status }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
+
+  # Scripts are PowerShell 7 (ADR 0048): every .ps1 parses, PSScriptAnalyzer reports no error and the Pester tests pass. The same steps as the
+  # `powershell` job of .github/workflows/ci.yml, which stays until the removal issue (#1030), so the two can be compared.
+  powershell:
+    runs-on: norvia-ci
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: powershell
+          state: pending
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+      # The runner image has PowerShell and the modules (.forgejo/runner-image/Dockerfile), installed from infra/tool-versions.psd1. A stale image
+      # fails here, with the version it has, and not as a confusing failure of the gate; rebuild it with runner-image.yml. The image's PATH is its own,
+      # so nothing is written to $GITHUB_PATH.
+      - name: Check the tool versions of the image
+        shell: pwsh
+        run: |
+          $versions = Import-PowerShellDataFile ./infra/tool-versions.psd1
+          $found = [ordered]@{ PowerShell = $PSVersionTable.PSVersion.ToString() }
+          foreach ($name in 'PSScriptAnalyzer', 'Pester') {
+              $module = Get-Module -ListAvailable $name | Sort-Object Version -Descending | Select-Object -First 1
+              $found[$name] = $module ? $module.Version.ToString() : 'missing'
+          }
+          $found.Keys | ForEach-Object { Write-Host "$_ $($found[$_]) (pinned $($versions[$_]))" }
+          $stale = $found.Keys | Where-Object { $found[$_] -ne $versions[$_] }
+          if ($stale) { throw "The runner image is stale for $($stale -join ', '): rebuild it (docs/operations/forgejo.md, Runner for CI)." }
+
+      - name: Parse, analyze and test the scripts
+        shell: pwsh
+        run: ./infra/test-scripts.ps1
+
+      # Every process doc under docs/processes is in its catalogue's table and in docs/status.md.
+      - name: Check that every process doc is catalogued
+        shell: pwsh
+        run: ./infra/check-process-docs.ps1
+
+      - if: always()
+        uses: ./.forgejo/actions/report-status
+        with:
+          job: powershell
+          state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}
