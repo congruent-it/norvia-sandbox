@@ -1,6 +1,8 @@
-# Waits for the statuses of the other workflows of the push and returns the state of forgejo/ci (#1079). See gate.ps1.
+# Decides forgejo/ci from the statuses of the push so far (#1079). Call it last in a workflow, with `if: always()`: it reports success when all the
+# workflows passed and failure at the first that did not, and nothing while one is still to report, so the last job to finish reports success.
+# It reads and writes commit statuses with the secret GH_STATUS_TOKEN. See gate.ps1.
 name: gate
-description: Rolls up the statuses of the workflows of a push.
+description: Rolls up the statuses of the workflows of a push into forgejo/ci, when it is decided.
 inputs:
   token:
     description: The GitHub token that may read and write commit statuses (the secret GH_STATUS_TOKEN)
@@ -9,24 +11,15 @@ inputs:
     description: The repository on GitHub. github.repository is the Forgejo mirror's name, so this is not derived from it.
     required: false
     default: congruent-it/norvia-sandbox
-outputs:
-  state:
-    description: success, failure or error
-    value: ${{ steps.gate.outputs.state }}
-  description:
-    description: Which workflows failed or did not report
-    value: ${{ steps.gate.outputs.description }}
 runs:
   using: composite
   steps:
-    - id: gate
-      shell: pwsh
+    - shell: pwsh
       env:
         TOKEN: ${{ inputs.token }}
         GH_REPOSITORY: ${{ inputs.github-repository }}
         SHA: ${{ github.sha }}
+        TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}
       run: |
-        $result = & "$env:GITHUB_ACTION_PATH/gate.ps1" -Sha $env:SHA -Repository $env:GH_REPOSITORY -Token $env:TOKEN
+        $result = & "$env:GITHUB_ACTION_PATH/gate.ps1" -Sha $env:SHA -Repository $env:GH_REPOSITORY -Token $env:TOKEN -TargetUrl $env:TARGET_URL
         Write-Host "$($result.State): $($result.Description)"
-        "state=$($result.State)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-        "description=$($result.Description)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append

@@ -81,3 +81,9 @@ jobs:
           state: ${{ needs.scope.result != 'success' && 'error' || (needs.integration.result == 'skipped' && 'success' || needs.integration.result) }}
           description: ${{ needs.scope.result != 'success' && 'The scope job did not pass' || (needs.integration.result == 'skipped' && 'Not affected by this change' || '') }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
+
+      # The last job to finish decides forgejo/ci (gate action): no job waits for the others.
+      - if: always()
+        uses: ./.forgejo/actions/gate
+        with:
+          token: ${{ secrets.GH_STATUS_TOKEN }}
