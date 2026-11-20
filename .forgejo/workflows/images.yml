@@ -1,4 +1,4 @@
-# Builds the application images and pushes them to the Forgejo registry (#1044, #1045, ADR 0056). Each image is one `uses:` of build-image.yml.
+# Builds the application images and pushes them to the Forgejo registry (#1044, #1045, #1046, ADR 0056). Each image is one `uses:` of build-image.yml.
 # Runs on push to main (tagged with the short SHA and latest), on v* tags (the SHA and the version) and on a branch named image/* (the SHA only):
 # every branch would fill the registry, and workflow_dispatch is not available on a mirror's push (infra/image-tags.ps1 holds the rule).
 # Needs the Forgejo variable REGISTRY and the secrets REGISTRY_USER, REGISTRY_TOKEN and GH_STATUS_TOKEN (docs/operations/forgejo.md, "The registry").
@@ -95,6 +95,88 @@ jobs:
     with:
       project: src/Simulator/Norvia.Simulator.Migrations/Norvia.Simulator.Migrations.csproj
       name: simulator-migrations
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  tms-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Tms/Norvia.Tms.Web/Norvia.Tms.Web.csproj
+      name: tms-web
+      registry: ${{ vars.REGISTRY }}
+      needs-node: true
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  erp-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Erp/Norvia.Erp.Web/Norvia.Erp.Web.csproj
+      name: erp-web
+      registry: ${{ vars.REGISTRY }}
+      needs-node: true
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  driver-app-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/DriverApp/Norvia.DriverApp.Web/Norvia.DriverApp.Web.csproj
+      name: driver-app-web
+      registry: ${{ vars.REGISTRY }}
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  integration-console-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/IntegrationConsole/Norvia.IntegrationConsole.Web/Norvia.IntegrationConsole.Web.csproj
+      name: integration-console-web
+      registry: ${{ vars.REGISTRY }}
+      needs-node: true
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  partner-portal-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/PartnerPortal/Norvia.PartnerPortal.Web/Norvia.PartnerPortal.Web.csproj
+      name: partner-portal-web
+      registry: ${{ vars.REGISTRY }}
+      needs-node: true
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  simulator-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/Simulator/Norvia.Simulator.Web/Norvia.Simulator.Web.csproj
+      name: simulator-web
+      registry: ${{ vars.REGISTRY }}
+      needs-node: true
+    secrets:
+      GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}
+      REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+
+  health-check-web:
+    uses: ./.forgejo/workflows/build-image.yml
+    with:
+      project: src/HealthCheck/Norvia.HealthCheck.Web/Norvia.HealthCheck.Web.csproj
+      name: health-check-web
       registry: ${{ vars.REGISTRY }}
     secrets:
       GH_STATUS_TOKEN: ${{ secrets.GH_STATUS_TOKEN }}

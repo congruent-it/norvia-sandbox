@@ -18,7 +18,7 @@ on:
         type: string
         required: true
       needs-node:
-        description: The project builds a Tailwind stylesheet (the Web projects), so the build needs Node. The runner image has it; the job fails clearly if it does not.
+        description: The project builds a Tailwind stylesheet (a Web project with a package.json; images.yml sets it for those), so the build needs Node. The runner image has it; the job fails clearly if it does not.
         type: boolean
         default: false
       base-image:
