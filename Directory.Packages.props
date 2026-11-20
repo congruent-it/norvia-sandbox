@@ -72,6 +72,9 @@
     <!-- Reads the text of an uploaded PDF in .NET before the model sees it (no OCR). -->
     <PackageVersion Include="PdfPig" Version="0.1.16" />
   </ItemGroup>
+  <ItemGroup Label="Docs">
+    <PackageVersion Include="Markdig" Version="1.6.0" />
+  </ItemGroup>
   <ItemGroup Label="Web">
     <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="4.14.4" />
   </ItemGroup>

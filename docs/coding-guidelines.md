@@ -259,7 +259,7 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 ## 11. Workflow
 
 - Every change goes through a pull request with at least one review.
-- A PR is mergeable only when the build has no warnings, `dotnet format --verify-no-changes` passes, all tests pass, the coverage gate is met and the Markdown link check (`lychee --offline`, [lychee.toml](../lychee.toml)) finds no dead relative link.
+- A PR is mergeable only when the build has no warnings, `dotnet format --verify-no-changes` passes, all tests pass, the coverage gate is met and the Markdown link check (`dotnet run infra/check-markdown-links.cs`, [source](../infra/check-markdown-links.cs)) finds no dead relative link. It checks every `*.md` for a link or image whose file or directory does not exist, and skips URLs, `#anchors` and code. It prints each one as `file:line -> target`, and the same command runs in the dev container and in CI.
 - Unit and architecture tests are part of the change, not a follow-up. Bug fixes start with a failing test that reproduces the bug.
 - Integration tests and UI tests are not: each is built in an issue of its own, linked to the feature issue it covers (see [Splitting work into issues](agents/issue-tracker.md#splitting-work-into-issues)). A feature issue does not list them in its acceptance criteria; it names the issues that will.
 - A decision that is hard to reverse, surprising, or the result of a real trade-off gets an ADR in [docs/adr/](adr/).
@@ -270,7 +270,7 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 
 ## 12. Scripts
 
-Scripts are PowerShell 7, not bash ([ADR 0048](adr/0048-scripts-are-powershell-7-not-bash.md)).
+Scripts are PowerShell 7, not bash ([ADR 0048](adr/0048-scripts-are-powershell-7-not-bash.md)). The exception is a check whose logic is worth unit tests of its own: it is a .NET file-based app (`dotnet run <file>.cs`) over a tested library in `src/`, as `infra/check-markdown-links.cs` is over `Norvia.Docs.LinkCheck`. It follows §1–§3 and §10, not the rules below.
 
 - Start with `#Requires -Version 7.4` and `$ErrorActionPreference = 'Stop'`. Name the file in kebab-case with the `.ps1` extension.
 - Import the shared helpers from `infra/lib/Norvia.Infra.psm1` (`Write-Pass`, `Write-Fail`, `Get-AppFqdn`, `New-ThrowawayJob`, `Invoke-LogAnalyticsQuery`, `Wait-Until`, ...) instead of copying them. A helper two scripts need goes into the module, with a Pester test that mocks `az`. Name functions `Verb-Noun` with an approved verb (`Get-Verb`).

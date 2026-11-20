@@ -2,6 +2,7 @@
   "name": "Norvia sandbox (Kubernetes tools)",
   "build": { "dockerfile": "Dockerfile", "context": ".." },
   "remoteUser": "vscode",
+  "updateRemoteUserUID": false,
   "mounts": [
     "source=claude-code-config,target=/home/vscode/.claude,type=volume"
   ],
@@ -13,7 +14,7 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "FORGEJO_TOKEN": "${localEnv:FORGEJO_TOKEN}"
   },
-  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude /workspaces/norvia-sandbox",
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude && gh auth setup-git",
   "customizations": {
     "vscode": {
       "extensions": [

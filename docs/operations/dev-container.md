@@ -20,6 +20,14 @@ Inside the container:
 pwsh infra/test-scripts.ps1
 ```
 
+The Markdown link check of the PR gate ([coding guidelines §11](../coding-guidelines.md#11-workflow)) needs only the .NET SDK, so it runs the same here and in CI:
+
+```bash
+dotnet run infra/check-markdown-links.cs
+```
+
+It prints `file:line -> target` for every relative link whose file or directory does not exist, and exits 1 if there is one. It does not check URLs or `#anchors`, and it does not look at HTML links (`<a href>`, `<img src>`); the Markdown has none today, so add them to the checker with the first one. A link written from the repository root (`/docs/x.md`) is resolved from the root, as GitHub does. Where it differs from lychee, which it replaced: it checks only that the target exists on disk, so a gitignored or generated target passes, and the check is case-sensitive only where the file system is (Linux, so CI and the container; not macOS or Windows by default). It reads every `*.md` outside `.git`, `bin`, `obj` and `node_modules`, including hidden folders such as `.github`, where lychee skipped them and read `.gitignore`. It lists every dead link, where lychee reported a repeated link once per file. The shared code is [src/Docs/Norvia.Docs.LinkCheck](../../src/Docs/Norvia.Docs.LinkCheck), tested in `tests/Docs/Norvia.Docs.LinkCheck.UnitTests`.
+
 ## One set of versions
 
 `infra/tool-versions.psd1` is the only place a version lives. The image build and the `powershell` job of [CI](../../.github/workflows/ci.yml) both run `infra/install-tools.ps1`, which checks each download (and the image build, PowerShell's) against the checksum its publisher posts, so a test that passes in the container passes in CI. To bump a tool, change the manifest. CI's runner brings its own `pwsh` (7.4 or later) and, unlike the container, the Azure CLI; the Pester tests stand in for `az` when it is missing.

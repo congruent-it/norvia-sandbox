@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Markdown link check behind infra/check-markdown-links.cs (a file-based app that references this project):
+       dead relative links and deleted pages, nothing else. -->
+  <ItemGroup>
+    <PackageReference Include="Markdig" />
+  </ItemGroup>
+</Project>
