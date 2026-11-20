@@ -1,0 +1,30 @@
+# The gates of CI (#1030). Forgejo pull-mirrors GitHub and a sync triggers `push` (ADR 0055); each job reports to the GitHub commit as the status forgejo/<job>.
+# Needs the Forgejo secret GH_STATUS_TOKEN (docs/operations/forgejo.md, "The GitHub status token"). Each later gate adds a job like `skeleton`.
+name: ci
+on:
+  push:
+    branches: ['**']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  skeleton:
+    runs-on: norvia-ci
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.forgejo/actions/report-status
+        with:
+          job: skeleton
+          state: pending
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+      - name: Trivial check
+        run: git log -1 --format=%H
+      # Last, whatever happened: success, failure, or cancelled (a newer push superseded this run).
+      - if: always()
+        uses: ./.forgejo/actions/report-status
+        with:
+          job: skeleton
+          state: ${{ job.status }}
+          token: ${{ secrets.GH_STATUS_TOKEN }}

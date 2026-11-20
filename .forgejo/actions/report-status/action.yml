@@ -1,0 +1,36 @@
+# Posts the state of a CI job to the GitHub commit as a status (#1039, ADR 0055). Call it with `pending` first and, with `if: always()`, last.
+name: report-status
+description: Post a commit status to GitHub for this job
+inputs:
+  job:
+    description: The job's name; the status context is forgejo/<job>
+    required: true
+  state:
+    description: pending, success, failure, error, or cancelled (reported as an error, "superseded"). Pass job.status at the end of a job.
+    required: true
+  token:
+    description: The GitHub token that may write commit statuses (the secret GH_STATUS_TOKEN)
+    required: true
+  description:
+    description: Short text for the status, at most 140 characters
+    required: false
+    default: ''
+  github-repository:
+    description: The repository on GitHub. github.repository is the Forgejo mirror's name, so this is not derived from it.
+    required: false
+    default: congruent-it/norvia-sandbox
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      env:
+        STATE: ${{ inputs.state }}
+        JOB: ${{ inputs.job }}
+        TOKEN: ${{ inputs.token }}
+        DESCRIPTION: ${{ inputs.description }}
+        GH_REPOSITORY: ${{ inputs.github-repository }}
+        SHA: ${{ github.sha }}
+        TARGET_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}
+      run: |
+        & "$env:GITHUB_ACTION_PATH/report-status.ps1" -State $env:STATE -Job $env:JOB -Sha $env:SHA `
+          -Repository $env:GH_REPOSITORY -TargetUrl $env:TARGET_URL -Token $env:TOKEN -Description $env:DESCRIPTION
