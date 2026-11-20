@@ -1,6 +1,6 @@
-# Config of the Forgejo runner for CI (#1038), used with `forgejo-runner daemon --config config.yaml` (Forgejo runner 13; `register` is deprecated).
-# docs/operations/forgejo.md "Runner for CI" says how to create the runner in Forgejo and start it. Only the keys this setup changes are here; the rest keep the runner's defaults
-# (`forgejo-runner generate-config` prints them all).
+# The settings the Forgejo runner for CI needs (#1038): a reference, not a deployment. The runner itself is installed by the homelab's K3s setup, which
+# carries these keys in its own config. docs/operations/forgejo.md "Runner for CI" says what the runner must provide. Only the keys this setup changes are
+# here; the rest keep the runner's defaults (`forgejo-runner generate-config` prints them all). Forgejo runner 13 or later (`register` is deprecated).
 log:
   level: info
 
@@ -8,9 +8,9 @@ server:
   connections:
     norvia-ci:
       url: https://git.home.arpa/
-      # From Forgejo, Settings, Actions, Runners, Create new runner: the runner's UUID, and its token kept in a file the daemon can read (not in git).
+      # From Forgejo, Settings, Actions, Runners, Create new runner: the runner's UUID, and its token from a secret (never in git).
       uuid: <uuid>
-      token_url: file:/etc/forgejo-runner/norvia-ci.token
+      token_url: file:/secrets/token
 
 runner:
   # Jobs this runner runs at once. Each runs in its own container with its own Docker daemon, so the limit is CPU, memory and disk, not names or ports.
