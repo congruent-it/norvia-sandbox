@@ -44,7 +44,7 @@ Describe 'the dev container' {
     It 'installs its tools with the script CI uses' {
         $dockerfile = Get-Content (Join-Path $script:root '.devcontainer/Dockerfile') -Raw
         $dockerfile | Should -Match 'install-tools\.ps1'
-        (Get-Content (Join-Path $script:root '.github/workflows/ci.yml') -Raw) | Should -Match 'install-tools\.ps1'
+        (Get-Content (Join-Path $script:root '.forgejo/runner-image/Dockerfile') -Raw) | Should -Match 'install-tools\.ps1'
     }
 }
 

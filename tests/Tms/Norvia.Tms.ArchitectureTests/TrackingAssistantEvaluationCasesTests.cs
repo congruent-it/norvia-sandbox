@@ -161,6 +161,6 @@ public sealed class TrackingAssistantEvaluationCasesTests
         var docs = File.ReadAllText(Path.Combine(RepositoryRoot.Path, "docs", "operations", "agent-evaluation.md"));
 
         docs.Should().Contain("shipper-tracking-assistant").And.Contain("valuesInInput").And.Contain("does not run in CI");
-        File.ReadAllText(Path.Combine(RepositoryRoot.Path, ".github", "workflows", "ci.yml")).Should().NotContain("shipper-tracking-assistant");
+        File.ReadAllText(Path.Combine(RepositoryRoot.Path, ".forgejo", "workflows", "ci.yml")).Should().NotContain("shipper-tracking-assistant");
     }
 }
