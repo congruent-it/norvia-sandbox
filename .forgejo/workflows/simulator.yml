@@ -76,6 +76,19 @@ jobs:
 
       - uses: ./.forgejo/actions/setup
 
+      # The AppHost starts SQL Server, the storage emulator and two Service Bus emulators, and its startup is cut off after 10 minutes. Pulled here, a slow or
+      # blocked pull shows in this step's log with its time and no longer counts against the fixtures. The tags are the ones Aspire.Hosting uses (the
+      # diagnostics below list what the daemon holds); a stale tag only makes this step pull an image nobody uses. A failed pull does not fail the leg.
+      - name: Pull the AppHost's images
+        if: contains(matrix.kinds, 'IntegrationTests') || contains(matrix.kinds, 'UiTests')
+        run: |
+          for image in mcr.microsoft.com/mssql/server:2022-latest mcr.microsoft.com/azure-storage/azurite:3.37.0 mcr.microsoft.com/azure-messaging/servicebus-emulator:latest; do
+            echo "== $image"
+            start=$(date +%s)
+            docker pull "$image" || echo "::warning::pulling $image failed"
+            echo "$(( $(date +%s) - start )) s"
+          done
+
       - name: Build
         run: |
           dotnet tool restore
@@ -114,6 +127,8 @@ jobs:
           docker info || true
           docker images || true
           docker ps -a || true
+          # What the daemon did in the last 30 minutes (pulls, creates, dies), since the AppHost has removed its containers by now.
+          timeout 60 docker events --since 30m --until 0s 2>&1 | tail -n 200 || true
           for log in TestResults/dcp/*; do [ -f "$log" ] && { echo "== $log"; tail -n 50 "$log"; }; done || true
       # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
       - name: Coverage summary
