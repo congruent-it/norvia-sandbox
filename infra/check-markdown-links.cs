@@ -23,7 +23,7 @@ foreach (var path in MarkdownFiles(root))
 {
     checkedFiles++;
     var file = Path.GetRelativePath(root, path).Replace('\\', '/');
-    dead.AddRange(DeadLinkFinder.Find(file, File.ReadAllText(path), target => File.Exists(Path.Combine(root, target)) || Directory.Exists(Path.Combine(root, target))));
+    dead.AddRange(DeadLinkFinder.Find(file, File.ReadAllText(path), Exists));
 }
 
 foreach (var link in dead)
@@ -52,4 +52,10 @@ static string? FindRoot(string start)
     }
 
     return null;
+}
+
+bool Exists(string target)
+{
+    var path = Path.Combine(root, target);
+    return File.Exists(path) || Directory.Exists(path);
 }

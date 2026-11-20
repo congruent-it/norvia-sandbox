@@ -3,6 +3,5 @@
        dead relative links and deleted pages, nothing else. -->
   <ItemGroup>
     <PackageReference Include="Markdig" />
-    <InternalsVisibleTo Include="Norvia.Docs.LinkCheck.UnitTests" />
   </ItemGroup>
 </Project>

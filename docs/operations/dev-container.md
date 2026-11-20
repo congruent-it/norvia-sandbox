@@ -26,7 +26,7 @@ The Markdown link check of the PR gate ([coding guidelines §11](../coding-guide
 dotnet run infra/check-markdown-links.cs
 ```
 
-It prints `file:line -> target` for every relative link whose file or directory does not exist, and exits 1 if there is one. It does not check URLs or `#anchors`, and it does not look at HTML links (`<a href>`, `<img src>`); the Markdown has none today, so add them to the checker with the first one. A link written from the repository root (`/docs/x.md`) is resolved from the root, as GitHub does. The shared code is [src/Docs/Norvia.Docs.LinkCheck](../../src/Docs/Norvia.Docs.LinkCheck), tested in `tests/Docs/Norvia.Docs.LinkCheck.UnitTests`.
+It prints `file:line -> target` for every relative link whose file or directory does not exist, and exits 1 if there is one. It does not check URLs or `#anchors`, and it does not look at HTML links (`<a href>`, `<img src>`); the Markdown has none today, so add them to the checker with the first one. A link written from the repository root (`/docs/x.md`) is resolved from the root, as GitHub does. Where it differs from lychee, which it replaced: it checks only that the target exists on disk, so a gitignored or generated target passes, and the check is case-sensitive only where the file system is (Linux, so CI and the container; not macOS or Windows by default). It reads every `*.md` outside `.git`, `bin`, `obj` and `node_modules`, including hidden folders such as `.github`, where lychee skipped them and read `.gitignore`. It lists every dead link, where lychee reported a repeated link once per file. The shared code is [src/Docs/Norvia.Docs.LinkCheck](../../src/Docs/Norvia.Docs.LinkCheck), tested in `tests/Docs/Norvia.Docs.LinkCheck.UnitTests`.
 
 ## One set of versions
 

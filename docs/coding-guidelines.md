@@ -270,7 +270,7 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 
 ## 12. Scripts
 
-Scripts are PowerShell 7, not bash ([ADR 0048](adr/0048-scripts-are-powershell-7-not-bash.md)).
+Scripts are PowerShell 7, not bash ([ADR 0048](adr/0048-scripts-are-powershell-7-not-bash.md)). The exception is a check whose logic is worth unit tests of its own: it is a .NET file-based app (`dotnet run <file>.cs`) over a tested library in `src/`, as `infra/check-markdown-links.cs` is over `Norvia.Docs.LinkCheck`. It follows §1–§3 and §10, not the rules below.
 
 - Start with `#Requires -Version 7.4` and `$ErrorActionPreference = 'Stop'`. Name the file in kebab-case with the `.ps1` extension.
 - Import the shared helpers from `infra/lib/Norvia.Infra.psm1` (`Write-Pass`, `Write-Fail`, `Get-AppFqdn`, `New-ThrowawayJob`, `Invoke-LogAnalyticsQuery`, `Wait-Until`, ...) instead of copying them. A helper two scripts need goes into the module, with a Pester test that mocks `az`. Name functions `Verb-Noun` with an approved verb (`Get-Verb`).
