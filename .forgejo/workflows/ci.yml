@@ -133,7 +133,7 @@ jobs:
       # nowhere, so a new application's tests either join a workflow (and .forgejo/ci-scope.psd1) or fail here. Branding, Docs and ServiceDefaults run below.
       - name: Check that every test project is claimed by a workflow
         run: |
-          claimed=$(yq '.jobs.integration.steps[] | select(.uses == "./.forgejo/actions/test-leg") | .with.directory' .forgejo/workflows/*.yml; echo Branding; echo Docs; echo ServiceDefaults)
+          claimed=$(yq '.jobs.integration.env.DIRECTORY' .forgejo/workflows/*.yml; echo Branding; echo Docs; echo ServiceDefaults)
           unclaimed=$(find tests -name '*.csproj' | cut -d/ -f2 | sort -u | grep -vxF "$claimed" || true)
           if [ -n "$unclaimed" ]; then
             echo "::error::Test projects under tests/ that no application workflow runs: $unclaimed"

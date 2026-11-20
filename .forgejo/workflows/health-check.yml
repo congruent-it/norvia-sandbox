@@ -39,6 +39,8 @@ jobs:
     if: needs.scope.outputs.affected == 'true'
     runs-on: norvia-ci
     timeout-minutes: 30
+    env:
+      DIRECTORY: HealthCheck
     strategy:
       fail-fast: false
       matrix:
@@ -53,12 +55,63 @@ jobs:
           state: pending
           token: ${{ secrets.GH_STATUS_TOKEN }}
 
-      - uses: ./.forgejo/actions/test-leg
-        with:
-          directory: HealthCheck
-          kinds: ${{ matrix.kinds }}
-          artifact: test-results-health-check-${{ strategy.job-index }}
+      # The steps of one leg (#1042, #1079), the same in every application workflow. They are steps here, not a composite action, so Forgejo's run page
+      # shows each one's log as it runs: a composite action is one row, with no log until it ends.
+      # The AppHost runs SQL Server and the Service Bus emulator in Docker. The job container is privileged and has no host socket, so this starts the
+      # daemon the leg alone uses (docs/operations/forgejo.md, "Runner for CI").
+      - name: Start Docker
+        run: start-dockerd
 
+      - uses: ./.forgejo/actions/setup
+
+      - name: Build
+        run: |
+          dotnet tool restore
+          dotnet build Norvia.slnx --configuration "$CONFIGURATION"
+
+      # Chromium's system libraries need root. The job runs as root, the job image's default user (the Dockerfile sets no USER), so `--with-deps`
+      # works here as it does on GitHub's runner. Every UI test project uses the same Playwright version, so the leg's own project's script serves.
+      - name: Install Playwright's Chromium
+        if: contains(matrix.kinds, 'UiTests')
+        run: pwsh "$(find tests/$DIRECTORY -path "*/bin/$CONFIGURATION/net10.0/playwright.ps1" -print -quit)" install --with-deps chromium
+
+      # UI tests keep a Playwright trace and video of every failed test. Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
+      - name: Unit, architecture, integration and UI tests
+        env:
+          KINDS: ${{ matrix.kinds }}
+          NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/${{ env.DIRECTORY }}.log
+          NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
+          # DCP, which Aspire starts the resources with, writes its own log: for an AppHost that stalls as it starts.
+          DCP_DIAGNOSTICS_LOG_LEVEL: debug
+          DCP_DIAGNOSTICS_LOG_FOLDER: ${{ github.workspace }}/TestResults/dcp
+        run: |
+          mkdir -p TestResults
+          failed=0
+          for kind in $KINDS; do
+            for project in $(find tests/$DIRECTORY -name "*.$kind.csproj" | sort); do
+              dotnet test "$project" --no-build --configuration "$CONFIGURATION" \
+                --logger trx --results-directory TestResults || failed=1
+            done
+          done
+          exit $failed
+
+      # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
+      - name: Coverage summary
+        if: always()
+        run: |
+          if find tests/$DIRECTORY -name coverage.cobertura.xml | grep -q .; then
+            dotnet reportgenerator -reports:"tests/$DIRECTORY/**/coverage.cobertura.xml" -targetdir:TestResults/coverage \
+              -reporttypes:"MarkdownSummaryGithub;Cobertura"
+            cat TestResults/coverage/SummaryGithub.md
+          fi
+
+      # v3: v4 needs GitHub's artifact service, which Forgejo does not have.
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-${{ github.workflow }}-${{ strategy.job-index }}
+          path: TestResults/
+          if-no-files-found: ignore
       - if: always()
         uses: ./.forgejo/actions/report-status
         with:
