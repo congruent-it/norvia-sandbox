@@ -79,6 +79,12 @@ jobs:
           state: ${{ job.status }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
 
+      # The last job to finish decides forgejo/ci (gate action): no job waits for the others.
+      - if: always()
+        uses: ./.forgejo/actions/gate
+        with:
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
   # Restore, a warnings-as-errors build, formatting, the estate's Bicep, vulnerable packages, and the unit tests of the shared libraries and the docs generator.
   build:
     runs-on: norvia-ci
@@ -168,29 +174,28 @@ jobs:
           state: ${{ job.status }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
 
-  # forgejo/ci (#1079): the one status for branch protection to require. Every application workflow reports forgejo/<application> on every push, a pass
-  # when the change does not affect it, so a path filter never leaves a status missing. This job waits for them and for build and powershell, and reports
-  # success, or failure as soon as one fails. It holds a runner slot while it waits (capacity 4, .forgejo/runner/config.yaml). A new application needs no
-  # change here: the workflows are the keys of .forgejo/ci-scope.psd1.
+      # The last job to finish decides forgejo/ci (gate action): no job waits for the others.
+      - if: always()
+        uses: ./.forgejo/actions/gate
+        with:
+          token: ${{ secrets.GH_STATUS_TOKEN }}
+
+  # forgejo/ci (#1079): the one status for branch protection to require. It starts pending here and is decided by the last job of the push to finish: this job,
+  # build, powershell and the `result` job of every application workflow end with the gate action, which reads the statuses of the commit and reports success
+  # when forgejo/powershell, forgejo/build and every forgejo/<application> passed, and failure at the first that did not. Every application workflow reports
+  # forgejo/<application> on every push, a pass when the change does not affect it, so a path filter never leaves a status missing. Nothing waits, so no job
+  # holds a runner slot that the others need. A new application needs no change here: the workflows are the keys of .forgejo/ci-scope.psd1.
   gate:
     runs-on: norvia-ci
-    timeout-minutes: 120
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: ./.forgejo/actions/report-status
         with:
           job: ci
           state: pending
-          token: ${{ secrets.GH_STATUS_TOKEN }}
-      - id: gate
+          token: ${{ secrets.GH_STATUS_TOKEN }}      # If every other job is done already (this one queued behind them), nothing else will decide.
+      - if: always()
         uses: ./.forgejo/actions/gate
         with:
-          token: ${{ secrets.GH_STATUS_TOKEN }}
-      # A timeout or a cancelled run (a newer push superseded this one) is an error; the gate's own state is what it reports otherwise.
-      - if: always()
-        uses: ./.forgejo/actions/report-status
-        with:
-          job: ci
-          state: ${{ steps.gate.outputs.state || (job.status == 'success' && 'error' || job.status) }}
-          description: ${{ steps.gate.outputs.description }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
