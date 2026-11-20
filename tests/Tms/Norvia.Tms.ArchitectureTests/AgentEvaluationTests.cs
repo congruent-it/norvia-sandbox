@@ -250,7 +250,7 @@ public sealed class AgentEvaluationTests
     [Fact]
     public void TheHarness_NeverRunsInCi_AndOnlyOnDemand()
     {
-        File.ReadAllText(Path.Combine(RepositoryRoot.Path, ".github", "workflows", "ci.yml"))
+        File.ReadAllText(Path.Combine(RepositoryRoot.Path, ".forgejo", "workflows", "ci.yml"))
             .Should().NotContain("run-agent-evaluation").And.NotContain("evaluate-agent");
 
         var manual = File.ReadAllText(Path.Combine(RepositoryRoot.Path, ".github", "workflows", "evaluate-agent.yml"));

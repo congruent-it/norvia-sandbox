@@ -4,7 +4,7 @@ Where to look. Terms are defined in [GLOSSARY.md](../GLOSSARY.md); the company b
 
 | Looking for | Go to |
 |---|---|
-| How to write .NET code and tests, what CI gates | [coding-guidelines.md](coding-guidelines.md), by section |
+| How to write .NET code and tests, what CI gates (they run on Forgejo) | [coding-guidelines.md](coding-guidelines.md), by section |
 | Why something is the way it is | [adr/](adr/), numbered, one decision each. Search the folder by keyword (`grep -il <word> docs/adr/*`) before reading one |
 | How the estate fits together: systems, events, identities, failures, local against Azure | [architecture/](architecture/README.md) |
 | What an application's APIs and database are | [applications/](applications/README.md), one page per application. The database sections are generated |

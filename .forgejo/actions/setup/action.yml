@@ -1,4 +1,4 @@
-# The Forgejo counterpart of .github/actions/setup (#1041): the build job and, later, every test leg start with it. It installs nothing. The runner image
+# The setup of the build job and, later, every test leg start with it. It installs nothing. The runner image
 # (.forgejo/runner-image/Dockerfile) has the .NET SDK, Node for the Tailwind build and the pinned tools, and the NuGet cache is a volume the runner
 # mounts at NUGET_PACKAGES (.forgejo/runner/config.yaml), so there is no setup-dotnet, setup-node or cache step. It fails, with the versions it found,
 # when the image is stale; rebuild it with runner-image.yml (docs/operations/forgejo.md, "Runner for CI").

@@ -248,7 +248,7 @@ public sealed partial class IntakeEvaluationCasesTests
             .And.Contain("evaluation/cases/booking-intake/")
             .And.Contain("never in CI");
         File.ReadAllText(Path.Combine(Root, "evaluation", "README.md")).Should().Contain("## Intake agent");
-        File.ReadAllText(Path.Combine(Root, ".github", "workflows", "ci.yml")).Should().NotContain("run-agent-evaluation");
+        File.ReadAllText(Path.Combine(Root, ".forgejo", "workflows", "ci.yml")).Should().NotContain("run-agent-evaluation");
     }
 
     private static IEnumerable<string> RejectionCodes() =>
