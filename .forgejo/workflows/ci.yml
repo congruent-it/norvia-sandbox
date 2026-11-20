@@ -264,9 +264,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      # `needs.integration.result` is success, failure, cancelled or skipped; any leg that failed fails it.
+      # `needs.integration.result` is success, failure, cancelled or skipped; any leg that failed fails it. report-status takes no `skipped`, so a
+      # skipped matrix is reported as an error, not left to throw.
       - uses: ./.forgejo/actions/report-status
         with:
           job: tests
-          state: ${{ needs.integration.result }}
+          state: ${{ needs.integration.result == 'skipped' && 'error' || needs.integration.result }}
           token: ${{ secrets.GH_STATUS_TOKEN }}
