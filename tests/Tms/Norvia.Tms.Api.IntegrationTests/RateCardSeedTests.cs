@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Norvia.AppHost;
@@ -29,7 +30,7 @@ public sealed class RateCardSeedTests
             [$"Parameters:{LocalTokens.SigningKeyParameter}={Convert.ToHexString(RandomNumberGenerator.GetBytes(32))}"],
             timeout.Token);
         builder.RemoveWhatTheTmsApiTestsDontUse();
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(r => r.Name == "tms-api"))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(r => r.Name == "tms-api"))
             .WithEnvironment("Seed__Path", Path.Combine(AppContext.BaseDirectory, "Seed", seedFile));
         await using var app = await builder.BuildAsync(timeout.Token);
 

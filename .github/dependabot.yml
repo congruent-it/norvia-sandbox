@@ -9,10 +9,9 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-    # Aspire 17 needs a migration (#1057): AddProject<T> is obsolete and the Microsoft.Extensions pins move.
-    # Drop this once it lands.
-    ignore:
-      - dependency-name: "Aspire.*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "CommunityToolkit.Aspire.*"
-        update-types: ["version-update:semver-major"]
+    # The Aspire packages move together: one PR per release, not one per package (a partial bump broke main, #1057).
+    groups:
+      aspire:
+        patterns:
+          - "Aspire.*"
+          - "CommunityToolkit.Aspire.*"

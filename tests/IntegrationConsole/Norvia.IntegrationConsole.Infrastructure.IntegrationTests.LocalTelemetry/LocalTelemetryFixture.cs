@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -61,7 +62,7 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
         }
 
         // What the AppHost gives the stand-in in the estate of a developer, without the TMS, the queues and the blob store it reaches for the calls it answers.
-        var partnerApi = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == PartnerApi));
+        var partnerApi = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == PartnerApi));
         foreach (var annotation in partnerApi.Resource.Annotations.Where(annotation => annotation is EnvironmentCallbackAnnotation or WaitAnnotation or ResourceRelationshipAnnotation).ToList())
         {
             partnerApi.Resource.Annotations.Remove(annotation);

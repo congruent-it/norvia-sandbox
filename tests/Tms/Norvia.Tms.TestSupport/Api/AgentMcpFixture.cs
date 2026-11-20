@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -67,7 +68,7 @@ public abstract class AgentMcpFixture : TmsFixture
     protected override void ConfigureAppHost(IDistributedApplicationTestingBuilder builder)
     {
         builder.RemoveWhatTheTmsAgentTestsDontUse();
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == StandInName))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == StandInName))
             .WithEnvironment("AgentMcp__RateLimitCalls", RateLimitCalls.ToString(CultureInfo.InvariantCulture))
             // The stand-in writes its logs as JSON with their scopes, like the TMS, so a test can follow a Message trail through it.
             .WithEnvironment("LOGGING__CONSOLE__FORMATTERNAME", "json")

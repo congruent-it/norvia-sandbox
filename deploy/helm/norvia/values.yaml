@@ -138,6 +138,7 @@ edge:
 # history does not survive a restart; retention is a separate issue. The UI has no Ingress: reach it with kubectl port-forward.
 telemetry:
   dashboard:
+    # The newest tag MCR publishes (checked 20 November 2026): the Aspire 17 packages have no dashboard image yet. Move it to the packages' major.minor once one exists (#1057).
     image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6
     # The image's ports: the UI and telemetry API, OTLP over gRPC (what ServiceDefaults exports), OTLP over HTTP.
     ports: { ui: 18888, otlpGrpc: 18889, otlpHttp: 18890 }

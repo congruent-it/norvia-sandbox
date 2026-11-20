@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Norvia.Tms.TestSupport;
 
@@ -21,7 +22,7 @@ public sealed class PlannerAgentPlanUiFixture : TmsUiFixture
     protected override void ConfigureAppHost(IDistributedApplicationTestingBuilder builder)
     {
         builder.RemoveWhatTheCustomerServiceAgentUiTestsDontUse();
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "tms-web"))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "tms-web"))
             .WithEnvironment("LiveList__RefreshInterval", "00:00:45")
             .WithEnvironment("Agents__MaxPlanOrders", MaxPlanOrders.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }

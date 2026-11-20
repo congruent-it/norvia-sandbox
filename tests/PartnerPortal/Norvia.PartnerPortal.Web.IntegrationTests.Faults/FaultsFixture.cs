@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Azure.Identity;
 using Azure.Messaging.ServiceBus;
@@ -97,7 +98,7 @@ public sealed class FaultsFixture : IAsyncLifetime
 
         // The AppHost's portal stays stopped: the tests run their own, with the same settings, so they reach what its pages ask of it and switch its faults in its process.
         var portal = builder.Resources.Single(resource => resource.Name == "partner-portal-web");
-        builder.CreateResourceBuilder((ProjectResource)portal).WithExplicitStart();
+        builder.CreateResourceBuilder((DotnetProjectResource)portal).WithExplicitStart();
 
         var portalAddress = new Uri($"http://localhost:{FreePort()}");
         PortalAddress = portalAddress;
@@ -213,7 +214,7 @@ public sealed class FaultsFixture : IAsyncLifetime
     private static void PointWorkerAtPortal(
         IDistributedApplicationTestingBuilder builder, string worker, string section, string parties, IEnumerable<SeedPersona> personas, Func<SeedPersona, string> path, Uri portalAddress)
     {
-        var resource = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == worker));
+        var resource = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == worker));
         var retry = $"{section}__Retry__";
         resource.WithEnvironment($"{retry}Count", "1")
             .WithEnvironment($"{retry}Interval", SendRetryInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture))

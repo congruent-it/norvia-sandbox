@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -116,7 +117,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
         // A copy of the seed in which only the priced Shipper, one Vehicle and one Driver are active, so every Shipment the Simulator books can be released to a Carrier.
         var simulator = builder.Resources.Single(resource => resource.Name == "simulator-web");
         _seedCopy = await CopySeedOfAsync(PricedShipper, OwnFleetVehicle, OwnFleetDriver, startup.Token);
-        builder.CreateResourceBuilder((ProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
+        builder.CreateResourceBuilder((DotnetProjectResource)simulator).WithEnvironment("Seed__Path", _seedCopy);
 
         var wanted = (Assembly.GetEntryAssembly() ?? throw new InvalidOperationException("The test assembly is the entry assembly."))
             .GetCustomAttributes<SimulatorVariantsAttribute>().SelectMany(attribute => attribute.Names).ToHashSet();
@@ -299,7 +300,7 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     // Another Simulator on the same database, with the same settings and waits as the first, and the given settings changed.
     private static void AddVariant(IDistributedApplicationTestingBuilder builder, IResource simulator, string name, params (string Name, string Value)[] changes)
     {
-        var variant = builder.AddProject<Projects.Norvia_Simulator_Web>(name).WithHttpHealthCheck("/health");
+        var variant = builder.AddDotnetProject(name, ((DotnetProjectResource)simulator).GetProjectMetadata().ProjectPath).WithHttpHealthCheck("/health");
         // Annotations can't be shared between resources (the first would lose its settings), so each one is made again. The changes come last, to win over the copied settings.
         foreach (var annotation in simulator.Annotations.ToList())
         {

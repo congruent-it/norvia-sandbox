@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Data.SqlClient;
@@ -113,11 +114,11 @@ public sealed class MasterDataSyncFixture : TmsFixture
         builder.RemoveWhatTheMasterDataSyncTestsDontUse();
 
         // The worker's retry waits are the workflow's 5 s up to 20 s; a test waits for them, so they are short here. The count stays the workflow's three.
-        var worker = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "master-data-sync-worker"));
+        var worker = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "master-data-sync-worker"));
         worker.WithEnvironment("MasterDataSync__TmsBaseAddress", Proxy.Address.ToString())
             .WithEnvironment("MasterDataSync__Retry__Interval", "00:00:00.200")
             .WithEnvironment("MasterDataSync__Retry__MaximumInterval", "00:00:00.800");
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "erp-web"))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "erp-web"))
             .WithEnvironment("Outbox__PollingInterval", "00:00:00.100")
             .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", string.Empty);
     }

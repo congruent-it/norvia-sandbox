@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Microsoft.Playwright;
 using Norvia.AppHost;
@@ -88,7 +89,7 @@ public sealed class FaultsUiFixture : TmsFixture
         builder.RemoveWhatTheTmsFaultUiTestsDontUse();
 
         var interval = RetryInterval.ToString("c", System.Globalization.CultureInfo.InvariantCulture);
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "driver-reports-worker"))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "driver-reports-worker"))
             .WithEnvironment("DriverReports__Retry__Count", "60")
             .WithEnvironment("DriverReports__Retry__Interval", interval)
             .WithEnvironment("DriverReports__Retry__MaximumInterval", interval);

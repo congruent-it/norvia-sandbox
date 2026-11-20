@@ -186,7 +186,7 @@ Describe 'the agent MCP stand-in' -Skip:$script:helmMissing {
         }
 
         It 'has every setting the AppHost gives it, with the same value for each token constant, and the key of the install for each token' {
-            $block = [regex]::Match($appHost, 'AddProject<Projects\.Norvia_Integration_LocalAgentMcp>[^;]*;').Value
+            $block = [regex]::Match($appHost, 'AddDotnetProject\("agent-mcp", ProjectPath\("Norvia\.Integration\.LocalAgentMcp"\)\)[^;]*;').Value
             $block | Should -Not -BeNullOrEmpty
             $names = [regex]::Matches($block, 'WithEnvironment\("((?:AgentMcp|Agents)__[A-Za-z_]+)"') | ForEach-Object { $_.Groups[1].Value }
             $names.Count | Should -BeGreaterThan 20

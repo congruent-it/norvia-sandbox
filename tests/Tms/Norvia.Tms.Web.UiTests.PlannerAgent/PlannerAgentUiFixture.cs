@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Norvia.Tms.TestSupport;
 
@@ -22,7 +23,7 @@ public sealed class PlannerAgentUiFixture : TmsUiFixture
 
         // The waiting-for-planning list reads again every second and drops an order planned meanwhile. The journey of a refused assignment plans the order behind the page and then presses Assign,
         // so the list reads again rarely enough that the order is still on it. Every journey opens the list after its order exists, and the first read is at once.
-        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "tms-web"))
+        builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "tms-web"))
             .WithEnvironment("LiveList__RefreshInterval", "00:00:45");
     }
 

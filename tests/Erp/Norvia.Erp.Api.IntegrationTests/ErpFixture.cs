@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
 using Mediator;
@@ -259,7 +260,7 @@ public sealed class ErpFixture : IAsyncLifetime
 
     private static bool IsUnneeded(IResource resource) =>
         resource.Name is "dbgate"
-        || resource is ProjectResource && resource.Name != "erp-migrations"
+        || resource is DotnetProjectResource && resource.Name != "erp-migrations"
         || resource.GetType().Name.Contains("ServiceBus", StringComparison.Ordinal)
         || resource.GetType().Name.Contains("Storage", StringComparison.Ordinal)
         || resource.GetType().Name.Contains("Blob", StringComparison.Ordinal);

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
 using Azure.Messaging.ServiceBus;
@@ -91,7 +92,7 @@ public class DriverAppFixture : IAsyncLifetime
 
         // The Simulator's reset waits for the subscription its Driver reports worker empties; the tests run without that worker, so the Driver app waits for
         // the subscription of the tests' own, which they empty as fast as the Driver app publishes.
-        var driverAppApi = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "driver-app-api"));
+        var driverAppApi = builder.CreateResourceBuilder(builder.Resources.OfType<DotnetProjectResource>().Single(resource => resource.Name == "driver-app-api"));
         driverAppApi.WithEnvironment("Reset__QuietSubscriptions__0", $"{DriverAppEventsTopic}/{TestSubscription}");
         foreach (var (name, value) in DriverAppApiSettings())
         {

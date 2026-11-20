@@ -7,7 +7,7 @@
 BeforeDiscovery {
     $script:helmMissing = -not (Get-Command helm -ErrorAction SilentlyContinue)
     $root = Split-Path $PSScriptRoot -Parent
-    $script:workerNames = [regex]::Matches((Get-Content (Join-Path $root 'src/Norvia.AppHost/AppHost.cs') -Raw), 'AddProject<Projects\.Norvia_Integration_Local\w+Worker>\("([^"]+)"\)') | ForEach-Object { $_.Groups[1].Value }
+    $script:workerNames = [regex]::Matches((Get-Content (Join-Path $root 'src/Norvia.AppHost/AppHost.cs') -Raw), 'AddDotnetProject\("([^"]+)", ProjectPath\("Norvia\.Integration\.Local\w+Worker"\)\)') | ForEach-Object { $_.Groups[1].Value }
 }
 
 BeforeAll {
@@ -54,7 +54,8 @@ BeforeAll {
 
     # The AppHost's statement that adds the worker (up to its semicolon).
     function script:Get-AppHostBlock([string] $Name) {
-        [regex]::Match($script:appHost, "AddProject<Projects\.Norvia_Integration_Local\w+Worker>\(""$Name""\)[^;]*;").Value
+        # The statement ends at the first semicolon that ends a line and is not followed by a deeper-indented line: a lambda in it has semicolons of its own.
+        [regex]::Match($script:appHost, "(?s)AddDotnetProject\(""$Name"", ProjectPath\(""Norvia\.Integration\.Local\w+Worker""\)\).*?;\r?\n(?! {8})").Value
     }
 
     $script:docs = Get-Rendered
@@ -135,7 +136,7 @@ Describe 'the workers' -Skip:$script:helmMissing {
         $signed = [regex]::Matches($appHost, '\((\w+Worker)\.Resource, "([A-Za-z_]+__SigningKey)"\)')
         $signed.Count | Should -Be 16
         foreach ($m in $signed) {
-            $resource = [regex]::Match($appHost, "var $($m.Groups[1].Value) = builder\.AddProject<[^>]+>\(""([^""]+)""\)").Groups[1].Value
+            $resource = [regex]::Match($appHost, "var $($m.Groups[1].Value) = builder\.AddDotnetProject\(""([^""]+)"", ProjectPath\([^)]*\)\)").Groups[1].Value
             (Get-Env (Get-Doc $docs 'Deployment' $resource))[$m.Groups[2].Value] | Should -Be 'secret:local-tokens/signing-key' -Because "$resource $($m.Groups[2].Value)"
         }
     }

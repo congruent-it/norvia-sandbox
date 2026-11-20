@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Testing;
 using Azure.Provisioning.AppContainers;
@@ -929,7 +930,7 @@ public sealed class AppHostModelTests
     {
         await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.Norvia_AppHost>(TestContext.Current.CancellationToken);
 
-        foreach (var app in builder.Resources.OfType<ProjectResource>())
+        foreach (var app in builder.Resources.OfType<DotnetProjectResource>())
         {
             (await EnvironmentOfAsync(builder, app.Name)).Keys.Should().NotContain("APPLICATIONINSIGHTS_CONNECTION_STRING", app.Name);
         }
