@@ -22,7 +22,7 @@
 
 - **Fork PRs are not tested.** A fork's branch is not in the mirror. The sandbox has no fork contributors; if it gets some, a maintainer pushes the commit to a branch of the repository.
 - **A PR is not tested as the merge commit.** `push` tests the branch head, not the result of merging it into `main`. A branch behind `main` can be green and break `main`. Keep the branches current (rebase, or merge `main`), or add the merge as a gate later.
-- **The mirror interval is a latency.** A commit arrives within 0 to 10 minutes (the default interval), then the run starts. The Sync now button, or the `mirror-sync` API, skips the wait.
+- **The mirror interval is a latency.** A commit arrives after the next sync, which is not bounded by the 10-minute interval: the mirror was seen 16 minutes after its last sync. Plan for up to about 20 minutes (the cause is probably that the interval only marks the mirror as due and Forgejo's own scheduler, `[cron.update_mirrors]`, picks it up; not verified), then the run starts. The Sync now button, or the `mirror-sync` API, skips the wait.
 - **A PR shows a status only for a commit Forgejo has built.** Until the sync, the PR shows nothing for the new head. It is not blocked, because branch protection is not changed here.
 - **The statuses are not branch protection.** Which `forgejo/*` contexts are required is a later issue.
 - **A stuck `pending`** can remain on a superseded commit if the runner is killed before the closing step. A newer push replaces the head, and the PR shows that.

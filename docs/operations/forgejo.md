@@ -29,7 +29,7 @@ curl -sS -X PATCH -H "Authorization: token $FORGEJO_TOKEN" -H 'Content-Type: app
 
 ### How soon a commit arrives
 
-Every `mirror_interval` (10 minutes here, which is also Forgejo's default minimum, `MIN_INTERVAL` under `[mirror]` in `app.ini`), so a commit lands within 0 to 10 minutes. To sync now:
+Every `mirror_interval` (10 minutes here, which is also Forgejo's default minimum, `MIN_INTERVAL` under `[mirror]` in `app.ini`), but that is when the mirror becomes due, not when it syncs: the page showed "synced 16 minutes ago" with this setting. Allow up to about 20 minutes. Probably Forgejo's scheduler (`[cron.update_mirrors]`, `SCHEDULE`, every 10 minutes by default) only checks for due mirrors every 10 minutes, so the wait is 10 to 20 minutes worst case; not verified, check that setting in `app.ini`. To sync now:
 
 ```bash
 curl -sS -X POST -H "Authorization: token $FORGEJO_TOKEN" "$FORGEJO_URL/api/v1/repos/<owner>/norvia-sandbox/mirror-sync"
@@ -96,7 +96,7 @@ The gates are moving here and will report to GitHub; today `ci.yml` has only a `
 
 **Add a gate:** add a job to `ci.yml` with `runs-on: norvia-ci` and the same two `report-status` steps, with its own `job:` name.
 
-**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (0 to 10 minutes after the push; Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. A `pending` that is never replaced stays on the old commit only, and the PR does not show it ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md#consequences)).
+**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (up to about 20 minutes after the push, see [How soon a commit arrives](#how-soon-a-commit-arrives); Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. A `pending` that is never replaced stays on the old commit only, and the PR does not show it ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md#consequences)).
 
 **Known limits of the skeleton.** `pending` is posted after `actions/checkout`, because the action is read from the checkout; a failed checkout posts only the closing `failure`. Not yet checked against a real run: that `target_url` (`<server>/<repo>/actions/runs/<run_number>`) opens the Forgejo run, and that `actions/checkout@v5` resolves.
 
