@@ -73,7 +73,7 @@ The gates ([#1030](https://github.com/congruent-it/norvia-sandbox/issues/1030)) 
 **Set up the runner**
 
 1. Edit `.forgejo/runner/config.yaml`: replace `<registry>` in the label and set `capacity`.
-2. Register it with a registration token from Forgejo: `forgejo-runner register --no-interactive --instance "$FORGEJO_URL" --token <token> --name homelab-ci --labels "docker:docker://<registry>/norvia-ci:latest"`.
+2. Register it with a registration token from Forgejo: `forgejo-runner register --no-interactive --instance "$FORGEJO_URL" --token <token> --name norvia-ci --labels "docker:docker://<registry>/norvia-ci:latest"`.
 3. Run `forgejo-runner daemon --config .forgejo/runner/config.yaml` under systemd or as a container.
 
 **Check it.** Run the `runner-check` workflow (Actions, runner-check, Run workflow). It prints the versions of `dotnet`, `pwsh`, `node`, `jq`, `yq`, git and helm, runs `docker run hello-world` and runs `dotnet test` on the Trips integration test project. Not yet run.
