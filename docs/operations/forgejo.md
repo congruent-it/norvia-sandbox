@@ -96,7 +96,9 @@ The gates are moving here and will report to GitHub; today `ci.yml` has only a `
 
 **Add a gate:** add a job to `ci.yml` with `runs-on: norvia-ci` and the same two `report-status` steps, with its own `job:` name.
 
-**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (0 to 10 minutes after the push; Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. If the runner is killed before that step, the old commit keeps a `pending` for good; the PR does not show it, because it shows the head.
+**What a PR shows.** The statuses of its head commit, under "Checks". `pending` appears once the run starts, which is after the mirror sync (0 to 10 minutes after the push; Sync now skips the wait). When a newer push cancels a run, the closing step posts `error` ("Cancelled: superseded by a newer push") on the old commit, and the PR shows the new head's statuses. A `pending` that is never replaced stays on the old commit only, and the PR does not show it ([ADR 0055](../adr/0055-ci-runs-on-the-homelabs-forgejo-on-push-and-reports-to-github-as-commit-statuses.md#consequences)).
+
+**Known limits of the skeleton.** `pending` is posted after `actions/checkout`, because the action is read from the checkout; a failed checkout posts only the closing `failure`. Not yet checked against a real run: that `target_url` (`<server>/<repo>/actions/runs/<run_number>`) opens the Forgejo run, and that `actions/checkout@v5` resolves.
 
 **Check it end to end.** Push a branch to GitHub and open a PR, then Sync now (or wait). Expect `forgejo/skeleton` `pending` and then `success` on the commit and in the PR. Then push twice in a row to see the first run cancelled. **Status: not run yet on the homelab**; record here whether Forgejo runs the `if: always()` step of a cancelled job.
 
