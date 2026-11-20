@@ -1,0 +1,39 @@
+# The Forgejo counterpart of .github/actions/setup (#1041): the build job and, later, every test leg start with it. It installs nothing. The runner image
+# (.forgejo/runner-image/Dockerfile) has the .NET SDK, Node for the Tailwind build and the pinned tools, and the NuGet cache is a volume the runner
+# mounts at NUGET_PACKAGES (.forgejo/runner/config.yaml), so there is no setup-dotnet, setup-node or cache step. It fails, with the versions it found,
+# when the image is stale; rebuild it with runner-image.yml (docs/operations/forgejo.md, "Runner for CI").
+name: Check the build tools
+description: Checks that the runner image has the .NET SDK of global.json and the tools of infra/tool-versions.psd1.
+
+runs:
+  using: composite
+  steps:
+    - shell: pwsh
+      run: |
+        $versions = Import-PowerShellDataFile ./infra/tool-versions.psd1
+        $ErrorActionPreference = 'Stop'
+        $stale = @()
+
+        # `dotnet --version` resolves the SDK global.json asks for (10.0.400 or a later feature band) and fails when the image has none.
+        $sdk = "missing"
+        if (Get-Command dotnet -ErrorAction SilentlyContinue) { $sdk = (& dotnet --version 2>&1 | Out-String).Trim() }
+        Write-Host "dotnet $sdk (global.json $((Get-Content ./global.json -Raw | ConvertFrom-Json).sdk.version))"
+        if ($sdk -notmatch "^\d+\.\d+\.\d+") { $stale += "dotnet" }
+
+        # The pinned tools by exact version, which the image installs from the same manifest.
+        $tools = @(
+            @{ Name = 'Node'; Command = 'node'; Pin = $versions.Node }
+            @{ Name = 'Bicep'; Command = 'bicep'; Pin = $versions.Bicep }
+            @{ Name = 'Yq'; Command = 'yq'; Pin = $versions.Yq }
+        )
+        foreach ($tool in $tools) {
+            $output = 'missing'
+            if (Get-Command $tool.Command -ErrorAction SilentlyContinue) { $output = (& $tool.Command --version 2>&1 | Out-String).Trim() }
+            Write-Host "$($tool.Name): $output (pinned $($tool.Pin))"
+            if ($output -notmatch [regex]::Escape($tool.Pin)) { $stale += $tool.Name }
+        }
+
+        Write-Host "NUGET_PACKAGES=$env:NUGET_PACKAGES"
+        if (-not $env:NUGET_PACKAGES) { $stale += 'NUGET_PACKAGES' }
+
+        if ($stale) { throw "The runner image is stale or incomplete for $($stale -join ', '): rebuild it (docs/operations/forgejo.md, Runner for CI)." }
