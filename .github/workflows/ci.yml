@@ -47,7 +47,7 @@ jobs:
         shell: pwsh
         run: ./infra/check-process-docs.ps1
 
-  # Dead relative links and deleted pages in the Markdown, nothing else (lychee.toml).
+  # Dead relative links and deleted pages in the Markdown, nothing else (infra/check-markdown-links.cs).
   links:
     name: Markdown links
     runs-on: ubuntu-latest
@@ -55,10 +55,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: lycheeverse/lychee-action@v2.4.1
+      - uses: actions/setup-dotnet@v5
         with:
-          args: --config lychee.toml --no-progress '**/*.md'
-          fail: true
+          global-json-file: global.json
+
+      - name: Check Markdown links
+        run: dotnet run infra/check-markdown-links.cs
 
   build:
     name: Build, format, Bicep and vulnerable packages
