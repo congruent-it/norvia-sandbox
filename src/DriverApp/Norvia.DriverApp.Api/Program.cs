@@ -15,8 +15,8 @@ using Norvia.DriverApp.Application.Reports.ReportStop;
 using Norvia.DriverApp.Application.Reports.StartTrip;
 using Norvia.DriverApp.Application.Trips.Receive;
 using Norvia.DriverApp.Infrastructure;
-using Norvia.ServiceDefaults.Faults;
 using Norvia.ServiceDefaults;
+using Norvia.ServiceDefaults.Faults;
 
 var builder = WebApplication.CreateBuilder(args);
 
