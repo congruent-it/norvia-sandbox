@@ -7,8 +7,8 @@ using Norvia.Erp.Application.IntegrationEvents;
 using Norvia.Erp.Application.MasterData;
 using Norvia.Erp.Application.MasterData.RateCards;
 using Norvia.Erp.Application.MasterData.RateCards.Save;
-using Norvia.Erp.Domain.Shippers;
 using Norvia.Erp.Domain.RateCards;
+using Norvia.Erp.Domain.Shippers;
 
 namespace Norvia.Erp.Application.UnitTests.MasterData;
 

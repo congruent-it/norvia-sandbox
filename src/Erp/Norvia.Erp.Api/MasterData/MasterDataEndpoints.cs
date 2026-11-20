@@ -1,7 +1,7 @@
 using Mediator;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Norvia.Erp.Api.Tracking;
 using Norvia.Erp.Application;
 using Norvia.Erp.Application.IntegrationEvents;

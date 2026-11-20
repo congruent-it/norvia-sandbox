@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authentication;
-using Norvia.Simulator.Application.Operators;
 using Norvia.ServiceDefaults;
+using Norvia.Simulator.Application.Operators;
 
 namespace Norvia.Simulator.Web.Operators;
 

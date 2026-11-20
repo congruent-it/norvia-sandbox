@@ -1,6 +1,6 @@
 using Ardalis.Specification;
-using Norvia.Tms.Domain.ShipperTracking;
 using Norvia.Tms.Domain.Shippers;
+using Norvia.Tms.Domain.ShipperTracking;
 using Norvia.Tms.Domain.TransportOrders;
 
 namespace Norvia.Tms.Domain.UnitTests.TransportOrders;
