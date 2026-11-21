@@ -97,6 +97,33 @@ Describe 'scope from git' {
     }
 }
 
+# The job log is where a run that was not skipped has to explain itself.
+Describe 'scope explains its answer' {
+    BeforeAll {
+        function script:Said($Application, $Files, [switch] $RunAll) {
+            $out = & $script:script -Application $Application -ChangedFile $Files -Manifest $script:fixture -RunAll:$RunAll 6>&1
+            ($out | Where-Object { $_ -is [System.Management.Automation.InformationRecord] } | ForEach-Object { "$($_.MessageData)" }) -join "`n"
+        }
+    }
+
+    It 'lists the changed files and names the file and the rule that affect the application' {
+        $said = Said alpha @('docs/a.md', 'src/Alpha/A.cs')
+        $said | Should -Match 'Changed files: 2'
+        $said | Should -Match 'docs/a\.md'
+        $said | Should -Match 'alpha: affected by src/Alpha/A\.cs \(its own paths\)'
+    }
+
+    It 'names shared code, an unclaimed path, -RunAll and an empty change as the reason' {
+        Said beta @('src/Common/C.cs') | Should -Match 'affected by src/Common/C\.cs \(shared code it consumes\)'
+        Said beta @('newfolder/x.txt') | Should -Match 'affected by newfolder/x\.txt \(no application, shared entry or ignored path claims it'
+        Said beta @('docs/a.md') -RunAll | Should -Match 'every workflow runs on this ref'
+        Said beta @() | Should -Match 'no changed file is known'
+    }
+
+    It 'says not affected when it skips' {
+        Said beta @('src/Alpha/A.cs') | Should -Match 'beta: not affected'
+    }
+}
 # The real manifest: the rules that keep the path lists honest as the code changes.
 Describe 'the manifest of this repository' {
     BeforeAll {

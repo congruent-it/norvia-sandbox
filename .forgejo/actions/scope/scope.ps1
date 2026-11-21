@@ -27,17 +27,25 @@ if (-not $scope.Applications.ContainsKey($Application)) {
     throw "The application '$Application' is not in $Manifest. Add it, with its workflow, or fix the name."
 }
 
-if ($RunAll) { return $true }
+# The scope action shows this output in the job log, so a run that is not skipped says why. Only Write-Host: the return value is the answer.
+if ($RunAll) { Write-Host "${Application}: affected, because every workflow runs on this ref (-RunAll)."; return $true }
 
 if (-not $PSBoundParameters.ContainsKey('ChangedFile')) {
     $mergeBase = git -C $Repository merge-base $Base HEAD 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $mergeBase) {
-        Write-Host "No merge-base with ${Base}: running everything."
+        Write-Host "${Application}: affected, because there is no merge-base with ${Base}, so everything runs."
         return $true
     }
     $ChangedFile = @(git -C $Repository diff --name-only $mergeBase HEAD)
+    Write-Host "Base ${Base} ($(git -C $Repository rev-parse --short $Base 2>$null)), merge-base $($mergeBase.Substring(0, [Math]::Min(8, $mergeBase.Length))), head $(git -C $Repository rev-parse --short HEAD 2>$null)."
 }
-if (-not $ChangedFile -or $ChangedFile.Count -eq 0) { return $true }
+Write-Host "Changed files: $(@($ChangedFile).Count)"
+@($ChangedFile) | Select-Object -First 30 | ForEach-Object { Write-Host "  $_" }
+if (@($ChangedFile).Count -gt 30) { Write-Host "  ... and $(@($ChangedFile).Count - 30) more" }
+if (-not $ChangedFile -or @($ChangedFile).Count -eq 0) {
+    Write-Host "${Application}: affected, because no changed file is known, so everything runs."
+    return $true
+}
 
 function Test-Match([string] $File, [string[]] $Patterns) {
     foreach ($pattern in $Patterns) { if ($File -like $pattern) { return $true } }
@@ -49,15 +57,19 @@ foreach ($file in $ChangedFile) {
     foreach ($name in $scope.Applications.Keys) {
         if (Test-Match $file $scope.Applications[$name]) {
             $claimed = $true
-            if ($name -eq $Application) { return $true }
+            if ($name -eq $Application) { Write-Host "${Application}: affected by $file (its own paths)."; return $true }
         }
     }
     foreach ($entry in $scope.Shared) {
         if (Test-Match $file $entry.Paths) {
             $claimed = $true
-            if ($entry.Applications -contains $Application) { return $true }
+            if ($entry.Applications -contains $Application) { Write-Host "${Application}: affected by $file (shared code it consumes)."; return $true }
         }
     }
-    if (-not $claimed -and -not (Test-Match $file $scope.Ignored)) { return $true }
+    if (-not $claimed -and -not (Test-Match $file $scope.Ignored)) {
+        Write-Host "${Application}: affected by $file (no application, shared entry or ignored path claims it, so everything runs)."
+        return $true
+    }
 }
+Write-Host "${Application}: not affected."
 return $false
