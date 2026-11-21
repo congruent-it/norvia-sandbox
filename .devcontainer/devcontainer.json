@@ -15,6 +15,9 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "FORGEJO_TOKEN": "${localEnv:FORGEJO_TOKEN}"
   },
+  "remoteEnv": {
+    "KUBECONFIG": "/home/vscode/.kube/config"
+  },
   "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.claude && gh auth setup-git",
   "customizations": {
     "vscode": {
