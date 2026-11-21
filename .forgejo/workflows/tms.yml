@@ -123,6 +123,27 @@ jobs:
             echo "$(( $(date +%s) - start )) s"
           done
 
+      # Where do a container's published ports end up? The first runs of the AppHost legs started SQL Server but it never became reachable, and the daemon
+      # was the runner pod's own, not one of the job's. This starts a cached container with a published port and calls it on the hosts a job could reach it
+      # by. A status code means reachable; "unreachable" means not. It never fails the leg.
+      - name: Probe Docker networking
+        if: contains(matrix.kinds, 'IntegrationTests') || contains(matrix.kinds, 'UiTests')
+        run: |
+          echo "DOCKER_HOST=${DOCKER_HOST:-<unset>}"
+          docker info --format 'daemon {{.Name}}, root {{.DockerRootDir}}, {{.Driver}}' || true
+          gw_hex=$(awk '$2=="00000000" {print $3; exit}' /proc/net/route)
+          gateway=""
+          if [ -n "$gw_hex" ]; then gateway=$(printf '%d.%d.%d.%d' "0x${gw_hex:6:2}" "0x${gw_hex:4:2}" "0x${gw_hex:2:2}" "0x${gw_hex:0:2}"); fi
+          daemon_host="${DOCKER_HOST#tcp://}"; daemon_host="${daemon_host%%:*}"
+          echo "container address: $(hostname -i 2>/dev/null || true), default gateway: ${gateway:-none}, daemon host: ${daemon_host:-none}"
+          docker run -d --rm --name probe -p 10555:10000 mcr.microsoft.com/azure-storage/azurite:3.37.0 azurite-blob --blobHost 0.0.0.0 || echo "::warning::the probe container did not start"
+          sleep 5
+          for host in localhost "$gateway" "$daemon_host"; do
+            [ -n "$host" ] || continue
+            printf '%s:10555 -> ' "$host"
+            curl -sS -m 5 -o /dev/null -w '%{http_code}\n' "http://$host:10555/" 2>&1 || echo "unreachable"
+          done
+          docker rm -f probe >/dev/null 2>&1 || true
       - name: Build
         run: |
           dotnet tool restore
@@ -178,7 +199,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: test-results-${{ github.workflow }}-${{ strategy.job-index }}
+          name: test-results-${{ github.workflow }}-${{ matrix.kinds }}
           path: TestResults/
           if-no-files-found: ignore
       - if: always()
