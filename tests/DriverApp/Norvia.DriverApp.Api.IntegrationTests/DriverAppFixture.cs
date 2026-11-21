@@ -100,9 +100,20 @@ public class DriverAppFixture : IAsyncLifetime
         }
 
         _app = await builder.BuildAsync(startup.Token);
-        await _app.StartAsync(startup.Token);
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-api", startup.Token);
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-web", startup.Token);
+        try
+        {
+            await _app.StartAsync(startup.Token);
+            await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-api", startup.Token);
+            await _app.ResourceNotifications.WaitForResourceHealthyAsync("driver-app-web", startup.Token);
+        }
+        catch (Exception exception)
+        {
+            // Aspire only says that the wait was cancelled. What failed is in the resources' health checks and logs, and CI has no other place to read them.
+            throw new InvalidOperationException(
+                $"The AppHost was not healthy within {StartupTimeout} ({exception.GetType().Name}: {exception.Message}).{Environment.NewLine}{await StartupDiagnostics.DescribeAsync(_app)}",
+                exception);
+        }
+
         DriverApp = _app.CreateHttpClient("driver-app-api");
         DriverApp.DefaultRequestHeaders.Add("X-Api-Key", EndpointKey);
         Anonymous = _app.CreateHttpClient("driver-app-api");
