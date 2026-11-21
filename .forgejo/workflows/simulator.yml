@@ -100,7 +100,8 @@ jobs:
           gw_hex=$(awk '$2=="00000000" {print $3; exit}' /proc/net/route)
           gateway=""
           if [ -n "$gw_hex" ]; then gateway=$(printf '%d.%d.%d.%d' "0x${gw_hex:6:2}" "0x${gw_hex:4:2}" "0x${gw_hex:2:2}" "0x${gw_hex:0:2}"); fi
-          daemon_host="${DOCKER_HOST#tcp://}"; daemon_host="${daemon_host%%:*}"
+          daemon_host=""
+          case "${DOCKER_HOST:-}" in tcp://*) daemon_host="${DOCKER_HOST#tcp://}"; daemon_host="${daemon_host%%:*}" ;; esac
           echo "container address: $(hostname -i 2>/dev/null || true), default gateway: ${gateway:-none}, daemon host: ${daemon_host:-none}"
           docker run -d --rm --name "probe-${GITHUB_RUN_ID:-0}-$$" -p 10555:10000 mcr.microsoft.com/azure-storage/azurite:3.37.0 azurite-blob --blobHost 0.0.0.0 || echo "::warning::the probe container did not start"
           sleep 5
