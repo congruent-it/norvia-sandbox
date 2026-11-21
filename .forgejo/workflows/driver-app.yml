@@ -98,10 +98,18 @@ jobs:
             curl -sS -m 5 -o /dev/null -w '%{http_code}\n' "http://$host:10555/" 2>&1 || echo "unreachable"
           done
           docker rm -f probe >/dev/null 2>&1 || true
+      # Builds the leg's own test projects, and so what they reference (the AppHost's applications among them), not the whole solution: a leg does not need the
+      # test projects of the other applications (the Driver app's leg: 66 projects, not 199). The `build` job of ci.yml builds Norvia.slnx once, warnings as errors.
       - name: Build
+        env:
+          KINDS: ${{ matrix.kinds }}
         run: |
           dotnet tool restore
-          dotnet build Norvia.slnx --configuration "$CONFIGURATION"
+          for kind in $KINDS; do
+            for project in $(find tests/$DIRECTORY -name "*.$kind.csproj" | sort); do
+              dotnet build "$project" --configuration "$CONFIGURATION"
+            done
+          done
 
       # Chromium's system libraries need root. The job runs as root, the job image's default user (the Dockerfile sets no USER), so `--with-deps`
       # works here as it does on GitHub's runner. Every UI test project uses the same Playwright version, so the leg's own project's script serves.
