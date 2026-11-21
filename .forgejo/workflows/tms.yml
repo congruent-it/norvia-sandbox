@@ -136,14 +136,14 @@ jobs:
           if [ -n "$gw_hex" ]; then gateway=$(printf '%d.%d.%d.%d' "0x${gw_hex:6:2}" "0x${gw_hex:4:2}" "0x${gw_hex:2:2}" "0x${gw_hex:0:2}"); fi
           daemon_host="${DOCKER_HOST#tcp://}"; daemon_host="${daemon_host%%:*}"
           echo "container address: $(hostname -i 2>/dev/null || true), default gateway: ${gateway:-none}, daemon host: ${daemon_host:-none}"
-          docker run -d --rm --name probe -p 10555:10000 mcr.microsoft.com/azure-storage/azurite:3.37.0 azurite-blob --blobHost 0.0.0.0 || echo "::warning::the probe container did not start"
+          docker run -d --rm --name "probe-${GITHUB_RUN_ID:-0}-$$" -p 10555:10000 mcr.microsoft.com/azure-storage/azurite:3.37.0 azurite-blob --blobHost 0.0.0.0 || echo "::warning::the probe container did not start"
           sleep 5
           for host in localhost "$gateway" "$daemon_host"; do
             [ -n "$host" ] || continue
             printf '%s:10555 -> ' "$host"
             curl -sS -m 5 -o /dev/null -w '%{http_code}\n' "http://$host:10555/" 2>&1 || echo "unreachable"
           done
-          docker rm -f probe >/dev/null 2>&1 || true
+          docker rm -f "probe-${GITHUB_RUN_ID:-0}-$$" >/dev/null 2>&1 || true
       # Builds the leg's own test projects, and so what they reference (the AppHost's applications among them), not the whole solution: a leg does not need the
       # test projects of the other applications (the Driver app's leg: 66 projects, not 199). The `build` job of ci.yml builds Norvia.slnx once, warnings as errors.
       - name: Build
