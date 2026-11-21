@@ -99,10 +99,19 @@ jobs:
 
       - uses: ./.forgejo/actions/setup
 
+      # Diagnostic (#1079): a restore of 1m37s is far more than a warm package cache needs (seconds), so is /nuget-cache empty at the start of a run? Never fails.
+      - name: NuGet cache before the restore
+        run: |
+          echo "NUGET_PACKAGES=$NUGET_PACKAGES"
+          findmnt -T "$NUGET_PACKAGES" -o TARGET,SOURCE,FSTYPE || true
+          ls -ld "$NUGET_PACKAGES" || true
+          echo "packages: $(ls "$NUGET_PACKAGES" 2>/dev/null | wc -l), size: $(du -sh "$NUGET_PACKAGES" 2>/dev/null | cut -f1), writable: $(test -w "$NUGET_PACKAGES" && echo yes || echo no), user: $(id -un)"
+
       - name: Restore
         run: |
           dotnet tool restore
-          dotnet restore Norvia.slnx
+          time dotnet restore Norvia.slnx
+          echo "packages after: $(ls "$NUGET_PACKAGES" | wc -l), size: $(du -sh "$NUGET_PACKAGES" | cut -f1)"
 
       # Warnings are errors (Directory.Build.props), so a clean build is also the "no warnings" gate. The application workflows build their own test projects and
       # everything those reference, so on a branch this job builds only what no application workflow does: the test projects it runs itself and the Azure Functions
