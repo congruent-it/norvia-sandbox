@@ -40,7 +40,7 @@ Source code dependencies point inwards only. An inner layer never references an 
 
 ## 2. Solution structure
 
-- Test projects mirror the project they test: `<App>.Domain.UnitTests`, `<App>.Application.UnitTests`, `<App>.ArchitectureTests`, `<App>.Api.IntegrationTests`, `<App>.Web.UiTests`. A large integration or UI test project may be split per component with a `.<Component>` suffix (`<App>.Api.IntegrationTests.Billing`), the small components sharing one project (the TMS UI's tests have `Norvia.Tms.Web.UiTests.Remaining`; the TMS API's integration tests are all split per feature, with the cross-cutting ones, such as the API reference, the AppHost model and the demo seed, in `Norvia.Tms.Api.IntegrationTests` itself), each project one leg of the CI `integration` matrix; the fixtures and helpers they share live in one `<App>.TestSupport` class library, which each test project references and registers its fixture from, rather than copying. A new project is added to the `InternalsVisibleTo` list of `<App>.TestSupport`, so it can use the helpers there.
+- Test projects mirror the project they test: `<App>.Domain.UnitTests`, `<App>.Application.UnitTests`, `<App>.ArchitectureTests`, `<App>.Api.IntegrationTests`, `<App>.Web.UiTests`. A large integration or UI test project may be split per component with a `.<Component>` suffix (`<App>.Api.IntegrationTests.Billing`), the small components sharing one project (the TMS UI's tests have `Norvia.Tms.Web.UiTests.Remaining`; the TMS API's integration tests are all split per feature, with the cross-cutting ones, such as the API reference, the AppHost model and the demo seed, in `Norvia.Tms.Api.IntegrationTests` itself); the fixtures and helpers they share live in one `<App>.TestSupport` class library, which each test project references and registers its fixture from, rather than copying. A new project is added to the `InternalsVisibleTo` list of `<App>.TestSupport`, so it can use the helpers there.
 - Applications **must not** reference each other's projects. They meet only through Azure Integration Services and the Canonical Model ([ADR 0001](adr/0001-realistic-applications-integrated-only-through-ais.md)).
 - Local orchestration goes through the Aspire AppHost; every service references the shared `ServiceDefaults` project ([ADR 0004](adr/0004-bicep-owns-the-estate-aspire-owns-the-apps.md)).
 - Package versions are managed centrally in `Directory.Packages.props`. Project files **must not** carry version numbers.
@@ -242,9 +242,10 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 
 ### Integration tests
 
+- CI does not run integration and UI tests (they are too slow); run them manually from VS Code or with `dotnet test <project>` before merging a change that affects them.
 - API integration tests run the real application with `WebApplicationFactory` or `Aspire.Hosting.Testing`, against a real database in a container (Testcontainers), not the EF in-memory provider.
 - Outbound dependencies outside the application (Service Bus, other APIs) are replaced at the edge, and tests assert on the events the application would publish.
-- Every test project or class whose fixture starts an AppHost costs about 6 GB. Run those projects one at a time (`dotnet test <project>`, as CI does), never `dotnet test Norvia.slnx`, and keep a project's xUnit parallelism (`xunit.runner.json`) low enough that few AppHosts run at once: xUnit's default is one test collection per core.
+- Every test project or class whose fixture starts an AppHost costs about 6 GB. Run those projects one at a time (`dotnet test <project>`), never `dotnet test Norvia.slnx`, and keep a project's xUnit parallelism (`xunit.runner.json`) low enough that few AppHosts run at once: xUnit's default is one test collection per core.
 - A test that counts what was published (`before`/`after`) first waits for the events its own set-up published, as `PublishedAsync` does, so a late event is not counted as one the test caused.
 
 ### UI tests
@@ -253,7 +254,7 @@ A new feature that needs an AppHost gets a feature-suffixed project, not a case 
 - Locate elements with `GetByRole`, `GetByLabel` and `GetByText`; fall back to `GetByTestId`. Never use CSS or XPath selectors tied to layout.
 - Rely on Playwright's auto-waiting and web-first assertions (`Expect(locator).ToBeVisibleAsync()`). Never use `Thread.Sleep`, `Task.Delay` or fixed timeouts.
 - Each test sets up its own data and does not depend on the order of other tests.
-- Record traces, screenshots and video on failure and publish them as CI artifacts.
+- Record traces, screenshots and video on failure.
 - Keep UI tests to the critical user journeys; cover edge cases lower in the pyramid.
 
 ## 11. Workflow

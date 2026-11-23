@@ -31,9 +31,8 @@ jobs:
         with:
           application: health-check
 
-  # One leg per kind of test of the application, each in its own job container with its own Docker daemon (start-dockerd), so the AppHosts of parallel legs
-  # cannot clash on container names or ports. The runner runs `capacity` jobs at once (.forgejo/runner/config.yaml) and the other legs queue; the timeout
-  # of a job counts from when it starts. Each leg reports its own status, forgejo/tests (<application>), so each can become required by itself.
+  # One leg per kind of test of the application. Integration and UI tests are not run here: they start the AppHost (about 6 GB each), so they run manually,
+  # from VS Code or `dotnet test <project>` (docs/coding-guidelines.md, §10). Each leg reports its own status, forgejo/tests (<application>).
   integration:
     needs: scope
     if: needs.scope.outputs.affected == 'true'
@@ -46,7 +45,7 @@ jobs:
       matrix:
         include:
           - application: Estate health check
-            kinds: UnitTests ArchitectureTests IntegrationTests UiTests
+            kinds: UnitTests ArchitectureTests
     steps:
       - uses: actions/checkout@v4
       - uses: ./.forgejo/actions/report-status
@@ -57,48 +56,8 @@ jobs:
 
       # The steps of one leg (#1042, #1079), the same in every application workflow. They are steps here, not a composite action, so Forgejo's run page
       # shows each one's log as it runs: a composite action is one row, with no log until it ends.
-      # The AppHost runs SQL Server and the Service Bus emulator in Docker. The job container is privileged and has no host socket, so this starts the
-      # daemon the leg alone uses (docs/operations/forgejo.md, "Runner for CI").
-      - name: Start Docker
-        run: start-dockerd
-
       - uses: ./.forgejo/actions/setup
 
-      # The AppHost starts SQL Server, the storage emulator and two Service Bus emulators, and its startup is cut off after 10 minutes. Pulled here, a slow or
-      # blocked pull shows in this step's log with its time and no longer counts against the fixtures. The tags are the ones Aspire.Hosting uses (the
-      # diagnostics below list what the daemon holds); a stale tag only makes this step pull an image nobody uses. A failed pull does not fail the leg.
-      - name: Pull the AppHost's images
-        if: contains(matrix.kinds, 'IntegrationTests') || contains(matrix.kinds, 'UiTests')
-        run: |
-          for image in mcr.microsoft.com/mssql/server:2022-latest mcr.microsoft.com/azure-storage/azurite:3.37.0 mcr.microsoft.com/azure-messaging/servicebus-emulator:latest; do
-            echo "== $image"
-            start=$(date +%s)
-            docker pull "$image" || echo "::warning::pulling $image failed"
-            echo "$(( $(date +%s) - start )) s"
-          done
-
-      # Where do a container's published ports end up? The first runs of the AppHost legs started SQL Server but it never became reachable, and the daemon
-      # was the runner pod's own, not one of the job's. This starts a cached container with a published port and calls it on the hosts a job could reach it
-      # by. A status code means reachable; "unreachable" means not. It never fails the leg.
-      - name: Probe Docker networking
-        if: contains(matrix.kinds, 'IntegrationTests') || contains(matrix.kinds, 'UiTests')
-        run: |
-          echo "DOCKER_HOST=${DOCKER_HOST:-<unset>}"
-          docker info --format 'daemon {{.Name}}, root {{.DockerRootDir}}, {{.Driver}}' || true
-          gw_hex=$(awk '$2=="00000000" {print $3; exit}' /proc/net/route)
-          gateway=""
-          if [ -n "$gw_hex" ]; then gateway=$(printf '%d.%d.%d.%d' "0x${gw_hex:6:2}" "0x${gw_hex:4:2}" "0x${gw_hex:2:2}" "0x${gw_hex:0:2}"); fi
-          daemon_host=""
-          case "${DOCKER_HOST:-}" in tcp://*) daemon_host="${DOCKER_HOST#tcp://}"; daemon_host="${daemon_host%%:*}" ;; esac
-          echo "container address: $(hostname -i 2>/dev/null || true), default gateway: ${gateway:-none}, daemon host: ${daemon_host:-none}"
-          docker run -d --rm --name "probe-${GITHUB_RUN_ID:-0}-$$" -p 10555:10000 mcr.microsoft.com/azure-storage/azurite:3.37.0 azurite-blob --blobHost 0.0.0.0 || echo "::warning::the probe container did not start"
-          sleep 5
-          for host in localhost "$gateway" "$daemon_host"; do
-            [ -n "$host" ] || continue
-            printf '%s:10555 -> ' "$host"
-            curl -sS -m 5 -o /dev/null -w '%{http_code}\n' "http://$host:10555/" 2>&1 || echo "unreachable"
-          done
-          docker rm -f "probe-${GITHUB_RUN_ID:-0}-$$" >/dev/null 2>&1 || true
       # Builds the leg's own test projects, and so what they reference (the AppHost's applications among them), not the whole solution: a leg does not need the
       # test projects of the other applications (the Driver app's leg: 66 projects, not 199). The `build` job of ci.yml builds Norvia.slnx once, warnings as errors.
       - name: Build
@@ -112,21 +71,11 @@ jobs:
             done
           done
 
-      # Chromium's system libraries need root. The job runs as root, the job image's default user (the Dockerfile sets no USER), so `--with-deps`
-      # works here as it does on GitHub's runner. Every UI test project uses the same Playwright version, so the leg's own project's script serves.
-      - name: Install Playwright's Chromium
-        if: contains(matrix.kinds, 'UiTests')
-        run: pwsh "$(find tests/$DIRECTORY -path "*/bin/$CONFIGURATION/net10.0/playwright.ps1" -print -quit)" install --with-deps chromium
-
-      # UI tests keep a Playwright trace and video of every failed test. Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
-      - name: Unit, architecture, integration and UI tests
+      # Each project enforces the 80% line coverage threshold itself (Directory.Build.props).
+      - name: Unit and architecture tests
         env:
           KINDS: ${{ matrix.kinds }}
           NORVIA_TEST_LOG_FILE: ${{ github.workspace }}/TestResults/${{ env.DIRECTORY }}.log
-          NORVIA_UI_TEST_ARTIFACTS: ${{ github.workspace }}/TestResults
-          # DCP, which Aspire starts the resources with, writes its own log: for an AppHost that stalls as it starts.
-          DCP_DIAGNOSTICS_LOG_LEVEL: debug
-          DCP_DIAGNOSTICS_LOG_FOLDER: ${{ github.workspace }}/TestResults/dcp
         run: |
           mkdir -p TestResults
           failed=0
@@ -138,16 +87,6 @@ jobs:
           done
           exit $failed
 
-      # When the AppHost does not start (Aspire's startup timeout), these say whether the daemon pulled its images and which container is stuck.
-      - name: Docker diagnostics
-        if: failure()
-        run: |
-          docker info || true
-          docker images || true
-          docker ps -a || true
-          # What the daemon did in the last 30 minutes (pulls, creates, dies), since the AppHost has removed its containers by now.
-          timeout 60 docker events --since 30m --until 0s 2>&1 | tail -n 200 || true
-          for log in TestResults/dcp/*; do [ -f "$log" ] && { echo "== $log"; tail -n 50 "$log"; }; done || true
       # Forgejo has no $GITHUB_STEP_SUMMARY page, so the Markdown summary goes to the log (and stays in TestResults/coverage with the artifact).
       - name: Coverage summary
         if: always()
