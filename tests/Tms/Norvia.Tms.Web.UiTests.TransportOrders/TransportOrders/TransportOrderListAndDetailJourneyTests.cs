@@ -295,9 +295,19 @@ public sealed partial class TransportOrderListAndDetailJourneyTests(TmsUiFixture
     // Applied when the Planner presses Enter, which reads the first page again.
     private async Task SearchAsync(string text)
     {
+        // The page is prerendered and only becomes interactive once Blazor's circuit connects, which resets the box: text typed before that is lost and its Enter does nothing.
+        // So the search is typed again until the box keeps it for a moment after the Enter.
         var search = Page.GetByRole(AriaRole.Textbox, new() { Name = "Search" });
-        await search.FillAsync(text);
-        await search.PressAsync("Enter");
+        for (var attempt = 1; ; attempt++)
+        {
+            await search.FillAsync(text);
+            await search.PressAsync("Enter");
+            await Page.WaitForTimeoutAsync(500);
+            if (await search.InputValueAsync() == text || attempt == 10)
+            {
+                return;
+            }
+        }
     }
 
     private async Task ChooseAsync(string filter, string option)
