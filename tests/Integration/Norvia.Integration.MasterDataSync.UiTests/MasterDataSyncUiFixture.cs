@@ -115,7 +115,11 @@ public sealed class MasterDataSyncUiFixture : TmsFixture
     /// </summary>
     private static void AddErpUiOfAReader(IDistributedApplicationTestingBuilder builder, DotnetProjectResource erp)
     {
-        var reader = builder.AddDotnetProject(ReaderHost, erp.GetProjectMetadata().ProjectPath);
+        // Not AddDotnetProject: Aspire 17.0.0 keeps what it knows of the AppHost's builds per builder, and the testing builder is a wrapper with none of it, so a project added here makes a second
+        // build resource of the same name and the startup fails ("already exists"). The projects are built already, as the AppHost's own are, so this one needs no build of its own.
+#pragma warning disable CS0618 // AddProject is obsolete for AddDotnetProject, which cannot be used from a test.
+        var reader = builder.AddProject(ReaderHost, erp.GetProjectMetadata().ProjectPath);
+#pragma warning restore CS0618
         var database = builder.Resources.OfType<IResourceWithConnectionString>().Single(resource => resource.Name == "erp");
         var edge = builder.Resources.OfType<IResourceWithConnectionString>().Single(resource => resource.Name == "messaging-2");
         reader.WithReference(builder.CreateResourceBuilder(database))

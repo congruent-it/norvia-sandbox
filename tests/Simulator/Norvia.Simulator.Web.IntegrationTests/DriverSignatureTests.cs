@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Norvia.Simulator.Domain.Drivers;
 using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.TestSupport.Ui;
 
 namespace Norvia.Simulator.Web.IntegrationTests;
 
@@ -30,7 +31,7 @@ public sealed class DriverSignatureTests(SimulatorFixture fixture)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task TheDeliveriesOfARun_LeaveProofsOfDeliveryWithDrawnSignatures_PhotosOnlyWithReservations_AndNoFileContentInTheTelemetry()
     {
         // The Drivers' rosters are Monday to Friday; at the weekend the Driver works today by a change of Roster, so the test runs on any day.

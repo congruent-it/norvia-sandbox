@@ -16,6 +16,18 @@ RUN /tmp/install-powershell.sh /tmp/tool-versions.psd1 && rm /tmp/install-powers
 COPY infra/install-tools.ps1 /tmp/install-tools.ps1
 RUN pwsh -NoProfile -File /tmp/install-tools.ps1 && rm /tmp/install-tools.ps1 /tmp/tool-versions.psd1
 
+# Chromium's system libraries, for the UI tests (Playwright). `install-deps` is what CI's `install --with-deps` runs as root; it needs only Node, and the version is the
+# one of Microsoft.Playwright in Directory.Packages.props, so the list of packages follows the version the tests use. The browser itself is downloaded per user, by the tests.
+COPY Directory.Packages.props /tmp/Directory.Packages.props
+RUN version=$(sed -n 's|.*Include="Microsoft.Playwright" Version="\([^"]*\)".*|\1|p' /tmp/Directory.Packages.props) \
+    && test -n "$version" \
+    && npx --yes "playwright@$version" install-deps chromium \
+    && rm -rf /var/lib/apt/lists/* /tmp/Directory.Packages.props /root/.npm
+
+# The Docker-in-Docker feature's daemon defaults to legacy iptables, which a host kernel with nftables only (no iptable_nat module) does not have: dockerd
+# then fails with "Table does not exist". Docker's nftables backend needs nothing from the host's iptables.
+RUN mkdir -p /etc/docker && echo '{ "firewall-backend": "nftables" }' > /etc/docker/daemon.json
+
 ARG USERNAME=vscode
 # The base image ships an "ubuntu" user at UID/GID 1000, the same UID as the usual host user, so the workspace bind mount is writable. Rename it instead of adding a second one.
 RUN groupmod --new-name "$USERNAME" ubuntu \

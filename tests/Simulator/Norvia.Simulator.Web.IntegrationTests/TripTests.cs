@@ -9,6 +9,7 @@ using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Planner;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.TestSupport.Ui;
 
 using SimulatorWeb::Norvia.Simulator.Web;
 
@@ -29,7 +30,7 @@ public sealed class TripTests(SimulatorFixture fixture)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task OwnFleetShipments_AreBuiltIntoDispatchedTrips_WithinTheRules_OrTheirPlacingIsLogged()
     {
         await using var simulator = await OwnFleetAsync("VEH-0003", "DRV-0003");
@@ -79,7 +80,7 @@ public sealed class TripTests(SimulatorFixture fixture)
         log.Any(Runs.IsDriver).Should().BeFalse("no Trip is for today, so no Driver starts one");
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task TheTripsOfToday_AreWorkedInOrderToCompleted_WithReservationsInExactlyTheConfiguredShare_AndTheTripsOfLaterDaysStayDispatched()
     {
         await using var worksToday = await fixture.WorkTodayAsync("DRV-0004", Ct);
@@ -132,7 +133,7 @@ public sealed class TripTests(SimulatorFixture fixture)
         }
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task TheFailedStops_AreExactlyTheConfiguredShares_OpenExceptions_AndTheFailedDeliveriesGoOnARedeliveryTrip()
     {
         await using var worksToday = await fixture.WorkTodayAsync("DRV-0005", Ct);
