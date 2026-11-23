@@ -123,13 +123,14 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
 
     /// <summary>
     /// Makes the mail server refuse to take an email, as a mail server that is down does: the folder the worker writes to becomes a file, so it can't send, and every try fails until the returned
-    /// handle is disposed, which gives the folder back.
+    /// handle is disposed, which gives the folder back with the emails it held: the tests that ran before sent emails a later test counts, so breaking the mailbox must not lose them.
     /// </summary>
     public IDisposable BreakMailbox()
     {
+        var kept = Directory.EnumerateFiles(_mailFolder).ToDictionary(file => Path.GetRelativePath(_mailFolder, file), File.ReadAllBytes);
         Directory.Delete(_mailFolder, recursive: true);
         File.WriteAllText(_mailFolder, string.Empty);
-        return new MailboxRepair(_mailFolder);
+        return new MailboxRepair(_mailFolder, kept);
     }
 
     /// <summary>Sends the worker a request for the Transport Order as the TMS's outbox would, to show what it does with one the TMS wouldn't have asked for.</summary>
@@ -235,12 +236,16 @@ public sealed class ConsigneeNotificationFixture : TmsFixture
         }
     }
 
-    private sealed class MailboxRepair(string folder) : IDisposable
+    private sealed class MailboxRepair(string folder, Dictionary<string, byte[]> kept) : IDisposable
     {
         public void Dispose()
         {
             File.Delete(folder);
             Directory.CreateDirectory(folder);
+            foreach (var (name, content) in kept)
+            {
+                File.WriteAllBytes(Path.Combine(folder, name), content);
+            }
         }
     }
 }

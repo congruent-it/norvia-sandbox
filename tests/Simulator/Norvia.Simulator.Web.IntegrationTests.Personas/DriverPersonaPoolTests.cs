@@ -9,6 +9,7 @@ using Norvia.Simulator.Domain.Log;
 using Norvia.Simulator.Domain.Personas;
 using Norvia.Simulator.Domain.Plans;
 using Norvia.Simulator.Domain.Runs;
+using Norvia.Simulator.TestSupport.Ui;
 
 using SimulatorWeb::Norvia.Simulator.Web;
 
@@ -28,7 +29,7 @@ public sealed class DriverPersonaPoolTests(SimulatorFixture fixture, DriverTextR
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task ACollectionFailed_ReachesTheTms_WithARemarkFromTheDriversPool()
     {
         var reports = await run.ReportsAsync(DriverActions.CollectionFailed, TextCategory.DriverCollectionFailedRemark, Ct);
@@ -37,7 +38,7 @@ public sealed class DriverPersonaPoolTests(SimulatorFixture fixture, DriverTextR
         await AssertRemarksReachTheTmsAsync(reports);
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task ADeliveryFailed_ReachesTheTms_WithARemarkFromTheDriversPool()
     {
         var reports = await run.ReportsAsync(DriverActions.DeliveryFailed, TextCategory.DriverDeliveryFailedRemark, Ct);
@@ -46,7 +47,7 @@ public sealed class DriverPersonaPoolTests(SimulatorFixture fixture, DriverTextR
         await AssertRemarksReachTheTmsAsync(reports);
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task ADamageReport_ReachesTheTms_WithARemarkFromTheDriversPool()
     {
         var reports = await run.ReportsAsync(DriverActions.ReportDamage, TextCategory.DriverDamageRemark, Ct);
@@ -55,7 +56,7 @@ public sealed class DriverPersonaPoolTests(SimulatorFixture fixture, DriverTextR
         await AssertRemarksReachTheTmsAsync(reports);
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task TheTexts_AreInTheLanguageOfTheDriversProfile()
     {
         var plan = await run.PlanAsync(Ct);
@@ -114,7 +115,7 @@ public sealed class DriverPersonaPoolTests(SimulatorFixture fixture, DriverTextR
         second.Pools.Where(pool => pool.IsDriverText).Should().BeEquivalentTo(pools, options => options.Excluding(pool => pool.Source), "the same seed writes the same pools");
     }
 
-    [Fact]
+    [Fact(SkipUnless = nameof(CollectionHours.TodayIsStillOpen), SkipType = typeof(CollectionHours), Skip = CollectionHours.Reason)]
     public async Task NoDriverText_IsInTheLogOrTheTelemetry_AndTheLogNamesAPoolAndAnIndex()
     {
         var plan = await run.PlanAsync(Ct);

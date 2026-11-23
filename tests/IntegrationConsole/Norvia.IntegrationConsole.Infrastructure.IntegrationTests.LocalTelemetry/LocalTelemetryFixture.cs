@@ -27,6 +27,7 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
     public const string ShipperClientId = "client-van-dijk";
     public const string UnregisteredClientId = "client-unregistered";
 
+    private const string BuildResourcePrefix = "__dotnet-project-build";
     private const string Issuer = "https://norvia.local/tokens";
     private const string Audience = "api://norvia-partner-api";
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(4);
@@ -56,7 +57,8 @@ public sealed class LocalTelemetryFixture : IAsyncLifetime
             (options, _) => options.DisableDashboard = false,
             startup.Token);
 
-        foreach (var resource in builder.Resources.Where(resource => resource.Name != PartnerApi && resource is not IResourceWithParent).ToList())
+        // The build resources stay: Aspire 17 builds the projects in a resource of its own, which a project waits for before it starts.
+        foreach (var resource in builder.Resources.Where(resource => resource.Name != PartnerApi && resource is not IResourceWithParent && !resource.Name.StartsWith(BuildResourcePrefix, StringComparison.Ordinal)).ToList())
         {
             builder.Resources.Remove(resource);
         }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -387,7 +388,7 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
     [Fact]
     public async Task ANewTripVersionWithoutTheShipment_KeepsTheCompletedStop_MarkedTakenOffByThePlanner()
     {
-        const string trip = "TR-3000014";
+        const string trip = "TR-3000017";
         await ReceiveTripAsync(trip, Anouk);
         using var browser = await SignedInAsync(Anouk);
         await StartAsync(browser, trip);
@@ -409,7 +410,7 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
     [Fact]
     public async Task Delivering_PublishesTheDeliveredAndTheProofOfDeliveryUnderOneCorrelationId_AndStoresTheFilesInTheTransitContainer()
     {
-        const string trip = "TR-3000015";
+        const string trip = "TR-3000018";
         await ReceiveTripAsync(trip, Anouk);
         using var browser = await SignedInAsync(Anouk);
         await StartAsync(browser, trip);
@@ -477,9 +478,17 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(Ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        while (driverApp.PublishedFor(trip).Count < count)
+        try
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(250), timeout.Token);
+            while (driverApp.PublishedFor(trip).Count < count)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (!Ct.IsCancellationRequested)
+        {
+            var seen = driverApp.PublishedFor(trip).Select(message => $"{message.ApplicationProperties["eventType"]} {message.Body}");
+            throw new TimeoutException($"Trip {trip}: {count} messages were not published within 30 s; {string.Join(" | ", seen)}");
         }
     }
 
@@ -521,11 +530,24 @@ public sealed partial class ReportingPathTests(DriverAppFixture driverApp)
         return await response.Content.ReadAsStringAsync(Ct);
     }
 
+    // The Trips page offers a form only while something can be pressed on it: Start Trip until the Trip has started, End Trip once every Stop has an outcome.
+    // In between it has none, so the token is read once, from the first page that has one, and kept for the browser.
+    private static readonly ConditionalWeakTable<HttpClient, string> Tokens = new();
+
     /// <summary>The antiforgery token a form on the Trips page carries. It belongs to the browser, not to the form, so it serves any report the browser makes.</summary>
-    private static async Task<string> TokenOfAsync(HttpClient browser) =>
-        AntiforgeryToken().Match(await PageAsync(browser)) is { Success: true } match
+    private static async Task<string> TokenOfAsync(HttpClient browser)
+    {
+        if (Tokens.TryGetValue(browser, out var known))
+        {
+            return known;
+        }
+
+        var token = AntiforgeryToken().Match(await PageAsync(browser)) is { Success: true } match
             ? WebUtility.HtmlDecode(match.Groups[1].Value)
             : throw new InvalidOperationException("The Trips page has no form with an antiforgery token.");
+        Tokens.Add(browser, token);
+        return token;
+    }
 
     /// <summary>Presses Start Trip as the browser would: with an antiforgery token.</summary>
     private static async Task<HttpResponseMessage> StartAsync(HttpClient browser, string trip)

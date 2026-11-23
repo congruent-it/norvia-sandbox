@@ -300,7 +300,11 @@ public sealed class SimulatorUiFixture : IAsyncLifetime
     // Another Simulator on the same database, with the same settings and waits as the first, and the given settings changed.
     private static void AddVariant(IDistributedApplicationTestingBuilder builder, IResource simulator, string name, params (string Name, string Value)[] changes)
     {
-        var variant = builder.AddDotnetProject(name, ((DotnetProjectResource)simulator).GetProjectMetadata().ProjectPath).WithHttpHealthCheck("/health");
+        // Not AddDotnetProject: Aspire 17.0.0 keeps what it knows of the AppHost's builds per builder, and the testing builder is a wrapper with none of it, so a project added here makes a second
+        // build resource of the same name and the startup fails ("already exists"). The projects are built already, as the AppHost's own are, so a variant needs no build of its own.
+#pragma warning disable CS0618 // AddProject is obsolete for AddDotnetProject, which cannot be used from a test.
+        var variant = builder.AddProject(name, ((DotnetProjectResource)simulator).GetProjectMetadata().ProjectPath).WithHttpHealthCheck("/health");
+#pragma warning restore CS0618
         // Annotations can't be shared between resources (the first would lose its settings), so each one is made again. The changes come last, to win over the copied settings.
         foreach (var annotation in simulator.Annotations.ToList())
         {

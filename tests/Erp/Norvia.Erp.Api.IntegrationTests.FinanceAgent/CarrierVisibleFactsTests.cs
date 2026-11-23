@@ -66,8 +66,12 @@ public sealed class CarrierVisibleFactsTests(FinanceAgentFixture fixture)
         var reference = FinanceAgentCalls.NewReference();
         var mangled = reference.Replace("-", string.Empty, StringComparison.Ordinal);
         var otherCarriersReference = mangled + "Q";
-        await FinanceAgentCalls.RecordCostAsync(fixture, 100m, _cancellationToken, otherCarriersReference, FinanceAgentCalls.OtherCarrier);
-        var (invoiceNumber, received) = await ReceiveAsync(mangled, 100m);
+
+        // An amount no other test uses: the ERP also ranks an Open cost of the Carrier whose total is within 1% of the invoiced amount, whatever its reference, so another test's
+        // cost of the same amount (the database is shared) would be the likely reference and this test could not tell that from a leak.
+        const decimal amount = 6543.21m;
+        await FinanceAgentCalls.RecordCostAsync(fixture, amount, _cancellationToken, otherCarriersReference, FinanceAgentCalls.OtherCarrier);
+        var (invoiceNumber, received) = await ReceiveAsync(mangled, amount);
 
         var text = await RejectionReasonCalls.ReadFactsTextAsync(fixture, FinanceAgentCalls.Carrier, invoiceNumber, mangled, CorrelationOf(received), _cancellationToken);
 
@@ -78,7 +82,7 @@ public sealed class CarrierVisibleFactsTests(FinanceAgentFixture fixture)
 
         // Control: the same line from the other Carrier does get that reference, so it was a likely one and only the Carrier boundary kept it out above.
         var otherInvoice = FinanceAgentCalls.NewInvoiceNumber();
-        var otherReceived = await FinanceAgentCalls.ReceiveAsync(fixture, otherInvoice, _cancellationToken, FinanceAgentCalls.OtherCarrier, (mangled, 100m));
+        var otherReceived = await FinanceAgentCalls.ReceiveAsync(fixture, otherInvoice, _cancellationToken, FinanceAgentCalls.OtherCarrier, (mangled, amount));
         var otherFacts = await RejectionReasonCalls.ReadFactsAsync(fixture, FinanceAgentCalls.OtherCarrier, otherInvoice, mangled, CorrelationOf(otherReceived), _cancellationToken);
         otherFacts["likelyCorrectReference"]!.GetValue<string>().Should().Be(otherCarriersReference);
     }
