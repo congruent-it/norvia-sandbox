@@ -1,0 +1,64 @@
+{{- /*
+  The ERP (#1018): the API and the UI, each a Deployment of one replica and a Service, behind the internal-only ingress (templates/ingress.yaml). Their
+  settings are those the AppHost gives them locally, under the same names (a template test compares them); what Azure sets (Entra, the managed identity,
+  Foundry, the as-found toggles) is not given. Both wait for the erp migrations Job, as the AppHost's WaitForCompletion does.
+  The API trusts the local key and the UI signs in the local Finance user (its own token for the API), both behind LocalAuth:Allowed (ADR 0053).
+*/ -}}
+{{- $apiEnv := include "erp-api.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "erp-api" "env" $apiEnv "waitFor" (list "erp")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "erp-api") }}
+---
+{{- $webEnv := include "erp-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "erp-web" "env" $webEnv "waitFor" (list "erp")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "erp-web") }}
+{{- define "erp-api.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "erp") }}
+{{- /* The ERP API peeks the subscriptions a reset waits on in both emulators: locally the Edge topics are in the second one, which it asks for as messaging-edge. */}}
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging") | quote }}
+- name: ConnectionStrings__messaging-edge
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+- name: Reset__QuietSubscriptions__0
+  value: transport-order-events/billing
+- name: Reset__QuietSubscriptions__1
+  value: shipment-events/carrier-cost
+- name: Reset__QuietSubscriptions__2
+  value: messaging-edge/invoicing-events/shipper-invoice
+- name: Reset__QuietSubscriptions__3
+  value: messaging-edge/invoicing-events/carrier-invoice-outcome
+- name: Reset__Enabled
+  value: "true"
+- name: Authentication__Schemes__Bearer__ValidIssuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: Authentication__Schemes__Bearer__ValidAudiences__0
+  value: {{ include "norvia.token" (dict "root" . "name" "ErpAudience") | quote }}
+- name: Authentication__Schemes__Bearer__SigningKeys__0__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+{{ include "norvia.signingKeyEnv" "Authentication__Schemes__Bearer__SigningKeys__0__Value" }}
+{{ include "norvia.localAuthEnv" . }}
+{{- end }}
+{{- define "erp-web.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "erp") }}
+{{- /* The ERP UI's outbox publishes the master-data events to the second emulator, which it asks for as messaging. */}}
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+- name: ErpApi__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "erp-api") | quote }}
+{{- /* Locally the UI signs Finance in (there is no Easy Auth) and signs its own token for the ERP API, as Entra would issue it to its managed identity. */}}
+- name: LocalUser__Name
+  value: Finance (local)
+- name: LocalUser__Roles__0
+  value: Finance
+- name: ErpApi__LocalTokens__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: ErpApi__LocalTokens__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "ErpAudience") | quote }}
+- name: ErpApi__LocalTokens__ClientId
+  value: {{ include "norvia.token" (dict "root" . "name" "ErpUiClientId") | quote }}
+{{ include "norvia.signingKeyEnv" "ErpApi__LocalTokens__SigningKey" }}
+{{ include "norvia.localAuthEnv" . }}
+{{- end }}

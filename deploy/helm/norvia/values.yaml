@@ -161,7 +161,7 @@ namespace:
 
 # What Norvia may use of a cluster others share (#938): a ResourceQuota for the namespace, and a LimitRange that gives the containers that name
 # no requests or limit (the init containers) small ones, which a quota on requests needs. Sized for what the chart deploys, the migrations Jobs
-# running at once, and about ten more applications (the ERP and the other UIs, which are not in the chart yet); a template test fails
+# running at once, and about ten more applications (the other UIs, which are not in the chart yet); a template test fails
 # when the chart outgrows it. There are no CPU limits (a CPU limit throttles, and the chart sets none), so none in the quota. Off, a cluster
 # that sets its own quotas and limits is not given a second set.
 quota:
@@ -226,6 +226,18 @@ apps:
     resources:
       requests: { cpu: 100m, memory: 256Mi }
       limits: { memory: 768Mi }
+  erp-api:
+    image: erp-api
+    host: erp-api
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
+  erp-web:
+    image: erp-web
+    host: erp-web
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
   partner-api:
     image: partner-api
     host: partner-api
@@ -257,6 +269,7 @@ localTokens:
   PartnerApiAudience: api://norvia-partner-api
   CarrierInvoiceTriggerAudience: api://norvia-carrier-invoice-logic-app
   TmsUiClientId: norvia-local-tms-ui
+  ErpUiClientId: norvia-local-erp-ui
   IntakeLogicAppClientId: norvia-local-intake-logic-app
   AnswerLogicAppClientId: norvia-local-answer-logic-app
   ApiManagementClientId: norvia-local-api-management
