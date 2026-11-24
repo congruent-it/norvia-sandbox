@@ -1,0 +1,55 @@
+{{- /*
+  The Driver app (#1019): the API and the UI, each a Deployment of one replica and a Service, behind the internal-only ingress (templates/ingress.yaml).
+  Their settings are those the AppHost gives them locally, under the same names (a template test compares them); what Azure sets (Entra, the managed
+  identity, Easy Auth) is not given. Both wait for the driver-app migrations Job, as the AppHost's WaitForCompletion does.
+  The API trusts the local key and the UI signs the Drivers in with the sign-in stand-in (LocalSignIn:Enabled, ADR 0037), both behind LocalAuth:Allowed (ADR 0053).
+*/ -}}
+{{- $apiEnv := include "driver-app-api.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "driver-app-api" "env" $apiEnv "waitFor" (list "driver-app")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "driver-app-api") }}
+---
+{{- $webEnv := include "driver-app-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "driver-app-web" "env" $webEnv "waitFor" (list "driver-app")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "driver-app-web") }}
+{{- define "driver-app-api.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "driver-app") }}
+{{- /* Its outbox publishes to the topic for Driver app events, which is in the second emulator; the app asks for it as messaging. */}}
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging-2") | quote }}
+{{- /* Its mediator holds the Deliver handler too, so it has the Driver app's transit container as its screens do. */}}
+- name: ConnectionStrings__driver-app-blobs
+  value: {{ include "norvia.azuriteConnectionString" . | quote }}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+- name: Reset__QuietSubscriptions__0
+  value: driver-app-events/driver-reports
+- name: Reset__Enabled
+  value: "true"
+{{- /* The credential its Trip endpoint asks the Trip dispatch worker for: only that key of the Secret, not all of it. */}}
+- name: DriverEndpoint__ApiKey
+  valueFrom:
+    secretKeyRef:
+      name: endpoint-keys
+      key: DriverEndpoint__ApiKey
+- name: Authentication__Schemes__Bearer__ValidIssuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: Authentication__Schemes__Bearer__ValidAudiences__0
+  value: {{ include "norvia.token" (dict "root" . "name" "DriverAppAudience") | quote }}
+- name: Authentication__Schemes__Bearer__SigningKeys__0__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+{{ include "norvia.signingKeyEnv" "Authentication__Schemes__Bearer__SigningKeys__0__Value" }}
+{{ include "norvia.localAuthEnv" . }}
+{{- end }}
+{{- define "driver-app-web.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "driver-app") }}
+- name: ConnectionStrings__driver-app-blobs
+  value: {{ include "norvia.azuriteConnectionString" . | quote }}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+{{- /* Locally the sign-in page lists the seeded Drivers and signs the chosen one in (there is no Easy Auth, ADR 0037). */}}
+- name: LocalSignIn__Enabled
+  value: "true"
+{{ include "norvia.localAuthEnv" . }}
+{{- end }}

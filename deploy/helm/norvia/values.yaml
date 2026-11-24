@@ -238,6 +238,18 @@ apps:
     resources:
       requests: { cpu: 100m, memory: 256Mi }
       limits: { memory: 768Mi }
+  driver-app-api:
+    image: driver-app-api
+    host: driver-app-api
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
+  driver-app-web:
+    image: driver-app-web
+    host: driver-app-web
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
   partner-api:
     image: partner-api
     host: partner-api
