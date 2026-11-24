@@ -12,6 +12,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git jq tar xz-utils sudo docker.io iptables \
     && rm -rf /var/lib/apt/lists/*
 
+# Trust for the homelab CA that signs git.home.arpa (Forgejo and its registry). The job container does not inherit the host's trust, so without it
+# `dotnet publish /t:PublishContainer` fails with CONTAINER1013 (SSL connection could not be established). Only the public certificate lives here.
+# update-ca-certificates installs it into the system bundle, which .NET and curl read. Replace the file when the CA is rotated and rebuild the image.
+COPY .forgejo/runner-image/homelab-ca.crt /usr/local/share/ca-certificates/homelab-ca.crt
+RUN update-ca-certificates
+
 # PowerShell first, because the install script is PowerShell. The same two steps as .devcontainer/Dockerfile; yq comes with the rest of the manifest.
 COPY infra/tool-versions.psd1 /tmp/tool-versions.psd1
 COPY infra/install-powershell.sh /tmp/install-powershell.sh
