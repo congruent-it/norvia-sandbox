@@ -183,7 +183,7 @@ The job reports `forgejo/image (tms-api)` to the commit on GitHub. It uses the s
 
 **Check it.** Push a branch named `image/check-images`, then:
 
-1. `forgejo/image (<name>)` goes to `success` on the commit, for each image in `images.yml`. A certificate error at `Publish the image` means the job image does not trust `git.home.arpa`.
+1. `forgejo/image (<name>)` goes to `success` on the commit, for each image in `images.yml`. A certificate error at `Publish the image` means the job image does not trust `git.home.arpa`: the image bakes in the homelab CA from `.forgejo/runner-image/homelab-ca.crt`, so replace that file when the CA is rotated and rebuild the image with `runner-image.yml`.
 2. Each package, tagged with the first 7 characters of the commit, is listed on the registry's packages page.
 3. From a node of the cluster: `docker pull git.home.arpa/smirking_squiggly/tms-api:<sha>` (or `crictl pull`), and the image is `linux/amd64`.
 4. `helm template norvia deploy/helm/norvia --set image.registry=git.home.arpa/smirking_squiggly --set image.tag=<sha> --set edge.baseDomain=norvia.test` names `git.home.arpa/smirking_squiggly/<name>:<sha>` for the migrations images, the workers, `partner-api` and (with `--set agents.enabled=true`) `agent-mcp`; the API and web images join them when the chart slices that deploy them land (#1017, #1018, #1019 and later) (`infra/image-workflow.Tests.ps1` checks the shape, and that every image the chart names under the registry has a caller).
