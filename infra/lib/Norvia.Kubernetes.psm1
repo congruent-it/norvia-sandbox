@@ -152,8 +152,8 @@ function Get-SmokeApplications {
 function Get-IsolationTargets {
     <# .SYNOPSIS What no other namespace may reach (#938): every application, SQL Server and the two Service Bus emulators, as host:port from another namespace. #>
     param([Parameter(Mandatory)][string] $Namespace, [switch] $Agents)
-    $targets = @(Get-SmokeApplications -Agents:$Agents | ForEach-Object { , @($_, 8080) }) + @(, @('sql', 1433)) + @(, @('messaging', 5672)) + @(, @('messaging-2', 5672))
-    foreach ($target in $targets) { "$($target[0]).$Namespace.svc.cluster.local:$($target[1])" }
+    $targets = @(Get-SmokeApplications -Agents:$Agents | ForEach-Object { "${_}:8080" }) + 'sql:1433', 'messaging:5672', 'messaging-2:5672'
+    foreach ($target in $targets) { $service, $port = $target -split ':'; "$service.$Namespace.svc.cluster.local:$port" }
 }
 
 function Test-PrivateRange {
@@ -172,6 +172,22 @@ function Test-PrivateRange {
     $false
 }
 
+function Get-IngressAllowedRanges {
+    <# .SYNOPSIS The ranges an Ingress admits, from the chart's Traefik middleware or ingress-nginx's whitelist; empty when it names neither. #>
+    param([Parameter(Mandatory)][string] $Namespace, [Parameter(Mandatory)][string] $Application)
+    $ingress = Invoke-Kubectl get ingress $Application --namespace $Namespace --output json | ConvertFrom-Json -AsHashtable
+    $annotations = $ingress.metadata.annotations ?? @{}
+    # Each entry is <namespace>-<middleware>@kubernetescrd; the namespace may hold hyphens.
+    $reference = @($annotations['traefik.ingress.kubernetes.io/router.middlewares'] -split ',') | Where-Object { $_ -match '^(?<namespace>.+)-internal-only@kubernetescrd$' } | Select-Object -First 1
+    if ($reference) {
+        $middleware = Invoke-Kubectl get middlewares.traefik.io internal-only --namespace $Matches.namespace --output json | ConvertFrom-Json -AsHashtable
+        return @($middleware.spec.ipAllowList.sourceRange)
+    }
+    $whitelist = $annotations['nginx.ingress.kubernetes.io/whitelist-source-range']
+    if ($whitelist) { return @($whitelist -split ',' | ForEach-Object { $_.Trim() }) }
+    @()
+}
+
 function Assert-IngressInternal {
     <#
     .SYNOPSIS Throws unless an Ingress is restricted to the private ranges (#938): the chart's Traefik middleware or ingress-nginx's whitelist.
@@ -181,19 +197,8 @@ function Assert-IngressInternal {
         With edge.internal.controller=none the restriction is the cluster's own (an internal ingress class), which this cannot read.
     #>
     param([Parameter(Mandatory)][string] $Namespace, [Parameter(Mandatory)][string] $Application)
-    $ingress = Invoke-Kubectl get ingress $Application --namespace $Namespace --output json | ConvertFrom-Json -AsHashtable
-    $annotations = $ingress.metadata.annotations ?? @{}
-    $ranges = $null
-    $middlewares = $annotations['traefik.ingress.kubernetes.io/router.middlewares']
-    $whitelist = $annotations['nginx.ingress.kubernetes.io/whitelist-source-range']
-    # Each entry is <namespace>-<middleware>@kubernetescrd; the namespace may hold hyphens.
-    $reference = @($middlewares -split ',') | Where-Object { $_ -match '^(?<namespace>.+)-internal-only@kubernetescrd$' } | Select-Object -First 1
-    if ($reference) {
-        $middleware = Invoke-Kubectl get middlewares.traefik.io internal-only --namespace $Matches.namespace --output json | ConvertFrom-Json -AsHashtable
-        $ranges = @($middleware.spec.ipAllowList.sourceRange)
-    }
-    elseif ($whitelist) { $ranges = @($whitelist -split ',' | ForEach-Object { $_.Trim() }) }
-    if (-not $ranges -or $ranges.Count -eq 0) { throw "the Ingress $Application is not restricted to the LAN or VPN: it names no internal-only middleware and no whitelist-source-range (edge.internal)" }
+    $ranges = @(Get-IngressAllowedRanges -Namespace $Namespace -Application $Application)
+    if ($ranges.Count -eq 0) { throw "the Ingress $Application is not restricted to the LAN or VPN: it names no internal-only middleware and no whitelist-source-range (edge.internal)" }
     $public = @($ranges | Where-Object { -not (Test-PrivateRange $_) })
     if ($public.Count -gt 0) { throw "the Ingress $Application admits $($public -join ', '), which is not a private range" }
 }
@@ -241,4 +246,4 @@ function Assert-Isolated {
     if ($reached.Count -gt 0) { throw "a pod in the namespace $ProbeNamespace reached $($reached -join ', '): the namespace is not isolated (does the cluster's CNI enforce NetworkPolicy?)" }
 }
 
-Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted, Get-SmokeApplications, Get-IsolationTargets, Test-PrivateRange, Assert-IngressInternal, Test-CanConnect, Assert-Isolated
+Export-ModuleMember -Function ConvertTo-Base64Url, Get-LocalToken, Get-IngressUrl, Test-SameStatus, Wait-ForValue, Invoke-SmokeStep, Invoke-Kubectl, Get-SecretValue, Invoke-Call, Format-Answer, Assert-Accepted, Get-SmokeApplications, Get-IsolationTargets, Test-PrivateRange, Get-IngressAllowedRanges, Assert-IngressInternal, Test-CanConnect, Assert-Isolated

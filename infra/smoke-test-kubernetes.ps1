@@ -25,9 +25,9 @@
     Before them, two checks of #938. The ingress check reads every application's Ingress and fails one that is not restricted to the
     private ranges (the chart's internal-only middleware, or ingress-nginx's whitelist); this script reaches the ingress from inside
     those ranges, so what it can check is what the controller is told. -SkipIngressCheck leaves it out, for `edge.internal.controller=none`,
-    where an internal ingress class is the restriction and cannot be read. The isolation check: a throwaway pod in a namespace it
-    creates for the purpose connects to every application, SQL Server and the two Service Bus emulators of the sandbox and is refused. It first connects from inside the sandbox's namespace,
-    so a probe that cannot run is not taken for a refusal. A cluster whose CNI does not enforce NetworkPolicy fails here, and
+    where an internal ingress class is the restriction and cannot be read.
+    The isolation check: a throwaway pod in a namespace it creates for the purpose connects to every application, SQL Server and the
+    two Service Bus emulators of the sandbox and is refused. It first connects from inside the sandbox's namespace, so a probe that cannot run is not taken for a refusal. A cluster whose CNI does not enforce NetworkPolicy fails here, and
     LocalAuth:Allowed must not be set on it. It needs to create and delete a namespace and run pods in it; -SkipIsolationCheck
     leaves it out, and the check then is yours.
 
