@@ -1,6 +1,6 @@
 # The Norvia chart
 
-Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1, infra/chart-tms.Tests.ps1, infra/chart-erp.Tests.ps1, infra/chart-driver-app.Tests.ps1, infra/chart-integration-console.Tests.ps1'`.
+Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1, infra/chart-tms.Tests.ps1, infra/chart-erp.Tests.ps1, infra/chart-driver-app.Tests.ps1, infra/chart-integration-console.Tests.ps1, infra/chart-partner-portal.Tests.ps1'`.
 
 ## The data tier (#926)
 
@@ -54,7 +54,7 @@ helm upgrade --install norvia deploy/helm/norvia -n norvia \
   --set image.registry=registry.example.org/norvia
 ```
 
-`localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. The other UIs (the Partner portal and the Simulator) are not in the chart yet: each joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (below) covers.
+`localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. Each UI joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (below) covers.
 
 ## The TMS (#1017)
 
@@ -65,7 +65,7 @@ helm upgrade --install norvia deploy/helm/norvia -n norvia \
 | `tms-web` | Signs in as the local operator: its own token for the API (`TmsApi__LocalTokens__*`, signed with the same key), behind `LocalAuth__Allowed`. It reads the `tms` database directly (the query side) and Azurite, and changes things only through `tms-api`. |
 | `localAuth.allowed` | `LocalAuth__Allowed` for every application that needs it (`true` by default; see `docs/operations/kubernetes.md`). |
 
-The smoke script (`infra/smoke-test-kubernetes.ps1`) is unchanged here: it reaches the TMS API through the ingress, and its own slice is #1022. Not given, because Azure sets them: Entra (`TmsApi__Entra__*`, `Authentication__Schemes__Bearer__Authority`), the as-found toggles and Application Insights. Not in this slice: the Agents' settings of the two applications (`Agents__*`), which come with `agents.enabled`; `tms-web`'s Partner portal link is the in-cluster address (`PartnerPortal__BaseAddress`) until the portal has an Ingress.
+The smoke script (`infra/smoke-test-kubernetes.ps1`) is unchanged here: it reaches the TMS API through the ingress, and its own slice is #1022. Not given, because Azure sets them: Entra (`TmsApi__Entra__*`, `Authentication__Schemes__Bearer__Authority`), the as-found toggles and Application Insights. Not in this slice: the Agents' settings of the two applications (`Agents__*`), which come with `agents.enabled`.
 
 ## The ERP (#1018)
 
@@ -83,6 +83,19 @@ The smoke script (`infra/smoke-test-kubernetes.ps1`) is unchanged here: it reach
 
 The workers that call `erp-api` (Billing, Carrier cost, Shipper invoice, Carrier invoice and its outcome) now find it. Not given, because Azure sets them: Entra (`ErpApi__Entra__*`, the managed identity), the as-found toggles and Application Insights. Not in this slice: the Agents' settings of the two applications (`Agents__*`), which come with `agents.enabled`. The smoke script is unchanged here (its slice is #1022).
 
+## The Partner portal and the Simulator (#1021)
+
+| Piece | What it is |
+|---|---|
+| `partner-portal-web`, `simulator-web` | The Partner portal and the Simulator (`templates/partner-portal.yaml`), built as the other UIs are: a Deployment of one replica, a Service on `appPort` probed on `/health` and `/alive`, an internal-only Ingress at `<name>.<edge.baseDomain>`, and an init container that waits for the `partner-portal` or `simulator` migrations Job. Their settings are the AppHost's, under the same names (a template test compares them); the connection string is the chart's (`norvia.databaseEnv`). Both read the seed file their image carries. |
+| `partner-portal-web` | Plays every Persona (`personas` in `values.yaml`), calling the Partner API by its Service name with tokens it signs itself (`PartnerApi__LocalTokens__*`, the key of `local-tokens`), holding the roles of `personaRoles` (the `*Role` constants of `LocalTokens.cs`; a template test compares them). It takes `subscription-keys` and `endpoint-keys` whole as `envFrom`: a key per Persona for the Partner API, the credential each Persona's endpoint asks its caller for, and `ResetEndpoint__ApiKey`. The presenter panel switches the TMS's and the Driver app's faults through their Services as the portal's own identity (`Faults__*`), and the reset of the Simulator's Reset estate is on (`Reset__Enabled`). |
+| `simulator-web` | On, with the AppHost's caps (`Simulator__*`), and signing the operator in locally with both roles (`LocalOperator__*`, `localOperator.name`) behind `LocalAuth__Allowed`. It books through the Partner API as each Persona, and signs its own tokens for the TMS, Driver app and ERP APIs as `norvia-local-simulator` (`<API>__LocalTokens__*`). It reads only the keys it uses, by `secretKeyRef`: each Persona's subscription key, each Shipper's and Carrier's endpoint key (`PartnerPortal__ShipperEndpointKeys__*`, `PartnerPortal__CarrierEndpointKeys__*`) and the portal's reset key. |
+| `ResetEndpoint__ApiKey` in `endpoint-keys` | The key the portal's reset endpoint asks the Simulator for, generated and kept like the others. |
+
+With `agents.enabled`, both get `Agents__Enabled` (the Shipper tracking assistant and the personas agent, in process with the scripted fake). The links a person follows in a browser are the hostnames (`norvia.publicUrl`, `https` unless `edge.tls.enabled=false`): the Simulator's links to the TMS UI and the Integration console, the TMS UI's tracking link for a Consignee, and the link in the Consignee's email. The applications call each other by Service name. Not given, because Azure sets them: Entra, the managed identities, Easy Auth, the Driver sign-ins (`DriverSignIns__*`) and the Driver reports Logic App's Azure site.
+
+Not verified on a cluster: the Driver reports fault. The portal creates its flag file (`Faults__LogicApp__FlagPath`, in the portal's own `/tmp`) so the fault page works, but the Driver reports worker is another pod and does not see it, so switching that fault on does not stop the worker. Sharing the file needs a `ReadWriteMany` volume or a node-local one, which the chart does not assume. The smoke script is unchanged here (its slice is #1022).
+
 ## The Logic App workers (#929)
 
 | Piece | What it is |
@@ -90,7 +103,7 @@ The workers that call `erp-api` (Billing, Carrier cost, Shipper invoice, Carrier
 | `workers` in `values.yaml` | The 13 `Local*Worker` hosts, each a Deployment of one replica (`templates/workers.yaml`): its settings, the Service Bus emulator it reads (`messaging` or `messaging-2`, as the AppHost's `messaging` and `messagingEdge`), the application it calls (`tms` or `erp`), the client ID of its token identity and, for the five that call a Shipper's or Carrier's endpoint, the Persona endpoints. They are plain generic hosts, so they have no port and no probes; `carrier-invoice-worker` is the exception (the Partner API calls its HTTP trigger), with a Service and the `/health` and `/alive` probes. `workerResources` holds their requests and limits. |
 | `endpoint-keys` | Generated at install and kept on upgrade, like `subscription-keys`: the credential each Shipper's and Carrier's endpoint in the Partner portal asks its caller for, and the Driver app's Trip endpoint asks the Trip dispatch worker for. The keys are named as the settings that read them (`CarrierEndpoint__ApiKeys__CAR-0001`, `ShipperEndpoint__ApiKeys__SHP-0001`, `DriverEndpoint__ApiKey`), so the Partner portal and the Driver app take the Secret as `envFrom` and a worker reads its key with `secretKeyRef`. |
 
-Every worker signs its tokens with `local-tokens/signing-key`. The workers call `tms-api`, `erp-api`, `driver-app-api` and `partner-portal-web` by the AppHost's resource names; `erp-api` and `driver-app-api` are in the chart, but `partner-portal-web` is not yet, so until it is a worker that calls it starts and retries. Not in this slice: the Driver reports worker's disabled flag (`DriverReports__DisabledFlagPath`), a file the Partner portal's fault page creates in the AppHost's temp directory. It is unset here, so the worker never reads as disabled; it needs a volume shared with the Partner portal, which comes with that application.
+Every worker signs its tokens with `local-tokens/signing-key`. The workers call `tms-api`, `erp-api`, `driver-app-api` and `partner-portal-web` by the AppHost's resource names; All four are in the chart. Not given: the Driver reports worker's disabled flag (`DriverReports__DisabledFlagPath`), a file the Partner portal's fault page creates in the AppHost's temp directory. It is unset here, so the worker never reads as disabled (see the Partner portal below).
 
 ## Telemetry phase 1: the standalone Aspire dashboard (#931)
 

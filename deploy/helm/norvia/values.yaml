@@ -161,7 +161,7 @@ namespace:
 
 # What Norvia may use of a cluster others share (#938): a ResourceQuota for the namespace, and a LimitRange that gives the containers that name
 # no requests or limit (the init containers) small ones, which a quota on requests needs. Sized for what the chart deploys, the migrations Jobs
-# running at once, and about ten more applications (the other UIs, which are not in the chart yet; the console and the Health check are); a template test fails
+# running at once, and about ten more applications (the Partner portal and the Simulator are in; the rest is headroom); a template test fails
 # when the chart outgrows it. There are no CPU limits (a CPU limit throttles, and the chart sets none), so none in the quota. Off, a cluster
 # that sets its own quotas and limits is not given a second set.
 quota:
@@ -267,6 +267,18 @@ apps:
     resources:
       requests: { cpu: 100m, memory: 256Mi }
       limits: { memory: 768Mi }
+  partner-portal-web:
+    image: partner-portal-web
+    host: partner-portal-web
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
+  simulator-web:
+    image: simulator-web
+    host: simulator-web
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
   partner-api:
     image: partner-api
     host: partner-api
@@ -289,6 +301,16 @@ personas:
   - { id: kessler-spedition, type: Carrier, party: CAR-0002 }
   - { id: pakketpunt-express, type: Carrier, party: CAR-0003 }
 
+# The app roles each Persona holds on the Partner API, by the application that signs its tokens and the Persona's type (the values of the
+# *Role constants of LocalTokens.cs; the template test compares them). The Simulator books as a Shipper and plays a Carrier in full.
+personaRoles:
+  partner-portal-web:
+    Shipper: [TransportOrders.Submit, Tracking.Read, TransportOrders.Draft]
+    Carrier: [CarrierBookings.Respond, Tracking.Submit, ProofsOfDelivery.Submit, CarrierInvoices.Submit]
+  simulator-web:
+    Shipper: [TransportOrders.Submit]
+    Carrier: [CarrierBookings.Respond, Tracking.Submit, ProofsOfDelivery.Submit, CarrierInvoices.Submit]
+
 # The constants of src/Norvia.AppHost/LocalTokens.cs that the chart's applications are given, under the same names (a template test
 # compares each). The token-signing key is not here: it is generated at install and kept in the Secret local-tokens.
 localTokens:
@@ -298,6 +320,8 @@ localTokens:
   PartnerApiAudience: api://norvia-partner-api
   CarrierInvoiceTriggerAudience: api://norvia-carrier-invoice-logic-app
   TmsUiClientId: norvia-local-tms-ui
+  SimulatorClientId: norvia-local-simulator
+  PartnerPortalClientId: norvia-local-partner-portal
   ErpUiClientId: norvia-local-erp-ui
   IntakeLogicAppClientId: norvia-local-intake-logic-app
   AnswerLogicAppClientId: norvia-local-answer-logic-app

@@ -2,7 +2,7 @@
   The Logic App workers (#929, ADR 0030 onwards): one Deployment of one replica each, with the settings, credentials and token key the
   AppHost gives it under Aspire. A worker is a plain generic host, so it is not probed and has no Service; carrier-invoice-worker is the
   exception, as the Partner API calls its HTTP trigger. They call the applications by Service name (tms-api, erp-api, driver-app-api,
-  partner-portal-web), which the chart's later slices deploy; until then a worker retries.
+  partner-portal-web).
 */ -}}
 {{- range $name, $worker := .Values.workers }}
 {{- $env := include "worker.env" (dict "root" $ "name" $name "worker" $worker) }}
@@ -33,9 +33,9 @@
 {{ include "norvia.tokenEnv" (dict "root" $root "prefix" "CarrierInvoice__Trigger" "audience" "CarrierInvoiceTriggerAudience" "clientId" "ApiManagementClientId") }}
 {{- end }}
 {{- if eq .name "consignee-notification-worker" }}
-{{- /* The link in the email is on the Partner portal. The chart has no ingress for the portal yet, so it is the in-cluster address until it has. */}}
+{{- /* The link in the email opens on the Partner portal, in the Consignee's browser: its hostname, not the Service. */}}
 - name: ConsigneeNotification__PartnerPortalBaseAddress
-  value: {{ include "norvia.url" (dict "root" $root "name" "partner-portal-web") | quote }}
+  value: {{ include "norvia.publicUrl" (dict "root" $root "app" "partner-portal-web") | quote }}
 {{- end }}
 {{- if eq .name "trip-dispatch-worker" }}
 - name: TripDispatch__DriverApp__Address
