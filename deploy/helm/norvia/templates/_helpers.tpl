@@ -172,12 +172,15 @@ resources:
   A one-replica Deployment of an application, with the shared container parts. env is the rendered list of its environment
   variables; secrets names the Secrets it takes as envFrom:
     {{ include "norvia.deployment" (dict "root" . "name" "partner-api" "env" $env "secrets" (list "subscription-keys")) }}
+  An application that waits for migrations passes "waitFor" (list "tms"): the pod runs as migrations-waiter, is labelled for the network policy
+  and has an init container per Job (norvia.waitForMigrations).
   A worker passes its own settings as "app" (image, resources), and "http" false when it serves nothing (a plain generic host: no
   port, no probes).
 */}}
 {{- define "norvia.deployment" -}}
 {{- $app := .app | default (index .root.Values.apps .name) -}}
 {{- $http := ternary .http true (hasKey . "http") -}}
+{{- $waitsForMigrations := or .waitsForMigrations .waitFor -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -194,15 +197,19 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ .name }}
-        {{- if .waitsForMigrations }}
+        {{- if $waitsForMigrations }}
         # What the network policy allow-api-server selects: the waiter's kubectl needs the API server.
         norvia.io/waits-for-migrations: "true"
         {{- end }}
     spec:
-      {{- include "norvia.podAccount" (dict "waitsForMigrations" .waitsForMigrations) | nindent 6 }}
+      {{- include "norvia.podAccount" (dict "waitsForMigrations" $waitsForMigrations) | nindent 6 }}
       {{- if .root.Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml .root.Values.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      {{- if .waitFor }}
+      initContainers:
+        {{- include "norvia.waitForMigrations" (dict "root" .root "names" .waitFor) | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ .name }}
@@ -256,7 +263,7 @@ http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.otlpGrpc }}
 
 {{/* The applications that get an Ingress, as a JSON array: {{ range include "norvia.exposedApplications" . | fromJsonArray }}. An application the chart deploys later is added here, and so is let through by the network policy. */}}
 {{- define "norvia.exposedApplications" -}}
-{{- $exposed := list "partner-api" -}}
+{{- $exposed := list "partner-api" "tms-api" "tms-web" -}}
 {{- if .Values.agents.enabled }}{{ $exposed = append $exposed "agent-mcp" }}{{ end -}}
 {{ toJson $exposed }}
 {{- end }}
@@ -298,4 +305,25 @@ serviceAccountName: migrations-waiter
 serviceAccountName: norvia
 automountServiceAccountToken: false
 {{- end }}
+{{- end }}
+
+{{/*
+  The settings an application reads a database of the sql StatefulSet with, as the migrations Jobs do: the sa login.
+    {{- include "norvia.databaseEnv" (dict "database" "tms") | nindent 0 }}
+  The connection string names MSSQL_SA_PASSWORD, which Kubernetes expands only when it is defined above, so the two stay together.
+*/}}
+{{- define "norvia.databaseEnv" -}}
+- name: MSSQL_SA_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: sql
+      key: sa-password
+- name: ConnectionStrings__{{ .database }}
+  value: "Server=sql,1433;Database={{ .database }};User ID=sa;Password=$(MSSQL_SA_PASSWORD);TrustServerCertificate=true"
+{{- end }}
+
+{{/* LocalAuth:Allowed, from the chart's localAuth.allowed (#930, ADR 0053), for every application that has a local sign-in or trusts the local key. */}}
+{{- define "norvia.localAuthEnv" -}}
+- name: LocalAuth__Allowed
+  value: {{ .Values.localAuth.allowed | quote }}
 {{- end }}
