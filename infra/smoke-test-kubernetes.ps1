@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 <#
 .SYNOPSIS
-    Post-deploy smoke run of the sandbox on Kubernetes (#932, ADR 0053, not in CI): a booking, tracking and a Proof of delivery.
+    Post-deploy smoke run of the sandbox on Kubernetes (#932, ADR 0053, not in CI): every application, then a booking, tracking and a Proof of delivery.
 .DESCRIPTION
     Run it after every `helm upgrade --install` of deploy/helm/norvia, from anywhere that can reach the cluster's ingress and
     has kubectl pointed at it:
@@ -10,7 +10,9 @@
 
     It drives one Shipment from booking to delivery through the ingress hostnames, as the Personas would, and fails loudly with
     the step that broke:
-      1. the Partner API and the TMS API answer on their ingress hostnames (TLS from cert-manager, routed by the controller);
+      1. every application the chart deploys (Get-SmokeApplications: the Partner API, the TMS, ERP and Driver app APIs and UIs, the Integration
+         console, the Estate health check, the Partner portal and the Simulator) answers /health on its ingress hostname (TLS from
+         cert-manager, routed by the controller), and none is skipped for being missing: the first that does not answer fails the run;
       2. Brouwer Dranken books Rotterdam to Dusseldorf through the Partner API and is given a Transport Order number;
       3. the Transport Order reaches the TMS, which is told, as the Planner, to assign it to Van Dijk Transport and release it
          (a Carrier booking number comes back); the booking worker needs only the Service Bus emulators for that;
@@ -20,20 +22,20 @@
          Shipment moves through Collected, In transit and Delivered (the tracking queue and the tracking worker);
       6. Van Dijk Transport sends a Proof of delivery, accepted (202 Accepted), and Brouwer Dranken reads it on its
          Transport Order, with its file, through the Partner API (Azurite, the queue and the Proof of delivery worker).
-    Before them, an isolation check (#938): a throwaway pod in a namespace it creates for the purpose connects to the Partner API, SQL
-    Server and the two Service Bus emulators of the sandbox and is refused. It first connects from inside the sandbox's namespace,
-    so a probe that cannot run is not taken for a refusal. A cluster whose CNI does not enforce NetworkPolicy fails here, and
+    Before them, two checks of #938. The ingress check reads every application's Ingress and fails one that is not restricted to the
+    private ranges (the chart's internal-only middleware, or ingress-nginx's whitelist); this script reaches the ingress from inside
+    those ranges, so what it can check is what the controller is told. -SkipIngressCheck leaves it out, for `edge.internal.controller=none`,
+    where an internal ingress class is the restriction and cannot be read.
+    The isolation check: a throwaway pod in a namespace it creates for the purpose connects to every application, SQL Server and the
+    two Service Bus emulators of the sandbox and is refused. It first connects from inside the sandbox's namespace, so a probe that cannot run is not taken for a refusal. A cluster whose CNI does not enforce NetworkPolicy fails here, and
     LocalAuth:Allowed must not be set on it. It needs to create and delete a namespace and run pods in it; -SkipIsolationCheck
     leaves it out, and the check then is yours.
-    A step that needs an application the chart does not deploy yet (the TMS API, the Partner portal) fails with that
-    application's own error until it is deployed; that is the check.
 
     No Azure and no Entra: the script signs the Personas' and the Planner's tokens itself, with the key the chart keeps in the
     Secret local-tokens, as the local stand-ins do, and takes the subscription keys from the Secret subscription-keys. It
     therefore needs `kubectl get secret` rights in the namespace. It prints only what the checks need: never a body, a
     token or a key. It books a new Transport Order on every run and leaves it behind; the sandbox is rebuilt from its seed file.
-    Not covered here: that a Message trail of the run is found in the Aspire dashboard (the Integration console is not in the
-    chart yet), which comes with it.
+    Not covered here: that a Message trail of the run is found in the Aspire dashboard.
 .PARAMETER BaseDomain
     The chart's edge.baseDomain. Left out, it is read from the Ingress of the Partner API.
 .PARAMETER Namespace
@@ -45,6 +47,10 @@
 .PARAMETER ProbeImage
     The image of the isolation check's probe pods: one with /agnhost, the Kubernetes e2e test image. Set it to a mirror when the
     cluster cannot pull from registry.k8s.io.
+.PARAMETER Agents
+    The chart is installed with agents.enabled: the MCP stand-in (agent-mcp) is one more application to reach and to isolate.
+.PARAMETER SkipIngressCheck
+    Leave out the check that every Ingress is restricted to the private ranges.
 .PARAMETER SkipIsolationCheck
     Leave out the check that a pod in another namespace is refused.
 .PARAMETER TimeoutSeconds
@@ -57,6 +63,8 @@ param(
     [switch] $Insecure,
     [switch] $SkipCertificateCheck,
     [string] $ProbeImage = 'registry.k8s.io/e2e-test-images/agnhost:2.47',
+    [switch] $Agents,
+    [switch] $SkipIngressCheck,
     [switch] $SkipIsolationCheck,
     [ValidateRange(5, 3600)][int] $TimeoutSeconds = 180
 )
@@ -84,6 +92,7 @@ if (-not $BaseDomain) {
 }
 $partnerApi = Get-IngressUrl -Application 'partner-api' -BaseDomain $BaseDomain -Insecure:$Insecure
 $tms = Get-IngressUrl -Application 'tms-api' -BaseDomain $BaseDomain -Insecure:$Insecure
+$applications = @(Get-SmokeApplications -Agents:$Agents)
 Write-Host "Partner API: $partnerApi"
 Write-Host "TMS API: $tms"
 
@@ -99,9 +108,9 @@ Invoke-SmokeStep 'Read the signing key and the Personas'' subscription keys from
 if ($SkipIsolationCheck) { Write-Host 'Skipped: a pod in another namespace is refused (-SkipIsolationCheck)' }
 else {
     $probeNamespace = "norvia-probe-$run".ToLowerInvariant()
-    Invoke-SmokeStep "A pod in another namespace ($probeNamespace) is refused by the Partner API, SQL Server and the Service Bus emulators" {
+    Invoke-SmokeStep "A pod in another namespace ($probeNamespace) is refused by all $($applications.Count) applications, SQL Server and the Service Bus emulators" {
         Invoke-Kubectl create namespace $probeNamespace | Out-Null
-        try { Assert-Isolated -Namespace $Namespace -ProbeNamespace $probeNamespace -Target (Get-IsolationTargets -Namespace $Namespace) -Image $ProbeImage }
+        try { Assert-Isolated -Namespace $Namespace -ProbeNamespace $probeNamespace -Target (Get-IsolationTargets -Namespace $Namespace -Agents:$Agents) -Image $ProbeImage }
         finally { Invoke-Kubectl delete namespace $probeNamespace --wait=false | Out-Null }
     } | Out-Null
 }
@@ -131,11 +140,21 @@ function Wait-ForShipmentStatus([string] $ShipmentNumber, [string] $Status, [str
     }
 }
 
-# 1. The ingress routes to both applications. Waits for a cold ingress or certificate, so a missing application takes the timeout to fail.
-Invoke-SmokeStep 'The Partner API and the TMS API answer on their ingress hostnames' {
-    foreach ($app in @(@{ Name = 'Partner API'; Url = $partnerApi }, @{ Name = 'TMS API'; Url = $tms })) {
-        $null = Wait-ForValue -Description "the $($app.Name) to answer /health at $($app.Url)" -Condition {
-            try { $answer = Invoke-Call GET "$($app.Url)/health"; if ($answer.Status -eq 200) { $answer } else { $script:lastError = Format-Answer $answer } } catch { $script:lastError = $_.Exception.Message }
+# 0. Every Ingress is restricted to the LAN or VPN (#938): what no address outside the allowed ranges is let through is the controller's, so
+# the script reads what the controller is told, for every application the chart exposes.
+if ($SkipIngressCheck) { Write-Host 'Skipped: every Ingress is restricted to the private ranges (-SkipIngressCheck)' }
+else {
+    Invoke-SmokeStep "All $($applications.Count) Ingresses admit only the private ranges" {
+        foreach ($application in $applications) { Assert-IngressInternal -Namespace $Namespace -Application $application }
+    } | Out-Null
+}
+
+# 1. The ingress routes to every application, none skipped. Waits for a cold ingress or certificate, so a missing application takes the timeout to fail.
+Invoke-SmokeStep "All $($applications.Count) applications answer on their ingress hostnames: $($applications -join ', ')" {
+    foreach ($application in $applications) {
+        $url = Get-IngressUrl -Application $application -BaseDomain $BaseDomain -Insecure:$Insecure
+        $null = Wait-ForValue -Description "$application to answer /health at $url" -Condition {
+            try { $answer = Invoke-Call GET "$url/health"; if ($answer.Status -eq 200) { $answer } else { $script:lastError = Format-Answer $answer } } catch { $script:lastError = $_.Exception.Message }
         } -Describe { $script:lastError }
     }
 } | Out-Null

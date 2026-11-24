@@ -195,18 +195,89 @@ Describe 'Get-SecretValue' {
     }
 }
 
-Describe 'Get-IsolationTargets' {
-    It 'names the Partner API, SQL Server and the two Service Bus emulators by their address from another namespace' {
-        Get-IsolationTargets -Namespace 'norvia' | Should -Be @(
-            'partner-api.norvia.svc.cluster.local:8080'
-            'sql.norvia.svc.cluster.local:1433'
-            'messaging.norvia.svc.cluster.local:5672'
-            'messaging-2.norvia.svc.cluster.local:5672'
-        )
+Describe 'Get-SmokeApplications' {
+    It 'lists every application the chart gives an Ingress, the Partner API first' {
+        Get-SmokeApplications | Should -Be @('partner-api', 'tms-api', 'tms-web', 'erp-api', 'erp-web', 'driver-app-api', 'driver-app-web', 'integration-console-web', 'health-check-web', 'partner-portal-web', 'simulator-web')
     }
 
-    It 'follows the namespace' {
+    It 'adds the agent MCP stand-in when the Agents are on' {
+        Get-SmokeApplications -Agents | Select-Object -Last 1 | Should -Be 'agent-mcp'
+    }
+}
+
+Describe 'Get-IsolationTargets' {
+    It 'names SQL Server, the two Service Bus emulators and every application by their address from another namespace' {
+        $targets = @(Get-IsolationTargets -Namespace 'norvia')
+        $targets | Should -Contain 'sql.norvia.svc.cluster.local:1433'
+        $targets | Should -Contain 'messaging.norvia.svc.cluster.local:5672'
+        $targets | Should -Contain 'messaging-2.norvia.svc.cluster.local:5672'
+        foreach ($app in Get-SmokeApplications) { $targets | Should -Contain "$app.norvia.svc.cluster.local:8080" }
+    }
+
+    It 'starts with the Partner API, which the probe inside the namespace connects to first' {
         Get-IsolationTargets -Namespace 'sandbox-2' | Select-Object -First 1 | Should -Be 'partner-api.sandbox-2.svc.cluster.local:8080'
+    }
+
+    It 'names the agent MCP stand-in only when asked' {
+        Get-IsolationTargets -Namespace 'norvia' | Should -Not -Contain 'agent-mcp.norvia.svc.cluster.local:8080'
+        Get-IsolationTargets -Namespace 'norvia' -Agents | Should -Contain 'agent-mcp.norvia.svc.cluster.local:8080'
+    }
+}
+
+Describe 'Test-PrivateRange' {
+    It 'accepts <_>' -ForEach '10.1.2.0/24', '10.0.0.0/8', '172.16.0.0/12', '172.31.255.1', '192.168.0.0/16' { Test-PrivateRange $_ | Should -BeTrue }
+    It 'refuses <_>' -ForEach '0.0.0.0/0', '10.0.0.0/7', '10.0.0.0/1', '172.32.0.0/16', '172.16.0.0/11', '8.8.8.0/24', '192.169.0.0/16', '300.1.1.1', 'nonsense' { Test-PrivateRange $_ | Should -BeFalse }
+}
+
+Describe 'Assert-IngressInternal' {
+    AfterAll { Remove-Variable IngressAnswer, MiddlewareAnswer -Scope Global -ErrorAction SilentlyContinue }
+    BeforeAll {
+        $script:private = '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'
+        $script:traefik = @{ 'traefik.ingress.kubernetes.io/router.middlewares' = 'norvia-internal-only@kubernetescrd' }
+        # What the cluster answers: a global, because the mock body does not see the test's script scope.
+        function script:Set-Answers([hashtable] $Annotations, [string[]] $SourceRange = @()) {
+            $ingress = @{ metadata = @{ annotations = $Annotations } } | ConvertTo-Json -Depth 5 -Compress
+            $middleware = @{ spec = @{ ipAllowList = @{ sourceRange = $SourceRange } } } | ConvertTo-Json -Depth 5 -Compress
+            $global:IngressAnswer = $ingress; $global:MiddlewareAnswer = $middleware
+        }
+        Mock Invoke-Kubectl -ModuleName Norvia.Kubernetes { if (($Arguments -join ' ') -match '^get ingress') { $global:IngressAnswer } else { $global:MiddlewareAnswer } }
+    }
+
+    It 'passes an Ingress that names the internal-only middleware, whose ranges are private' {
+        Set-Answers $traefik $private
+        { Assert-IngressInternal -Namespace 'norvia' -Application 'tms-web' } | Should -Not -Throw
+        Should -Invoke Invoke-Kubectl -ModuleName Norvia.Kubernetes -ParameterFilter { ($Arguments -join ' ') -match 'middlewares.traefik.io internal-only --namespace norvia' }
+    }
+
+    It 'fails an Ingress with no restriction, naming it' {
+        Set-Answers @{}
+        { Assert-IngressInternal -Namespace 'norvia' -Application 'erp-web' } | Should -Throw '*erp-web*is not restricted*'
+    }
+
+    It 'fails when the middleware admits a public range' {
+        Set-Answers $traefik ($private + '0.0.0.0/0')
+        { Assert-IngressInternal -Namespace 'norvia' -Application 'tms-web' } | Should -Throw '*0.0.0.0/0*'
+    }
+
+    It 'accepts the whitelist annotation of ingress-nginx' {
+        Set-Answers @{ 'nginx.ingress.kubernetes.io/whitelist-source-range' = '10.0.0.0/8,192.168.0.0/16' }
+        { Assert-IngressInternal -Namespace 'norvia' -Application 'tms-web' } | Should -Not -Throw
+    }
+
+    It 'fails a range that only starts in a private block but is wider than it (10.0.0.0/1)' {
+        Set-Answers @{ 'nginx.ingress.kubernetes.io/whitelist-source-range' = '10.0.0.0/1' }
+        { Assert-IngressInternal -Namespace 'norvia' -Application 'tms-web' } | Should -Throw '*10.0.0.0/1*'
+    }
+
+    It 'reads the namespace of the middleware when it holds hyphens' {
+        Set-Answers @{ 'traefik.ingress.kubernetes.io/router.middlewares' = 'sandbox-team-a-internal-only@kubernetescrd' } $private
+        { Assert-IngressInternal -Namespace 'sandbox-team-a' -Application 'tms-web' } | Should -Not -Throw
+        Should -Invoke Invoke-Kubectl -ModuleName Norvia.Kubernetes -ParameterFilter { ($Arguments -join ' ') -match 'internal-only --namespace sandbox-team-a ' }
+    }
+
+    It 'fails an nginx whitelist that admits everyone' {
+        Set-Answers @{ 'nginx.ingress.kubernetes.io/whitelist-source-range' = '0.0.0.0/0' }
+        { Assert-IngressInternal -Namespace 'norvia' -Application 'tms-web' } | Should -Throw '*0.0.0.0/0*'
     }
 }
 
