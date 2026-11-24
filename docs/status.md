@@ -16,7 +16,7 @@ What the sandbox does today, area by area, and what is not built. Checked agains
 | Estate health check | Audits the estate's configuration and cost and reports Findings. Runs locally from a snapshot, and in Azure against the real estate | [applications/estate-health-check.md](applications/estate-health-check.md), [operations/estate-health-check.md](operations/estate-health-check.md) |
 | Agents | Integration operations, Estate health-check, Planner, Customer service, Intake, Carrier invoice matching, FinOps, Shipper tracking assistant and the Simulator personas. They read the estate through API Management MCP servers and have no write tools | [agents/README.md](../agents/README.md), [operations/foundry.md](operations/foundry.md) |
 
-The estate (API Management, Logic Apps, Service Bus, monitoring, Entra) deploys to Azure with `azd up`; locally the AppHost runs the applications and stand-ins for the Azure services.
+The estate (API Management, Logic Apps, Service Bus, monitoring, Entra) deploys to Azure with `azd up`; locally the AppHost runs the applications and stand-ins for the Azure services. The same local topology, with every application, also runs on a Kubernetes cluster from a Helm chart, checked by a smoke script ([operations/kubernetes.md](operations/kubernetes.md), [architecture/local-vs-azure.md](architecture/local-vs-azure.md)).
 
 ## Not built
 
@@ -39,4 +39,4 @@ The estate (API Management, Logic Apps, Service Bus, monitoring, Entra) deploys 
 | Retention and malware scanning for Proof of delivery | Deferred | [#921](https://github.com/congruent-it/norvia-sandbox/issues/921) |
 | Integration console panel for failures that never reach a Logic App | Deferred | [#922](https://github.com/congruent-it/norvia-sandbox/issues/922) |
 
-Also open, and optional: running the sandbox on Kubernetes ([#923](https://github.com/congruent-it/norvia-sandbox/issues/923)) and Dapr for messaging, resiliency and scheduled work ([#937](https://github.com/congruent-it/norvia-sandbox/issues/937), [#939](https://github.com/congruent-it/norvia-sandbox/issues/939), [#940](https://github.com/congruent-it/norvia-sandbox/issues/940)).
+Also open, and optional: Dapr for messaging, resiliency and scheduled work ([#937](https://github.com/congruent-it/norvia-sandbox/issues/937), [#939](https://github.com/congruent-it/norvia-sandbox/issues/939), [#940](https://github.com/congruent-it/norvia-sandbox/issues/940)).

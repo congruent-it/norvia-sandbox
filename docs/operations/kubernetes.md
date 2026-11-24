@@ -4,7 +4,7 @@ How to run the sandbox's local topology on a Kubernetes cluster, set the chart's
 
 The chart runs the **local topology**, not the Azure estate: no Azure account, Entra, Key Vault, Foundry or Application Insights, and the as-found toggles, the alerts and the real Estate health check stay Azure-only. Nodes must be amd64, because SQL Server and the Service Bus emulator have no ARM images.
 
-## What is in the chart today
+## What is in the chart
 
 ![Kubernetes: the local topology as pods in the norvia namespace](../architecture/diagrams/kubernetes.png)
 
@@ -12,7 +12,7 @@ The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernet
 
 In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the TMS, ERP and Driver app APIs and UIs, the Integration console and the Estate health check, the Partner portal and the Simulator, the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, an Ingress per exposed application, and the namespace's protection ([below](#the-namespace-is-closed-to-the-others)): a default-deny `NetworkPolicy`, an internal-only ingress, Secrets read by name, requests and limits on every pod, and a `ResourceQuota` with a `LimitRange`.
 
-Every application of the AppHost is in the chart: `tms-api`, `tms-web`, `erp-api`, `erp-web`, `driver-app-api`, `driver-app-web`, `integration-console-web`, `health-check-web`, `partner-portal-web` and `simulator-web`, each reached at `<name>.<baseDomain>`.
+Every application of the AppHost is in the chart: `tms-api`, `tms-web`, `erp-api`, `erp-web`, `driver-app-api`, `driver-app-web`, `integration-console-web`, `health-check-web`, `partner-portal-web` and `simulator-web`, each reached at `<name>.<baseDomain>`. They get the environment variables the AppHost gives them, under the same names, and a template test compares the two.
 
 ## Before you deploy
 
@@ -85,7 +85,7 @@ Pass `-Insecure` when the ingress is plain http, `-SkipCertificateCheck` for a s
 
 First it reads every application's Ingress and fails one that is not restricted to the private ranges (the chart's `internal-only` middleware, or the `whitelist-source-range` of ingress-nginx, with no public range in it). It can only read what the controller is told, because the script reaches the ingress from inside those ranges; with `edge.internal.controller=none` the restriction is your internal ingress class, which it cannot read, so pass `-SkipIngressCheck` and check it yourself. Then it checks the isolation: a throwaway pod in a namespace made for the run connects to every application (all 11, 12 with `-Agents`), SQL Server and the two emulators and must be refused (after the same pod, inside the sandbox's namespace, has connected, so a probe that cannot run is not mistaken for a refusal). The namespace is removed after. Then it waits for every application to answer `/health` on its hostname, with none skipped for being missing, and drives one Shipment from booking to delivery through the ingress: Brouwer Dranken books, the Planner assigns and releases, Van Dijk Transport confirms, sends PU, DEP and POD tracking events and a Proof of delivery, and Brouwer Dranken reads the Proof of delivery, its file and the tracking events back. It signs the tokens itself with `local-tokens/signing-key` and takes the keys from `subscription-keys`, so it needs `get` on those Secrets. It stops at the first failing step, naming it, with the status the application answered and never a body, token or key. Each run leaves one Transport Order behind.
 
-A pass settles what the chart's README lists as not verified: that the ingress controller and cert-manager route to every application, that every Ingress is restricted and every Service closed to another namespace, that two emulators share one SQL Server, and that the booking, tracking and Proof of delivery path works through the emulators and Azurite. It does not cover that the Aspire dashboard finds the run's trail, which the smoke script does not search for yet (its slice is #1022).
+A pass settles what the chart's README lists as not verified: that the ingress controller and cert-manager route to every application, that every Ingress is restricted and every Service closed to another namespace, that two emulators share one SQL Server, and that the booking, tracking and Proof of delivery path works through the emulators and Azurite. It does not cover that the Aspire dashboard finds the run's trail, because the smoke script does not search for it. Check it by hand: search the run's correlation ID on the Integration console's trail search (its home page).
 
 ## What goes wrong
 

@@ -121,8 +121,8 @@ specs["kubernetes"] = new GraphSpec
 {
     Title = "Kubernetes · The local topology as pods",
     Subtitle = "One namespace, norvia, on a shared cluster. The chart installs no ingress controller, issuer or storage class, and nothing in it reaches Azure (ADR 0053).",
-    Footnote = "Source of truth: deploy/helm/norvia/ (values.yaml and templates) and docs/adr/0053-kubernetes-runs-the-local-topology.md. Dashed: not in the chart yet.",
-    Legend = [L("Owned by the cluster", Cl), L("Integration layer, as under Aspire", Vi), L("Data", Bl), L("Telemetry and keys", "teal"), Palette.LegendPlanned("Not in the chart yet")],
+    Footnote = "Source of truth: deploy/helm/norvia/ (values.yaml and templates) and docs/adr/0053-kubernetes-runs-the-local-topology.md.",
+    Legend = [L("Owned by the cluster", Cl), L("Integration layer and applications, as under Aspire", Vi), L("Data", Bl), L("Telemetry and keys", "teal")],
     Cell = (390, 120),
     Nodes = [
         new GraphNode { Id = "person", Col = 0, Row = 0.4, Kind = "person", W = 240, Title = "Operator", Sub = "helm upgrade --install, the smoke script, a browser on the LAN or VPN" },
@@ -133,7 +133,7 @@ specs["kubernetes"] = new GraphSpec
         new GraphNode { Id = "mcp", Col = 1.3, Row = 1.5, Palette = Vi, W = 270, Title = "agent-mcp", Sub = "[Deployment] Only when agents.enabled. The Agents are scripted fakes" },
         new GraphNode { Id = "workers", Col = 1.3, Row = 2.6, Palette = Vi, W = 270, Title = "13 Local*Worker", Sub = "[Deployments, 1 replica each] One per Logic App. carrier-invoice-worker alone has a Service and probes" },
         new GraphNode { Id = "dash", Col = 1.3, Row = 3.8, Palette = "teal", W = 270, Title = "aspire-dashboard", Sub = "[Deployment] OTLP on 18889, in memory. The UI has no Ingress: kubectl port-forward" },
-        new GraphNode { Id = "apps", Col = 1.3, Row = 5.0, Kind = "planned", W = 270, Title = "TMS, ERP, Driver app, Partner portal, Simulator, Integration console", Sub = "The workers and the smoke script call them by name" },
+        new GraphNode { Id = "apps", Col = 1.3, Row = 5.0, Palette = Vi, W = 270, Title = "The applications", Sub = "[Deployments, an Ingress each] TMS, ERP, Driver app, Integration console, Estate health check, Partner portal, Simulator. Those with a database wait for its migrations" },
         new GraphNode { Id = "bus1", Col = 2.9, Row = 2.0, Palette = Vi, W = 290, Title = "messaging", Sub = "[Deployment, Service, ConfigMap] Service Bus emulator, 10 connections" },
         new GraphNode { Id = "bus2", Col = 2.9, Row = 0.4, Palette = Vi, W = 290, Title = "messaging-2", Sub = "[Deployment, Service, ConfigMap] The Driver app, ERP and Carrier tracking path topics and queues" },
         new GraphNode { Id = "sql", Col = 2.9, Row = 3.3, Palette = Bl, W = 290, Title = "sql", Sub = "[StatefulSet, PVC on the storage class] Five databases, and the emulators' state. No backup, no HA" },
