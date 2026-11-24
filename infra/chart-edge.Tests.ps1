@@ -213,6 +213,13 @@ Describe 'the ingress' -Skip:$script:helmMissing {
         $ingress.Text | Should -Match '(?s)name: partner-api\s+port:\s+name: http'
     }
 
+    It 'gives an Ingress to exactly the applications the smoke script runs through (Get-SmokeApplications)' {
+        Import-Module (Join-Path $script:root 'infra/lib/Norvia.Infra.psm1') -Force
+        Import-Module (Join-Path $script:root 'infra/lib/Norvia.Kubernetes.psm1') -Force
+        @($docs | Where-Object Kind -eq 'Ingress' | ForEach-Object Name | Sort-Object) | Should -Be @(Get-SmokeApplications | Sort-Object)
+        @($withAgents | Where-Object Kind -eq 'Ingress' | ForEach-Object Name | Sort-Object) | Should -Be @(Get-SmokeApplications -Agents | Sort-Object)
+    }
+
     It 'routes the MCP stand-in only when it is deployed' {
         Get-Doc $docs 'Ingress' 'agent-mcp' | Should -BeNullOrEmpty
         (Get-Doc $withAgents 'Ingress' 'agent-mcp').Text | Should -Match 'host: agent-mcp\.norvia\.test'
