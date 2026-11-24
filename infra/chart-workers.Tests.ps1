@@ -175,8 +175,8 @@ Describe 'the workers' -Skip:$script:helmMissing {
 Describe 'the endpoint keys' -Skip:$script:helmMissing {
     BeforeAll { $script:endpointKeys = Get-SecretData (Get-Doc $script:docs 'Secret' 'endpoint-keys') }
 
-    It 'has a key for each Shipper and Carrier and one for the Driver app, all different, under the names of the settings that read them' {
-        $names = @('DriverEndpoint__ApiKey') + @($seed.personas | ForEach-Object { "$($_.party.type)Endpoint__ApiKeys__$($_.party.id)" })
+    It 'has a key for each Shipper and Carrier, one for the Driver app and one for the Partner portal''s reset, all different, under the names of the settings that read them' {
+        $names = @('DriverEndpoint__ApiKey', 'ResetEndpoint__ApiKey') + @($seed.personas | ForEach-Object { "$($_.party.type)Endpoint__ApiKeys__$($_.party.id)" })
         $endpointKeys.Keys | Should -Be $names
         ($endpointKeys.Values | Select-Object -Unique).Count | Should -Be $names.Count
         $endpointKeys.Values | ForEach-Object { $_ | Should -Match '^[a-z0-9]{32}$' }

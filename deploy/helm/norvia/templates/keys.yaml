@@ -44,7 +44,8 @@ data:
 # What Key Vault holds in Azure: the credential each Shipper's and Carrier's endpoint in the Partner portal asks its caller for, and the
 # Driver app's Trip endpoint asks the Trip dispatch worker for. The names are the settings that read them, so the Partner portal and the
 # Driver app take the Secret as envFrom, and a worker reads its key with secretKeyRef. A Carrier's one key serves its booking, cancellation
-# and invoice outcome endpoints; a Shipper's, its notification and invoice endpoints.
+# and invoice outcome endpoints; a Shipper's, its notification and invoice endpoints. ResetEndpoint__ApiKey is the key the Partner portal's reset
+# endpoint asks the Simulator's Reset estate for (ADR 0039): the portal takes it as envFrom, the Simulator reads it as PartnerPortal__ResetApiKey.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -54,7 +55,7 @@ metadata:
     {{- include "norvia.labels" . | nindent 4 }}
 type: Opaque
 data:
-  {{- $names := list "DriverEndpoint__ApiKey" }}
+  {{- $names := list "DriverEndpoint__ApiKey" "ResetEndpoint__ApiKey" }}
   {{- range .Values.personas }}{{ $names = append $names (include "norvia.endpointKeyName" .) }}{{ end }}
   {{- range $name := $names }}
   {{- $value := "" }}

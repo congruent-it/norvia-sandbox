@@ -179,8 +179,8 @@ Describe 'tms-web' -Skip:$script:helmMissing {
         $env['LocalAuth__Allowed'] | Should -Be 'true'
     }
 
-    It 'links a Consignee to the Partner portal at the address the AppHost gives it, which is the in-cluster one until the portal has an ingress' {
-        $env['PartnerPortal__BaseAddress'] | Should -Be 'http://partner-portal-web:8080'
+    It 'links a Consignee to the Partner portal at its hostname, which a browser reaches (the AppHost gives it the portal''s endpoint)' {
+        $env['PartnerPortal__BaseAddress'] | Should -Be 'https://partner-portal-web.norvia.test'
     }
 
     It 'reads the seed file the image carries' {

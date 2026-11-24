@@ -84,6 +84,11 @@ Endpoint=sb://{{ .host }};SharedAccessKeyName=RootManageSharedAccessKey;SharedAc
 http://{{ .name }}:{{ .root.Values.appPort }}
 {{- end }}
 
+{{/* The address a browser reaches an application at, through its Ingress: {{ include "norvia.publicUrl" (dict "root" . "app" "tms-web") }}. For the links a person follows; the applications call each other by norvia.url. */}}
+{{- define "norvia.publicUrl" -}}
+{{ ternary "https" "http" .root.Values.edge.tls.enabled }}://{{ include "norvia.host" . }}
+{{- end }}
+
 {{/* The hostname of an application under the base domain: {{ include "norvia.host" (dict "root" . "app" "partner-api") }}. */}}
 {{- define "norvia.host" -}}
 {{- $app := index .root.Values.apps .app -}}
@@ -214,10 +219,12 @@ spec:
       containers:
         - name: {{ .name }}
           {{- include "norvia.appContainer" (dict "root" .root "app" $app "http" $http) | nindent 10 }}
-          {{- range .secrets | default list }}
+          {{- with .secrets }}
           envFrom:
+            {{- range . }}
             - secretRef:
                 name: {{ . }}
+            {{- end }}
           {{- end }}
           env:
             {{- include "norvia.otlpEnv" (dict "root" .root "name" .name) | nindent 12 }}
@@ -263,7 +270,7 @@ http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.otlpGrpc }}
 
 {{/* The applications that get an Ingress, as a JSON array: {{ range include "norvia.exposedApplications" . | fromJsonArray }}. An application the chart deploys later is added here, and so is let through by the network policy. */}}
 {{- define "norvia.exposedApplications" -}}
-{{- $exposed := list "partner-api" "tms-api" "tms-web" "erp-api" "erp-web" "driver-app-api" "driver-app-web" "integration-console-web" "health-check-web" -}}
+{{- $exposed := list "partner-api" "tms-api" "tms-web" "erp-api" "erp-web" "driver-app-api" "driver-app-web" "integration-console-web" "health-check-web" "partner-portal-web" "simulator-web" -}}
 {{- if .Values.agents.enabled }}{{ $exposed = append $exposed "agent-mcp" }}{{ end -}}
 {{ toJson $exposed }}
 {{- end }}

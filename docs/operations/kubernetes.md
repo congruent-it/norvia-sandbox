@@ -10,9 +10,9 @@ The chart runs the **local topology**, not the Azure estate: no Azure account, E
 
 The editable source is [kubernetes.excalidraw](../architecture/diagrams/kubernetes.excalidraw), generated from [deployment.cs](../architecture/diagrams/deployment.cs).
 
-In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the TMS, ERP and Driver app APIs and UIs, the Integration console and the Estate health check, the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, an Ingress per exposed application, and the namespace's protection ([below](#the-namespace-is-closed-to-the-others)): a default-deny `NetworkPolicy`, an internal-only ingress, Secrets read by name, requests and limits on every pod, and a `ResourceQuota` with a `LimitRange`.
+In the chart: SQL Server and Azurite on PVCs, the migrations as Jobs, the two Service Bus emulators, the Partner API stand-in (`LocalPartnerApi`) and the agent MCP stand-in (when `agents.enabled`), the TMS, ERP and Driver app APIs and UIs, the Integration console and the Estate health check, the Partner portal and the Simulator, the 13 `Local*Worker` Deployments, the standalone Aspire dashboard, an Ingress per exposed application, and the namespace's protection ([below](#the-namespace-is-closed-to-the-others)): a default-deny `NetworkPolicy`, an internal-only ingress, Secrets read by name, requests and limits on every pod, and a `ResourceQuota` with a `LimitRange`.
 
-Not in the chart yet: the other UIs (the Partner portal and the Simulator). The workers and the smoke script call them by name, so until they are deployed a worker that calls one starts and retries, and the smoke script fails at its first step that needs one, naming it. The TMS, the ERP, the Driver app, the Integration console and the Estate health check are in (`tms-api`, `tms-web`, `erp-api`, `erp-web`, `driver-app-api`, `driver-app-web`, `integration-console-web` and `health-check-web`, each reached at `<name>.<baseDomain>`).
+Every application of the AppHost is in the chart: `tms-api`, `tms-web`, `erp-api`, `erp-web`, `driver-app-api`, `driver-app-web`, `integration-console-web`, `health-check-web`, `partner-portal-web` and `simulator-web`, each reached at `<name>.<baseDomain>`.
 
 ## Before you deploy
 
@@ -44,7 +44,7 @@ The generated Secrets (`local-tokens`, `subscription-keys`, `endpoint-keys`, the
 | `image.registry`, `image.tag`, `image.pullSecrets` | Where the Norvia images come from. Empty registry: the image names are used as they are, which suits a cluster that has them loaded. |
 | `persistence.storageClass` | The storage class of every PVC. Empty: the cluster's default. |
 | `sql.saPassword` | Empty: generated. Must not contain a semicolon. |
-| `localAuth.allowed` | `LocalAuth:Allowed` for the applications that have a local sign-in or trust the local key (`tms-api`, `tms-web`, `erp-api`, `erp-web`, `driver-app-api`, `driver-app-web`). `true` by default; read [the section below](#localauthallowed) first. |
+| `localAuth.allowed` | `LocalAuth:Allowed` for the applications that have a local sign-in or trust the local key (`tms-api`, `tms-web`, `erp-api`, `erp-web`, `driver-app-api`, `driver-app-web`, `simulator-web`). `true` by default; read [the section below](#localauthallowed) first. |
 | `agents.enabled` | Off, as under Aspire. On, the Partner API runs the Intake agent's scripted fake and `agent-mcp` is deployed. No model is called either way. |
 
 The rest of `values.yaml` (the emulators' topics, the Personas, the token constants, the workers) repeats what the AppHost and the seed file hold, and the chart's template tests compare them: change one, change the other.
@@ -89,8 +89,8 @@ A pass settles what the chart's README lists as not verified: that the ingress c
 
 ## What goes wrong
 
-- **The smoke script fails at the Partner portal.** It is not in the chart yet. That is the expected result until they are. If it fails at the TMS or ERP API, look at `kubectl logs deploy/tms-api -n norvia` (or `erp-api`): an application that finds `LocalAuth:Allowed` off refuses to start.
+- **The smoke script fails at the Partner portal.** Look at `kubectl logs deploy/partner-portal-web -n norvia`: it stops at startup when a Persona has no key or client ID. If it fails at the TMS or ERP API, look at `kubectl logs deploy/tms-api -n norvia` (or `erp-api`): an application that finds `LocalAuth:Allowed` off refuses to start.
 - **A pod stays in `Init`.** Its init container waits for a migrations Job: `kubectl get jobs -n norvia`, then the Job's log.
 - **The dashboard's history is gone.** It keeps telemetry in memory and loses it on a restart. A rendered-without-lookup upgrade also changes its API key; restart the Integration console with it.
 - **Data is gone.** A lost SQL Server or Azurite volume is not backed up. Reinstall, and the seed file loads the Shippers, Carriers and Rate Cards again.
-- **The chart's template tests:** `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1, infra/chart-tms.Tests.ps1, infra/chart-erp.Tests.ps1, infra/chart-driver-app.Tests.ps1, infra/chart-integration-console.Tests.ps1'`. They run offline.
+- **The chart's template tests:** `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1, infra/chart-tms.Tests.ps1, infra/chart-erp.Tests.ps1, infra/chart-driver-app.Tests.ps1, infra/chart-integration-console.Tests.ps1, infra/chart-partner-portal.Tests.ps1'`. They run offline.

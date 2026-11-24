@@ -1,0 +1,150 @@
+{{- /*
+  The Partner portal and the Simulator (#1021): each a Deployment of one replica and a Service, behind the internal-only ingress (templates/ingress.yaml).
+  Their settings are those the AppHost gives them locally, under the same names (a template test compares them); what Azure sets (Entra, the managed
+  identities, Easy Auth, the Driver sign-ins, Application Insights) is not given. Each waits for its own migrations Job, as the AppHost's WaitForCompletion does.
+  Both sign every token they send themselves, with the key of the install (local-tokens/signing-key), as Entra would issue it to the Persona or the identity.
+  The keys they ask or are asked for are the install's (subscription-keys, endpoint-keys), so no key is in a values file.
+*/ -}}
+{{- $portalEnv := include "partner-portal-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "partner-portal-web" "env" $portalEnv "waitFor" (list "partner-portal") "secrets" (list "subscription-keys" "endpoint-keys")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "partner-portal-web") }}
+---
+{{- $simulatorEnv := include "simulator-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "simulator-web" "env" $simulatorEnv "waitFor" (list "simulator")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "simulator-web") }}
+{{- /* The Personas' client IDs, as PartnerApi:PersonaClientIds takes them: personaId=clientId pairs separated by semicolons. */}}
+{{- define "partner-portal.personaClientIds" -}}
+{{- $pairs := list -}}
+{{- range .Values.personas }}{{ $pairs = append $pairs (printf "%s=%s" .id (include "norvia.personaClientId" .id)) }}{{ end -}}
+{{ join ";" $pairs }}
+{{- end }}
+{{- /* The Persona's app roles on the Partner API, as the application that signs its tokens holds them: {{ include "partner-portal.personaRoles" (dict "root" . "app" "simulator-web") }}. */}}
+{{- define "partner-portal.personaRoles" -}}
+{{- $app := .app -}}
+{{- range $.root.Values.personas }}
+{{- $persona := . }}
+{{- range $index, $role := index $.root.Values.personaRoles $app $persona.type }}
+- name: PartnerApi__LocalTokens__Roles__{{ $persona.id }}__{{ $index }}
+  value: {{ $role | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- define "partner-portal-web.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "partner-portal") }}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+{{- /* Every Persona calls the Partner API, which plays API Management, with a token the portal signs itself (ADR 0023). */}}
+- name: PartnerApi__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "partner-api") }}/partner/v1
+- name: PartnerApi__PersonaClientIds
+  value: {{ include "partner-portal.personaClientIds" . | quote }}
+- name: PartnerApi__LocalTokens__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: PartnerApi__LocalTokens__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "PartnerApiAudience") | quote }}
+{{ include "norvia.signingKeyEnv" "PartnerApi__LocalTokens__SigningKey" }}
+{{ include "partner-portal.personaRoles" (dict "root" . "app" "partner-portal-web") }}
+{{- /* The presenter panel switches the faults the TMS and the Driver app own through their APIs, as the presenter: a token the portal signs itself. */}}
+- name: Faults__Owners__driver-app__Address
+  value: {{ include "norvia.url" (dict "root" . "name" "driver-app-api") | quote }}
+- name: Faults__Owners__driver-app__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "DriverAppAudience") | quote }}
+- name: Faults__Owners__tms__Address
+  value: {{ include "norvia.url" (dict "root" . "name" "tms-api") | quote }}
+- name: Faults__Owners__tms__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "TmsAudience") | quote }}
+- name: Faults__LocalTokens__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: Faults__LocalTokens__ClientId
+  value: {{ include "norvia.token" (dict "root" . "name" "PartnerPortalClientId") | quote }}
+{{ include "norvia.signingKeyEnv" "Faults__LocalTokens__SigningKey" }}
+{{- /* The Driver reports Logic App's disabled flag. The portal creates this file; the worker that plays the Logic App, in another pod, does not see it (see the README). */}}
+- name: Faults__LogicApp__FlagPath
+  value: /tmp/norvia-driver-reports-disabled
+{{- /* The Simulator's Reset estate calls the portal's reset endpoint with ResetEndpoint__ApiKey, which comes from endpoint-keys whole. */}}
+- name: Reset__Enabled
+  value: "true"
+{{- if .Values.agents.enabled }}
+{{- /* The Shipper tracking assistant (ADR 0049): in process, with the scripted fake. It has no tool and needs no token. */}}
+- name: Agents__Enabled
+  value: "true"
+{{- end }}
+{{- end }}
+{{- define "simulator-web.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "simulator") }}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+- name: Simulator__Enabled
+  value: "true"
+- name: Simulator__MaxOrdersPerRun
+  value: "500"
+- name: Simulator__MaxConcurrentRequests
+  value: "4"
+{{- /* There is no Easy Auth on a cluster: the operator is signed in locally, with both roles, behind LocalAuth:Allowed (ADR 0042, ADR 0053). */}}
+- name: LocalOperator__Name
+  value: {{ .Values.localOperator.name | quote }}
+- name: LocalOperator__Roles__0
+  value: Simulator.Run
+- name: LocalOperator__Roles__1
+  value: Simulator.Read
+{{ include "norvia.localAuthEnv" . }}
+{{- /* The links the presenter follows in a browser: the hostnames, not the Services. */}}
+- name: IntegrationConsole__Address
+  value: {{ include "norvia.publicUrl" (dict "root" . "app" "integration-console-web") | quote }}
+- name: TmsWeb__Address
+  value: {{ include "norvia.publicUrl" (dict "root" . "app" "tms-web") | quote }}
+{{- /* The estate's real doors, by Service name: the TMS API, the Driver app API and the ERP API as the Simulator, the Partner API as each Persona. */}}
+- name: TmsApi__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "tms-api") | quote }}
+- name: DriverApp__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "driver-app-api") | quote }}
+- name: ErpApi__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "erp-api") | quote }}
+- name: PartnerPortal__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "partner-portal-web") | quote }}
+- name: PartnerApi__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "partner-api") }}/partner/v1
+- name: PartnerApi__PersonaClientIds
+  value: {{ include "partner-portal.personaClientIds" . | quote }}
+- name: PartnerApi__LocalTokens__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: PartnerApi__LocalTokens__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "PartnerApiAudience") | quote }}
+{{ include "norvia.signingKeyEnv" "PartnerApi__LocalTokens__SigningKey" }}
+{{ include "partner-portal.personaRoles" (dict "root" . "app" "simulator-web") }}
+{{- /* Its own token for each API, with the key of the install: the Simulator's client ID for the three, the Driver ID as the one app role for a Driver. */}}
+{{- range $section, $audience := dict "TmsApi" "TmsAudience" "DriverApp" "DriverAppAudience" "ErpApi" "ErpAudience" }}
+- name: {{ $section }}__LocalTokens__Issuer
+  value: {{ include "norvia.token" (dict "root" $ "name" "Issuer") | quote }}
+- name: {{ $section }}__LocalTokens__Audience
+  value: {{ include "norvia.token" (dict "root" $ "name" $audience) | quote }}
+- name: {{ $section }}__LocalTokens__ClientId
+  value: {{ include "norvia.token" (dict "root" $ "name" "SimulatorClientId") | quote }}
+{{ include "norvia.signingKeyEnv" (printf "%s__LocalTokens__SigningKey" $section) }}
+{{- end }}
+{{- /* Only the keys it uses, by secretKeyRef, as the AppHost gives it only those: a subscription key per Persona, the endpoint key of each Shipper's and Carrier's inbox, and the reset key. */}}
+{{- range .Values.personas }}
+- name: PartnerApi__SubscriptionKeys__{{ .id }}
+  valueFrom:
+    secretKeyRef:
+      name: subscription-keys
+      key: PartnerApi__SubscriptionKeys__{{ .id }}
+- name: PartnerPortal__{{ .type }}EndpointKeys__{{ .party }}
+  valueFrom:
+    secretKeyRef:
+      name: endpoint-keys
+      key: {{ include "norvia.endpointKeyName" . }}
+{{- end }}
+- name: PartnerPortal__ResetApiKey
+  valueFrom:
+    secretKeyRef:
+      name: endpoint-keys
+      key: ResetEndpoint__ApiKey
+{{- if .Values.agents.enabled }}
+{{- /* The personas agent writes the plan's pools of Carrier texts, in process with the scripted fake. It has no tool and needs no token. */}}
+- name: Agents__Enabled
+  value: "true"
+{{- end }}
+{{- end }}

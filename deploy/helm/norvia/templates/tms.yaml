@@ -63,9 +63,8 @@
 - name: TmsApi__LocalTokens__ClientId
   value: {{ include "norvia.token" (dict "root" . "name" "TmsUiClientId") | quote }}
 {{ include "norvia.signingKeyEnv" "TmsApi__LocalTokens__SigningKey" }}
-{{- /* The Planner's tracking link for a Consignee opens on the Partner portal (ADR 0052). The chart has no ingress for the portal yet, so it is the */}}
-{{- /* in-cluster address until it has (as for the Consignee notification worker). */}}
+{{- /* The Planner's tracking link for a Consignee opens on the Partner portal (ADR 0052), in a browser: its hostname, not the Service. */}}
 - name: PartnerPortal__BaseAddress
-  value: {{ include "norvia.url" (dict "root" . "name" "partner-portal-web") | quote }}
+  value: {{ include "norvia.publicUrl" (dict "root" . "app" "partner-portal-web") | quote }}
 {{ include "norvia.localAuthEnv" . }}
 {{- end }}
