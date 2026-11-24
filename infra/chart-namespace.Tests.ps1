@@ -96,7 +96,7 @@ Describe 'what the default-deny policy lets through' -Skip:$script:helmMissing {
     It 'lets the ingress controller reach the exposed applications on the app port, and only them' {
         $policy = Get-Doc $docs 'NetworkPolicy' 'allow-ingress-controller'
         $policy.Text | Should -Match '(?s)kubernetes\.io/metadata\.name: kube-system'
-        $policy.Text | Should -Match '(?s)app\.kubernetes\.io/name\s+operator: In\s+values:\s+- partner-api\s+- tms-api\s+- tms-web\s+- erp-api\s+- erp-web\s+- driver-app-api\s+- driver-app-web'
+        $policy.Text | Should -Match '(?s)app\.kubernetes\.io/name\s+operator: In\s+values:\s+- partner-api\s+- tms-api\s+- tms-web\s+- erp-api\s+- erp-web\s+- driver-app-api\s+- driver-app-web\s+- integration-console-web\s+- health-check-web'
         $policy.Text | Should -Not -Match 'agent-mcp'
         $policy.Text | Should -Match '(?s)port: 8080'
         (Get-Doc (Get-Rendered @('agents.enabled=true')) 'NetworkPolicy' 'allow-ingress-controller').Text | Should -Match '- agent-mcp'

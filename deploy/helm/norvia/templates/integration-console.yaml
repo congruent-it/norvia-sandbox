@@ -1,0 +1,55 @@
+{{- /*
+  The Integration console and the Estate health check (#1020): each a Deployment of one replica and a Service, behind the internal-only ingress
+  (templates/ingress.yaml). Their settings are those the AppHost gives them locally, under the same names (a template test compares them); what Azure
+  sets (Entra, the managed identity, Foundry, Application Insights) is not given. Neither has a database, so neither waits for a migrations Job.
+  Both sign the local operator in, behind LocalAuth:Allowed (ADR 0026, ADR 0053). Not in this slice: the Agents' settings (Agents__*), which come with agents.enabled.
+*/ -}}
+{{- $consoleEnv := include "integration-console-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "integration-console-web" "env" $consoleEnv) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "integration-console-web") }}
+---
+{{- $healthEnv := include "health-check-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "health-check-web" "env" $healthEnv) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "health-check-web") }}
+{{- define "integration-console-web.env" -}}
+{{ include "norvia.localAuthEnv" . }}
+- name: LocalOperator__Name
+  value: {{ .Values.localOperator.name | quote }}
+- name: LocalOperator__Roles__0
+  value: IntegrationConsole.Read
+- name: LocalOperator__Roles__1
+  value: IntegrationConsole.Resubmit
+{{- /* No estate on a cluster: the console searches the dashboard (below) and the retention is only the placeholder it starts with. */}}
+- name: Estate__LogAnalyticsWorkspaceId
+  value: ""
+- name: Estate__ResourceGroupId
+  value: ""
+- name: Estate__IntegrationRetentionDays
+  value: "90"
+{{- /* The Dead-letter queues page lists both emulators' entities. The AppHost calls the second one messaging-edge; the chart's is messaging-2. */}}
+{{- range $namespace, $host := dict "messaging" "messaging" "messaging-edge" "messaging-2" }}
+- name: LocalServiceBus__Namespaces__{{ $namespace }}__ConnectionString
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" $ "name" $host) | quote }}
+- name: LocalServiceBus__Namespaces__{{ $namespace }}__ManagementConnectionString
+  value: {{ include "norvia.serviceBusManagementConnectionString" (dict "name" $host) | quote }}
+{{- end }}
+{{ include "norvia.localTelemetryEnv" . }}
+{{- end }}
+{{- define "health-check-web.env" -}}
+{{ include "norvia.localAuthEnv" . }}
+- name: LocalOperator__Name
+  value: {{ .Values.localOperator.name | quote }}
+- name: LocalOperator__Roles__0
+  value: HealthCheck.Run
+- name: LocalOperator__Roles__1
+  value: HealthCheck.Read
+- name: LocalOperator__Roles__2
+  value: HealthCheck.Cost
+- name: IntegrationConsole__Address
+  value: {{ include "norvia.url" (dict "root" . "name" "integration-console-web") | quote }}
+{{- /* There is no running estate to read: the snapshot is the estate as found, as under Aspire. */}}
+- name: Estate__Snapshot
+  value: as-found
+{{- end }}
