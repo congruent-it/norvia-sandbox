@@ -96,7 +96,7 @@ Describe 'what the default-deny policy lets through' -Skip:$script:helmMissing {
     It 'lets the ingress controller reach the exposed applications on the app port, and only them' {
         $policy = Get-Doc $docs 'NetworkPolicy' 'allow-ingress-controller'
         $policy.Text | Should -Match '(?s)kubernetes\.io/metadata\.name: kube-system'
-        $policy.Text | Should -Match '(?s)app\.kubernetes\.io/name\s+operator: In\s+values:\s+- partner-api\s+- tms-api\s+- tms-web\s+- erp-api\s+- erp-web'
+        $policy.Text | Should -Match '(?s)app\.kubernetes\.io/name\s+operator: In\s+values:\s+- partner-api\s+- tms-api\s+- tms-web\s+- erp-api\s+- erp-web\s+- driver-app-api\s+- driver-app-web'
         $policy.Text | Should -Not -Match 'agent-mcp'
         $policy.Text | Should -Match '(?s)port: 8080'
         (Get-Doc (Get-Rendered @('agents.enabled=true')) 'NetworkPolicy' 'allow-ingress-controller').Text | Should -Match '- agent-mcp'
@@ -191,7 +191,7 @@ Describe 'who can read the Secrets' -Skip:$script:helmMissing {
         $pods = $docs | Where-Object { $_.Kind -in 'Deployment', 'StatefulSet', 'Job' }
         $pods | Should -Not -BeNullOrEmpty
         # Only the applications that wait for a migrations Job keep their token; a pod that gains the label by mistake fails here.
-        ($pods | Where-Object { $_.Text -match 'norvia\.io/waits-for-migrations: "true"' } | ForEach-Object Name | Sort-Object) | Should -Be @('erp-api', 'erp-web', 'tms-api', 'tms-web')
+        ($pods | Where-Object { $_.Text -match 'norvia\.io/waits-for-migrations: "true"' } | ForEach-Object Name | Sort-Object) | Should -Be @('driver-app-api', 'driver-app-web', 'erp-api', 'erp-web', 'tms-api', 'tms-web')
         foreach ($pod in $pods) {
             if ($pod.Text -match 'norvia\.io/waits-for-migrations: "true"') {
                 $pod.Text | Should -Match '(?m)^\s+serviceAccountName: migrations-waiter$' -Because "$($pod.Kind) $($pod.Name) waits for the migrations, so its init container needs the API"
