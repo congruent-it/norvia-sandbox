@@ -161,7 +161,7 @@ namespace:
 
 # What Norvia may use of a cluster others share (#938): a ResourceQuota for the namespace, and a LimitRange that gives the containers that name
 # no requests or limit (the init containers) small ones, which a quota on requests needs. Sized for what the chart deploys, the migrations Jobs
-# running at once, and about ten more applications (the other UIs, which are not in the chart yet); a template test fails
+# running at once, and about ten more applications (the other UIs, which are not in the chart yet; the console and the Health check are); a template test fails
 # when the chart outgrows it. There are no CPU limits (a CPU limit throttles, and the chart sets none), so none in the quota. Off, a cluster
 # that sets its own quotas and limits is not given a second set.
 quota:
@@ -211,6 +211,11 @@ agents:
 localAuth:
   allowed: true
 
+# The signed-in local operator of the Integration console and the Estate health check (LocalOperator, ADR 0026), which the AppHost names after the
+# developer's user. There is no such user on a cluster.
+localOperator:
+  name: operator (local)
+
 # The applications and stand-ins the chart deploys, by name: the image, the hostname under edge.baseDomain, and the requests and limits. One
 # replica each; the stand-ins that play API Management and the Logic Apps' front door (ADR 0023, ADR 0041) keep their rate limits in memory.
 apps:
@@ -247,6 +252,18 @@ apps:
   driver-app-web:
     image: driver-app-web
     host: driver-app-web
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
+  integration-console-web:
+    image: integration-console-web
+    host: integration-console-web
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { memory: 768Mi }
+  health-check-web:
+    image: health-check-web
+    host: health-check-web
     resources:
       requests: { cpu: 100m, memory: 256Mi }
       limits: { memory: 768Mi }
