@@ -1,6 +1,6 @@
 # The Norvia chart
 
-Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1'`.
+Runs the sandbox's local topology on Kubernetes ([ADR 0053](../../../docs/adr/0053-kubernetes-runs-the-local-topology.md)). Applied with `helm upgrade --install`. Template tests: `pwsh -c 'Invoke-Pester infra/chart-data-tier.Tests.ps1, infra/chart-service-bus.Tests.ps1, infra/chart-edge.Tests.ps1, infra/chart-workers.Tests.ps1, infra/chart-telemetry.Tests.ps1, infra/chart-namespace.Tests.ps1, infra/chart-tms.Tests.ps1'`.
 
 ## The data tier (#926)
 
@@ -54,7 +54,18 @@ helm upgrade --install norvia deploy/helm/norvia -n norvia \
   --set image.registry=registry.example.org/norvia
 ```
 
-`localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. The other UIs and APIs (the TMS, the ERP, the console and the rest) are not in the chart yet: each joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (below) covers.
+`localTokens`, `personas` and `agentMcpServers` in `values.yaml` repeat what `LocalTokens.cs`, the seed file and `AppHost.cs` hold; the template tests compare them. The other UIs and APIs (the ERP, the console and the rest) are not in the chart yet: each joins the `exposed` list of `templates/ingress.yaml` when it is deployed, and the Services the MCP stand-in and the Partner API name (`tms-api`, `erp-api`, `integration-console-web`, `health-check-web`, `carrier-invoice-worker`) are those the AppHost's resources are called. Not verified on a cluster: Traefik and cert-manager, which the smoke script (below) covers.
+
+## The TMS (#1017)
+
+| Piece | What it is |
+|---|---|
+| `tms-api`, `tms-web` | The TMS API and UI, each a Deployment of one replica (`templates/tms.yaml`), a Service on `appPort` (8080) probed on `/health` and `/alive`, and an Ingress at `<name>.<edge.baseDomain>`, internal-only like the others. Both run as `migrations-waiter` with an init container that waits for the `tms` migrations Job (`"waitFor" (list "tms")` of `norvia.deployment`), as the AppHost's `WaitForCompletion` does. Their settings are the AppHost's, under the same names (a template test compares them); the connection strings are the chart's (`norvia.databaseEnv`: the `sa` login from the `sql` Secret, as the migrations Jobs use). |
+| `tms-api` | Trusts the local key (`Authentication__Schemes__Bearer__SigningKeys__0__Value` from `local-tokens/signing-key`) behind `LocalAuth__Allowed`, reads the seed file its image carries, and has the Reset estate on, as the AppHost's local mode does. |
+| `tms-web` | Signs in as the local operator: its own token for the API (`TmsApi__LocalTokens__*`, signed with the same key), behind `LocalAuth__Allowed`. It reads the `tms` database directly (the query side) and Azurite, and changes things only through `tms-api`. |
+| `localAuth.allowed` | `LocalAuth__Allowed` for every application that needs it (`true` by default; see `docs/operations/kubernetes.md`). |
+
+The smoke script (`infra/smoke-test-kubernetes.ps1`) is unchanged here: it reaches the TMS API through the ingress, and its own slice is #1022. Not given, because Azure sets them: Entra (`TmsApi__Entra__*`, `Authentication__Schemes__Bearer__Authority`), the as-found toggles and Application Insights. Not in this slice: the Agents' settings of the two applications (`Agents__*`), which come with `agents.enabled`; `tms-web`'s Partner portal link is the in-cluster address (`PartnerPortal__BaseAddress`) until the portal has an Ingress.
 
 ## The Logic App workers (#929)
 

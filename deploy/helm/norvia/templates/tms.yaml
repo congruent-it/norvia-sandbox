@@ -1,0 +1,71 @@
+{{- /*
+  The TMS (#1017): the API and the UI, each a Deployment of one replica and a Service, behind the internal-only ingress (templates/ingress.yaml). Their
+  settings are those the AppHost gives them locally, under the same names (a template test compares them); what Azure sets (Entra, the managed identity,
+  Foundry, the as-found toggles) is not given. Both wait for the tms migrations Job, as the AppHost's WaitForCompletion does.
+  The API trusts the local key and the UI signs in the local operator (its own token for the API), both behind LocalAuth:Allowed (ADR 0053).
+*/ -}}
+{{- $apiEnv := include "tms-api.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "tms-api" "env" $apiEnv "waitFor" (list "tms")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "tms-api") }}
+---
+{{- $webEnv := include "tms-web.env" . }}
+{{ include "norvia.deployment" (dict "root" . "name" "tms-web" "env" $webEnv "waitFor" (list "tms")) }}
+---
+{{ include "norvia.service" (dict "root" . "name" "tms-web") }}
+{{- define "tms-api.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "tms") }}
+- name: ConnectionStrings__messaging
+  value: {{ include "norvia.serviceBusConnectionString" (dict "root" . "name" "messaging") | quote }}
+- name: ConnectionStrings__blobs
+  value: {{ include "norvia.azuriteConnectionString" . | quote }}
+{{- /* The seed file each image carries, next to the application (the image's working directory). */}}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+{{- /* The TMS books the demo's days on its first start, as it does under the AppHost. */}}
+- name: Seed__DemoData
+  value: "True"
+{{- /* The subscriptions whose consumers write records back, which the Simulator's Reset estate waits on (ADR 0039). */}}
+- name: Reset__QuietSubscriptions__0
+  value: shipment-events/carrier-booking
+- name: Reset__QuietSubscriptions__1
+  value: shipment-events/shipper-notification
+- name: Reset__QuietSubscriptions__2
+  value: shipment-events/carrier-cancellation
+- name: Reset__QuietSubscriptions__3
+  value: trip-events/trip-dispatch
+- name: Reset__Enabled
+  value: "true"
+- name: Authentication__Schemes__Bearer__ValidIssuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: Authentication__Schemes__Bearer__ValidAudiences__0
+  value: {{ include "norvia.token" (dict "root" . "name" "TmsAudience") | quote }}
+- name: Authentication__Schemes__Bearer__SigningKeys__0__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+{{ include "norvia.signingKeyEnv" "Authentication__Schemes__Bearer__SigningKeys__0__Value" }}
+- name: IntakeCallers__ClientIdsByChannel__ShipperApi__0
+  value: {{ include "norvia.token" (dict "root" . "name" "IntakeLogicAppClientId") | quote }}
+{{ include "norvia.localAuthEnv" . }}
+{{- end }}
+{{- define "tms-web.env" -}}
+{{ include "norvia.databaseEnv" (dict "database" "tms") }}
+- name: ConnectionStrings__blobs
+  value: {{ include "norvia.azuriteConnectionString" . | quote }}
+- name: Seed__Path
+  value: seed/norvia.seed.json
+- name: TmsApi__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "tms-api") | quote }}
+{{- /* Locally the UI signs its token for the TMS API itself, as Entra would issue it to its managed identity. */}}
+- name: TmsApi__LocalTokens__Issuer
+  value: {{ include "norvia.token" (dict "root" . "name" "Issuer") | quote }}
+- name: TmsApi__LocalTokens__Audience
+  value: {{ include "norvia.token" (dict "root" . "name" "TmsAudience") | quote }}
+- name: TmsApi__LocalTokens__ClientId
+  value: {{ include "norvia.token" (dict "root" . "name" "TmsUiClientId") | quote }}
+{{ include "norvia.signingKeyEnv" "TmsApi__LocalTokens__SigningKey" }}
+{{- /* The Planner's tracking link for a Consignee opens on the Partner portal (ADR 0052). The chart has no ingress for the portal yet, so it is the */}}
+{{- /* in-cluster address until it has (as for the Consignee notification worker). */}}
+- name: PartnerPortal__BaseAddress
+  value: {{ include "norvia.url" (dict "root" . "name" "partner-portal-web") | quote }}
+{{ include "norvia.localAuthEnv" . }}
+{{- end }}
