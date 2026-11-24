@@ -263,7 +263,7 @@ http://aspire-dashboard:{{ .Values.telemetry.dashboard.ports.otlpGrpc }}
 
 {{/* The applications that get an Ingress, as a JSON array: {{ range include "norvia.exposedApplications" . | fromJsonArray }}. An application the chart deploys later is added here, and so is let through by the network policy. */}}
 {{- define "norvia.exposedApplications" -}}
-{{- $exposed := list "partner-api" "tms-api" "tms-web" -}}
+{{- $exposed := list "partner-api" "tms-api" "tms-web" "erp-api" "erp-web" -}}
 {{- if .Values.agents.enabled }}{{ $exposed = append $exposed "agent-mcp" }}{{ end -}}
 {{ toJson $exposed }}
 {{- end }}
