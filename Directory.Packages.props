@@ -38,8 +38,8 @@
     <PackageVersion Include="Ardalis.GuardClauses" Version="5.0.0" />
     <PackageVersion Include="Ardalis.Result" Version="10.1.0" />
     <PackageVersion Include="Ardalis.SharedKernel" Version="5.0.0" />
-    <PackageVersion Include="Ardalis.Specification" Version="9.3.1" />
-    <PackageVersion Include="Ardalis.Specification.EntityFrameworkCore" Version="9.3.1" />
+    <PackageVersion Include="Ardalis.Specification" Version="10.0.0" />
+    <PackageVersion Include="Ardalis.Specification.EntityFrameworkCore" Version="10.0.0" />
     <PackageVersion Include="Asp.Versioning.Http" Version="10.2.3" />
     <PackageVersion Include="Asp.Versioning.OpenApi" Version="10.2.3" />
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
