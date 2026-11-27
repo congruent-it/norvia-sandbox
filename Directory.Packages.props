@@ -68,7 +68,7 @@
   <ItemGroup Label="Logic Apps local functions">
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Abstractions" Version="1.3.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.15.1" />
-    <PackageVersion Include="Microsoft.Azure.Workflows.WebJobs.Sdk" Version="1.2.0" />
+    <PackageVersion Include="Microsoft.Azure.Workflows.WebJobs.Sdk" Version="1.4.1" />
   </ItemGroup>
   <ItemGroup Label="Intake agent">
     <!-- Reads the text of an uploaded PDF in .NET before the model sees it (no OCR). -->
